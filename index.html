@@ -1065,9 +1065,23 @@
         <div class="sr-feature">Estate and legacy exposure review</div>
         <div class="sr-feature">Custom advisor brief — delivered same day</div>
       </div>
-      <a href="https://structurereview.integratedplanningpartners.com" class="btn-primary" style="width: 100%; text-align: center;">
-        Begin Your StructureReview™
-      </a>
+      <form id="sr-form" style="margin-top: 8px;">
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <input type="text" id="sr-name" name="name" placeholder="Full Name" required
+            style="background: var(--navy2); border: 1px solid var(--border); color: var(--off-white); padding: 14px 18px; font-family: 'Barlow', sans-serif; font-size: 15px; border-radius: 2px; outline: none; width: 100%;">
+          <input type="email" id="sr-email" name="email" placeholder="Email Address" required
+            style="background: var(--navy2); border: 1px solid var(--border); color: var(--off-white); padding: 14px 18px; font-family: 'Barlow', sans-serif; font-size: 15px; border-radius: 2px; outline: none; width: 100%;">
+          <input type="tel" id="sr-phone" name="phone" placeholder="Phone Number"
+            style="background: var(--navy2); border: 1px solid var(--border); color: var(--off-white); padding: 14px 18px; font-family: 'Barlow', sans-serif; font-size: 15px; border-radius: 2px; outline: none; width: 100%;">
+          <textarea id="sr-message" name="message" placeholder="Anything you'd like us to know before your review? (optional)" rows="3"
+            style="background: var(--navy2); border: 1px solid var(--border); color: var(--off-white); padding: 14px 18px; font-family: 'Barlow', sans-serif; font-size: 15px; border-radius: 2px; outline: none; width: 100%; resize: vertical;"></textarea>
+          <button type="submit" id="sr-submit"
+            style="background: var(--gold); color: var(--navy); font-family: 'Barlow Condensed', sans-serif; font-size: 14px; font-weight: 600; letter-spacing: 0.08em; padding: 18px 40px; border: none; border-radius: 2px; cursor: pointer; width: 100%; transition: background 0.2s;">
+            Begin Your StructureReview™
+          </button>
+          <div id="sr-status" style="display:none; text-align: center; font-size: 14px; padding: 12px; border-radius: 2px;"></div>
+        </div>
+      </form>
     </div>
   </div>
 </section>
@@ -1088,7 +1102,7 @@
         For clients who want to understand the thinking behind IncomeArc™ and StructureReview™ — and for advisors who want to deliver planning conversations at a different level entirely.
       </p>
       <div class="book-cta">
-        <a href="/cdn-cgi/l/email-protection#92c1e6e0e7f1e6e7e0f7c0f7e4fbf7e5d2dbfce6f7f5e0f3e6f7f6c2fef3fcfcfbfcf5c2f3e0e6fcf7e0e1bcf1fdffade1e7f0f8f7f1e6afd3e0f1fafbe6f7f1e6e7e0f7b2fdf4b2c0f7e6fbe0f7fff7fce6b2701206b2dcfde6fbf4ebb2dff7" class="btn-secondary">Notify Me at Publication</a>
+        <a href="mailto:support@integratedplanningpartners.com?subject=Architecture of Retirement — Notify Me" class="btn-secondary">Notify Me at Publication</a>
       </div>
     </div>
   </div>
@@ -1180,6 +1194,64 @@
   window.addEventListener('hashchange', () => {
     const target = document.querySelector(window.location.hash);
     if (target) target.querySelectorAll('.reveal').forEach(el => el.classList.add('visible'));
+  });
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script>
+  emailjs.init("XyWTKKWFoeYOhfFbV");
+
+  document.getElementById("sr-form").addEventListener("submit", function(e) {
+    e.preventDefault();
+    const btn = document.getElementById("sr-submit");
+    const status = document.getElementById("sr-status");
+    btn.textContent = "Sending...";
+    btn.disabled = true;
+
+    const params = {
+      name:    document.getElementById("sr-name").value,
+      email:   document.getElementById("sr-email").value,
+      phone:   document.getElementById("sr-phone").value,
+      message: document.getElementById("sr-message").value,
+      time:    new Date().toLocaleString()
+    };
+
+    emailjs.send("IPP Support", "template_qxximsu", params)
+      .then(() => {
+        status.style.display = "block";
+        status.style.background = "rgba(200,169,110,0.15)";
+        status.style.color = "#C8A96E";
+        status.style.border = "1px solid #C8A96E";
+        status.textContent = "Thank you — we'll be in touch shortly with your StructureReview™.";
+        document.getElementById("sr-form").reset();
+        btn.textContent = "Begin Your StructureReview™";
+        btn.disabled = false;
+      })
+      .catch((err) => {
+        status.style.display = "block";
+        status.style.background = "rgba(255,80,80,0.1)";
+        status.style.color = "#ff6b6b";
+        status.style.border = "1px solid #ff6b6b";
+        status.textContent = "Something went wrong. Please email us directly at support@integratedplanningpartners.com";
+        btn.textContent = "Begin Your StructureReview™";
+        btn.disabled = false;
+      });
+  });
+
+  // Reveal animations
+  document.querySelectorAll(".reveal").forEach(el => el.classList.add("visible"));
+  if (!window.location.hash) {
+    document.querySelectorAll(".reveal").forEach(el => el.classList.remove("visible"));
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) entry.target.classList.add("visible");
+      });
+    }, { threshold: 0.05, rootMargin: "0px 0px -40px 0px" });
+    document.querySelectorAll(".reveal").forEach(el => observer.observe(el));
+  }
+  window.addEventListener("hashchange", () => {
+    const target = document.querySelector(window.location.hash);
+    if (target) target.querySelectorAll(".reveal").forEach(el => el.classList.add("visible"));
   });
 </script>
 </body>
