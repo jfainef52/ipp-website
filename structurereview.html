@@ -995,7 +995,82 @@ function CompletionScreen({onReport,onAdvisor,answers,report}) {
       const trackList = report.tracks.join(", ").toUpperCase();
       const age = calcAge(answers.dob);
 
-      // Send client copy
+      // Build full HTML summary for client email
+      const trackLabels = {
+        qp:"Qualified Plan Strategy", le:"Liquidity Event Planning",
+        business:"Business Owner Planning", estate:"Estate Planning", income:"Income & Protection Planning",
+      };
+      const trackColors = {qp:"#C47A7A",le:"#7BAF84",business:"#C8A030",estate:"#9B7EC8",income:"#6E9BC8"};
+      const trackDescs = {
+        qp:"Your retirement accounts carry a deferred tax obligation that grows as the account grows. There are strategies available to reposition this into tax-free income, care protection, and a more efficient legacy \u2014 before RMDs dictate the timing.",
+        le:"A capital gains event is an opportunity \u2014 but only if the right structure is in place before or shortly after closing. The difference between paying tax out of pocket and keeping the full gross amount working for you is permanent and compounding.",
+        business:"Business owners have planning tools available that W-2 employees don't. Tax deduction strategies, retirement plan design, key person protection, and exit structuring can each significantly improve the financial outcome.",
+        estate:"At your asset level, how wealth transfers to the next generation matters. Estate tax exposure, beneficiary structure, and the tax character of inherited assets can all be meaningfully improved with the right approach.",
+        income:"Retirement income, care cost exposure, and life insurance protection are the foundation of a resilient financial plan. These areas often get underbuilt \u2014 and the gaps only become visible when it\u2019s too late to address them.",
+      };
+
+      let tracksHtml = "";
+      report.tracks.forEach(t => {
+        const col = trackColors[t] || "#C8A96E";
+        tracksHtml += '<div style="padding:13px 15px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-left:3px solid ' + col + ';border-radius:0 8px 8px 0;margin-bottom:10px;">';
+        tracksHtml += '<div style="font-size:10px;font-weight:700;color:' + col + ';letter-spacing:.06em;text-transform:uppercase;margin-bottom:5px;">' + (trackLabels[t] || t) + '</div>';
+        tracksHtml += '<p style="font-size:13px;line-height:1.6;color:#C8BFA8;font-weight:300;margin:0;">' + (trackDescs[t] || "") + '</p>';
+        tracksHtml += '</div>';
+      });
+
+      const highFlags = report.flags.filter(f => f.priority === "high");
+      let flagsHtml = "";
+      if (highFlags.length > 0) {
+        flagsHtml += '<div style="margin-bottom:24px;">';
+        flagsHtml += '<h2 style="font-family:Georgia,serif;font-size:19px;font-weight:600;color:#F5F2EC;margin-bottom:12px;">Time-Sensitive Items</h2>';
+        highFlags.forEach(f => {
+          flagsHtml += '<div style="padding:12px 14px;background:rgba(196,106,106,.06);border:1px solid rgba(196,106,106,.18);border-radius:8px;margin-bottom:8px;">';
+          flagsHtml += '<div style="font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#C47A7A;margin-bottom:5px;">Needs Attention</div>';
+          flagsHtml += '<p style="font-size:13px;line-height:1.58;color:#C8BFA8;font-weight:300;margin:0;">' + f.text + '</p>';
+          flagsHtml += '</div>';
+        });
+        flagsHtml += '</div>';
+      }
+
+      let visionHtml = "";
+      if (answers.retirement_vision) {
+        visionHtml += '<div style="margin-bottom:24px;">';
+        visionHtml += '<h2 style="font-family:Georgia,serif;font-size:19px;font-weight:600;color:#F5F2EC;margin-bottom:10px;">Your Vision</h2>';
+        visionHtml += '<div style="padding:14px 16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-left:3px solid #C8A96E;border-radius:0 8px 8px 0;">';
+        visionHtml += '<p style="font-size:14px;line-height:1.65;color:#F5F2EC;font-style:italic;font-family:Georgia,serif;font-weight:300;margin:0;">\u201c' + answers.retirement_vision + '\u201d</p>';
+        visionHtml += '</div></div>';
+      }
+
+      let clientHtml = '<!DOCTYPE html><html><head><meta charset="utf-8"></head>';
+      clientHtml += '<body style="margin:0;padding:0;background:#0E1824;font-family:Helvetica Neue,Arial,sans-serif;">';
+      clientHtml += '<div style="max-width:520px;margin:0 auto;padding-bottom:48px;">';
+      clientHtml += '<div style="background:#162032;border-bottom:1px solid rgba(200,169,110,.2);padding:20px 22px;">';
+      clientHtml += '<div style="font-size:9px;letter-spacing:.18em;color:#C8A96E;margin-bottom:7px;"><span style="text-transform:uppercase;">Client Summary \u2014 </span><span>StructureReview\u2122</span></div>';
+      clientHtml += '<h1 style="font-family:Georgia,serif;font-size:26px;font-weight:400;color:#F5F2EC;margin:0 0 3px;">' + (report.name ? report.name + "\u2019s Planning Overview" : "Your Planning Overview") + '</h1>';
+      clientHtml += '<p style="font-size:11px;color:#6E8299;margin:0;">Prepared by Integrated Planning Partners</p>';
+      clientHtml += '</div>';
+      clientHtml += '<div style="padding:22px 22px 0;">';
+      if (report.tracks.length > 0) {
+        clientHtml += '<div style="margin-bottom:26px;">';
+        clientHtml += '<h2 style="font-family:Georgia,serif;font-size:19px;font-weight:600;color:#F5F2EC;margin-bottom:14px;">Planning Areas Identified</h2>';
+        clientHtml += tracksHtml;
+        clientHtml += '</div>';
+      }
+      clientHtml += visionHtml;
+      clientHtml += flagsHtml;
+      clientHtml += '<div style="margin-bottom:24px;">';
+      clientHtml += '<h2 style="font-family:Georgia,serif;font-size:19px;font-weight:600;color:#F5F2EC;margin-bottom:12px;">What Comes Next</h2>';
+      clientHtml += '<div style="padding:14px 16px;background:rgba(200,169,110,.06);border:1px solid rgba(200,169,110,.18);border-radius:8px;">';
+      clientHtml += '<p style="font-size:13px;line-height:1.65;color:#C8BFA8;font-weight:300;margin:0;">Your responses have been organized into a planning brief for your advisor. The next step is a StructureReview\u2122 conversation \u2014 typically 30\u201345 minutes \u2014 where we walk through the areas identified, show you what the numbers look like for your situation, and answer any questions you have. There is no obligation.</p>';
+      clientHtml += '</div></div>';
+      clientHtml += '<div style="padding:16px 18px;background:#162032;border:1px solid rgba(200,169,110,.15);border-radius:10px;margin-bottom:20px;">';
+      clientHtml += '<div style="font-family:Georgia,serif;font-size:17px;font-weight:600;color:#F5F2EC;margin-bottom:3px;">Jeffrey Faine, CLU, RICP</div>';
+      clientHtml += '<div style="font-size:10px;color:#C8A96E;letter-spacing:.04em;margin-bottom:8px;">Founder &amp; Chief Strategist \u2014 Integrated Planning Partners</div>';
+      clientHtml += '<div style="font-size:11px;color:#6E8299;line-height:1.85;"><div>integratedplanningpartners.com</div><div>StructureReview@IntegratedPlanningPartners.com</div></div>';
+      clientHtml += '</div>';
+      clientHtml += '</div></div></body></html>';
+
+            // Send client copy with full HTML summary
       await fetch("https://api.emailjs.com/api/v1.0/email/send", {
         method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({
@@ -1005,15 +1080,105 @@ function CompletionScreen({onReport,onAdvisor,answers,report}) {
           template_params: {
             to_email: answers.email,
             to_name: report.firstName || answers.first_name || "there",
-            client_name: report.name,
-            tracks: trackList||"General Planning",
-            vision: answers.retirement_vision||"(not provided)",
-            retire_age: answers.retire_age||"(not provided)",
+            html_content: clientHtml,
           }
         })
       });
 
-      // Send advisor copy to Jeffrey
+      // Build full HTML advisor brief using safe string concatenation
+      const pColorMap={high:"#C47A7A",medium:"#C8A030"};
+      const pLabelMap={high:"High Priority",medium:"Medium Priority"};
+      const retireAge2=parseInt(answers.retire_age)||null;
+      const yearsToRetire2=(age!==null&&retireAge2!==null&&retireAge2>age)?retireAge2-age:null;
+      const retireYear2=(new Date().getFullYear()+(yearsToRetire2||0));
+      const urgencyMap2={pu_urgent:"Urgent",pu_active:"Active",pu_curious:"Curious",pu_early:"Early stages"};
+      const contactMap={cp_email:"Email",cp_call:"Phone call",cp_text:"Text",cp_any:"Any"};
+      const qMap2={}; QUESTIONS.forEach(q=>{qMap2[q.id]=q;});
+      const fmt2=(q,v)=>{
+        if(!v)return"(not provided)";
+        if(q.type==="text")return v;
+        if(q.type==="number")return"Age "+v+(yearsToRetire2!==null?" — "+yearsToRetire2+" yrs away ("+retireYear2+")":"");
+        if(q.type==="date")return formatDOB(v)+(calcAge(v)!==null?" (age "+calcAge(v)+")":"");
+        if(q.type==="multi"&&Array.isArray(v))return v.map(id=>q.options&&q.options.find(o=>o.id===id)&&q.options.find(o=>o.id===id).label).filter(Boolean).join(", ");
+        if(q.type==="select")return(q.options&&q.options.find(o=>o.id===v)&&q.options.find(o=>o.id===v).label)||v;
+        return(q.options&&q.options.find(o=>o.id===v)&&q.options.find(o=>o.id===v).label)||v;
+      };
+      const advPhases=[
+        {id:"universal",label:"Client Profile"},
+        {id:"qp",label:"Qualified Plan"},
+        {id:"le",label:"Liquidity Event"},
+        {id:"business",label:"Business Planning"},
+        {id:"estate",label:"Estate Planning"},
+        {id:"income",label:"Income & Protection"},
+        {id:"motivations",label:"Goals & Concerns"},
+        {id:"wrap",label:"Wrap-Up"},
+      ];
+
+      let flagsAdvHtml="";
+      report.flags.forEach(f=>{
+        flagsAdvHtml+='<div style="display:flex;gap:14px;margin-bottom:9px;padding:11px 13px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-left:3px solid '+(pColorMap[f.priority]||"#6E8299")+';border-radius:0 6px 6px 0;">';
+        flagsAdvHtml+='<div style="min-width:82px;"><div style="font-size:8px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:'+(pColorMap[f.priority]||"#6E8299")+';">'+(pLabelMap[f.priority]||"Note")+'</div>';
+        flagsAdvHtml+='<div style="font-size:9px;color:#6E8299;margin-top:2px;">'+f.track+'</div></div>';
+        flagsAdvHtml+='<p style="font-size:12px;line-height:1.6;color:#C8BFA8;font-weight:300;margin:0;">'+f.text+'</p></div>';
+      });
+
+      let responsesHtml="";
+      advPhases.forEach(phase=>{
+        const qs=Object.entries(answers).filter(([k])=>qMap2[k]&&qMap2[k].phase===phase.id);
+        if(qs.length===0)return;
+        responsesHtml+='<div style="margin-bottom:16px;">';
+        responsesHtml+='<div style="font-size:9px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#C8A96E;margin-bottom:7px;">'+phase.label+'</div>';
+        qs.forEach(([k,v])=>{
+          responsesHtml+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);">';
+          responsesHtml+='<span style="font-size:11px;color:#6E8299;line-height:1.45;">'+(qMap2[k].shortQ||qMap2[k].q)+'</span>';
+          responsesHtml+='<span style="font-size:11px;color:#F5F2EC;font-weight:500;line-height:1.45;">'+fmt2(qMap2[k],v)+'</span>';
+          responsesHtml+='</div>';
+        });
+        responsesHtml+='</div>';
+      });
+
+      const nextStepsAdv=[
+        "Schedule StructureReview\u2122 conversation \u2014 30\u201345 min, client and advisor present",
+        report.tracks.includes("qp")&&"Request QP ETA illustration \u2014 RMD projection, MAGI model, Roth FIA sizing",
+        report.tracks.includes("le")&&answers.le_timing!=="le_closed"&&"Initiate LE ETA bank facility \u2014 must be structured before closing",
+        report.tracks.includes("business")&&["brp_none","brp_sep_simple"].includes(answers.biz_retirement_plan)&&"Model defined benefit / cash balance plan \u2014 potential $100K\u2013$300K+ annual deduction",
+        report.tracks.includes("estate")&&"Coordinate with estate planning attorney on beneficiary structure and estate tax exposure",
+        ["cp_none","cp_self"].includes(answers.care_plan)&&"Initiate Layer 2 living benefits underwriting \u2014 health-dependent, start early",
+        report.yearsToRetire!==null&&report.yearsToRetire<=5&&"Retirement in "+report.yearsToRetire+" year"+(report.yearsToRetire===1?"":"s")+" \u2014 prioritize time-sensitive structures immediately",
+      ].filter(Boolean);
+
+      let nextStepsHtml="";
+      nextStepsAdv.forEach((s,i)=>{
+        nextStepsHtml+='<div style="display:flex;gap:9px;margin-bottom:7px;align-items:flex-start;">';
+        nextStepsHtml+='<div style="width:17px;height:17px;border-radius:50%;background:rgba(200,169,110,.14);border:1px solid rgba(200,169,110,.28);font-size:8px;font-weight:700;color:#C8A96E;text-align:center;line-height:17px;flex-shrink:0;">'+(i+1)+'</div>';
+        nextStepsHtml+='<p style="font-size:12px;line-height:1.55;color:#C8BFA8;font-weight:300;margin:0;">'+s+'</p>';
+        nextStepsHtml+='</div>';
+      });
+
+      let motivHtml="";
+      if(answers.retirement_vision) motivHtml+='<div style="display:grid;grid-template-columns:140px 1fr;gap:10px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05);"><span style="font-size:11px;color:#6E8299;">Retirement vision</span><span style="font-size:11px;color:#F5F2EC;font-style:italic;">\u201c'+answers.retirement_vision+'\u201d</span></div>';
+      if(retireAge2) motivHtml+='<div style="display:grid;grid-template-columns:140px 1fr;gap:10px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05);"><span style="font-size:11px;color:#6E8299;">Target retirement age</span><span style="font-size:11px;color:#F5F2EC;font-weight:500;">'+retireAge2+(yearsToRetire2!==null?" \u2014 "+yearsToRetire2+" yrs away, est. "+retireYear2:"")+'</span></div>';
+      if(answers.planning_urgency) motivHtml+='<div style="display:grid;grid-template-columns:140px 1fr;gap:10px;padding:5px 0;"><span style="font-size:11px;color:#6E8299;">Planning urgency</span><span style="font-size:11px;color:#F5F2EC;font-weight:500;">'+(urgencyMap2[answers.planning_urgency]||answers.planning_urgency)+'</span></div>';
+
+      const stateFmt=answers.state?answers.state.replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase()):"";
+      let advisorHtml='<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#090F18;font-family:Helvetica Neue,Arial,sans-serif;">';
+      advisorHtml+='<div style="max-width:640px;margin:0 auto;padding-bottom:60px;">';
+      advisorHtml+='<div style="background:#111E2E;border-bottom:2px solid rgba(200,169,110,.22);padding:18px 24px;">';
+      advisorHtml+='<div style="font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:#C8A96E;margin-bottom:5px;">Advisor Brief \u2014 Confidential</div>';
+      advisorHtml+='<h1 style="font-family:Georgia,serif;font-size:24px;font-weight:400;color:#F5F2EC;margin:0 0 4px;">StructureReview\u2122 \u2014 '+(report.name||"Client")+(age!==null?' <span style="font-size:14px;font-weight:300;color:#6E8299;">Age '+age+'</span>':"")+'</h1>';
+      advisorHtml+='<p style="font-size:10px;color:#6E8299;margin:0 0 2px;">Integrated Planning Partners &middot; '+new Date().toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"})+(answers.bio_sex?" &middot; "+answers.bio_sex.charAt(0).toUpperCase()+answers.bio_sex.slice(1):"")+(stateFmt?" &middot; "+stateFmt:"")+(retireAge2?" &middot; Target retirement: age "+retireAge2+(yearsToRetire2!==null?" ("+yearsToRetire2+" yrs / "+retireYear2+")":""):"")+'</p>';
+      if(answers.email||answers.phone) advisorHtml+='<p style="font-size:10px;color:#6E8299;margin:3px 0 0;">'+(answers.email||"")+(answers.phone?" &middot; "+answers.phone:"")+(answers.contact_preference?" &middot; Prefers: "+(contactMap[answers.contact_preference]||answers.contact_preference):"")+'</p>';
+      advisorHtml+='</div>';
+      advisorHtml+='<div style="padding:22px 24px 0;">';
+      if(motivHtml) advisorHtml+='<div style="margin-bottom:20px;padding:14px 16px;background:rgba(200,169,110,.05);border:1px solid rgba(200,169,110,.15);border-radius:8px;"><div style="font-size:9px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#C8A96E;margin-bottom:10px;">Client Motivation Snapshot</div>'+motivHtml+'</div>';
+      advisorHtml+='<h2 style="font-family:Georgia,serif;font-size:18px;font-weight:600;color:#F5F2EC;margin-bottom:12px;border-bottom:1px solid rgba(255,255,255,.07);padding-bottom:7px;">Planning Flags &amp; Priorities</h2>';
+      advisorHtml+=(report.flags.length===0?'<p style="font-size:13px;color:#6E8299;margin-bottom:20px;">No specific flags generated.</p>':flagsAdvHtml);
+      advisorHtml+='<h2 style="font-family:Georgia,serif;font-size:18px;font-weight:600;color:#F5F2EC;margin-bottom:12px;border-bottom:1px solid rgba(255,255,255,.07);padding-bottom:7px;margin-top:22px;">Full Response Summary</h2>';
+      advisorHtml+=responsesHtml;
+      advisorHtml+='<div style="margin-top:20px;padding:15px 17px;background:rgba(200,169,110,.06);border:1px solid rgba(200,169,110,.18);border-radius:8px;"><div style="font-size:9px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#C8A96E;margin-bottom:10px;">Recommended Next Steps</div>'+nextStepsHtml+'</div>';
+      advisorHtml+='</div></div></body></html>';
+
+      // Send advisor copy
       await fetch("https://api.emailjs.com/api/v1.0/email/send", {
         method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({
@@ -1023,21 +1188,7 @@ function CompletionScreen({onReport,onAdvisor,answers,report}) {
           template_params: {
             to_email: "StructureReview@IntegratedPlanningPartners.com",
             client_name: report.name,
-            spouse_name: (answers.spouse_first_name&&answers.spouse_last_name)?`${answers.spouse_first_name} ${answers.spouse_last_name}`:(answers.spouse_first_name||"(not provided)"),
-            client_email: answers.email||"(not provided)",
-            client_phone: answers.phone||"(not provided)",
-            contact_pref: answers.contact_preference||"(not provided)",
-            client_age: age!==null?String(age):"(not provided)",
-            client_state: answers.state?answers.state.replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase()):"(not provided)",
-            bio_sex: answers.bio_sex||"(not provided)",
-            tracks: trackList||"None",
-            flags: flagList||"No flags generated.",
-            how_heard: answers.how_heard||"(not provided)",
-            referring_advisor: answers.referring_advisor_name||"N/A",
-            vision: answers.retirement_vision||"(not provided)",
-            retire_age: answers.retire_age||"(not provided)",
-            urgency: answers.planning_urgency||"(not provided)",
-            open_concerns: answers.open_concerns||"None",
+            html_content: advisorHtml,
           }
         })
       });
@@ -1091,7 +1242,7 @@ function ClientReport({answers,report,onBack}) {
     <div style={{minHeight:"100vh",background:"#0E1824",fontFamily:"'DM Sans',sans-serif",paddingBottom:48}}>
       <div style={{maxWidth:520,margin:"0 auto"}}>
         <div style={{background:"#162032",borderBottom:"1px solid rgba(200,169,110,.2)",padding:"20px 22px"}}>
-          <div style={{fontSize:9,letterSpacing:".18em",textTransform:"uppercase",color:"#C8A96E",marginBottom:7}}>StructureReview™ — Client Summary</div>
+          <div style={{fontSize:9,letterSpacing:".18em",color:"#C8A96E",marginBottom:7}}><span style={{textTransform:"uppercase"}}>Client Summary — </span><span>StructureReview™</span></div>
           <h1 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:26,fontWeight:400,color:"#F5F2EC",marginBottom:3}}>{report.name?`${report.name}'s Planning Overview`:"Your Planning Overview"}</h1>
           <p style={{fontSize:11,color:"#6E8299"}}>Prepared by Integrated Planning Partners</p>
         </div>
