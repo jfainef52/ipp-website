@@ -1070,7 +1070,10 @@ function CompletionScreen({onReport,onAdvisor,answers,report}) {
       clientHtml += '</div>';
       clientHtml += '</div></div></body></html>';
 
-            // Send client copy with full HTML summary
+            // Send client copy with full HTML
+      console.log("CLIENT HTML LENGTH:", clientHtml ? clientHtml.length : "EMPTY/NULL");
+      console.log("CLIENT HTML PREVIEW:", clientHtml ? clientHtml.substring(0,200) : "NONE");
+      console.log("ADVISOR HTML LENGTH:", advisorHtml ? advisorHtml.length : "EMPTY/NULL");
       await fetch("https://api.emailjs.com/api/v1.0/email/send", {
         method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({
@@ -1178,7 +1181,7 @@ function CompletionScreen({onReport,onAdvisor,answers,report}) {
       advisorHtml+='<div style="margin-top:20px;padding:15px 17px;background:rgba(200,169,110,.06);border:1px solid rgba(200,169,110,.18);border-radius:8px;"><div style="font-size:9px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#C8A96E;margin-bottom:10px;">Recommended Next Steps</div>'+nextStepsHtml+'</div>';
       advisorHtml+='</div></div></body></html>';
 
-      // Send advisor copy
+      // Send advisor copy with full HTML
       await fetch("https://api.emailjs.com/api/v1.0/email/send", {
         method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({
