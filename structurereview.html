@@ -1,0 +1,1318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StructureReview™ — Integrated Planning Partners</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script>
+  (function(){
+    if(typeof emailjs !== "undefined") emailjs.init("XyWTKKWFoeYOhfFbV");
+  })();
+</script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: #0E1824; min-height: 100vh; }
+#root { min-height: 100vh; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+const GS = `
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&family=DM+Sans:wght@300;400;500;600&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  button { cursor: pointer; border: none; background: none; font-family: inherit; }
+  input, select { font-family: inherit; }
+  @keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+  @keyframes slideUp { from { opacity:0; transform:translateY(30px); } to { opacity:1; transform:translateY(0); } }
+`;
+
+function calcAge(dob) {
+  if (!dob) return null;
+  const today = new Date(), birth = new Date(dob);
+  if (isNaN(birth)) return null;
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+  return age;
+}
+
+function formatDOB(dob) {
+  if (!dob) return "";
+  const d = new Date(dob);
+  if (isNaN(d)) return dob;
+  return d.toLocaleDateString("en-US", { month:"long", day:"numeric", year:"numeric" });
+}
+
+function netWorthWarrantsEstate(nw) {
+  return ["nw_2_5m","nw_5_10m","nw_10_20m","nw_over20m"].includes(nw);
+}
+
+// ─────────────────────────────────────────
+// QUESTION BANK
+// ─────────────────────────────────────────
+const QUESTIONS = [
+
+  // ── UNIVERSAL ──
+  { id:"first_name", phase:"universal", type:"text", q:"Let's start with your name. What's your first name?", placeholder:"First name", why:null },
+  { id:"last_name", phase:"universal", type:"text", q:"And your last name?", placeholder:"Last name", why:null },
+  { id:"email", phase:"universal", type:"email",
+    q:"What's the best email address to reach you?",
+    placeholder:"your@email.com",
+    why:"We'll use this to send you a copy of your planning summary and to follow up ahead of your StructureReview™ conversation. We never share your information.",
+  },
+  { id:"phone", phase:"universal", type:"text",
+    q:"And a phone number?",
+    placeholder:"(555) 555-5555",
+    why:null,
+  },
+  { id:"contact_preference", phase:"universal", type:"single",
+    q:"How do you prefer we reach out to you?",
+    why:null,
+    options:[
+      {id:"cp_email",  label:"Email"},
+      {id:"cp_call",   label:"Phone call"},
+      {id:"cp_text",   label:"Text message"},
+      {id:"cp_any",    label:"Any — whatever is fastest"},
+    ],
+  },
+  { id:"email", phase:"universal", type:"text",
+    q:"What's the best email address to reach you?",
+    placeholder:"your@email.com",
+    why:"We'll use this to send you a copy of your planning summary and to follow up ahead of your StructureReview™ conversation. We never share your information.",
+  },
+  { id:"phone", phase:"universal", type:"text",
+    q:"And a phone number?",
+    placeholder:"(555) 555-5555",
+    why:null,
+  },
+  { id:"contact_preference", phase:"universal", type:"single",
+    q:"How do you prefer we reach out to you?",
+    why:null,
+    options:[
+      {id:"cp_email",  label:"Email"},
+      {id:"cp_call",   label:"Phone call"},
+      {id:"cp_text",   label:"Text message"},
+      {id:"cp_any",    label:"Any — whatever is fastest"},
+    ],
+  },
+  { id:"dob", phase:"universal", type:"date", q:"What is your date of birth?",
+    why:"Your age determines which planning windows are open, which tax rules apply, and helps us calculate where you stand relative to key milestones like RMDs at 73 and Medicare at 65." },
+  { id:"bio_sex", phase:"universal", type:"single", q:"What is your biological sex at birth?",
+    why:"Insurance carriers use biological sex at birth for underwriting purposes — it affects mortality tables, premium calculations, and benefit projections for the insurance components of the planning structure.",
+    options:[{id:"male",label:"Male"},{id:"female",label:"Female"}] },
+  { id:"marital", phase:"universal", type:"single", q:"What's your marital or partnership status?",
+    why:"Survivor income needs, joint tax planning, beneficiary structure, and some insurance strategies depend on whether there is a spouse or partner.",
+    options:[{id:"married",label:"Married or partnered"},{id:"single",label:"Single"},{id:"divorced",label:"Divorced"},{id:"widowed",label:"Widowed"}] },
+  { id:"employment", phase:"universal", type:"single", q:"What best describes your current work situation?",
+    why:"Whether you're employed, self-employed, or retired determines which accounts, deductions, and planning tools are on the table.",
+    options:[{id:"w2",label:"Employed — W-2"},{id:"business_owner",label:"Business owner or self-employed"},{id:"retired",label:"Retired"},{id:"transitioning",label:"Transitioning — sale, retirement, or career change ahead"}] },
+  { id:"primary_asset", phase:"universal", type:"single", q:"Where does most of your wealth sit today?",
+    why:"This helps us focus the conversation on the planning areas most relevant to your actual situation — and skip the ones that aren't.",
+    options:[{id:"qp",label:"Retirement accounts — IRA, 401(k), 403(b)"},{id:"business",label:"A business or professional practice"},{id:"real_estate",label:"Real estate"},{id:"investments",label:"Investment or brokerage accounts"},{id:"mixed",label:"A mix of several"}] },
+  { id:"net_worth", phase:"universal", type:"single", q:"Roughly what is your estimated total net worth — including all assets?",
+    why:"Net worth helps us identify whether estate planning is a priority. State-level estate taxes can apply at lower thresholds than federal, and the structure of how assets transfer matters at many levels.",
+    options:[{id:"nw_under500k",label:"Under $500,000"},{id:"nw_500k_1m",label:"$500,000 – $1,000,000"},{id:"nw_1_2m",label:"$1,000,000 – $2,000,000"},{id:"nw_2_5m",label:"$2,000,000 – $5,000,000"},{id:"nw_5_10m",label:"$5,000,000 – $10,000,000"},{id:"nw_10_20m",label:"$10,000,000 – $20,000,000"},{id:"nw_over20m",label:"Over $20,000,000"}] },
+  { id:"event_horizon", phase:"universal", type:"single", q:"Is a major financial event on the horizon in the next 1–3 years?",
+    why:"Some planning strategies must be in place before an event closes — not after. Knowing what's coming lets us focus on time-sensitive opportunities first.",
+    options:[{id:"business_sale",label:"Selling a business"},{id:"real_estate_sale",label:"Selling real estate"},{id:"equity_event",label:"Equity compensation — RSUs, stock options, ESPP"},{id:"retirement",label:"Retiring or stepping back from work"},{id:"nothing",label:"No major event anticipated"}] },
+
+  // ── HEALTH & UNDERWRITING ──
+  { id:"health_status", phase:"universal", type:"single",
+    q:"How would you describe your overall health?",
+    why:"Several planning strategies involve life insurance. Health status affects underwriting eligibility, carrier classification, and premium costs — and in some cases determines whether an alternative structure is more appropriate.",
+    options:[
+      {id:"hs_excellent", label:"Excellent — no significant issues"},
+      {id:"hs_good",      label:"Good — minor issues, well managed"},
+      {id:"hs_fair",      label:"Fair — some ongoing health concerns"},
+      {id:"hs_poor",      label:"Poor — significant health issues"},
+    ],
+  },
+  { id:"tobacco", phase:"universal", type:"single",
+    q:"Do you use tobacco or nicotine products?",
+    why:"Tobacco use is one of the most significant underwriting factors. It affects carrier classification, premium calculations, and in some cases eligibility for certain policy designs.",
+    options:[
+      {id:"tobacco_no",      label:"No — never or quit more than 5 years ago"},
+      {id:"tobacco_former",  label:"Former user — quit within the last 5 years"},
+      {id:"tobacco_yes",     label:"Yes — current user"},
+    ],
+  },
+  { id:"insurance_declined", phase:"universal", type:"single",
+    q:"Have you ever been declined, rated, or postponed for life insurance coverage?",
+    why:"A prior decline or rating doesn't eliminate options — but it changes the approach. We need to know this before the StructureReview™ conversation so we can set accurate expectations and explore appropriate alternatives.",
+    options:[
+      {id:"id_no",      label:"No — never"},
+      {id:"id_rated",   label:"Yes — I was rated or had a modified offer"},
+      {id:"id_declined",label:"Yes — I was declined"},
+      {id:"id_unsure",  label:"I'm not sure"},
+    ],
+  },
+
+  // ── FAMILY ──
+  { id:"children_count", phase:"universal", type:"single",
+    q:"How many children do you have?",
+    why:"Number of children affects beneficiary structure, estate equalization, legacy planning, and life insurance need — particularly if there are minor children still at home.",
+    options:[
+      {id:"ch_none",  label:"No children"},
+      {id:"ch_1",     label:"1"},
+      {id:"ch_2",     label:"2"},
+      {id:"ch_3",     label:"3"},
+      {id:"ch_4plus", label:"4 or more"},
+    ],
+  },
+  { id:"minor_children_count", phase:"universal", type:"single",
+    q:"How many of your children are minors — under age 18?",
+    why:"Minor children still at home create income replacement needs and guardianship considerations that affect life insurance structure and estate planning priorities.",
+    options:[
+      {id:"mc_none",  label:"None — all are adults"},
+      {id:"mc_1",     label:"1"},
+      {id:"mc_2",     label:"2"},
+      {id:"mc_3plus", label:"3 or more"},
+    ],
+  },
+  { id:"adult_children_count", phase:"universal", type:"single",
+    q:"How many adult children do you have?",
+    why:"Adult children are often beneficiaries of retirement accounts and estates. The SECURE Act's 10-year distribution rule, estate equalization, and legacy strategies all depend on how many adult beneficiaries are in the picture.",
+    options:[
+      {id:"ac_none",  label:"None"},
+      {id:"ac_1",     label:"1"},
+      {id:"ac_2",     label:"2"},
+      {id:"ac_3plus", label:"3 or more"},
+    ],
+  },
+
+  // ── SPOUSE (shown only if married) ──
+  { id:"spouse_dob", phase:"universal", type:"date",
+    q:"What is your spouse's date of birth?",
+    why:"Spouse age affects survivor income planning, joint life underwriting, Social Security optimization, and the sequencing of retirement strategies.",
+  },
+  { id:"spouse_health", phase:"universal", type:"single",
+    q:"How would you describe your spouse's overall health?",
+    why:"Spouse health affects joint underwriting eligibility and survivor planning options — particularly for second-to-die policies and joint living benefit structures.",
+    options:[
+      {id:"sh_excellent", label:"Excellent — no significant issues"},
+      {id:"sh_good",      label:"Good — minor issues, well managed"},
+      {id:"sh_fair",      label:"Fair — some ongoing health concerns"},
+      {id:"sh_poor",      label:"Poor — significant health issues"},
+    ],
+  },
+
+  // ── EXISTING ADVISORS ──
+  { id:"has_cpa", phase:"universal", type:"single",
+    q:"Do you have a CPA or tax advisor you work with?",
+    why:"Coordinating with your existing CPA is important — some strategies have direct tax reporting implications, and we want to make sure everyone is aligned before implementation.",
+    options:[
+      {id:"cpa_yes", label:"Yes"},
+      {id:"cpa_no",  label:"No"},
+    ],
+  },
+  { id:"cpa_name", phase:"universal", type:"text",
+    q:"What is your CPA's name?",
+    placeholder:"Name or firm name",
+    why:null,
+  },
+  { id:"has_advisor", phase:"universal", type:"single",
+    q:"Do you have a financial advisor or investment advisor you work with?",
+    why:"Understanding your existing advisory relationships helps us coordinate approach and ensure the StructureReview™ complements — rather than conflicts with — your current plan.",
+    options:[
+      {id:"adv_yes", label:"Yes"},
+      {id:"adv_no",  label:"No"},
+    ],
+  },
+  { id:"advisor_name", phase:"universal", type:"text",
+    q:"What is your financial advisor's name?",
+    placeholder:"Name or firm name",
+    why:null,
+  },
+  { id:"has_attorney", phase:"universal", type:"single",
+    q:"Do you have an estate planning attorney?",
+    why:"Estate planning attorneys play an important coordination role — particularly for trust structures, beneficiary designations, and business succession documents.",
+    options:[
+      {id:"att_yes", label:"Yes"},
+      {id:"att_no",  label:"No"},
+    ],
+  },
+  { id:"attorney_name", phase:"universal", type:"text",
+    q:"What is your estate attorney's name?",
+    placeholder:"Name or firm name",
+    why:null,
+  },
+
+  // ── REFERRAL & LOCATION ──
+  { id:"state", phase:"universal", type:"select",
+    q:"What state do you live in?",
+    why:"State of residence affects income tax planning, state estate tax exposure, and Medicaid rules — all of which vary significantly across states.",
+    options:[
+      "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware",
+      "Florida","Georgia","Hawaii","Idaho","Illinois","Indiana","Iowa","Kansas","Kentucky",
+      "Louisiana","Maine","Maryland","Massachusetts","Michigan","Minnesota","Mississippi",
+      "Missouri","Montana","Nebraska","Nevada","New Hampshire","New Jersey","New Mexico",
+      "New York","North Carolina","North Dakota","Ohio","Oklahoma","Oregon","Pennsylvania",
+      "Rhode Island","South Carolina","South Dakota","Tennessee","Texas","Utah","Vermont",
+      "Virginia","Washington","West Virginia","Wisconsin","Wyoming",
+    ].map(s=>({id:s.toLowerCase().replace(/ /g,"_"), label:s})),
+  },
+  { id:"how_heard", phase:"universal", type:"single",
+    q:"How did you learn about Integrated Planning Partners?",
+    why:null,
+    options:[
+      {id:"hh_advisor",  label:"Referred by an advisor or firm"},
+      {id:"hh_seminar",  label:"Attended a seminar"},
+      {id:"hh_book",     label:"Read Jeff Faine's book — Architecture of Retirement"},
+      {id:"hh_social",   label:"Social media, internet, or YouTube"},
+      {id:"hh_other",    label:"Other"},
+    ],
+  },
+  { id:"referring_advisor_name", phase:"universal", type:"text",
+    q:"What is the name of the advisor or firm who referred you?",
+    placeholder:"Advisor or firm name",
+    why:null,
+  },
+
+  // ── QUALIFIED PLAN TRACK ──
+  { id:"has_qp", phase:"qp", type:"multi",
+    q:"Which of the following retirement accounts do you have? Check all that apply.",
+    why:"Qualified retirement accounts carry a deferred tax obligation that grows alongside the account. The account types you hold determine which repositioning strategies are available and how urgently they need to be addressed.",
+    options:[
+      {id:"hqp_401k",   label:"401(k) or 403(b) — employer plan"},
+      {id:"hqp_ira",    label:"Traditional IRA or Rollover IRA"},
+      {id:"hqp_roth",   label:"Roth IRA or Roth 401(k)"},
+      {id:"hqp_sep",    label:"SEP-IRA or SIMPLE IRA"},
+      {id:"hqp_tsp",    label:"TSP — Thrift Savings Plan"},
+      {id:"hqp_db",     label:"Defined Benefit or Cash Balance Plan"},
+      {id:"hqp_none",   label:"None — I don't have any of these"},
+    ],
+  },
+  { id:"qp_roth_pct", phase:"qp", type:"single",
+    q:"Roughly what portion of your total retirement account balance is in Roth accounts?",
+    why:"Roth assets are already tax-free — they don't carry a deferred tax obligation and aren't subject to RMDs. Knowing the split helps us understand how much of the balance is exposed to future taxation.",
+    options:[
+      {id:"rp_small",   label:"Less than 10% is in Roth"},
+      {id:"rp_quarter", label:"Roughly 10% – 25% is in Roth"},
+      {id:"rp_half",    label:"Roughly 25% – 50% is in Roth"},
+      {id:"rp_most",    label:"More than 50% is in Roth"},
+      {id:"rp_all",     label:"Virtually all of it is in Roth"},
+    ],
+  },
+  { id:"qp_balance", phase:"qp", type:"single", q:"Roughly how much is in your qualified retirement accounts?",
+    why:"The size of the account determines which repositioning strategies are economically meaningful — some require scale to work well.",
+    options:[{id:"under500k",label:"Under $500,000"},{id:"500k_1m",label:"$500,000 – $1,000,000"},{id:"1m_2m",label:"$1,000,000 – $2,000,000"},{id:"2m_5m",label:"$2,000,000 – $5,000,000"},{id:"over5m",label:"Over $5,000,000"}] },
+  { id:"rmd_status", phase:"qp", type:"single", q:"Where are you with Required Minimum Distributions?",
+    why:"RMDs begin at age 73. The window for the most impactful repositioning strategies is before they begin — but options remain after.",
+    options:[{id:"rmd_far",label:"More than 10 years away"},{id:"rmd_near",label:"Within 5 – 10 years"},{id:"rmd_imminent",label:"Starting within 1 – 3 years"},{id:"rmd_active",label:"Already receiving RMDs"}] },
+  { id:"rmd_concern", phase:"qp", type:"single", q:"Have you thought about what your RMDs will do to your tax situation?",
+    why:"A $2M IRA generates roughly $75,000–$120,000 in mandatory taxable income per year once RMDs begin — whether you need the money or not. Many clients haven't seen this modeled yet.",
+    options:[{id:"rmd_yes_concerned",label:"Yes — and I'm concerned about the tax impact"},{id:"rmd_yes_notconcerned",label:"Yes — I've thought about it and I'm comfortable"},{id:"rmd_no",label:"I haven't really looked at this yet"}] },
+  { id:"qp_beneficiary", phase:"qp", type:"single", q:"Who inherits your retirement accounts when you're gone?",
+    why:"The SECURE Act's 10-year rule forces most non-spouse beneficiaries to fully distribute an inherited IRA within 10 years — often at their peak earning years. This changes how we think about what gets left behind.",
+    options:[{id:"qp_spouse",label:"Spouse"},{id:"qp_children",label:"Adult children"},{id:"qp_mixed",label:"A mix — spouse and children"},{id:"qp_trust",label:"A trust or charity"},{id:"qp_undecided",label:"Not yet decided"}] },
+
+  // ── LIQUIDITY EVENT TRACK ──
+  { id:"le_type", phase:"le", type:"single", q:"What kind of liquidity event are you looking at?",
+    why:"Different event types have different tax characters — capital gains, depreciation recapture, ordinary income from equity compensation — and each requires a different approach.",
+    options:[{id:"le_business",label:"Business sale"},{id:"le_realestate",label:"Real estate sale"},{id:"le_equity",label:"Equity compensation — RSUs, options, ESPP"},{id:"le_other",label:"Other concentrated position"}] },
+  { id:"le_size", phase:"le", type:"single", q:"Roughly what's the expected capital gains tax obligation?",
+    why:"The size of the tax bill determines which strategies are structurally viable. Some approaches require a minimum threshold to make economic sense.",
+    options:[{id:"le_under100",label:"Under $100,000"},{id:"le_100_250",label:"$100,000 – $250,000"},{id:"le_250_500",label:"$250,000 – $500,000"},{id:"le_500_1m",label:"$500,000 – $1,000,000"},{id:"le_over1m",label:"Over $1,000,000"}] },
+  { id:"le_timing", phase:"le", type:"single", q:"Has the transaction closed yet?",
+    why:"Some strategies must be structured before proceeds are received. The earlier we're involved, the more options are available — but meaningful planning is still possible after closing.",
+    options:[{id:"le_open",label:"No — still in negotiation or planning"},{id:"le_soon",label:"Closing within 90 days"},{id:"le_closed",label:"Already closed"}] },
+  { id:"le_plan", phase:"le", type:"single", q:"What's the current plan for the proceeds after taxes?",
+    why:"Understanding how you're thinking about the money helps us identify gaps — retirement income structure, care protection, legacy planning — that often get overlooked in the transaction focus.",
+    options:[{id:"le_invest",label:"Invest in a diversified portfolio"},{id:"le_retire",label:"Fund my retirement"},{id:"le_undecided",label:"Still figuring it out"},{id:"le_other_plan",label:"Have a specific plan in mind"}] },
+
+  // ── BUSINESS OWNER TRACK ──
+  { id:"biz_structure", phase:"business", type:"single", q:"How is your business structured?",
+    why:"The entity type affects which deduction strategies, retirement plans, and exit planning options are available — some are exclusive to specific structures.",
+    options:[{id:"biz_sole",label:"Sole proprietor or single-member LLC"},{id:"biz_scorp",label:"S-Corporation"},{id:"biz_ccorp",label:"C-Corporation"},{id:"biz_partner",label:"Partnership or multi-member LLC"},{id:"biz_prof",label:"Professional practice — medical, legal, dental, etc."}] },
+  { id:"biz_priorities", phase:"business", type:"multi", q:"What are your biggest business planning priorities right now?",
+    why:"Business owners have a wider range of planning tools available than most employees — but they require intentional use. These priorities help focus the conversation.",
+    options:[{id:"bp_reduce_tax",label:"Reducing business or personal income tax"},{id:"bp_retirement",label:"Building tax-advantaged retirement savings"},{id:"bp_exit",label:"Planning for an eventual exit or sale"},{id:"bp_keyman",label:"Protecting the business if I or a key person dies or is disabled"},{id:"bp_buysell",label:"Funding a buy-sell agreement with a partner"},{id:"bp_attract",label:"Attracting or retaining key employees"}] },
+  { id:"biz_retirement_plan", phase:"business", type:"single",
+    q:"What type of retirement plan does your business currently offer?",
+    why:"Many business owners are leaving significant tax deductions on the table. A defined benefit or cash balance plan can allow contributions of $100,000–$300,000+ per year — far beyond a standard 401(k) or SEP-IRA.",
+    options:[
+      {id:"brp_401k",      label:"401(k) — with or without profit sharing"},
+      {id:"brp_sep_simple",label:"SEP-IRA or SIMPLE IRA"},
+      {id:"brp_db",        label:"Defined benefit or cash balance plan"},
+      {id:"brp_none",      label:"No formal plan in place"},
+    ],
+  },
+  { id:"biz_compensation", phase:"business", type:"single",
+    q:"Roughly what has your annual business income or salary been over the last two years?",
+    why:"Compensation level determines which retirement plan structures deliver the largest deductions — a cash balance or defined benefit plan is most impactful above certain income thresholds.",
+    options:[
+      {id:"bc_under150",  label:"Under $150,000"},
+      {id:"bc_150_300",   label:"$150,000 – $300,000"},
+      {id:"bc_300_500",   label:"$300,000 – $500,000"},
+      {id:"bc_500_1m",    label:"$500,000 – $1,000,000"},
+      {id:"bc_over1m",    label:"Over $1,000,000"},
+    ],
+  },
+  { id:"biz_employees", phase:"business", type:"single",
+    q:"How many employees does your business have?",
+    why:"Employee count affects which retirement plan designs are available and cost-effective. Some high-contribution strategies work best in smaller or owner-only structures.",
+    options:[
+      {id:"be_just_me",   label:"Just me — owner only"},
+      {id:"be_2_5",       label:"2 – 5"},
+      {id:"be_6_20",      label:"6 – 20"},
+      {id:"be_21_50",     label:"21 – 50"},
+      {id:"be_over50",    label:"More than 50"},
+    ],
+  },
+  { id:"biz_has_partners", phase:"business", type:"single",
+    q:"Do you have business partners or co-owners?",
+    why:"Partnership structures create specific planning needs — buy-sell agreements, key person coverage, and succession planning are all more complex when ownership is shared.",
+    options:[
+      {id:"bhp_yes", label:"Yes"},
+      {id:"bhp_no",  label:"No — I'm the sole owner"},
+    ],
+  },
+  { id:"biz_partner_count", phase:"business", type:"single",
+    q:"How many partners or co-owners?",
+    why:null,
+    options:[
+      {id:"bpc_one",    label:"1 other partner"},
+      {id:"bpc_two",    label:"2 other partners"},
+      {id:"bpc_three",  label:"3 or more"},
+    ],
+  },
+  { id:"biz_buysell", phase:"business", type:"single",
+    q:"Do you have a buy-sell agreement in place?",
+    why:"A buy-sell agreement controls what happens to ownership if a partner dies, becomes disabled, or wants to exit. Without one, ownership can pass to unintended parties — including a deceased partner's spouse.",
+    options:[
+      {id:"bbs_yes",     label:"Yes — we have one"},
+      {id:"bbs_no",      label:"No — nothing formal in place"},
+      {id:"bbs_outdated",label:"We have something but it hasn't been reviewed recently"},
+    ],
+  },
+  { id:"biz_buysell_funding", phase:"business", type:"single",
+    q:"How is the buy-sell agreement funded?",
+    why:"An unfunded buy-sell is essentially unenforceable — if a partner dies and there's no money to buy out the interest, the agreement doesn't accomplish anything. Life insurance is the most common and cost-effective funding mechanism.",
+    options:[
+      {id:"bbf_life",    label:"Life insurance"},
+      {id:"bbf_cash",    label:"Cash reserve or sinking fund"},
+      {id:"bbf_loan",    label:"Bank financing or installment"},
+      {id:"bbf_none",    label:"It isn't funded"},
+      {id:"bbf_unknown", label:"I'm not sure how it's funded"},
+    ],
+  },
+
+  // ── ESTATE TRACK ──
+  { id:"estate_plan", phase:"estate", type:"single", q:"Do you have an estate plan in place?",
+    why:"An outdated or incomplete estate plan can cost families significantly in taxes, delays, and unintended distributions. Even well-crafted plans need review when assets or laws change.",
+    options:[{id:"ep_yes_current",label:"Yes — reviewed within the last 3 years"},{id:"ep_yes_old",label:"Yes — but it hasn't been updated in a while"},{id:"ep_basic",label:"Basic documents only — will, maybe a trust"},{id:"ep_no",label:"No formal estate plan in place"}] },
+  { id:"estate_concern", phase:"estate", type:"multi", q:"Which estate planning concerns are on your mind?",
+    why:"These help us prioritize which tools to discuss — insurance, trusts, charitable strategies, and business succession each address different risks.",
+    options:[{id:"ec_tax",label:"Minimizing estate taxes"},{id:"ec_legacy",label:"Leaving a meaningful legacy"},{id:"ec_charity",label:"Charitable giving"},{id:"ec_survivor",label:"Protecting a surviving spouse"},{id:"ec_business",label:"Business succession"},{id:"ec_equalize",label:"Equalizing inheritance among children"}] },
+
+  // ── INCOME & PROTECTION ──
+  { id:"income_gap", phase:"income", type:"single",
+    q:"In retirement, do you expect your guaranteed income to cover your essential expenses?",
+    why:"A true guaranteed income floor means contractual income that cannot be reduced or outlived — typically a pension or structured annuity. Investment returns and Social Security alone leave retirement income exposed to factors outside your control.",
+    options:[{id:"ig_yes",label:"Yes — I have a pension that covers my essential expenses"},{id:"ig_partial",label:"Partially — Social Security will help but there will still be a gap"},{id:"ig_no",label:"No — my income will come primarily from investments"},{id:"ig_unknown",label:"I haven't modeled this yet"}] },
+  { id:"care_plan", phase:"income", type:"single",
+    q:"Do you have a plan for long-term care costs if you need them?",
+    why:"The average cost of assisted living exceeds $60,000/year. A memory care or skilled nursing facility can run $100,000–$150,000/year. Without a funded plan, this cost typically comes directly from the investment portfolio.",
+    options:[{id:"cp_ltc",label:"Yes — standalone long-term care policy"},{id:"cp_hybrid",label:"Yes — hybrid life/LTC or living benefit policy"},{id:"cp_self",label:"Planning to self-insure from savings"},{id:"cp_none",label:"No plan in place"}] },
+  { id:"life_insurance", phase:"income", type:"single",
+    q:"Do you currently have life insurance?",
+    why:"Life insurance serves different roles at different life stages — income replacement, estate liquidity, business protection, or tax-free legacy. Understanding what's in place helps us identify any gaps.",
+    options:[{id:"li_term",label:"Term insurance"},{id:"li_perm",label:"Permanent — whole life or universal life"},{id:"li_both",label:"Both term and permanent"},{id:"li_none",label:"No life insurance in place"},{id:"li_business",label:"Business-owned policy"}] },
+
+  // ── MOTIVATIONS ──
+  {
+    id:"retire_age", phase:"motivations", type:"number",
+    q:"At what age would you like to retire — or fully step back from work?",
+    placeholder:"e.g. 62",
+    why:"Retirement age is one of the most important variables in any financial plan. It determines how long your money needs to grow, how long it needs to last, and how much time we have to put the right structures in place.",
+  },
+  {
+    id:"retirement_vision", phase:"motivations", type:"text",
+    q:"In your own words, what does a successful retirement look like to you?",
+    placeholder:"Travel, time with family, staying active, peace of mind...",
+    why:"Understanding what you're working toward — not just the numbers — helps shape a plan that actually serves your life, not just your portfolio.",
+  },
+  {
+    id:"concern_tax_burden", phase:"motivations", type:"single",
+    q:"A $1,000,000 retirement account growing at 7% for 20 years becomes nearly $4,000,000 — of which $1,450,000 or more could be owed in taxes at current rates before your family sees a dollar. How concerned are you about the deferred tax burden inside your retirement accounts?",
+    why:"Every dollar in a traditional IRA or 401(k) has never been taxed. The IRS is effectively a silent partner — and their share grows alongside yours. At a 37% federal rate on $3.9M in accumulated value, the tax obligation alone exceeds $1,450,000. Most retirement savers have never seen this modeled.",
+    options:[
+      {id:"ct_very", label:"Very concerned — this is something I think about"},
+      {id:"ct_somewhat", label:"Somewhat concerned — I know it's there but haven't addressed it"},
+      {id:"ct_not", label:"Not concerned — I have a plan for this"},
+      {id:"ct_new", label:"I hadn't thought about it in those terms before"},
+    ],
+  },
+  {
+    id:"concern_care_cost", phase:"motivations", type:"single",
+    q:"A three-year care event — assisted living, memory care, or in-home nursing — can easily cost $250,000 to $450,000. Most retirement plans have no dedicated funding for this. If that happened to you or your spouse, where would the money come from?",
+    why:"Long-term care is the most underplanned risk in retirement. It doesn't just affect finances — a portfolio forced to liquidate during a care event at the wrong time may never recover.",
+    options:[
+      {id:"cc_covered", label:"We have a dedicated plan or policy in place"},
+      {id:"cc_portfolio", label:"It would come from our investment portfolio"},
+      {id:"cc_family", label:"We would rely on family support"},
+      {id:"cc_unknown", label:"Honestly, we haven't figured that out"},
+    ],
+  },
+  {
+    id:"concern_market_seq", phase:"motivations", type:"single",
+    q:"Markets have dropped 30–50% multiple times in the last 25 years. If that happened in the first three years of your retirement, your portfolio might never fully recover — even if markets bounce back. Does your current plan have a protected income floor for that scenario?",
+    why:"Sequence of returns risk is the most dangerous threat to a retirement portfolio. A 40% loss in year one of retirement has a fundamentally different impact than the same loss in year fifteen — and most plans aren't structured to absorb it.",
+    options:[
+      {id:"cm_yes", label:"Yes — part of my income is contractually protected"},
+      {id:"cm_partial", label:"Partially — some protection but not enough"},
+      {id:"cm_no", label:"No — my income depends entirely on portfolio performance"},
+      {id:"cm_unknown", label:"I'm not sure how my plan handles this"},
+    ],
+  },
+  {
+    id:"concern_spouse", phase:"motivations", type:"single",
+    q:"If something happened to you tomorrow — death or disability — would your spouse or family be able to maintain their current lifestyle indefinitely without your income or your involvement in managing the finances?",
+    why:"Survivor planning is often deferred because it's uncomfortable to think about. But the gap between 'probably fine' and 'financially secure regardless' is where most families are exposed.",
+    options:[
+      {id:"cs_yes", label:"Yes — they would be fully provided for"},
+      {id:"cs_mostly", label:"Mostly — there would be some adjustment but they'd be okay"},
+      {id:"cs_no", label:"No — it would significantly impact their financial picture"},
+      {id:"cs_unsure", label:"Honestly, I'm not sure"},
+    ],
+  },
+  {
+    id:"planning_urgency", phase:"motivations", type:"single",
+    q:"How would you describe where you are with your financial planning right now?",
+    why:null,
+    options:[
+      {id:"pu_urgent", label:"Urgent — there are things I know I need to address soon"},
+      {id:"pu_active", label:"Active — I'm engaged and looking to improve the plan"},
+      {id:"pu_curious", label:"Curious — exploring options, no immediate pressure"},
+      {id:"pu_early", label:"Early stages — just starting to think about this seriously"},
+    ],
+  },
+
+  // ── WRAP ──
+  { id:"advisor_present", phase:"wrap", type:"single", q:"Are you completing this with your advisor, or on your own?", why:null,
+    options:[{id:"with_advisor",label:"With my advisor"},{id:"on_own",label:"On my own before our meeting"},{id:"exploring",label:"Just exploring on my own"}] },
+  { id:"open_concerns", phase:"wrap", type:"text", q:"Is there anything specific on your mind that we haven't covered yet?", placeholder:"Optional — anything you'd like us to know", why:null },
+];
+
+// ─────────────────────────────────────────
+// ROUTING
+// ─────────────────────────────────────────
+function buildSequence(answers) {
+  const seq = [];
+  seq.push(...QUESTIONS.filter(q => q.phase === "universal"));
+  const emp = answers.employment, asset = answers.primary_asset,
+        event = answers.event_horizon, nw = answers.net_worth;
+
+  if (asset==="qp"||asset==="mixed"||emp==="w2"||emp==="retired")
+    seq.push(...QUESTIONS.filter(q=>q.phase==="qp"));
+  if (event==="business_sale"||event==="real_estate_sale"||event==="equity_event"||emp==="transitioning"||asset==="real_estate")
+    seq.push(...QUESTIONS.filter(q=>q.phase==="le"));
+  if (emp==="business_owner"||emp==="transitioning"||asset==="business")
+    seq.push(...QUESTIONS.filter(q=>q.phase==="business"));
+
+  // If they're a business owner heading into a sale, le_type is redundant — we already know
+  // the event type. Skip it and pre-populate via the report generator.
+  const bizSaleRedundant = (emp==="business_owner"||asset==="business") && event==="business_sale";
+
+  const qpBig=["2m_5m","over5m"].includes(answers.qp_balance);
+  const leBig=["le_500_1m","le_over1m"].includes(answers.le_size);
+  if (netWorthWarrantsEstate(nw)||qpBig||leBig||emp==="business_owner")
+    seq.push(...QUESTIONS.filter(q=>q.phase==="estate"));
+
+  seq.push(...QUESTIONS.filter(q=>q.phase==="income"));
+  seq.push(...QUESTIONS.filter(q=>q.phase==="motivations"));
+  seq.push(...QUESTIONS.filter(q=>q.phase==="wrap"));
+
+  // Skip concern_spouse if single/widowed
+  const skipSpouse = answers.marital==="single"||answers.marital==="widowed";
+  // Skip retire_age if already retired
+  const skipRetire = answers.employment==="retired";
+  // Skip name follow-ups if they don't have that advisor type
+  const skipCpaName      = answers.has_cpa      !== "cpa_yes";
+  const skipAdvisorName  = answers.has_advisor   !== "adv_yes";
+  const skipAttorneyName = answers.has_attorney  !== "att_yes";
+  // Skip referring advisor name if not referred by advisor
+  const skipReferralName = answers.how_heard !== "hh_advisor";
+  // Skip partner/buy-sell questions if no partners
+  const skipPartners    = answers.biz_has_partners !== "bhp_yes";
+  // Skip buy-sell funding if no buy-sell in place
+  const skipBuySellFund = answers.biz_buysell !== "bbs_yes";
+
+  // Skip all QP questions after has_qp if they selected "none"
+  const hasQPAnswered = Array.isArray(answers.has_qp) && answers.has_qp.length > 0;
+  const skipQP = hasQPAnswered && answers.has_qp.includes("hqp_none");
+  // Skip Roth pct question if they didn't select a Roth account type
+  const skipRothPct = !Array.isArray(answers.has_qp) || !answers.has_qp.some(x => x==="hqp_roth");
+
+  const seen = new Set();
+  return seq.filter(q => {
+    if (seen.has(q.id)) return false;
+    if (q.phase==="qp" && q.id!=="has_qp" && skipQP) return false;
+    if (q.id==="qp_roth_pct" && skipRothPct) return false;
+    if (q.id==="concern_spouse"         && skipSpouse)       return false;
+    if (q.id==="retire_age"             && skipRetire)       return false;
+    if (q.id==="cpa_name"               && skipCpaName)      return false;
+    if (q.id==="advisor_name"           && skipAdvisorName)  return false;
+    if (q.id==="attorney_name"          && skipAttorneyName) return false;
+    if (q.id==="referring_advisor_name" && skipReferralName) return false;
+    if ((q.id==="biz_partner_count"||q.id==="biz_buysell"||q.id==="biz_buysell_funding") && skipPartners) return false;
+    if (q.id==="le_type" && bizSaleRedundant) return false;
+    // Skip biz_retirement_plan if they already have a DB/cash balance plan — nothing to upgrade to
+    const hasDB  = Array.isArray(answers.has_qp) && answers.has_qp.includes("hqp_db");
+    // Skip if no qualified accounts at all — not relevant
+    const hasNoQP = Array.isArray(answers.has_qp) && answers.has_qp.length===1 && answers.has_qp.includes("hqp_none");
+    // Skip if only personal IRA/Roth (no employer plan indicated) — business plan question
+    // is still relevant since they may have no plan at the business level
+    if (q.id==="biz_retirement_plan" && (hasDB || hasNoQP)) return false;
+    if (q.id==="biz_buysell_funding"    && skipBuySellFund)  return false;
+    seen.add(q.id); return true;
+  });
+}
+
+// ─────────────────────────────────────────
+// REPORT GENERATION
+// ─────────────────────────────────────────
+function generateReport(answers) {
+  const flags=[], tracks=[];
+  const firstName=answers.first_name||"", lastName=answers.last_name||"";
+  const name=[firstName,lastName].filter(Boolean).join(" ");
+  const age=calcAge(answers.dob);
+  const retireAge=parseInt(answers.retire_age)||null;
+  const yearsToRetire=(age!==null&&retireAge!==null&&retireAge>age)?retireAge-age:null;
+
+  if (answers.qp_balance&&answers.qp_balance!=="under500k") {
+    tracks.push("qp");
+    if (["rmd_active","rmd_imminent"].includes(answers.rmd_status))
+      flags.push({priority:"high",track:"IncomeArc™ QP",text:"RMDs are active or imminent — repositioning window is open now. A tax-free income structure via Roth FIA and ETA IUL should be modeled immediately."});
+    else
+      flags.push({priority:"medium",track:"IncomeArc™ QP",text:"Qualified plan balance warrants IncomeArc™ QP analysis. Pre-RMD window offers maximum repositioning flexibility."});
+    if (["qp_children","qp_mixed"].includes(answers.qp_beneficiary))
+      flags.push({priority:"medium",track:"Estate / SECURE Act",text:"Non-spouse beneficiaries are inheriting a qualified account. SECURE Act 10-year rule creates a compressed, taxable distribution problem that IncomeArc™ QP addresses directly."});
+  }
+  if (answers.le_size&&answers.le_size!=="le_under100") {
+    tracks.push("le");
+    if (answers.le_timing==="le_open"||answers.le_timing==="le_soon")
+      flags.push({priority:"high",track:"IncomeArc™ LE",text:"Transaction has not closed — full ETA structuring window is open. Time-sensitive: the bank financing structure must be in place before closing."});
+    else
+      flags.push({priority:"medium",track:"IncomeArc™ LE",text:"Transaction has closed. Discuss NQ annuity structuring, living benefits, and taxable brokerage optimization for the net proceeds."});
+  }
+  if (answers.biz_priorities) {
+    tracks.push("business");
+    if (answers.biz_priorities.includes("bp_reduce_tax")||["brp_none","brp_sep_simple"].includes(answers.biz_retirement_plan))
+      flags.push({priority:"high",track:"Defined Benefit / Cash Balance",text:"Business owner with tax reduction priority and no advanced retirement plan. A defined benefit or cash balance plan could deliver $100,000–$300,000+ in annual deductions."});
+    if (answers.biz_priorities.includes("bp_keyman")||answers.biz_priorities.includes("bp_buysell"))
+      flags.push({priority:"medium",track:"Business Protection",text:"Buy-sell funding and/or key person coverage identified as priorities. Review life and disability insurance structures."});
+    if (answers.biz_priorities.includes("bp_exit"))
+      flags.push({priority:"medium",track:"Exit Planning",text:"Business exit is on the horizon. Coordinate with LE track — ETA bank financing may be applicable to sale proceeds."});
+  }
+  if (netWorthWarrantsEstate(answers.net_worth)) {
+    tracks.push("estate");
+    if (["nw_10_20m","nw_over20m"].includes(answers.net_worth))
+      flags.push({priority:"high",track:"Estate Planning",text:"Net worth level indicates meaningful federal estate tax exposure. ILIT, survivorship coverage, and charitable strategies should be reviewed."});
+    else
+      flags.push({priority:"medium",track:"Estate Planning",text:"Net worth warrants estate planning review. State-level estate taxes may apply at lower thresholds than federal. Coordinate with estate planning counsel."});
+  }
+  if (["ep_yes_old","ep_basic","ep_no"].includes(answers.estate_plan))
+    flags.push({priority:"medium",track:"Estate Documents",text:"Estate plan is outdated, incomplete, or nonexistent. Referral to estate planning counsel recommended before implementing any multi-layer structure."});
+  if (["cp_none","cp_self"].includes(answers.care_plan))
+    flags.push({priority:"medium",track:"Healthcare Insulation",text:"No dedicated long-term care plan in place. Layer 2 living benefits IUL addresses care costs without portfolio liquidation."});
+  if (["ig_no","ig_partial","ig_unknown"].includes(answers.income_gap))
+    flags.push({priority:"medium",track:"Guaranteed Income Floor",text:"Retirement income lacks a contractual guaranteed floor. Layer 1 FIA with GLWB provides income that cannot be outlived and cannot decline regardless of market performance."});
+  if (answers.life_insurance==="li_none")
+    flags.push({priority:"medium",track:"Life Insurance Gap",text:"No life insurance in place. Depending on estate goals, family situation, and business needs, this may represent a meaningful gap."});
+
+  // Motivation-driven flags
+  if (answers.concern_tax_burden==="ct_new"||answers.concern_tax_burden==="ct_somewhat")
+    flags.push({priority:"medium",track:"Tax Awareness",text:"Client indicated the deferred tax burden on retirement accounts was not fully on their radar. The RMD tax conversation should be a centerpiece of the StructureReview™."});
+  if (answers.concern_care_cost==="cc_portfolio"||answers.concern_care_cost==="cc_unknown")
+    flags.push({priority:"medium",track:"Care Cost Exposure",text:"No dedicated care funding plan. Client acknowledged portfolio or unknown as the fallback — reinforcing the Layer 2 living benefits conversation."});
+  if (answers.concern_market_seq==="cm_no"||answers.concern_market_seq==="cm_unknown")
+    flags.push({priority:"medium",track:"Sequence of Returns Risk",text:"Client has no contractual income protection against early-retirement market loss. Sequence of returns risk conversation is warranted — Layer 1 FIA directly addresses this."});
+  if (answers.concern_spouse==="cs_no"||answers.concern_spouse==="cs_unsure")
+    flags.push({priority:"medium",track:"Survivor Protection Gap",text:"Client indicated spouse would not be fully provided for. Survivor income planning, life insurance review, and beneficiary structure should be addressed."});
+  if (yearsToRetire!==null&&yearsToRetire<=5)
+    flags.push({priority:"high",track:"Retirement Timeline",text:`Client targets retirement at age ${retireAge} — approximately ${yearsToRetire} year${yearsToRetire===1?"":"s"} away. Planning window is short. Time-sensitive strategies should be prioritized immediately.`});
+
+  flags.sort((a,b)=>a.priority==="high"?-1:1);
+  return {flags,tracks:[...new Set(tracks)],name,firstName,age,retireAge,yearsToRetire};
+}
+
+// ─────────────────────────────────────────
+// COMPONENTS
+// ─────────────────────────────────────────
+
+function WhyCard({text,onClose}) {
+  return (
+    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.65)",zIndex:200,display:"flex",alignItems:"flex-end",animation:"fadeIn .2s ease"}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:"#1E2E44",borderTop:"1px solid rgba(200,169,110,.3)",borderRadius:"14px 14px 0 0",padding:"22px 22px 32px",width:"100%",animation:"slideUp .22s ease"}}>
+        <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
+          <span style={{fontSize:10,fontWeight:700,letterSpacing:".18em",textTransform:"uppercase",color:"#C8A96E"}}>Why we ask</span>
+          <button onClick={onClose} style={{color:"#6E8299",fontSize:22,lineHeight:1}}>×</button>
+        </div>
+        <p style={{fontSize:14,lineHeight:1.65,color:"#C8BFA8",fontWeight:300}}>{text}</p>
+      </div>
+    </div>
+  );
+}
+
+function ChoiceBtn({label,selected,onClick,index}) {
+  const L="ABCDEFGHIJ";
+  return (
+    <button onClick={onClick} style={{display:"flex",alignItems:"center",gap:13,width:"100%",padding:"13px 15px",background:selected?"rgba(200,169,110,.13)":"rgba(255,255,255,.04)",border:`1px solid ${selected?"rgba(200,169,110,.45)":"rgba(255,255,255,.09)"}`,borderRadius:10,marginBottom:8,textAlign:"left",transition:"all .15s ease",animation:`fadeUp .28s ease ${index*.05}s both`}}>
+      <span style={{width:27,height:27,borderRadius:6,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,background:selected?"rgba(200,169,110,.22)":"rgba(255,255,255,.07)",border:`1px solid ${selected?"rgba(200,169,110,.4)":"rgba(255,255,255,.1)"}`,color:selected?"#C8A96E":"#6E8299",transition:"all .15s"}}>{L[index]}</span>
+      <span style={{fontSize:14,color:selected?"#F5F2EC":"#C8BFA8",fontWeight:selected?500:400,transition:"color .15s",lineHeight:1.4}}>{label}</span>
+      {selected&&<span style={{marginLeft:"auto",color:"#C8A96E",fontSize:15,flexShrink:0}}>✓</span>}
+    </button>
+  );
+}
+
+function AnchorFact({text}) {
+  return (
+    <div style={{padding:"12px 15px",background:"rgba(200,169,110,.07)",border:"1px solid rgba(200,169,110,.2)",borderRadius:8,marginBottom:16,animation:"fadeUp .3s ease .05s both"}}>
+      <p style={{fontSize:13,lineHeight:1.6,color:"#C8BFA8",fontWeight:300,fontStyle:"italic"}}>{text}</p>
+    </div>
+  );
+}
+
+function DateInput({value,onChange}) {
+  return (
+    <div style={{animation:"fadeUp .3s ease .08s both"}}>
+      <input type="date" value={value||""} onChange={e=>onChange(e.target.value)} max={new Date().toISOString().split("T")[0]}
+        style={{width:"100%",padding:"15px 16px",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.12)",borderRadius:10,color:"#F5F2EC",fontSize:15,outline:"none",colorScheme:"dark"}}/>
+      {value&&calcAge(value)!==null&&(
+        <div style={{marginTop:10,padding:"9px 13px",background:"rgba(200,169,110,.08)",border:"1px solid rgba(200,169,110,.2)",borderRadius:8}}>
+          <span style={{fontSize:12,color:"#C8BFA8"}}>Current age: </span>
+          <span style={{fontSize:13,fontWeight:700,color:"#C8A96E"}}>{calcAge(value)}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NumberInput({value,onChange,placeholder,onNext}) {
+  return (
+    <div style={{animation:"fadeUp .3s ease .08s both"}}>
+      <input type="number" value={value||""} placeholder={placeholder} min={30} max={90}
+        onChange={e=>onChange(e.target.value)}
+        onKeyDown={e=>e.key==="Enter"&&value&&onNext()}
+        style={{width:"100%",padding:"15px 16px",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.12)",borderRadius:10,color:"#F5F2EC",fontSize:22,fontWeight:600,textAlign:"center",outline:"none",colorScheme:"dark"}}/>
+      <p style={{fontSize:11,color:"#6E8299",textAlign:"center",marginTop:8}}>Enter an age between 30 and 90</p>
+    </div>
+  );
+}
+
+// ── Question Screen ──
+// Anchored motivation questions get a split layout: fact block above, then question + choices below
+function QuestionScreen({question,answer,onAnswer,onNext,onBack,stepNum,totalSteps}) {
+  const [showWhy,setShowWhy]=useState(false);
+  const [textVal,setTextVal]=useState(answer||"");
+  const [multiSel,setMultiSel]=useState(Array.isArray(answer)?answer:[]);
+  const inputRef=useRef(null);
+
+  useEffect(()=>{
+    setTextVal(answer||""); setMultiSel(Array.isArray(answer)?answer:[]); setShowWhy(false);
+    if((question.type==="text"||question.type==="number")&&inputRef.current) setTimeout(()=>inputRef.current?.focus(),100);
+  },[question.id]);
+
+  const toggleMulti=id=>{const n=multiSel.includes(id)?multiSel.filter(x=>x!==id):[...multiSel,id];setMultiSel(n);onAnswer(n);};
+
+  const isValidEmail = v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+  const canContinue=
+    question.type==="email"?isValidEmail(textVal):
+    question.type==="text"?(question.id==="open_concerns"||question.id==="retirement_vision"||question.id==="cpa_name"||question.id==="advisor_name"||question.id==="attorney_name"||question.id==="referring_advisor_name"||question.id==="phone"||textVal.trim().length>0):
+    question.type==="number"?(!!answer&&parseInt(answer)>=30&&parseInt(answer)<=90):
+    question.type==="multi"?multiSel.length>0:
+    question.type==="date"?(!!answer&&calcAge(answer)!==null):
+    question.type==="select"?!!answer:
+    !!answer;
+
+  const pct=Math.round((stepNum/totalSteps)*100);
+
+  // Parse anchored questions — format: "ANCHOR_FACT || QUESTION_TEXT"
+  const hasAnchor=question.anchor;
+
+  // Section label for motivations phase
+  const isMotivation=question.phase==="motivations";
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",height:"100vh",background:"#0E1824",position:"relative",overflow:"hidden",fontFamily:"'DM Sans',sans-serif"}}>
+      <div style={{position:"absolute",top:-100,right:-100,width:380,height:380,borderRadius:"50%",background:"radial-gradient(circle,rgba(200,169,110,.06) 0%,transparent 70%)",pointerEvents:"none"}}/>
+
+      {/* Header */}
+      <div style={{padding:"14px 20px 0",flexShrink:0}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+          <div style={{display:"flex",flexDirection:"column",gap:3}}>
+            <div dangerouslySetInnerHTML={{__html:`<svg id="Layer_1" style="height:30px;width:auto;display:block;" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="875 1789 3260 1462">
+  <!-- Generator: Adobe Illustrator 30.0.0, SVG Export Plug-In . SVG Version: 2.1.1 Build 123)  -->
+  <defs>
+    <style>
+      .st0 {
+        fill: #C8A96E;
+      }
+    </style>
+  </defs>
+  <g>
+    <rect class="st0" x="914.76" y="2074.65" width="228.09" height="228.09"/>
+    <rect class="st0" x="1226.07" y="2697.25" width="228.09" height="228.09"/>
+    <path class="st0" d="M1564.58,2074.65h-338.52v228.09h566.61c0-125.97-102.12-228.09-228.09-228.09Z"/>
+    <path class="st0" d="M1226.07,2614.05h338.52c125.97,0,228.09-102.12,228.09-228.09h-566.61v228.09Z"/>
+    <rect class="st0" x="914.76" y="2385.95" width="228.09" height="539.39"/>
+  </g>
+  <g>
+    <rect class="st0" x="2246.63" y="1965.47" width="36.35" height="254.46"/>
+    <path class="st0" d="M2385.48,2120.69c0-14.05,2.49-25.8,7.45-35.25,4.97-9.45,12.06-16.6,21.27-21.45s19.99-7.27,32.35-7.27c16.47,0,29.26,4.73,38.35,14.17,9.09,9.45,13.63,23.51,13.63,42.17v106.87h34.9v-110.87c0-18.9-3.4-34.53-10.18-46.89-6.79-12.36-16.17-21.56-28.17-27.63-12-6.05-25.87-9.09-41.62-9.09-17.45,0-32.72,3.52-45.8,10.54-9.77,5.25-17.64,12.06-23.63,20.41v-29.14h-33.44v192.66h34.9v-99.24Z"/>
+    <path class="st0" d="M2599.59,2161.76c0,19.39,5.33,34.3,15.99,44.72,10.66,10.42,25.68,15.63,45.07,15.63,8,0,15.69-1.1,23.08-3.27,7.39-2.18,13.75-5.57,19.08-10.18l-10.9-25.08c-7.27,6.06-16.36,9.09-27.26,9.09-9.7,0-17.15-2.79-22.36-8.36-5.21-5.58-7.81-13.57-7.81-24v-104.33h55.25v-28.72h-55.25v-42.17h-34.9v42.17h-32.72v28.72h32.72v105.78Z"/>
+    <path class="st0" d="M2766.26,2209.39c15.63,8.49,33.74,12.73,54.34,12.73,15.99,0,30.47-2.66,43.44-8,12.96-5.33,23.81-13.09,32.53-23.27l-19.27-22.54c-7.03,7.76-15.21,13.58-24.53,17.45-9.34,3.87-19.69,5.81-31.08,5.81-13.81,0-26.05-2.79-36.72-8.36-10.67-5.57-18.96-13.39-24.9-23.44-4.38-7.42-7.12-15.6-8.27-24.54h156.39c.24-1.69.42-3.51.55-5.46.12-1.93.18-3.63.18-5.08,0-19.87-4.06-37.26-12.18-52.17-8.12-14.9-19.33-26.47-33.63-34.71-14.3-8.24-30.78-12.36-49.44-12.36s-34.96,4.19-49.62,12.54c-14.67,8.36-26.17,19.93-34.54,34.71-8.36,14.79-12.54,31.75-12.54,50.9s4.3,36.11,12.9,50.89c8.6,14.78,20.72,26.42,36.35,34.9ZM2759.17,2085.97c5.33-9.81,12.72-17.44,22.18-22.89,9.45-5.46,20.23-8.18,32.35-8.18s23.2,2.72,32.53,8.18c9.33,5.45,16.66,13.02,21.99,22.72,4.04,7.34,6.46,15.47,7.3,24.35h-123.8c1.02-8.82,3.49-16.88,7.45-24.17Z"/>
+    <path class="st0" d="M2983.64,2200.12c14.66,7.88,31.32,11.81,49.98,11.81,16.48,0,31.5-3.45,45.07-10.36,9.48-4.82,17.54-11.43,24.36-19.62v15.44c0,21.81-5.33,38.04-15.99,48.71-10.67,10.66-27.39,15.99-50.17,15.99-14.3,0-27.99-2.25-41.07-6.72-13.09-4.49-24.12-10.61-33.08-18.36l-16.72,26.9c10.42,9.21,23.93,16.3,40.53,21.27,16.6,4.96,33.74,7.45,51.44,7.45,32.72,0,57.56-8,74.52-23.99,16.96-16,25.44-40.96,25.44-74.89v-166.49h-33.08v29.56c-7.16-9.18-15.87-16.32-26.17-21.38-13.57-6.67-28.6-10-45.07-10-18.67,0-35.32,3.88-49.98,11.64-14.67,7.76-26.3,18.6-34.9,32.53-8.6,13.94-12.9,30.23-12.9,48.89s4.3,34.66,12.9,48.71c8.6,14.06,20.23,25.03,34.9,32.9ZM2979.64,2085.8c5.69-9.45,13.57-16.78,23.63-22,10.05-5.21,21.5-7.82,34.35-7.82s24.23,2.61,34.17,7.82c9.94,5.21,17.75,12.54,23.45,22,5.69,9.45,8.54,20.35,8.54,32.71s-2.85,23.27-8.54,32.71c-5.7,9.45-13.51,16.85-23.45,22.18-9.94,5.33-21.33,7.99-34.17,7.99s-24.3-2.66-34.35-7.99c-10.06-5.33-17.94-12.73-23.63-22.18-5.7-9.45-8.54-20.35-8.54-32.71s2.85-23.27,8.54-32.71Z"/>
+    <path class="st0" d="M3235.72,2123.96c0-21.08,5.45-37.2,16.36-48.35,10.9-11.14,25.68-16.72,44.35-16.72h3.82c1.33,0,2.73.13,4.18.37v-33.81c-18.42,0-33.93,3.52-46.53,10.54-10.4,5.8-18.18,13.88-23.63,23.96v-32.69h-33.44v192.66h34.9v-95.97Z"/>
+    <path class="st0" d="M3393.12,2109.06c-19.15,0-34.35,2.54-45.62,7.63-11.27,5.09-19.39,11.88-24.36,20.36-4.97,8.49-7.45,17.93-7.45,28.35s2.91,20.66,8.72,29.26c5.82,8.6,14.11,15.33,24.9,20.17,10.78,4.86,23.32,7.28,37.62,7.28,17.69,0,32.35-3.33,43.98-10,8.2-4.7,14.56-10.63,19.26-17.68v25.5h33.08v-116.32c0-26.41-7.15-46.04-21.45-58.89-14.3-12.85-34.66-19.27-61.07-19.27-15.27,0-29.87,2.12-43.8,6.36-13.94,4.25-25.87,10.36-35.81,18.36l14.54,26.17c7.51-6.3,16.72-11.33,27.62-15.09,10.91-3.76,22.05-5.64,33.44-5.64,17.2,0,30.11,4.06,38.71,12.18,8.6,8.13,12.9,19.58,12.9,34.36v6.9h-55.25ZM3448.38,2161.04c-4.36,11.15-11.45,19.63-21.27,25.44-9.81,5.81-21.27,8.72-34.35,8.72s-23.75-2.85-31.26-8.54c-7.52-5.69-11.27-13.27-11.27-22.72,0-8.24,3.03-15.27,9.09-21.08,6.05-5.81,17.81-8.72,35.26-8.72h53.8v26.9Z"/>
+    <path class="st0" d="M3549.43,2161.76c0,19.39,5.33,34.3,15.99,44.72,10.66,10.42,25.68,15.63,45.07,15.63,8,0,15.69-1.1,23.08-3.27,7.39-2.18,13.75-5.57,19.08-10.18l-10.9-25.08c-7.27,6.06-16.36,9.09-27.26,9.09-9.7,0-17.15-2.79-22.36-8.36-5.21-5.58-7.81-13.57-7.81-24v-104.33h55.25v-28.72h-55.25v-42.17h-34.9v42.17h-32.72v28.72h32.72v105.78Z"/>
+    <path class="st0" d="M3812.97,2037.81c-14.3-8.24-30.78-12.36-49.44-12.36s-34.96,4.19-49.62,12.54c-14.67,8.36-26.17,19.93-34.54,34.71-8.36,14.79-12.54,31.75-12.54,50.9s4.3,36.11,12.9,50.89c8.6,14.78,20.72,26.42,36.35,34.9,15.63,8.49,33.74,12.73,54.34,12.73,15.99,0,30.47-2.66,43.44-8,12.96-5.33,23.81-13.09,32.53-23.27l-19.27-22.54c-7.03,7.76-15.21,13.58-24.53,17.45-9.34,3.87-19.69,5.81-31.08,5.81-13.81,0-26.05-2.79-36.72-8.36-10.67-5.57-18.96-13.39-24.9-23.44-4.38-7.42-7.12-15.6-8.27-24.54h156.39c.24-1.69.42-3.51.55-5.46.12-1.93.18-3.63.18-5.08,0-19.87-4.06-37.26-12.18-52.17-8.12-14.9-19.33-26.47-33.63-34.71ZM3701.56,2110.15c1.02-8.82,3.49-16.88,7.45-24.17,5.33-9.81,12.72-17.44,22.18-22.89,9.45-5.46,20.23-8.18,32.35-8.18s23.2,2.72,32.53,8.18c9.33,5.45,16.66,13.02,21.99,22.72,4.04,7.34,6.46,15.47,7.3,24.35h-123.8Z"/>
+    <path class="st0" d="M4050.34,1950.21v106.5c-6.55-8.47-14.24-15.34-23.27-20.35-13.09-7.27-27.75-10.91-43.98-10.91-18.66,0-35.32,4.13-49.98,12.36-14.66,8.24-26.24,19.69-34.71,34.36-8.49,14.66-12.72,31.81-12.72,51.44s4.24,36.84,12.72,51.62c8.48,14.78,20.05,26.3,34.71,34.53,14.66,8.24,31.32,12.36,49.98,12.36,16.72,0,31.63-3.7,44.71-11.09,9.43-5.33,17.39-12.58,23.99-21.62v30.53h33.44v-269.72h-34.89ZM4042.16,2159.41c-5.7,10.31-13.45,18.24-23.26,23.81-9.81,5.58-20.78,8.36-32.9,8.36s-23.39-2.79-33.08-8.36c-9.7-5.57-17.45-13.5-23.26-23.81-5.82-10.3-8.73-22.23-8.73-35.8s2.91-25.75,8.73-35.81c5.81-10.05,13.57-17.87,23.26-23.44,9.69-5.57,20.72-8.36,33.08-8.36s23.08,2.79,32.9,8.36c9.81,5.57,17.57,13.39,23.26,23.44,5.69,10.06,8.54,22,8.54,35.81s-2.85,25.5-8.54,35.8Z"/>
+    <path class="st0" d="M2402.93,2389.86c-15.76-7.03-34.78-10.54-57.07-10.54h-99.24v254.46h36.35v-77.06h62.89c22.29,0,41.31-3.58,57.07-10.72,15.75-7.15,27.87-17.32,36.35-30.54,8.48-13.21,12.73-29.02,12.73-47.44s-4.24-34.29-12.73-47.62c-8.48-13.33-20.6-23.5-36.35-30.54ZM2397.66,2510.18c-12,9.94-29.63,14.9-52.89,14.9h-61.79v-114.14h61.79c23.26,0,40.89,4.97,52.89,14.9,12,9.94,18,23.99,18,42.17s-6,32.23-18,42.17Z"/>
+    <rect class="st0" x="2500.35" y="2364.05" width="34.9" height="269.72"/>
+    <path class="st0" d="M2717.72,2608.27v25.5h33.08v-116.32c0-26.41-7.15-46.04-21.45-58.89-14.3-12.85-34.66-19.27-61.07-19.27-15.27,0-29.87,2.12-43.8,6.36-13.94,4.25-25.87,10.36-35.81,18.36l14.54,26.17c7.51-6.3,16.72-11.33,27.62-15.09,10.91-3.76,22.05-5.64,33.44-5.64,17.2,0,30.11,4.06,38.71,12.18,8.6,8.13,12.9,19.58,12.9,34.36v6.9h-55.25c-19.15,0-34.35,2.54-45.62,7.63-11.27,5.09-19.39,11.88-24.36,20.36-4.97,8.49-7.45,17.93-7.45,28.35s2.91,20.66,8.72,29.26c5.82,8.6,14.11,15.33,24.9,20.17,10.78,4.86,23.32,7.28,37.62,7.28,17.69,0,32.35-3.33,43.98-10,8.2-4.7,14.56-10.63,19.26-17.68ZM2694.64,2600.33c-9.81,5.81-21.27,8.72-34.35,8.72s-23.75-2.85-31.26-8.54c-7.52-5.69-11.27-13.27-11.27-22.72,0-8.24,3.03-15.27,9.09-21.08,6.05-5.81,17.81-8.72,35.26-8.72h53.8v26.9c-4.36,11.15-11.45,19.63-21.27,25.44Z"/>
+    <path class="st0" d="M2956.37,2448.38c-12-6.05-25.87-9.09-41.62-9.09-17.45,0-32.72,3.52-45.8,10.54-9.77,5.25-17.64,12.06-23.63,20.41v-29.14h-33.44v192.66h34.9v-99.24c0-14.05,2.49-25.8,7.45-35.25,4.97-9.45,12.06-16.6,21.27-21.45,9.21-4.85,19.99-7.27,32.35-7.27,16.47,0,29.26,4.73,38.35,14.17,9.09,9.45,13.63,23.51,13.63,42.17v106.87h34.9v-110.87c0-18.9-3.4-34.53-10.18-46.89-6.79-12.36-16.17-21.56-28.17-27.63Z"/>
+    <path class="st0" d="M3238.63,2633.77v-110.87c0-18.9-3.4-34.53-10.18-46.89-6.79-12.36-16.17-21.56-28.17-27.63-12-6.05-25.87-9.09-41.62-9.09-17.45,0-32.72,3.52-45.8,10.54-9.77,5.25-17.64,12.06-23.63,20.41v-29.14h-33.44v192.66h34.9v-99.24c0-14.05,2.49-25.8,7.45-35.25,4.97-9.45,12.06-16.6,21.27-21.45,9.21-4.85,19.99-7.27,32.35-7.27,16.47,0,29.26,4.73,38.35,14.17,9.09,9.45,13.63,23.51,13.63,42.17v106.87h34.9Z"/>
+    <rect class="st0" x="3299.7" y="2441.11" width="34.9" height="192.66"/>
+    <path class="st0" d="M3334.05,2364.95c-4.49-4.23-10.12-6.36-16.9-6.36s-12.42,2.18-16.9,6.54c-4.49,4.36-6.73,9.82-6.73,16.36s2.24,11.64,6.73,16c4.48,4.36,10.12,6.55,16.9,6.55s12.73-2.24,17.09-6.73c4.36-4.48,6.54-9.99,6.54-16.54s-2.24-11.57-6.72-15.82Z"/>
+    <path class="st0" d="M3541.97,2448.38c-12-6.05-25.87-9.09-41.62-9.09-17.45,0-32.72,3.52-45.8,10.54-9.77,5.25-17.64,12.06-23.63,20.41v-29.14h-33.44v192.66h34.9v-99.24c0-14.05,2.49-25.8,7.45-35.25,4.97-9.45,12.06-16.6,21.27-21.45,9.21-4.85,19.99-7.27,32.35-7.27,16.47,0,29.26,4.73,38.35,14.17,9.09,9.45,13.63,23.51,13.63,42.17v106.87h34.9v-110.87c0-18.9-3.4-34.53-10.18-46.89-6.79-12.36-16.17-21.56-28.17-27.63Z"/>
+    <path class="st0" d="M3792.61,2470.67c-7.16-9.18-15.87-16.32-26.17-21.38-13.57-6.67-28.6-10-45.07-10-18.67,0-35.32,3.88-49.98,11.64-14.67,7.76-26.3,18.6-34.9,32.53-8.6,13.94-12.9,30.23-12.9,48.89s4.3,34.66,12.9,48.71c8.6,14.06,20.23,25.03,34.9,32.9,14.66,7.88,31.32,11.81,49.98,11.81,16.48,0,31.5-3.45,45.07-10.36,9.48-4.82,17.54-11.43,24.36-19.62v15.44c0,21.81-5.33,38.04-15.99,48.71-10.67,10.66-27.39,15.99-50.17,15.99-14.3,0-27.99-2.25-41.07-6.72-13.09-4.49-24.12-10.61-33.08-18.36l-16.72,26.9c10.42,9.21,23.93,16.3,40.53,21.27,16.6,4.96,33.74,7.45,51.44,7.45,32.72,0,57.56-8,74.52-23.99,16.96-16,25.44-40.96,25.44-74.89v-166.49h-33.08v29.56ZM3782.98,2565.06c-5.7,9.45-13.51,16.85-23.45,22.18-9.94,5.33-21.33,7.99-34.17,7.99s-24.3-2.66-34.35-7.99c-10.06-5.33-17.94-12.73-23.63-22.18-5.7-9.45-8.54-20.35-8.54-32.71s2.85-23.27,8.54-32.71c5.69-9.45,13.57-16.78,23.63-22,10.05-5.21,21.5-7.82,34.35-7.82s24.23,2.61,34.17,7.82c9.94,5.21,17.75,12.54,23.45,22,5.69,9.45,8.54,20.35,8.54,32.71s-2.85,23.27-8.54,32.71Z"/>
+    <path class="st0" d="M2402.93,2803.7c-15.76-7.03-34.78-10.54-57.07-10.54h-99.24v254.46h36.35v-77.06h62.89c22.29,0,41.31-3.58,57.07-10.72,15.75-7.15,27.87-17.32,36.35-30.54,8.48-13.21,12.73-29.02,12.73-47.44s-4.24-34.29-12.73-47.62c-8.48-13.33-20.6-23.5-36.35-30.54ZM2397.66,2924.02c-12,9.94-29.63,14.9-52.89,14.9h-61.79v-114.14h61.79c23.26,0,40.89,4.97,52.89,14.9,12,9.94,18,23.99,18,42.17s-6,32.23-18,42.17Z"/>
+    <path class="st0" d="M2565.05,2853.13c-15.27,0-29.87,2.12-43.8,6.36-13.94,4.25-25.87,10.36-35.81,18.36l14.54,26.17c7.51-6.3,16.72-11.33,27.62-15.09,10.91-3.76,22.05-5.64,33.44-5.64,17.2,0,30.11,4.06,38.71,12.18,8.6,8.13,12.9,19.58,12.9,34.36v6.9h-55.25c-19.15,0-34.35,2.54-45.62,7.63-11.27,5.09-19.39,11.88-24.36,20.36-4.97,8.49-7.45,17.93-7.45,28.35s2.91,20.66,8.72,29.26c5.82,8.6,14.11,15.33,24.9,20.17,10.78,4.86,23.32,7.28,37.62,7.28,17.69,0,32.35-3.33,43.98-10,8.2-4.7,14.56-10.63,19.26-17.68v25.5h33.08v-116.32c0-26.41-7.15-46.04-21.45-58.89-14.3-12.85-34.66-19.27-61.07-19.27ZM2612.67,2988.72c-4.36,11.15-11.45,19.63-21.27,25.44-9.81,5.81-21.27,8.72-34.35,8.72s-23.75-2.85-31.26-8.54c-7.52-5.69-11.27-13.27-11.27-22.72,0-8.24,3.03-15.27,9.09-21.08,6.05-5.81,17.81-8.72,35.26-8.72h53.8v26.9Z"/>
+    <path class="st0" d="M2742.08,2887.64v-32.69h-33.44v192.66h34.9v-95.97c0-21.08,5.45-37.2,16.36-48.35,10.9-11.14,25.68-16.72,44.35-16.72h3.82c1.33,0,2.73.13,4.18.37v-33.81c-18.42,0-33.93,3.52-46.53,10.54-10.4,5.8-18.18,13.88-23.63,23.96Z"/>
+    <path class="st0" d="M2929.65,3020.35c-9.7,0-17.15-2.79-22.36-8.36-5.21-5.58-7.81-13.57-7.81-24v-104.33h55.25v-28.72h-55.25v-42.17h-34.9v42.17h-32.72v28.72h32.72v105.78c0,19.39,5.33,34.3,15.99,44.72,10.66,10.42,25.68,15.63,45.07,15.63,8,0,15.69-1.1,23.08-3.27,7.39-2.18,13.75-5.57,19.08-10.18l-10.9-25.08c-7.27,6.06-16.36,9.09-27.26,9.09Z"/>
+    <path class="st0" d="M3150.84,2862.22c-12-6.05-25.87-9.09-41.62-9.09-17.45,0-32.72,3.52-45.8,10.54-9.77,5.25-17.64,12.06-23.63,20.41v-29.14h-33.44v192.66h34.9v-99.24c0-14.05,2.49-25.8,7.45-35.25,4.97-9.45,12.06-16.6,21.27-21.45,9.21-4.85,19.99-7.27,32.35-7.27,16.47,0,29.26,4.73,38.35,14.17,9.09,9.45,13.63,23.51,13.63,42.17v106.87h34.9v-110.87c0-18.9-3.4-34.53-10.18-46.89-6.79-12.36-16.17-21.56-28.17-27.63Z"/>
+    <path class="st0" d="M3378.57,2865.49c-14.3-8.24-30.78-12.36-49.44-12.36s-34.96,4.19-49.62,12.54c-14.67,8.36-26.17,19.93-34.54,34.71-8.36,14.79-12.54,31.75-12.54,50.9s4.3,36.11,12.9,50.89c8.6,14.78,20.72,26.42,36.35,34.9,15.63,8.49,33.74,12.73,54.34,12.73,15.99,0,30.47-2.66,43.44-8,12.96-5.33,23.81-13.09,32.53-23.27l-19.27-22.54c-7.03,7.76-15.21,13.58-24.53,17.45-9.34,3.87-19.69,5.81-31.08,5.81-13.81,0-26.05-2.79-36.72-8.36-10.67-5.57-18.96-13.39-24.9-23.44-4.38-7.42-7.12-15.6-8.27-24.54h156.39c.24-1.69.42-3.51.55-5.46.12-1.93.18-3.63.18-5.08,0-19.87-4.06-37.26-12.18-52.17-8.12-14.9-19.33-26.47-33.63-34.71ZM3267.16,2937.83c1.02-8.82,3.49-16.89,7.45-24.17,5.33-9.81,12.72-17.44,22.18-22.89,9.45-5.46,20.23-8.18,32.35-8.18s23.2,2.72,32.53,8.18c9.33,5.45,16.66,13.02,21.99,22.72,4.04,7.34,6.46,15.47,7.3,24.35h-123.8Z"/>
+    <path class="st0" d="M3502.53,2887.64v-32.69h-33.44v192.66h34.9v-95.97c0-21.08,5.45-37.2,16.36-48.35,10.9-11.14,25.68-16.72,44.35-16.72h3.82c1.33,0,2.73.13,4.18.37v-33.81c-18.42,0-33.93,3.52-46.53,10.54-10.4,5.8-18.18,13.88-23.63,23.96Z"/>
+    <path class="st0" d="M3728.45,2951.28c-7.15-3.64-15.09-6.48-23.81-8.55-8.73-2.06-17.45-3.75-26.17-5.08-8.72-1.33-16.66-2.97-23.81-4.91-7.15-1.94-12.97-4.67-17.45-8.18-4.49-3.51-6.72-8.54-6.72-15.09,0-7.75,3.75-14.11,11.27-19.08,7.51-4.96,18.9-7.45,34.17-7.45,9.45,0,18.9,1.09,28.35,3.27,9.45,2.18,18.54,6.17,27.26,12l14.91-27.63c-8.24-5.57-18.85-9.87-31.81-12.91-12.97-3.02-25.75-4.54-38.35-4.54-16.48,0-30.71,2.37-42.71,7.09-12,4.73-21.27,11.45-27.81,20.17-6.54,8.73-9.81,18.91-9.81,30.54s2.18,20.06,6.55,26.72c4.36,6.67,10.18,11.87,17.45,15.63,7.27,3.76,15.27,6.67,23.99,8.72,8.72,2.06,17.45,3.77,26.17,5.09,8.73,1.34,16.66,2.85,23.81,4.54,7.15,1.7,12.9,4.25,17.27,7.63,4.36,3.39,6.55,8.12,6.55,14.18,0,8.24-3.58,14.67-10.72,19.26-7.15,4.6-18.85,6.9-35.08,6.9-12.6,0-24.96-1.93-37.08-5.81-12.12-3.87-22.3-8.6-30.54-14.17l-14.54,27.62c8.24,6.31,19.57,11.64,33.99,16,14.42,4.36,29.63,6.55,45.62,6.55,17.2,0,31.99-2.37,44.35-7.09,12.36-4.73,21.93-11.33,28.72-19.81,6.78-8.48,10.18-18.53,10.18-30.17,0-10.91-2.25-19.63-6.73-26.17-4.49-6.54-10.3-11.63-17.45-15.26Z"/>
+  </g>
+  <rect class="st0" x="2011.69" y="1828.72" width="15.92" height="1342.55"/>
+</svg>`}} />
+            <div style={{fontSize:9,color:"#6E8299",letterSpacing:".08em",textTransform:"none"}}>
+              {isMotivation ? <span style={{color:"rgba(200,169,110,.7)"}}>Goals & Concerns</span> : "StructureReview™"}
+            </div>
+          </div>
+          {stepNum>1&&<button onClick={onBack} style={{color:"#6E8299",fontSize:12,fontWeight:500,display:"flex",alignItems:"center",gap:5}}>← Back</button>}
+        </div>
+        <div style={{marginBottom:4}}>
+          <div style={{display:"flex",justifyContent:"flex-end",marginBottom:5}}>
+            <span style={{fontSize:10,color:"#6E8299"}}>{pct}%</span>
+          </div>
+          <div style={{height:3,background:"rgba(255,255,255,.07)",borderRadius:2}}>
+            <div style={{height:"100%",width:`${pct}%`,background:"linear-gradient(90deg,#C8A96E,#E0C080)",borderRadius:2,transition:"width .4s ease"}}/>
+          </div>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div style={{flex:1,padding:"20px 20px 0",overflowY:"auto"}}>
+
+        {/* Anchor fact block if present */}
+        {question.anchor&&<AnchorFact text={question.anchor}/>}
+
+        <div style={{animation:"fadeUp .32s ease both"}}>
+          <h2 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:question.anchor?20:24,fontWeight:400,lineHeight:1.38,color:"#F5F2EC",marginBottom:20}}>
+            {question.shortQ||question.q}
+          </h2>
+        </div>
+
+        {question.type==="single"&&question.options.map((o,i)=>
+          <ChoiceBtn key={o.id} label={o.label} selected={answer===o.id} index={i} onClick={()=>onAnswer(o.id)}/>
+        )}
+        {question.type==="multi"&&<>
+          <p style={{fontSize:11,color:"#6E8299",marginBottom:10,fontWeight:500}}>Select all that apply</p>
+          {question.options.map((o,i)=>
+            <ChoiceBtn key={o.id} label={o.label} selected={multiSel.includes(o.id)} index={i} onClick={()=>toggleMulti(o.id)}/>
+          )}
+        </>}
+        {(question.type==="text"||question.type==="email")&&(
+          <div style={{animation:"fadeUp .3s ease .08s both"}}>
+            <input ref={inputRef} type={question.type==="email"?"email":"text"} value={textVal} placeholder={question.placeholder}
+              onChange={e=>{setTextVal(e.target.value);onAnswer(e.target.value);}}
+              onKeyDown={e=>e.key==="Enter"&&canContinue&&onNext()}
+              style={{width:"100%",padding:"15px 16px",background:"rgba(255,255,255,.05)",border:`1px solid ${question.type==="email"&&textVal.length>3&&!isValidEmail(textVal)?"rgba(196,122,122,.6)":"rgba(255,255,255,.12)"}`,borderRadius:10,color:"#F5F2EC",fontSize:15,outline:"none"}}/>
+            {question.type==="email"&&textVal.length>3&&!isValidEmail(textVal)&&(
+              <p style={{fontSize:11,color:"#C47A7A",marginTop:7}}>Please enter a valid email — example@domain.com</p>
+            )}
+          </div>
+        )}
+        {question.type==="date"&&<DateInput value={answer} onChange={onAnswer}/>}
+        {question.type==="number"&&<NumberInput value={answer} onChange={onAnswer} placeholder={question.placeholder} onNext={onNext}/>}
+        {question.type==="select"&&(
+          <div style={{animation:"fadeUp .3s ease .08s both",position:"relative"}}>
+            <select value={answer||""} onChange={e=>onAnswer(e.target.value)}
+              style={{width:"100%",padding:"15px 16px",background:"#162032",border:"1px solid rgba(255,255,255,.12)",borderRadius:10,color:answer?"#F5F2EC":"#6E8299",fontSize:15,outline:"none",colorScheme:"dark",appearance:"none",paddingRight:40}}>
+              <option value="" disabled>Select your state...</option>
+              {question.options.map(o=><option key={o.id} value={o.id}>{o.label}</option>)}
+            </select>
+            <span style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",color:"#6E8299",fontSize:12,pointerEvents:"none"}}>▾</span>
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div style={{padding:"16px 20px 24px",flexShrink:0}}>
+        {question.why&&(
+          <button onClick={()=>setShowWhy(true)} style={{display:"flex",alignItems:"center",gap:7,marginBottom:12,color:"#6E8299",fontSize:12,fontWeight:500}}>
+            <span style={{width:17,height:17,borderRadius:"50%",border:"1px solid #4A6070",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,color:"#6E8299"}}>?</span>
+            Why are we asking this?
+          </button>
+        )}
+        <button onClick={()=>{if(question.type==="text"||question.type==="number")onAnswer(textVal||answer);onNext();}} disabled={!canContinue} style={{
+          width:"100%",padding:"15px",borderRadius:11,fontSize:14,fontWeight:700,letterSpacing:".03em",
+          background:canContinue?"#C8A96E":"rgba(255,255,255,.06)",
+          color:canContinue?"#0E1824":"#3A5268",
+          transition:"all .18s ease",
+        }}>{stepNum===totalSteps?"Complete Review →":"Continue →"}</button>
+      </div>
+      {showWhy&&<WhyCard text={question.why} onClose={()=>setShowWhy(false)}/>}
+    </div>
+  );
+}
+
+// ── Welcome ──
+function WelcomeScreen({onStart}) {
+  return (
+    <div style={{minHeight:"100vh",background:"#0E1824",display:"flex",flexDirection:"column",justifyContent:"center",padding:"36px 24px",position:"relative",overflow:"hidden",fontFamily:"'DM Sans',sans-serif"}}>
+      <div style={{position:"absolute",top:-80,right:-80,width:440,height:440,borderRadius:"50%",background:"radial-gradient(circle,rgba(200,169,110,.07) 0%,transparent 65%)",pointerEvents:"none"}}/>
+      <div style={{position:"absolute",bottom:-80,left:-80,width:360,height:360,borderRadius:"50%",background:"radial-gradient(circle,rgba(95,168,160,.05) 0%,transparent 65%)",pointerEvents:"none"}}/>
+      <div style={{animation:"fadeUp .45s ease both",maxWidth:400}}>
+        <div style={{marginBottom:16}} dangerouslySetInnerHTML={{__html:`<svg id="Layer_1" style="height:44px;width:auto;display:block;" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="875 1789 3260 1462">
+  <!-- Generator: Adobe Illustrator 30.0.0, SVG Export Plug-In . SVG Version: 2.1.1 Build 123)  -->
+  <defs>
+    <style>
+      .st0 {
+        fill: #C8A96E;
+      }
+    </style>
+  </defs>
+  <g>
+    <rect class="st0" x="914.76" y="2074.65" width="228.09" height="228.09"/>
+    <rect class="st0" x="1226.07" y="2697.25" width="228.09" height="228.09"/>
+    <path class="st0" d="M1564.58,2074.65h-338.52v228.09h566.61c0-125.97-102.12-228.09-228.09-228.09Z"/>
+    <path class="st0" d="M1226.07,2614.05h338.52c125.97,0,228.09-102.12,228.09-228.09h-566.61v228.09Z"/>
+    <rect class="st0" x="914.76" y="2385.95" width="228.09" height="539.39"/>
+  </g>
+  <g>
+    <rect class="st0" x="2246.63" y="1965.47" width="36.35" height="254.46"/>
+    <path class="st0" d="M2385.48,2120.69c0-14.05,2.49-25.8,7.45-35.25,4.97-9.45,12.06-16.6,21.27-21.45s19.99-7.27,32.35-7.27c16.47,0,29.26,4.73,38.35,14.17,9.09,9.45,13.63,23.51,13.63,42.17v106.87h34.9v-110.87c0-18.9-3.4-34.53-10.18-46.89-6.79-12.36-16.17-21.56-28.17-27.63-12-6.05-25.87-9.09-41.62-9.09-17.45,0-32.72,3.52-45.8,10.54-9.77,5.25-17.64,12.06-23.63,20.41v-29.14h-33.44v192.66h34.9v-99.24Z"/>
+    <path class="st0" d="M2599.59,2161.76c0,19.39,5.33,34.3,15.99,44.72,10.66,10.42,25.68,15.63,45.07,15.63,8,0,15.69-1.1,23.08-3.27,7.39-2.18,13.75-5.57,19.08-10.18l-10.9-25.08c-7.27,6.06-16.36,9.09-27.26,9.09-9.7,0-17.15-2.79-22.36-8.36-5.21-5.58-7.81-13.57-7.81-24v-104.33h55.25v-28.72h-55.25v-42.17h-34.9v42.17h-32.72v28.72h32.72v105.78Z"/>
+    <path class="st0" d="M2766.26,2209.39c15.63,8.49,33.74,12.73,54.34,12.73,15.99,0,30.47-2.66,43.44-8,12.96-5.33,23.81-13.09,32.53-23.27l-19.27-22.54c-7.03,7.76-15.21,13.58-24.53,17.45-9.34,3.87-19.69,5.81-31.08,5.81-13.81,0-26.05-2.79-36.72-8.36-10.67-5.57-18.96-13.39-24.9-23.44-4.38-7.42-7.12-15.6-8.27-24.54h156.39c.24-1.69.42-3.51.55-5.46.12-1.93.18-3.63.18-5.08,0-19.87-4.06-37.26-12.18-52.17-8.12-14.9-19.33-26.47-33.63-34.71-14.3-8.24-30.78-12.36-49.44-12.36s-34.96,4.19-49.62,12.54c-14.67,8.36-26.17,19.93-34.54,34.71-8.36,14.79-12.54,31.75-12.54,50.9s4.3,36.11,12.9,50.89c8.6,14.78,20.72,26.42,36.35,34.9ZM2759.17,2085.97c5.33-9.81,12.72-17.44,22.18-22.89,9.45-5.46,20.23-8.18,32.35-8.18s23.2,2.72,32.53,8.18c9.33,5.45,16.66,13.02,21.99,22.72,4.04,7.34,6.46,15.47,7.3,24.35h-123.8c1.02-8.82,3.49-16.88,7.45-24.17Z"/>
+    <path class="st0" d="M2983.64,2200.12c14.66,7.88,31.32,11.81,49.98,11.81,16.48,0,31.5-3.45,45.07-10.36,9.48-4.82,17.54-11.43,24.36-19.62v15.44c0,21.81-5.33,38.04-15.99,48.71-10.67,10.66-27.39,15.99-50.17,15.99-14.3,0-27.99-2.25-41.07-6.72-13.09-4.49-24.12-10.61-33.08-18.36l-16.72,26.9c10.42,9.21,23.93,16.3,40.53,21.27,16.6,4.96,33.74,7.45,51.44,7.45,32.72,0,57.56-8,74.52-23.99,16.96-16,25.44-40.96,25.44-74.89v-166.49h-33.08v29.56c-7.16-9.18-15.87-16.32-26.17-21.38-13.57-6.67-28.6-10-45.07-10-18.67,0-35.32,3.88-49.98,11.64-14.67,7.76-26.3,18.6-34.9,32.53-8.6,13.94-12.9,30.23-12.9,48.89s4.3,34.66,12.9,48.71c8.6,14.06,20.23,25.03,34.9,32.9ZM2979.64,2085.8c5.69-9.45,13.57-16.78,23.63-22,10.05-5.21,21.5-7.82,34.35-7.82s24.23,2.61,34.17,7.82c9.94,5.21,17.75,12.54,23.45,22,5.69,9.45,8.54,20.35,8.54,32.71s-2.85,23.27-8.54,32.71c-5.7,9.45-13.51,16.85-23.45,22.18-9.94,5.33-21.33,7.99-34.17,7.99s-24.3-2.66-34.35-7.99c-10.06-5.33-17.94-12.73-23.63-22.18-5.7-9.45-8.54-20.35-8.54-32.71s2.85-23.27,8.54-32.71Z"/>
+    <path class="st0" d="M3235.72,2123.96c0-21.08,5.45-37.2,16.36-48.35,10.9-11.14,25.68-16.72,44.35-16.72h3.82c1.33,0,2.73.13,4.18.37v-33.81c-18.42,0-33.93,3.52-46.53,10.54-10.4,5.8-18.18,13.88-23.63,23.96v-32.69h-33.44v192.66h34.9v-95.97Z"/>
+    <path class="st0" d="M3393.12,2109.06c-19.15,0-34.35,2.54-45.62,7.63-11.27,5.09-19.39,11.88-24.36,20.36-4.97,8.49-7.45,17.93-7.45,28.35s2.91,20.66,8.72,29.26c5.82,8.6,14.11,15.33,24.9,20.17,10.78,4.86,23.32,7.28,37.62,7.28,17.69,0,32.35-3.33,43.98-10,8.2-4.7,14.56-10.63,19.26-17.68v25.5h33.08v-116.32c0-26.41-7.15-46.04-21.45-58.89-14.3-12.85-34.66-19.27-61.07-19.27-15.27,0-29.87,2.12-43.8,6.36-13.94,4.25-25.87,10.36-35.81,18.36l14.54,26.17c7.51-6.3,16.72-11.33,27.62-15.09,10.91-3.76,22.05-5.64,33.44-5.64,17.2,0,30.11,4.06,38.71,12.18,8.6,8.13,12.9,19.58,12.9,34.36v6.9h-55.25ZM3448.38,2161.04c-4.36,11.15-11.45,19.63-21.27,25.44-9.81,5.81-21.27,8.72-34.35,8.72s-23.75-2.85-31.26-8.54c-7.52-5.69-11.27-13.27-11.27-22.72,0-8.24,3.03-15.27,9.09-21.08,6.05-5.81,17.81-8.72,35.26-8.72h53.8v26.9Z"/>
+    <path class="st0" d="M3549.43,2161.76c0,19.39,5.33,34.3,15.99,44.72,10.66,10.42,25.68,15.63,45.07,15.63,8,0,15.69-1.1,23.08-3.27,7.39-2.18,13.75-5.57,19.08-10.18l-10.9-25.08c-7.27,6.06-16.36,9.09-27.26,9.09-9.7,0-17.15-2.79-22.36-8.36-5.21-5.58-7.81-13.57-7.81-24v-104.33h55.25v-28.72h-55.25v-42.17h-34.9v42.17h-32.72v28.72h32.72v105.78Z"/>
+    <path class="st0" d="M3812.97,2037.81c-14.3-8.24-30.78-12.36-49.44-12.36s-34.96,4.19-49.62,12.54c-14.67,8.36-26.17,19.93-34.54,34.71-8.36,14.79-12.54,31.75-12.54,50.9s4.3,36.11,12.9,50.89c8.6,14.78,20.72,26.42,36.35,34.9,15.63,8.49,33.74,12.73,54.34,12.73,15.99,0,30.47-2.66,43.44-8,12.96-5.33,23.81-13.09,32.53-23.27l-19.27-22.54c-7.03,7.76-15.21,13.58-24.53,17.45-9.34,3.87-19.69,5.81-31.08,5.81-13.81,0-26.05-2.79-36.72-8.36-10.67-5.57-18.96-13.39-24.9-23.44-4.38-7.42-7.12-15.6-8.27-24.54h156.39c.24-1.69.42-3.51.55-5.46.12-1.93.18-3.63.18-5.08,0-19.87-4.06-37.26-12.18-52.17-8.12-14.9-19.33-26.47-33.63-34.71ZM3701.56,2110.15c1.02-8.82,3.49-16.88,7.45-24.17,5.33-9.81,12.72-17.44,22.18-22.89,9.45-5.46,20.23-8.18,32.35-8.18s23.2,2.72,32.53,8.18c9.33,5.45,16.66,13.02,21.99,22.72,4.04,7.34,6.46,15.47,7.3,24.35h-123.8Z"/>
+    <path class="st0" d="M4050.34,1950.21v106.5c-6.55-8.47-14.24-15.34-23.27-20.35-13.09-7.27-27.75-10.91-43.98-10.91-18.66,0-35.32,4.13-49.98,12.36-14.66,8.24-26.24,19.69-34.71,34.36-8.49,14.66-12.72,31.81-12.72,51.44s4.24,36.84,12.72,51.62c8.48,14.78,20.05,26.3,34.71,34.53,14.66,8.24,31.32,12.36,49.98,12.36,16.72,0,31.63-3.7,44.71-11.09,9.43-5.33,17.39-12.58,23.99-21.62v30.53h33.44v-269.72h-34.89ZM4042.16,2159.41c-5.7,10.31-13.45,18.24-23.26,23.81-9.81,5.58-20.78,8.36-32.9,8.36s-23.39-2.79-33.08-8.36c-9.7-5.57-17.45-13.5-23.26-23.81-5.82-10.3-8.73-22.23-8.73-35.8s2.91-25.75,8.73-35.81c5.81-10.05,13.57-17.87,23.26-23.44,9.69-5.57,20.72-8.36,33.08-8.36s23.08,2.79,32.9,8.36c9.81,5.57,17.57,13.39,23.26,23.44,5.69,10.06,8.54,22,8.54,35.81s-2.85,25.5-8.54,35.8Z"/>
+    <path class="st0" d="M2402.93,2389.86c-15.76-7.03-34.78-10.54-57.07-10.54h-99.24v254.46h36.35v-77.06h62.89c22.29,0,41.31-3.58,57.07-10.72,15.75-7.15,27.87-17.32,36.35-30.54,8.48-13.21,12.73-29.02,12.73-47.44s-4.24-34.29-12.73-47.62c-8.48-13.33-20.6-23.5-36.35-30.54ZM2397.66,2510.18c-12,9.94-29.63,14.9-52.89,14.9h-61.79v-114.14h61.79c23.26,0,40.89,4.97,52.89,14.9,12,9.94,18,23.99,18,42.17s-6,32.23-18,42.17Z"/>
+    <rect class="st0" x="2500.35" y="2364.05" width="34.9" height="269.72"/>
+    <path class="st0" d="M2717.72,2608.27v25.5h33.08v-116.32c0-26.41-7.15-46.04-21.45-58.89-14.3-12.85-34.66-19.27-61.07-19.27-15.27,0-29.87,2.12-43.8,6.36-13.94,4.25-25.87,10.36-35.81,18.36l14.54,26.17c7.51-6.3,16.72-11.33,27.62-15.09,10.91-3.76,22.05-5.64,33.44-5.64,17.2,0,30.11,4.06,38.71,12.18,8.6,8.13,12.9,19.58,12.9,34.36v6.9h-55.25c-19.15,0-34.35,2.54-45.62,7.63-11.27,5.09-19.39,11.88-24.36,20.36-4.97,8.49-7.45,17.93-7.45,28.35s2.91,20.66,8.72,29.26c5.82,8.6,14.11,15.33,24.9,20.17,10.78,4.86,23.32,7.28,37.62,7.28,17.69,0,32.35-3.33,43.98-10,8.2-4.7,14.56-10.63,19.26-17.68ZM2694.64,2600.33c-9.81,5.81-21.27,8.72-34.35,8.72s-23.75-2.85-31.26-8.54c-7.52-5.69-11.27-13.27-11.27-22.72,0-8.24,3.03-15.27,9.09-21.08,6.05-5.81,17.81-8.72,35.26-8.72h53.8v26.9c-4.36,11.15-11.45,19.63-21.27,25.44Z"/>
+    <path class="st0" d="M2956.37,2448.38c-12-6.05-25.87-9.09-41.62-9.09-17.45,0-32.72,3.52-45.8,10.54-9.77,5.25-17.64,12.06-23.63,20.41v-29.14h-33.44v192.66h34.9v-99.24c0-14.05,2.49-25.8,7.45-35.25,4.97-9.45,12.06-16.6,21.27-21.45,9.21-4.85,19.99-7.27,32.35-7.27,16.47,0,29.26,4.73,38.35,14.17,9.09,9.45,13.63,23.51,13.63,42.17v106.87h34.9v-110.87c0-18.9-3.4-34.53-10.18-46.89-6.79-12.36-16.17-21.56-28.17-27.63Z"/>
+    <path class="st0" d="M3238.63,2633.77v-110.87c0-18.9-3.4-34.53-10.18-46.89-6.79-12.36-16.17-21.56-28.17-27.63-12-6.05-25.87-9.09-41.62-9.09-17.45,0-32.72,3.52-45.8,10.54-9.77,5.25-17.64,12.06-23.63,20.41v-29.14h-33.44v192.66h34.9v-99.24c0-14.05,2.49-25.8,7.45-35.25,4.97-9.45,12.06-16.6,21.27-21.45,9.21-4.85,19.99-7.27,32.35-7.27,16.47,0,29.26,4.73,38.35,14.17,9.09,9.45,13.63,23.51,13.63,42.17v106.87h34.9Z"/>
+    <rect class="st0" x="3299.7" y="2441.11" width="34.9" height="192.66"/>
+    <path class="st0" d="M3334.05,2364.95c-4.49-4.23-10.12-6.36-16.9-6.36s-12.42,2.18-16.9,6.54c-4.49,4.36-6.73,9.82-6.73,16.36s2.24,11.64,6.73,16c4.48,4.36,10.12,6.55,16.9,6.55s12.73-2.24,17.09-6.73c4.36-4.48,6.54-9.99,6.54-16.54s-2.24-11.57-6.72-15.82Z"/>
+    <path class="st0" d="M3541.97,2448.38c-12-6.05-25.87-9.09-41.62-9.09-17.45,0-32.72,3.52-45.8,10.54-9.77,5.25-17.64,12.06-23.63,20.41v-29.14h-33.44v192.66h34.9v-99.24c0-14.05,2.49-25.8,7.45-35.25,4.97-9.45,12.06-16.6,21.27-21.45,9.21-4.85,19.99-7.27,32.35-7.27,16.47,0,29.26,4.73,38.35,14.17,9.09,9.45,13.63,23.51,13.63,42.17v106.87h34.9v-110.87c0-18.9-3.4-34.53-10.18-46.89-6.79-12.36-16.17-21.56-28.17-27.63Z"/>
+    <path class="st0" d="M3792.61,2470.67c-7.16-9.18-15.87-16.32-26.17-21.38-13.57-6.67-28.6-10-45.07-10-18.67,0-35.32,3.88-49.98,11.64-14.67,7.76-26.3,18.6-34.9,32.53-8.6,13.94-12.9,30.23-12.9,48.89s4.3,34.66,12.9,48.71c8.6,14.06,20.23,25.03,34.9,32.9,14.66,7.88,31.32,11.81,49.98,11.81,16.48,0,31.5-3.45,45.07-10.36,9.48-4.82,17.54-11.43,24.36-19.62v15.44c0,21.81-5.33,38.04-15.99,48.71-10.67,10.66-27.39,15.99-50.17,15.99-14.3,0-27.99-2.25-41.07-6.72-13.09-4.49-24.12-10.61-33.08-18.36l-16.72,26.9c10.42,9.21,23.93,16.3,40.53,21.27,16.6,4.96,33.74,7.45,51.44,7.45,32.72,0,57.56-8,74.52-23.99,16.96-16,25.44-40.96,25.44-74.89v-166.49h-33.08v29.56ZM3782.98,2565.06c-5.7,9.45-13.51,16.85-23.45,22.18-9.94,5.33-21.33,7.99-34.17,7.99s-24.3-2.66-34.35-7.99c-10.06-5.33-17.94-12.73-23.63-22.18-5.7-9.45-8.54-20.35-8.54-32.71s2.85-23.27,8.54-32.71c5.69-9.45,13.57-16.78,23.63-22,10.05-5.21,21.5-7.82,34.35-7.82s24.23,2.61,34.17,7.82c9.94,5.21,17.75,12.54,23.45,22,5.69,9.45,8.54,20.35,8.54,32.71s-2.85,23.27-8.54,32.71Z"/>
+    <path class="st0" d="M2402.93,2803.7c-15.76-7.03-34.78-10.54-57.07-10.54h-99.24v254.46h36.35v-77.06h62.89c22.29,0,41.31-3.58,57.07-10.72,15.75-7.15,27.87-17.32,36.35-30.54,8.48-13.21,12.73-29.02,12.73-47.44s-4.24-34.29-12.73-47.62c-8.48-13.33-20.6-23.5-36.35-30.54ZM2397.66,2924.02c-12,9.94-29.63,14.9-52.89,14.9h-61.79v-114.14h61.79c23.26,0,40.89,4.97,52.89,14.9,12,9.94,18,23.99,18,42.17s-6,32.23-18,42.17Z"/>
+    <path class="st0" d="M2565.05,2853.13c-15.27,0-29.87,2.12-43.8,6.36-13.94,4.25-25.87,10.36-35.81,18.36l14.54,26.17c7.51-6.3,16.72-11.33,27.62-15.09,10.91-3.76,22.05-5.64,33.44-5.64,17.2,0,30.11,4.06,38.71,12.18,8.6,8.13,12.9,19.58,12.9,34.36v6.9h-55.25c-19.15,0-34.35,2.54-45.62,7.63-11.27,5.09-19.39,11.88-24.36,20.36-4.97,8.49-7.45,17.93-7.45,28.35s2.91,20.66,8.72,29.26c5.82,8.6,14.11,15.33,24.9,20.17,10.78,4.86,23.32,7.28,37.62,7.28,17.69,0,32.35-3.33,43.98-10,8.2-4.7,14.56-10.63,19.26-17.68v25.5h33.08v-116.32c0-26.41-7.15-46.04-21.45-58.89-14.3-12.85-34.66-19.27-61.07-19.27ZM2612.67,2988.72c-4.36,11.15-11.45,19.63-21.27,25.44-9.81,5.81-21.27,8.72-34.35,8.72s-23.75-2.85-31.26-8.54c-7.52-5.69-11.27-13.27-11.27-22.72,0-8.24,3.03-15.27,9.09-21.08,6.05-5.81,17.81-8.72,35.26-8.72h53.8v26.9Z"/>
+    <path class="st0" d="M2742.08,2887.64v-32.69h-33.44v192.66h34.9v-95.97c0-21.08,5.45-37.2,16.36-48.35,10.9-11.14,25.68-16.72,44.35-16.72h3.82c1.33,0,2.73.13,4.18.37v-33.81c-18.42,0-33.93,3.52-46.53,10.54-10.4,5.8-18.18,13.88-23.63,23.96Z"/>
+    <path class="st0" d="M2929.65,3020.35c-9.7,0-17.15-2.79-22.36-8.36-5.21-5.58-7.81-13.57-7.81-24v-104.33h55.25v-28.72h-55.25v-42.17h-34.9v42.17h-32.72v28.72h32.72v105.78c0,19.39,5.33,34.3,15.99,44.72,10.66,10.42,25.68,15.63,45.07,15.63,8,0,15.69-1.1,23.08-3.27,7.39-2.18,13.75-5.57,19.08-10.18l-10.9-25.08c-7.27,6.06-16.36,9.09-27.26,9.09Z"/>
+    <path class="st0" d="M3150.84,2862.22c-12-6.05-25.87-9.09-41.62-9.09-17.45,0-32.72,3.52-45.8,10.54-9.77,5.25-17.64,12.06-23.63,20.41v-29.14h-33.44v192.66h34.9v-99.24c0-14.05,2.49-25.8,7.45-35.25,4.97-9.45,12.06-16.6,21.27-21.45,9.21-4.85,19.99-7.27,32.35-7.27,16.47,0,29.26,4.73,38.35,14.17,9.09,9.45,13.63,23.51,13.63,42.17v106.87h34.9v-110.87c0-18.9-3.4-34.53-10.18-46.89-6.79-12.36-16.17-21.56-28.17-27.63Z"/>
+    <path class="st0" d="M3378.57,2865.49c-14.3-8.24-30.78-12.36-49.44-12.36s-34.96,4.19-49.62,12.54c-14.67,8.36-26.17,19.93-34.54,34.71-8.36,14.79-12.54,31.75-12.54,50.9s4.3,36.11,12.9,50.89c8.6,14.78,20.72,26.42,36.35,34.9,15.63,8.49,33.74,12.73,54.34,12.73,15.99,0,30.47-2.66,43.44-8,12.96-5.33,23.81-13.09,32.53-23.27l-19.27-22.54c-7.03,7.76-15.21,13.58-24.53,17.45-9.34,3.87-19.69,5.81-31.08,5.81-13.81,0-26.05-2.79-36.72-8.36-10.67-5.57-18.96-13.39-24.9-23.44-4.38-7.42-7.12-15.6-8.27-24.54h156.39c.24-1.69.42-3.51.55-5.46.12-1.93.18-3.63.18-5.08,0-19.87-4.06-37.26-12.18-52.17-8.12-14.9-19.33-26.47-33.63-34.71ZM3267.16,2937.83c1.02-8.82,3.49-16.89,7.45-24.17,5.33-9.81,12.72-17.44,22.18-22.89,9.45-5.46,20.23-8.18,32.35-8.18s23.2,2.72,32.53,8.18c9.33,5.45,16.66,13.02,21.99,22.72,4.04,7.34,6.46,15.47,7.3,24.35h-123.8Z"/>
+    <path class="st0" d="M3502.53,2887.64v-32.69h-33.44v192.66h34.9v-95.97c0-21.08,5.45-37.2,16.36-48.35,10.9-11.14,25.68-16.72,44.35-16.72h3.82c1.33,0,2.73.13,4.18.37v-33.81c-18.42,0-33.93,3.52-46.53,10.54-10.4,5.8-18.18,13.88-23.63,23.96Z"/>
+    <path class="st0" d="M3728.45,2951.28c-7.15-3.64-15.09-6.48-23.81-8.55-8.73-2.06-17.45-3.75-26.17-5.08-8.72-1.33-16.66-2.97-23.81-4.91-7.15-1.94-12.97-4.67-17.45-8.18-4.49-3.51-6.72-8.54-6.72-15.09,0-7.75,3.75-14.11,11.27-19.08,7.51-4.96,18.9-7.45,34.17-7.45,9.45,0,18.9,1.09,28.35,3.27,9.45,2.18,18.54,6.17,27.26,12l14.91-27.63c-8.24-5.57-18.85-9.87-31.81-12.91-12.97-3.02-25.75-4.54-38.35-4.54-16.48,0-30.71,2.37-42.71,7.09-12,4.73-21.27,11.45-27.81,20.17-6.54,8.73-9.81,18.91-9.81,30.54s2.18,20.06,6.55,26.72c4.36,6.67,10.18,11.87,17.45,15.63,7.27,3.76,15.27,6.67,23.99,8.72,8.72,2.06,17.45,3.77,26.17,5.09,8.73,1.34,16.66,2.85,23.81,4.54,7.15,1.7,12.9,4.25,17.27,7.63,4.36,3.39,6.55,8.12,6.55,14.18,0,8.24-3.58,14.67-10.72,19.26-7.15,4.6-18.85,6.9-35.08,6.9-12.6,0-24.96-1.93-37.08-5.81-12.12-3.87-22.3-8.6-30.54-14.17l-14.54,27.62c8.24,6.31,19.57,11.64,33.99,16,14.42,4.36,29.63,6.55,45.62,6.55,17.2,0,31.99-2.37,44.35-7.09,12.36-4.73,21.93-11.33,28.72-19.81,6.78-8.48,10.18-18.53,10.18-30.17,0-10.91-2.25-19.63-6.73-26.17-4.49-6.54-10.3-11.63-17.45-15.26Z"/>
+  </g>
+  <rect class="st0" x="2011.69" y="1828.72" width="15.92" height="1342.55"/>
+</svg>`}} />
+        <h1 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:40,fontWeight:300,lineHeight:1.18,color:"#F5F2EC",marginBottom:6}}>StructureReview<span style={{color:"#C8A96E"}}>™</span></h1>
+        <p style={{fontSize:14,lineHeight:1.65,color:"#C8BFA8",fontWeight:300,marginBottom:28}}>A guided discovery process that adapts to your situation — so we spend time on what matters and skip what doesn't.</p>
+        {[["~10 minutes","Adapts to your answers in real time"],["Private","Used only to prepare your planning conversation"],["No obligation","Discovery only — not a commitment"]].map(([l,d])=>(
+          <div key={l} style={{display:"flex",gap:11,marginBottom:9,alignItems:"start"}}>
+            <div style={{width:5,height:5,borderRadius:"50%",background:"#C8A96E",marginTop:6,flexShrink:0}}/>
+            <div><span style={{fontSize:13,fontWeight:600,color:"#F5F2EC"}}>{l}</span><span style={{fontSize:13,color:"#6E8299"}}> — {d}</span></div>
+          </div>
+        ))}
+        <button onClick={onStart} style={{width:"100%",marginTop:24,padding:"16px",background:"#C8A96E",color:"#0E1824",borderRadius:11,fontSize:15,fontWeight:700,letterSpacing:".03em"}}>Begin StructureReview™</button>
+      </div>
+      <div style={{marginTop:32,textAlign:"center"}}>
+        <p style={{fontSize:10,color:"#3A5268"}}>Powered by Integrated Planning Partners</p>
+      </div>
+    </div>
+  );
+}
+
+// ── Completion ──
+function CompletionScreen({onReport,onAdvisor,answers,report}) {
+  const [sending,setSending]=useState(false);
+  const [sent,setSent]=useState(false);
+  const [sendError,setSendError]=useState(false);
+
+  // EmailJS config — replace these with your actual IDs
+  const EMAILJS_SERVICE_ID  = "IPP Support";
+  const EMAILJS_TEMPLATE_CLIENT = "template_qxximsu";
+  const EMAILJS_TEMPLATE_ADVISOR = "template_qxximsu";
+  const EMAILJS_PUBLIC_KEY  = "XyWTKKWFoeYOhfFbV";
+
+  const sendEmails = async () => {
+    if (!answers.email) { onReport(); return; }
+    setSending(true);
+    try {
+      // Build plain-text advisor summary
+      const flagList = report.flags.map(f=>`[${f.priority.toUpperCase()}] ${f.track}: ${f.text}`).join("\
+\
+");
+      const trackList = report.tracks.join(", ").toUpperCase();
+      const age = calcAge(answers.dob);
+
+      // Send client copy
+      await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          service_id: EMAILJS_SERVICE_ID,
+          template_id: EMAILJS_TEMPLATE_CLIENT,
+          user_id: EMAILJS_PUBLIC_KEY,
+          template_params: {
+            to_email: answers.email,
+            to_name: report.firstName || answers.first_name || "there",
+            client_name: report.name,
+            tracks: trackList||"General Planning",
+            vision: answers.retirement_vision||"(not provided)",
+            retire_age: answers.retire_age||"(not provided)",
+          }
+        })
+      });
+
+      // Send advisor copy to Jeffrey
+      await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          service_id: EMAILJS_SERVICE_ID,
+          template_id: EMAILJS_TEMPLATE_ADVISOR,
+          user_id: EMAILJS_PUBLIC_KEY,
+          template_params: {
+            to_email: "StructureReview@IntegratedPlanningPartners.com",
+            client_name: report.name,
+            client_email: answers.email||"(not provided)",
+            client_phone: answers.phone||"(not provided)",
+            contact_pref: answers.contact_preference||"(not provided)",
+            client_age: age!==null?String(age):"(not provided)",
+            client_state: answers.state?answers.state.replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase()):"(not provided)",
+            bio_sex: answers.bio_sex||"(not provided)",
+            tracks: trackList||"None",
+            flags: flagList||"No flags generated.",
+            how_heard: answers.how_heard||"(not provided)",
+            referring_advisor: answers.referring_advisor_name||"N/A",
+            vision: answers.retirement_vision||"(not provided)",
+            retire_age: answers.retire_age||"(not provided)",
+            urgency: answers.planning_urgency||"(not provided)",
+            open_concerns: answers.open_concerns||"None",
+          }
+        })
+      });
+
+      setSent(true);
+    } catch(e) {
+      console.error("EmailJS error:",e);
+      setSendError(true);
+    }
+    setSending(false);
+  };
+
+  // Auto-send on mount if email present
+  useEffect(()=>{ sendEmails(); },[]);
+
+  return (
+    <div style={{minHeight:"100vh",background:"#0E1824",display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"center",padding:"40px 24px",fontFamily:"'DM Sans',sans-serif",position:"relative",overflow:"hidden"}}>
+      <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",width:420,height:420,borderRadius:"50%",background:"radial-gradient(circle,rgba(200,169,110,.07) 0%,transparent 65%)",pointerEvents:"none"}}/>
+      <div style={{animation:"fadeUp .45s ease both",textAlign:"center",maxWidth:340}}>
+        <div style={{width:52,height:52,borderRadius:"50%",background:"rgba(200,169,110,.12)",border:"1px solid rgba(200,169,110,.3)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 18px",fontSize:20}}>✓</div>
+        <h2 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:30,fontWeight:300,color:"#F5F2EC",marginBottom:10}}>Review Complete</h2>
+        <p style={{fontSize:13,lineHeight:1.65,color:"#C8BFA8",fontWeight:300,marginBottom:8}}>Thank you. Your responses have been organized into a planning summary.</p>
+
+        {/* Email send status */}
+        {answers.email&&(
+          <div style={{marginBottom:20,padding:"9px 14px",borderRadius:8,background:sent?"rgba(123,175,132,.1)":sendError?"rgba(196,122,122,.08)":"rgba(255,255,255,.04)",border:`1px solid ${sent?"rgba(123,175,132,.3)":sendError?"rgba(196,122,122,.2)":"rgba(255,255,255,.08)"}`}}>
+            {sending&&<p style={{fontSize:12,color:"#6E8299"}}>Sending your summary to {answers.email}...</p>}
+            {sent&&<p style={{fontSize:12,color:"#7BAF84"}}>✓ Summary sent to {answers.email}</p>}
+            {sendError&&<p style={{fontSize:12,color:"#C47A7A"}}>Couldn't send email — you can still view your summary below.</p>}
+          </div>
+        )}
+
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          <button onClick={onReport} style={{padding:"14px",background:"#C8A96E",color:"#0E1824",borderRadius:10,fontSize:14,fontWeight:700}}>View My Summary →</button>
+          <button onClick={onAdvisor} style={{padding:"14px",background:"rgba(255,255,255,.05)",color:"#C8BFA8",borderRadius:10,fontSize:13,fontWeight:500,border:"1px solid rgba(255,255,255,.1)"}}>View Advisor Brief</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Client Report ──
+function ClientReport({answers,report,onBack}) {
+  const tInfo={
+    qp:{label:"Qualified Plan Strategy",color:"#C47A7A",desc:"Your retirement accounts carry a deferred tax obligation that grows as the account grows. There are strategies available to reposition this into tax-free income, care protection, and a more efficient legacy — before RMDs dictate the timing."},
+    le:{label:"Liquidity Event Planning",color:"#7BAF84",desc:"A capital gains event is an opportunity — but only if the right structure is in place before or shortly after closing. The difference between paying tax out of pocket and keeping the full gross amount working for you is permanent and compounding."},
+    business:{label:"Business Owner Planning",color:"#C8A030",desc:"Business owners have planning tools available that W-2 employees don't. Tax deduction strategies, retirement plan design, key person protection, and exit structuring can each significantly improve the financial outcome."},
+    estate:{label:"Estate Planning",color:"#9B7EC8",desc:"At your asset level, how wealth transfers to the next generation matters. Estate tax exposure, beneficiary structure, and the tax character of inherited assets can all be meaningfully improved with the right approach."},
+  };
+  return (
+    <div style={{minHeight:"100vh",background:"#0E1824",fontFamily:"'DM Sans',sans-serif",paddingBottom:48}}>
+      <div style={{maxWidth:520,margin:"0 auto"}}>
+        <div style={{background:"#162032",borderBottom:"1px solid rgba(200,169,110,.2)",padding:"20px 22px"}}>
+          <div style={{fontSize:9,letterSpacing:".18em",textTransform:"uppercase",color:"#C8A96E",marginBottom:7}}>StructureReview™ — Client Summary</div>
+          <h1 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:26,fontWeight:400,color:"#F5F2EC",marginBottom:3}}>{report.name?`${report.name}'s Planning Overview`:"Your Planning Overview"}</h1>
+          <p style={{fontSize:11,color:"#6E8299"}}>Prepared by Integrated Planning Partners</p>
+        </div>
+        <div style={{padding:"22px 22px 0"}}>
+          {report.tracks.length>0&&(
+            <div style={{marginBottom:26}}>
+              <h2 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:19,fontWeight:600,color:"#F5F2EC",marginBottom:14}}>Planning Areas Identified</h2>
+              {report.tracks.map(t=>{const i=tInfo[t];if(!i)return null;return(
+                <div key={t} style={{padding:"13px 15px",background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.07)",borderLeft:`3px solid ${i.color}`,borderRadius:"0 8px 8px 0",marginBottom:10}}>
+                  <div style={{fontSize:10,fontWeight:700,color:i.color,letterSpacing:".06em",textTransform:"uppercase",marginBottom:5}}>{i.label}</div>
+                  <p style={{fontSize:13,lineHeight:1.6,color:"#C8BFA8",fontWeight:300}}>{i.desc}</p>
+                </div>);}
+              )}
+            </div>
+          )}
+
+          {/* Retirement vision if provided */}
+          {answers.retirement_vision&&(
+            <div style={{marginBottom:24}}>
+              <h2 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:19,fontWeight:600,color:"#F5F2EC",marginBottom:10}}>Your Vision</h2>
+              <div style={{padding:"14px 16px",background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.07)",borderLeft:"3px solid #C8A96E",borderRadius:"0 8px 8px 0"}}>
+                <p style={{fontSize:14,lineHeight:1.65,color:"#F5F2EC",fontStyle:"italic",fontFamily:"'Cormorant Garamond',serif",fontWeight:300}}>"{answers.retirement_vision}"</p>
+              </div>
+            </div>
+          )}
+
+          {report.flags.filter(f=>f.priority==="high").length>0&&(
+            <div style={{marginBottom:24}}>
+              <h2 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:19,fontWeight:600,color:"#F5F2EC",marginBottom:12}}>Time-Sensitive Items</h2>
+              {report.flags.filter(f=>f.priority==="high").map((f,i)=>(
+                <div key={i} style={{padding:"12px 14px",background:"rgba(196,106,106,.06)",border:"1px solid rgba(196,106,106,.18)",borderRadius:8,marginBottom:8}}>
+                  <div style={{fontSize:9,fontWeight:700,letterSpacing:".14em",textTransform:"uppercase",color:"#C47A7A",marginBottom:5}}>Needs Attention</div>
+                  <p style={{fontSize:13,lineHeight:1.58,color:"#C8BFA8",fontWeight:300}}>{f.text}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={{marginBottom:24}}>
+            <h2 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:19,fontWeight:600,color:"#F5F2EC",marginBottom:12}}>What Comes Next</h2>
+            <div style={{padding:"14px 16px",background:"rgba(200,169,110,.06)",border:"1px solid rgba(200,169,110,.18)",borderRadius:8}}>
+              <p style={{fontSize:13,lineHeight:1.65,color:"#C8BFA8",fontWeight:300}}>Your responses have been organized into a planning brief for your advisor. The next step is a StructureReview™ conversation — typically 30–45 minutes — where we walk through the areas identified, show you what the numbers look like for your situation, and answer any questions you have. There is no obligation.</p>
+            </div>
+          </div>
+
+          <div style={{padding:"16px 18px",background:"#162032",border:"1px solid rgba(200,169,110,.15)",borderRadius:10,marginBottom:20}}>
+            <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:17,fontWeight:600,color:"#F5F2EC",marginBottom:3}}>Jeffrey Faine, CLU, RICP</div>
+            <div style={{fontSize:10,color:"#C8A96E",letterSpacing:".04em",marginBottom:8}}>Founder & Chief Strategist — Integrated Planning Partners</div>
+            <div style={{fontSize:11,color:"#6E8299",lineHeight:1.85}}>
+              <div>integratedplanningpartners.com</div>
+              <div>StructureReview@IntegratedPlanningPartners.com</div>
+              <div>773-318-9608</div>
+            </div>
+          </div>
+          <button onClick={onBack} style={{width:"100%",padding:"13px",background:"rgba(255,255,255,.05)",color:"#6E8299",borderRadius:10,fontSize:13,border:"1px solid rgba(255,255,255,.08)",marginBottom:16}}>← Start Over</button>
+          <p style={{fontSize:10,color:"#2A4060",lineHeight:1.5}}>For informational purposes only. Not financial, tax, or legal advice. IncomeArc™ and StructureReview™ are trademarks of Integrated Planning Partners. © 2026 Jeffrey Faine, CLU, RICP.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Advisor Brief ──
+function AdvisorBrief({answers,report,onBack}) {
+  const qMap={}; QUESTIONS.forEach(q=>{qMap[q.id]=q;});
+  const age=calcAge(answers.dob);
+  const retireAge=parseInt(answers.retire_age)||null;
+  const yearsToRetire=(age!==null&&retireAge!==null&&retireAge>age)?retireAge-age:null;
+  const retireYear=(new Date().getFullYear()+(yearsToRetire||0));
+
+  const fmt=(q,v)=>{
+    if(!v)return"(not provided)";
+    if(q.type==="text")return v;
+    if(q.type==="number")return`Age ${v}${yearsToRetire!==null?` — ${yearsToRetire} year${yearsToRetire===1?"":"s"} from now (${retireYear})`:""}`;
+    if(q.type==="date")return`${formatDOB(v)}${calcAge(v)!==null?` (age ${calcAge(v)})`:""}`;
+    if(q.type==="multi"&&Array.isArray(v))return v.map(id=>q.options?.find(o=>o.id===id)?.label).filter(Boolean).join(", ");
+    if(q.type==="select")return q.options?.find(o=>o.id===v)?.label||v;
+    return q.options?.find(o=>o.id===v)?.label||v;
+  };
+
+  const phases=[
+    {id:"universal",label:"Client Profile"},
+    {id:"qp",label:"Qualified Plan"},
+    {id:"le",label:"Liquidity Event"},
+    {id:"business",label:"Business Planning"},
+    {id:"estate",label:"Estate Planning"},
+    {id:"income",label:"Income & Protection"},
+    {id:"motivations",label:"Goals & Concerns"},
+    {id:"wrap",label:"Wrap-Up"},
+  ];
+  const pColor={high:"#C47A7A",medium:"#C8A030"};
+  const pLabel={high:"High Priority",medium:"Medium Priority"};
+
+  // Motivation summary block
+  const motivSummary=[];
+  if(answers.retirement_vision) motivSummary.push({label:"Retirement vision",val:`"${answers.retirement_vision}"`});
+  if(retireAge) motivSummary.push({label:"Target retirement age",val:`${retireAge}${yearsToRetire!==null?` — ${yearsToRetire} yr${yearsToRetire===1?"":"s"} away, est. ${retireYear}`:""}`});
+  const urgencyMap={pu_urgent:"Urgent",pu_active:"Active",pu_curious:"Curious",pu_early:"Early stages"};
+  if(answers.planning_urgency) motivSummary.push({label:"Planning urgency",val:urgencyMap[answers.planning_urgency]||answers.planning_urgency});
+
+  return (
+    <div style={{minHeight:"100vh",background:"#090F18",fontFamily:"'DM Sans',sans-serif",paddingBottom:60}}>
+      <div style={{maxWidth:640,margin:"0 auto"}}>
+        <div style={{background:"#111E2E",borderBottom:"2px solid rgba(200,169,110,.22)",padding:"18px 24px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:10}}>
+            <div>
+              <div style={{fontSize:9,letterSpacing:".2em",textTransform:"uppercase",color:"#C8A96E",marginBottom:5}}>Advisor Brief — Confidential</div>
+              <h1 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:24,fontWeight:400,color:"#F5F2EC"}}>
+                StructureReview™ — {report.name||"Client"}
+                {age!==null&&<span style={{fontSize:14,fontWeight:300,color:"#6E8299",marginLeft:8}}>Age {age}</span>}
+              </h1>
+              <p style={{fontSize:10,color:"#6E8299",marginTop:2}}>
+                Integrated Planning Partners · {new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}
+                {answers.bio_sex&&<span style={{marginLeft:8,textTransform:"capitalize"}}>· {answers.bio_sex}</span>}
+                {answers.state&&<span style={{marginLeft:8}}>· {answers.state.replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase())}</span>}
+                {retireAge&&<span style={{marginLeft:8}}>· Target retirement: age {retireAge}{yearsToRetire!==null?` (${yearsToRetire} yr${yearsToRetire===1?"":"s"} / ${retireYear})`:""}</span>}
+              </p>
+              {(answers.email||answers.phone)&&(
+                <p style={{fontSize:10,color:"#6E8299",marginTop:3}}>
+                  {answers.email&&<span>{answers.email}</span>}
+                  {answers.phone&&<span style={{marginLeft:10}}>· {answers.phone}</span>}
+                  {answers.contact_preference&&<span style={{marginLeft:10}}>· Prefers: {{cp_email:"Email",cp_call:"Phone call",cp_text:"Text",cp_any:"Any"}[answers.contact_preference]||answers.contact_preference}</span>}
+                </p>
+              )}
+            </div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {report.tracks.map(t=><div key={t} style={{fontSize:8,fontWeight:700,letterSpacing:".1em",textTransform:"uppercase",padding:"3px 8px",background:"rgba(200,169,110,.1)",border:"1px solid rgba(200,169,110,.25)",borderRadius:3,color:"#C8A96E"}}>{t.toUpperCase()}</div>)}
+            </div>
+          </div>
+        </div>
+
+        <div style={{padding:"22px 24px 0"}}>
+
+          {/* Motivation snapshot */}
+          {motivSummary.length>0&&(
+            <div style={{marginBottom:20,padding:"14px 16px",background:"rgba(200,169,110,.05)",border:"1px solid rgba(200,169,110,.15)",borderRadius:8}}>
+              <div style={{fontSize:9,fontWeight:700,letterSpacing:".16em",textTransform:"uppercase",color:"#C8A96E",marginBottom:10}}>Client Motivation Snapshot</div>
+              {motivSummary.map((m,i)=>(
+                <div key={i} style={{display:"grid",gridTemplateColumns:"140px 1fr",gap:10,padding:"5px 0",borderBottom:"1px solid rgba(255,255,255,.05)"}}>
+                  <span style={{fontSize:11,color:"#6E8299"}}>{m.label}</span>
+                  <span style={{fontSize:11,color:"#F5F2EC",fontWeight:500,fontStyle:m.label==="Retirement vision"?"italic":"normal"}}>{m.val}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <h2 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:18,fontWeight:600,color:"#F5F2EC",marginBottom:12,borderBottom:"1px solid rgba(255,255,255,.07)",paddingBottom:7}}>Planning Flags &amp; Priorities</h2>
+          {report.flags.length===0&&<p style={{fontSize:13,color:"#6E8299",marginBottom:20}}>No specific flags generated.</p>}
+          {report.flags.map((f,i)=>(
+            <div key={i} style={{display:"flex",gap:14,marginBottom:9,padding:"11px 13px",background:"rgba(255,255,255,.02)",border:"1px solid rgba(255,255,255,.06)",borderLeft:`3px solid ${pColor[f.priority]||"#6E8299"}`,borderRadius:"0 6px 6px 0"}}>
+              <div style={{minWidth:82}}>
+                <div style={{fontSize:8,fontWeight:700,letterSpacing:".1em",textTransform:"uppercase",color:pColor[f.priority]||"#6E8299"}}>{pLabel[f.priority]||"Note"}</div>
+                <div style={{fontSize:9,color:"#6E8299",marginTop:2}}>{f.track}</div>
+              </div>
+              <p style={{fontSize:12,lineHeight:1.6,color:"#C8BFA8",fontWeight:300}}>{f.text}</p>
+            </div>
+          ))}
+
+          <h2 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:18,fontWeight:600,color:"#F5F2EC",marginBottom:12,borderBottom:"1px solid rgba(255,255,255,.07)",paddingBottom:7,marginTop:22}}>Full Response Summary</h2>
+          {phases.map(phase=>{
+            const qs=Object.entries(answers).filter(([k])=>qMap[k]&&qMap[k].phase===phase.id);
+            if(qs.length===0)return null;
+            return(
+              <div key={phase.id} style={{marginBottom:16}}>
+                <div style={{fontSize:9,fontWeight:700,letterSpacing:".16em",textTransform:"uppercase",color:"#C8A96E",marginBottom:7}}>{phase.label}</div>
+                {qs.map(([k,v])=>(
+                  <div key={k} style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,.05)"}}>
+                    <span style={{fontSize:11,color:"#6E8299",lineHeight:1.45}}>{qMap[k].shortQ||qMap[k].q}</span>
+                    <span style={{fontSize:11,color:"#F5F2EC",fontWeight:500,lineHeight:1.45}}>{fmt(qMap[k],v)}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+
+          <div style={{marginTop:20,padding:"15px 17px",background:"rgba(200,169,110,.06)",border:"1px solid rgba(200,169,110,.18)",borderRadius:8}}>
+            <div style={{fontSize:9,fontWeight:700,letterSpacing:".16em",textTransform:"uppercase",color:"#C8A96E",marginBottom:10}}>Recommended Next Steps</div>
+            {[
+              "Schedule StructureReview™ conversation — 30–45 min, client and advisor present",
+              report.tracks.includes("qp")&&"Request QP ETA illustration — RMD projection, MAGI model, Roth FIA sizing",
+              report.tracks.includes("le")&&answers.le_timing!=="le_closed"&&"Initiate LE ETA bank facility — must be structured before closing",
+              report.tracks.includes("business")&&["brp_none","brp_sep_simple"].includes(answers.biz_retirement_plan)&&"Model defined benefit / cash balance plan — potential $100K–$300K+ annual deduction",
+              report.tracks.includes("estate")&&"Coordinate with estate planning attorney on beneficiary structure and estate tax exposure",
+              ["cp_none","cp_self"].includes(answers.care_plan)&&"Initiate Layer 2 living benefits underwriting — health-dependent, start early",
+              report.yearsToRetire!==null&&report.yearsToRetire<=5&&`Retirement in ${report.yearsToRetire} year${report.yearsToRetire===1?"":"s"} — prioritize time-sensitive structures immediately`,
+            ].filter(Boolean).map((s,i)=>(
+              <div key={i} style={{display:"flex",gap:9,marginBottom:7,alignItems:"start"}}>
+                <div style={{width:17,height:17,borderRadius:"50%",background:"rgba(200,169,110,.14)",border:"1px solid rgba(200,169,110,.28)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,fontWeight:700,color:"#C8A96E",flexShrink:0,marginTop:1}}>{i+1}</div>
+                <p style={{fontSize:12,lineHeight:1.55,color:"#C8BFA8",fontWeight:300}}>{s}</p>
+              </div>
+            ))}
+          </div>
+
+          <button onClick={onBack} style={{width:"100%",marginTop:16,padding:"13px",background:"rgba(255,255,255,.04)",color:"#6E8299",borderRadius:10,fontSize:12,border:"1px solid rgba(255,255,255,.07)"}}>← Start Over</button>
+          <p style={{fontSize:10,color:"#1A3050",lineHeight:1.5,marginTop:16,marginBottom:8}}>Advisor brief — not for client distribution. IncomeArc™ and StructureReview™ are trademarks of Integrated Planning Partners. © 2026.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main ──
+function App() {
+  const [view,setView]=useState("welcome");
+  const [answers,setAnswers]=useState({});
+  const [sequence,setSequence]=useState([]);
+  const [step,setStep]=useState(0);
+  const [report,setReport]=useState(null);
+
+  useEffect(()=>{
+    const s=document.createElement("style");s.textContent=GS;document.head.appendChild(s);
+    return()=>document.head.removeChild(s);
+  },[]);
+
+  const start=()=>{setSequence(buildSequence({}));setStep(0);setAnswers({});setView("flow");};
+  const currentQ=sequence[step];
+
+  const handleAnswer=val=>{
+    const na={...answers,[currentQ.id]:val};
+    setAnswers(na);
+    // Rebuild sequence on universal questions AND any question that gates a conditional branch
+    const rebuildTriggers = ["universal","has_qp","biz_has_partners","biz_buysell","biz_retirement_plan"];
+    if(currentQ.phase==="universal" || rebuildTriggers.includes(currentQ.id))
+      setSequence(buildSequence(na));
+  };
+
+  const next=()=>{
+    if(step>=sequence.length-1){const r=generateReport(answers);setReport(r);setView("complete");}
+    else setStep(s=>s+1);
+  };
+
+  if(view==="welcome") return (<WelcomeScreen onStart={start}/>);
+  if(view==="complete") return (<CompletionScreen onReport={()=>setView("report")} onAdvisor={()=>setView("advisor")} answers={answers} report={report}/>);
+  if(view==="report") return (<ClientReport answers={answers} report={report} onBack={start}/>);
+  if(view==="advisor") return (<AdvisorBrief answers={answers} report={report} onBack={start}/>);
+  if(view==="flow"&&currentQ)return(
+    <QuestionScreen question={currentQ} answer={answers[currentQ.id]} onAnswer={handleAnswer} onNext={next}
+      onBack={step>0?()=>setStep(s=>s-1):null} stepNum={step+1} totalSteps={sequence.length}/>
+  );
+  return null;
+}
+
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
