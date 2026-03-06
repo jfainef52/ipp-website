@@ -536,9 +536,8 @@ function buildSequence(answers) {
   if (emp==="business_owner"||emp==="transitioning"||asset==="business")
     seq.push(...QUESTIONS.filter(q=>q.phase==="business"));
 
-  // If they're a business owner heading into a sale, le_type is redundant — we already know
-  // the event type. Skip it and pre-populate via the report generator.
-  const bizSaleRedundant = (emp==="business_owner"||asset==="business") && event==="business_sale";
+  // le_type is redundant if event_horizon already captured the event type
+  const bizSaleRedundant = event==="business_sale"||event==="real_estate_sale"||event==="equity_event";
 
   const qpBig=["2m_5m","over5m"].includes(answers.qp_balance);
   const leBig=["le_500_1m","le_over1m"].includes(answers.le_size);
@@ -584,7 +583,7 @@ function buildSequence(answers) {
     if (q.id==="referring_advisor_name" && skipReferralName) return false;
     if ((q.id==="biz_partner_count"||q.id==="biz_buysell"||q.id==="biz_buysell_funding") && skipPartners) return false;
     if (q.id==="le_type" && bizSaleRedundant) return false;
-    const isEquity = event==="equity_event" || answers.le_type==="le_equity";
+    const isEquity = event==="equity_event";
     if (q.id==="le_timing" && isEquity) return false;
     if (q.id==="le_equity_status" && !isEquity) return false;
     // Skip biz_retirement_plan if they already have a DB/cash balance plan — nothing to upgrade to
@@ -996,28 +995,22 @@ function CompletionScreen({onReport,onAdvisor,answers,report}) {
       const age = calcAge(answers.dob);
 
       // Send client copy
-      try {
-        const clientRes = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
-          method:"POST", headers:{"Content-Type":"application/json"},
-          body: JSON.stringify({
-            service_id: EMAILJS_SERVICE_ID,
-            template_id: EMAILJS_TEMPLATE_CLIENT,
-            user_id: EMAILJS_PUBLIC_KEY,
-            template_params: {
-              to_email: answers.email,
-              to_name: report.firstName || answers.first_name || "there",
-              client_name: report.name,
-              tracks: trackList||"General Planning",
-              vision: answers.retirement_vision||"(not provided)",
-              retire_age: answers.retire_age||"(not provided)",
-            }
-          })
-        });
-        const clientText = await clientRes.text();
-        console.log("Client email response:", clientRes.status, clientText);
-      } catch(clientErr) {
-        console.error("Client email failed:", clientErr);
-      }
+      await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          service_id: EMAILJS_SERVICE_ID,
+          template_id: EMAILJS_TEMPLATE_CLIENT,
+          user_id: EMAILJS_PUBLIC_KEY,
+          template_params: {
+            to_email: answers.email,
+            to_name: report.firstName || answers.first_name || "there",
+            client_name: report.name,
+            tracks: trackList||"General Planning",
+            vision: answers.retirement_vision||"(not provided)",
+            retire_age: answers.retire_age||"(not provided)",
+          }
+        })
+      });
 
       // Send advisor copy to Jeffrey
       await fetch("https://api.emailjs.com/api/v1.0/email/send", {
@@ -1050,7 +1043,7 @@ function CompletionScreen({onReport,onAdvisor,answers,report}) {
 
       setSent(true);
     } catch(e) {
-      console.error("EmailJS error:", e?.message || e?.text || JSON.stringify(e));
+      console.error("EmailJS error:",e);
       setSendError(true);
     }
     setSending(false);
