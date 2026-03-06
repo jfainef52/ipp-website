@@ -318,12 +318,12 @@ const QUESTIONS = [
   { id:"le_type", phase:"le", type:"single", q:"What kind of liquidity event are you looking at?",
     why:"Different event types have different tax characters — capital gains, depreciation recapture, ordinary income from equity compensation — and each requires a different approach.",
     options:[{id:"le_business",label:"Business sale"},{id:"le_realestate",label:"Real estate sale"},{id:"le_equity",label:"Equity compensation — RSUs, options, ESPP"},{id:"le_other",label:"Other concentrated position"}] },
-  { id:"le_size", phase:"le", type:"single", q:"Roughly what's the expected capital gains tax obligation?",
-    why:"The size of the tax bill determines which strategies are structurally viable. Some approaches require a minimum threshold to make economic sense.",
-    options:[{id:"le_under100",label:"Under $100,000"},{id:"le_100_250",label:"$100,000 – $250,000"},{id:"le_250_500",label:"$250,000 – $500,000"},{id:"le_500_1m",label:"$500,000 – $1,000,000"},{id:"le_over1m",label:"Over $1,000,000"}] },
   { id:"le_timing", phase:"le", type:"single", q:"Has the transaction closed yet?",
     why:"Some strategies must be structured before proceeds are received. The earlier we're involved, the more options are available — but meaningful planning is still possible after closing.",
     options:[{id:"le_open",label:"No — still in negotiation or planning"},{id:"le_soon",label:"Closing within 90 days"},{id:"le_closed",label:"Already closed"}] },
+  { id:"le_size", phase:"le", type:"single", q:"Roughly what's the expected capital gains tax obligation?",
+    why:"The size of the tax bill determines which strategies are structurally viable. Some approaches require a minimum threshold to make economic sense.",
+    options:[{id:"le_under100",label:"Under $100,000"},{id:"le_100_250",label:"$100,000 – $250,000"},{id:"le_250_500",label:"$250,000 – $500,000"},{id:"le_500_1m",label:"$500,000 – $1,000,000"},{id:"le_over1m",label:"Over $1,000,000"}] },
   { id:"le_plan", phase:"le", type:"single", q:"What's the current plan for the proceeds after taxes?",
     why:"Understanding how you're thinking about the money helps us identify gaps — retirement income structure, care protection, legacy planning — that often get overlooked in the transaction focus.",
     options:[{id:"le_invest",label:"Invest in a diversified portfolio"},{id:"le_retire",label:"Fund my retirement"},{id:"le_undecided",label:"Still figuring it out"},{id:"le_other_plan",label:"Have a specific plan in mind"}] },
@@ -507,14 +507,22 @@ const QUESTIONS = [
 // ─────────────────────────────────────────
 function buildSequence(answers) {
   const seq = [];
-  seq.push(...QUESTIONS.filter(q => q.phase === "universal"));
   const emp = answers.employment, asset = answers.primary_asset,
         event = answers.event_horizon, nw = answers.net_worth;
 
-  if (asset==="qp"||asset==="mixed"||emp==="w2"||emp==="retired")
-    seq.push(...QUESTIONS.filter(q=>q.phase==="qp"));
+  // Push universal questions up to and including event_horizon
+  const eventHorizonIndex = QUESTIONS.findIndex(q => q.id === "event_horizon");
+  seq.push(...QUESTIONS.filter((q, i) => q.phase === "universal" && i <= eventHorizonIndex));
+
+  // Immediately follow event_horizon with LE questions if applicable
   if (event==="business_sale"||event==="real_estate_sale"||event==="equity_event"||emp==="transitioning"||asset==="real_estate")
     seq.push(...QUESTIONS.filter(q=>q.phase==="le"));
+
+  // Then push remaining universal questions
+  seq.push(...QUESTIONS.filter((q, i) => q.phase === "universal" && i > eventHorizonIndex));
+
+  if (asset==="qp"||asset==="mixed"||emp==="w2"||emp==="retired")
+    seq.push(...QUESTIONS.filter(q=>q.phase==="qp"));
   if (emp==="business_owner"||emp==="transitioning"||asset==="business")
     seq.push(...QUESTIONS.filter(q=>q.phase==="business"));
 
