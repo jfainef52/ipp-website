@@ -533,9 +533,8 @@ function buildSequence(answers) {
   if (emp==="business_owner"||emp==="transitioning"||asset==="business")
     seq.push(...QUESTIONS.filter(q=>q.phase==="business"));
 
-  // If they're a business owner heading into a sale, le_type is redundant — we already know
-  // the event type. Skip it and pre-populate via the report generator.
-  const bizSaleRedundant = (emp==="business_owner"||asset==="business") && event==="business_sale";
+  // le_type is redundant if event_horizon already captured the event type
+  const bizSaleRedundant = event==="business_sale"||event==="real_estate_sale"||event==="equity_event";
 
   const qpBig=["2m_5m","over5m"].includes(answers.qp_balance);
   const leBig=["le_500_1m","le_over1m"].includes(answers.le_size);
