@@ -332,6 +332,9 @@ const QUESTIONS = [
   { id:"le_timing", phase:"le", type:"single", q:"Has the transaction closed yet?",
     why:"Some strategies must be structured before proceeds are received. The earlier we're involved, the more options are available — but meaningful planning is still possible after closing.",
     options:[{id:"le_open",label:"No — still in negotiation or planning"},{id:"le_soon",label:"Closing within 90 days"},{id:"le_closed",label:"Already closed"}] },
+  { id:"le_equity_status", phase:"le", type:"single", q:"Where are you in the equity compensation process?",
+    why:"RSUs, stock options, and ESPP shares each have different tax treatment and planning windows. Knowing where you are in the vesting or exercise cycle helps us focus on the most time-sensitive strategies.",
+    options:[{id:"leq_vesting",label:"Shares are vesting over the next 1–3 years"},{id:"leq_exercising",label:"Options are exercisable now or soon"},{id:"leq_selling",label:"Planning to sell vested shares"},{id:"leq_already_sold",label:"Already sold — reviewing tax impact"}] },
   { id:"le_size", phase:"le", type:"single", q:"Roughly what's the expected capital gains tax obligation?",
     why:"The size of the tax bill determines which strategies are structurally viable. Some approaches require a minimum threshold to make economic sense.",
     options:[{id:"le_under100",label:"Under $100,000"},{id:"le_100_250",label:"$100,000 – $250,000"},{id:"le_250_500",label:"$250,000 – $500,000"},{id:"le_500_1m",label:"$500,000 – $1,000,000"},{id:"le_over1m",label:"Over $1,000,000"}] },
@@ -533,8 +536,9 @@ function buildSequence(answers) {
   if (emp==="business_owner"||emp==="transitioning"||asset==="business")
     seq.push(...QUESTIONS.filter(q=>q.phase==="business"));
 
-  // le_type is redundant if event_horizon already captured the event type
-  const bizSaleRedundant = event==="business_sale"||event==="real_estate_sale"||event==="equity_event";
+  // If they're a business owner heading into a sale, le_type is redundant — we already know
+  // the event type. Skip it and pre-populate via the report generator.
+  const bizSaleRedundant = (emp==="business_owner"||asset==="business") && event==="business_sale";
 
   const qpBig=["2m_5m","over5m"].includes(answers.qp_balance);
   const leBig=["le_500_1m","le_over1m"].includes(answers.le_size);
@@ -546,7 +550,7 @@ function buildSequence(answers) {
   seq.push(...QUESTIONS.filter(q=>q.phase==="wrap"));
 
   // Skip concern_spouse if single/widowed
-  const skipSpouse = answers.marital==="single"||answers.marital==="widowed";
+  const skipSpouse = answers.marital==="single"||answers.marital==="widowed"||answers.marital==="divorced";
   // Skip retire_age if already retired
   const skipRetire = answers.employment==="retired";
   // Skip name follow-ups if they don't have that advisor type
@@ -580,6 +584,9 @@ function buildSequence(answers) {
     if (q.id==="referring_advisor_name" && skipReferralName) return false;
     if ((q.id==="biz_partner_count"||q.id==="biz_buysell"||q.id==="biz_buysell_funding") && skipPartners) return false;
     if (q.id==="le_type" && bizSaleRedundant) return false;
+    const isEquity = event==="equity_event" || answers.le_type==="le_equity";
+    if (q.id==="le_timing" && isEquity) return false;
+    if (q.id==="le_equity_status" && !isEquity) return false;
     // Skip biz_retirement_plan if they already have a DB/cash balance plan — nothing to upgrade to
     const hasDB  = Array.isArray(answers.has_qp) && answers.has_qp.includes("hqp_db");
     // Skip if no qualified accounts at all — not relevant
@@ -989,22 +996,28 @@ function CompletionScreen({onReport,onAdvisor,answers,report}) {
       const age = calcAge(answers.dob);
 
       // Send client copy
-      await fetch("https://api.emailjs.com/api/v1.0/email/send", {
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({
-          service_id: EMAILJS_SERVICE_ID,
-          template_id: EMAILJS_TEMPLATE_CLIENT,
-          user_id: EMAILJS_PUBLIC_KEY,
-          template_params: {
-            to_email: answers.email,
-            to_name: report.firstName || answers.first_name || "there",
-            client_name: report.name,
-            tracks: trackList||"General Planning",
-            vision: answers.retirement_vision||"(not provided)",
-            retire_age: answers.retire_age||"(not provided)",
-          }
-        })
-      });
+      try {
+        const clientRes = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+          method:"POST", headers:{"Content-Type":"application/json"},
+          body: JSON.stringify({
+            service_id: EMAILJS_SERVICE_ID,
+            template_id: EMAILJS_TEMPLATE_CLIENT,
+            user_id: EMAILJS_PUBLIC_KEY,
+            template_params: {
+              to_email: answers.email,
+              to_name: report.firstName || answers.first_name || "there",
+              client_name: report.name,
+              tracks: trackList||"General Planning",
+              vision: answers.retirement_vision||"(not provided)",
+              retire_age: answers.retire_age||"(not provided)",
+            }
+          })
+        });
+        const clientText = await clientRes.text();
+        console.log("Client email response:", clientRes.status, clientText);
+      } catch(clientErr) {
+        console.error("Client email failed:", clientErr);
+      }
 
       // Send advisor copy to Jeffrey
       await fetch("https://api.emailjs.com/api/v1.0/email/send", {
@@ -1037,7 +1050,7 @@ function CompletionScreen({onReport,onAdvisor,answers,report}) {
 
       setSent(true);
     } catch(e) {
-      console.error("EmailJS error:",e);
+      console.error("EmailJS error:", e?.message || e?.text || JSON.stringify(e));
       setSendError(true);
     }
     setSending(false);
