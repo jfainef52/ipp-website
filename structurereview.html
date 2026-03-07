@@ -1130,6 +1130,7 @@ function CompletionScreen({onReport,onAdvisor,answers,report}) {
           template_params: {
             to_email: answers.email,
             to_name: report.firstName || answers.first_name || "there",
+            name: report.name || "Client",
             client_name: report.name,
             tracks: trackList||"General Planning",
             vision: answers.retirement_vision||"(not provided)",
@@ -1144,7 +1145,87 @@ function CompletionScreen({onReport,onAdvisor,answers,report}) {
         throw new Error("Client email failed: " + clientRes.status + " " + errText);
       }
 
-      // Send advisor copy to Jeffrey
+      // Build advisor HTML email
+      const spouseName = (answers.spouse_first_name&&answers.spouse_last_name)
+        ? (answers.spouse_first_name + " " + answers.spouse_last_name)
+        : (answers.spouse_first_name || "");
+      const clientState = answers.state
+        ? answers.state.replace(/_/g," ").replace(/\b\w/g,function(c){return c.toUpperCase();})
+        : "(not provided)";
+
+      let flagRows = "";
+      report.flags.forEach(function(f) {
+        const color = f.priority==="high" ? "#C47A7A" : f.priority==="medium" ? "#C8A030" : "#6E8299";
+        flagRows += "<tr><td style=\"padding:0 0 10px 0;\">"
+          + "<div style=\"padding:12px 16px;background:#1a2438;border-left:3px solid " + color + ";border-radius:0 6px 6px 0;\">"
+          + "<span style=\"font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:" + color + ";font-weight:600;\">" + f.priority.toUpperCase() + " · " + f.track + "</span>"
+          + "<p style=\"margin:4px 0 0;font-size:12px;line-height:1.55;color:#C8BFA8;\">" + f.text + "</p>"
+          + "</div></td></tr>";
+      });
+      if (!flagRows) flagRows = "<tr><td style=\"font-size:12px;color:#6E8299;padding:8px 0;\">No flags generated.</td></tr>";
+
+      let detailRows = "";
+      const details = [
+        ["Name", report.name||"(not provided)"],
+        ["Email", answers.email||"(not provided)"],
+        ["Phone", answers.phone||"(not provided)"],
+        ["Age", age!==null?String(age):"(not provided)"],
+        ["State", clientState],
+        ["Spouse", spouseName||"N/A"],
+        ["Contact Preference", answers.contact_preference||"(not provided)"],
+        ["How Heard", answers.how_heard||"(not provided)"],
+        ["Referring Advisor", answers.referring_advisor_name||"N/A"],
+        ["Planning Urgency", answers.planning_urgency||"(not provided)"],
+        ["Retire Age Target", answers.retire_age||"(not provided)"],
+        ["Vision", answers.retirement_vision||"(not provided)"],
+        ["Open Concerns", answers.open_concerns||"None"],
+      ];
+      details.forEach(function(d) {
+        detailRows += "<tr>"
+          + "<td style=\"padding:7px 12px;font-size:11px;color:#6E8299;white-space:nowrap;border-bottom:1px solid rgba(255,255,255,.05);width:38%;\">" + d[0] + "</td>"
+          + "<td style=\"padding:7px 12px;font-size:12px;color:#C8BFA8;border-bottom:1px solid rgba(255,255,255,.05);\">" + d[1] + "</td>"
+          + "</tr>";
+      });
+
+      const advisorHtml = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"></head>"
+        + "<body style=\"margin:0;padding:0;background:#0A1520;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;\">"
+        + "<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background:#0A1520;\">"
+        + "<tr><td align=\"center\" style=\"padding:24px 16px;\">"
+        + "<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"max-width:580px;\">"
+
+        // Header
+        + "<tr><td style=\"background:#162032;border-bottom:2px solid #C8A96E;border-radius:8px 8px 0 0;padding:18px 24px;\">"
+        + "<p style=\"margin:0 0 4px;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#C8A96E;\">New StructureReview™ Submission</p>"
+        + "<p style=\"margin:0;font-family:Georgia,serif;font-size:20px;color:#F5F2EC;\">" + (report.name||"Client") + "</p>"
+        + "</td></tr>"
+
+        // Tracks badge row
+        + "<tr><td style=\"background:#0F1D2E;padding:12px 24px;\">"
+        + "<p style=\"margin:0 0 8px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#C8A96E;\">Planning Tracks Identified</p>"
+        + "<p style=\"margin:0;font-size:13px;color:#F5F2EC;font-weight:600;\">" + (trackList||"General Planning") + "</p>"
+        + "</td></tr>"
+
+        // Flags
+        + "<tr><td style=\"background:#0F1D2E;padding:8px 24px 16px;\">"
+        + "<p style=\"margin:0 0 10px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#C8A96E;\">Flags</p>"
+        + "<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">" + flagRows + "</table>"
+        + "</td></tr>"
+
+        // Client Details
+        + "<tr><td style=\"background:#162032;padding:16px 24px;\">"
+        + "<p style=\"margin:0 0 10px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#C8A96E;\">Client Details</p>"
+        + "<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background:#0F1D2E;border-radius:6px;overflow:hidden;\">"
+        + detailRows
+        + "</table></td></tr>"
+
+        // Footer
+        + "<tr><td style=\"background:#0A1520;border-radius:0 0 8px 8px;padding:14px 24px;\">"
+        + "<p style=\"margin:0;font-size:10px;color:#2A3D50;\">Integrated Planning Partners · StructureReview™ · Internal Advisor Brief</p>"
+        + "</td></tr>"
+
+        + "</table></td></tr></table></body></html>";
+
+      // Send advisor copy
       const advisorRes = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
         method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({
@@ -1153,22 +1234,8 @@ function CompletionScreen({onReport,onAdvisor,answers,report}) {
           user_id: EMAILJS_PUBLIC_KEY,
           template_params: {
             to_email: "StructureReview@IntegratedPlanningPartners.com",
-            client_name: report.name,
-            spouse_name: (answers.spouse_first_name&&answers.spouse_last_name)?`${answers.spouse_first_name} ${answers.spouse_last_name}`:(answers.spouse_first_name||"(not provided)"),
-            client_email: answers.email||"(not provided)",
-            client_phone: answers.phone||"(not provided)",
-            contact_pref: answers.contact_preference||"(not provided)",
-            client_age: age!==null?String(age):"(not provided)",
-            client_state: answers.state?answers.state.replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase()):"(not provided)",
-            bio_sex: answers.bio_sex||"(not provided)",
-            tracks: trackList||"None",
-            flags: flagList||"No flags generated.",
-            how_heard: answers.how_heard||"(not provided)",
-            referring_advisor: answers.referring_advisor_name||"N/A",
-            vision: answers.retirement_vision||"(not provided)",
-            retire_age: answers.retire_age||"(not provided)",
-            urgency: answers.planning_urgency||"(not provided)",
-            open_concerns: answers.open_concerns||"None",
+            name: report.name||"Client",
+            html_content: advisorHtml,
           }
         })
       });
