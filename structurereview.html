@@ -1235,6 +1235,8 @@ function CompletionScreen({onReport,onAdvisor,answers,report}) {
           template_params: {
             to_email: "StructureReview@IntegratedPlanningPartners.com",
             name: report.name||"Client",
+            email: answers.email||"",
+            reply_to: answers.email||"",
             html_content: advisorHtml,
           }
         })
