@@ -777,6 +777,7 @@ function QuestionScreen({question:questionProp,answer,onAnswer,onNext,onBack,ste
   const [textVal,setTextVal]=useState(answer||"");
   const [multiSel,setMultiSel]=useState(Array.isArray(answer)?answer:[]);
   const inputRef=useRef(null);
+  const continueRef=useRef(null);
 
   useEffect(()=>{
     setTextVal(answer||""); setMultiSel(Array.isArray(answer)?answer:[]); setShowWhy(false);
@@ -1029,7 +1030,7 @@ function CompletionScreen({onReport,onAdvisor,answers,report}) {
     const trackLabels = {
       qp:       { label: "Qualified Plan Strategy",   color: "#C47A7A", desc: "Your retirement accounts carry a deferred tax obligation that grows with the account. There are strategies available to reposition this into tax-free income, care protection, and a more efficient legacy — before RMDs dictate the timing." },
       le:       { label: "Liquidity Event Planning",  color: "#7BAF84", desc: "A capital gains event is an opportunity — but only if the right structure is in place before or shortly after closing. Keeping the full gross amount working for you rather than paying tax out of pocket is a permanent, compounding difference." },
-      business: { label: "Business Owner Planning",   color: "#C8A030", desc: "Business owners have planning tools available that W-2 employees don't — tax deduction strategies, retirement plan design, key person protection, and exit structuring can each significantly improve the financial outcome." },
+      business: { label: "Business Owner Planning",   color: "#C8A030", desc: "Business owners have planning tools available that W-2 employees don\'t — tax deduction strategies, retirement plan design, key person protection, and exit structuring can each significantly improve the financial outcome." },
       estate:   { label: "Estate Planning",           color: "#9B7EC8", desc: "At your asset level, how wealth transfers to the next generation matters. Estate tax exposure, beneficiary structure, and the tax character of inherited assets can all be meaningfully improved with the right approach." },
     };
 
@@ -1078,7 +1079,7 @@ function CompletionScreen({onReport,onAdvisor,answers,report}) {
       // Greeting
       + '<tr><td style="background:#0F1D2E;padding:24px 28px 8px 28px;">'
       + '<p style="margin:0 0 14px 0;font-size:15px;line-height:1.65;color:#C8BFA8;">Hi ' + firstName + ',</p>'
-      + '<p style="margin:0 0 14px 0;font-size:14px;line-height:1.7;color:#8EA4B8;">Thank you for completing your StructureReview™. Based on your responses, we've identified the planning areas most relevant to your situation. Your advisor will walk through each of these in your upcoming conversation.</p>'
+      + '<p style="margin:0 0 14px 0;font-size:14px;line-height:1.7;color:#8EA4B8;">Thank you for completing your StructureReview™. Based on your responses, we\'ve identified the planning areas most relevant to your situation. Your advisor will walk through each of these in your upcoming conversation.</p>'
       + '</td></tr>'
 
       // Planning Areas
@@ -1092,7 +1093,7 @@ function CompletionScreen({onReport,onAdvisor,answers,report}) {
       // Next Step CTA
       + '<tr><td style="background:#162032;border-top:1px solid rgba(200,169,110,0.15);padding:24px 28px;">'
       + '<p style="margin:0 0 8px 0;font-family:Georgia,serif;font-size:17px;color:#F5F2EC;">Your next step</p>'
-      + '<p style="margin:0 0 18px 0;font-size:13px;line-height:1.7;color:#8EA4B8;">A StructureReview™ conversation is typically 30–45 minutes. We'll walk through the areas identified, show you what the numbers look like for your specific situation, and answer any questions you have. There is no obligation.</p>'
+      + '<p style="margin:0 0 18px 0;font-size:13px;line-height:1.7;color:#8EA4B8;">A StructureReview™ conversation is typically 30–45 minutes. We\'ll walk through the areas identified, show you what the numbers look like for your specific situation, and answer any questions you have. There is no obligation.</p>'
       + '<table cellpadding="0" cellspacing="0" border="0"><tr>'
       + '<td style="background:#C8A96E;border-radius:7px;padding:12px 24px;">'
       + '<a href="mailto:StructureReview@IntegratedPlanningPartners.com" style="font-size:13px;font-weight:700;color:#0E1824;text-decoration:none;letter-spacing:.03em;">Schedule Your Conversation →</a>'
