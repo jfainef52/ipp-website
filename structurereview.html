@@ -15,8 +15,12 @@
 </script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { background: #0E1824; min-height: 100vh; }
-#root { min-height: 100vh; }
+html, body { background: #0E1824; min-height: 100vh; height: 100%; }
+#root { min-height: 100vh; height: 100%; }
+* { -webkit-tap-highlight-color: transparent; }
+@supports (height: 100dvh) {
+  html, body, #root { min-height: 100dvh; }
+}
 </style>
 </head>
 <body>
@@ -581,7 +585,25 @@ function buildSequence(answers) {
     if (q.id==="referring_advisor_name" && skipReferralName) return false;
     if ((q.id==="biz_partner_count"||q.id==="biz_buysell"||q.id==="biz_buysell_funding") && skipPartners) return false;
     if (q.id==="le_type" && bizSaleRedundant) return false;
-    // Skip biz_retirement_plan if they already have a DB/cash balance plan — nothing to upgrade to
+    // Skip minor/adult children questions if no children
+  const skipChildrenFollowUp = answers.children_count === "ch_none";
+  // Skip adult_children_count if all children are minors (count matches)
+  const allMinors =
+    (answers.children_count === "ch_1" && answers.minor_children_count === "mc_1") ||
+    (answers.children_count === "ch_2" && answers.minor_children_count === "mc_2") ||
+    (answers.children_count === "ch_3" && answers.minor_children_count === "mc_3plus") ||
+    (answers.children_count === "ch_4plus" && answers.minor_children_count === "mc_3plus") ||
+    answers.minor_children_count === "mc_none"; // none are minors → adult_children still needed, but skip if all are minors
+
+  // Actually: skip adult_children_count if minors == total children count
+  const skipAdultChildren =
+    skipChildrenFollowUp ||
+    (answers.children_count === "ch_1" && answers.minor_children_count === "mc_1") ||
+    (answers.children_count === "ch_2" && answers.minor_children_count === "mc_2") ||
+    (answers.children_count === "ch_3" && answers.minor_children_count === "mc_3plus") ||
+    (answers.children_count === "ch_4plus" && answers.minor_children_count === "mc_3plus");
+
+  // Skip biz_retirement_plan if they already have a DB/cash balance plan — nothing to upgrade to
     const hasDB  = Array.isArray(answers.has_qp) && answers.has_qp.includes("hqp_db");
     // Skip if no qualified accounts at all — not relevant
     const hasNoQP = Array.isArray(answers.has_qp) && answers.has_qp.length===1 && answers.has_qp.includes("hqp_none");
@@ -589,6 +611,8 @@ function buildSequence(answers) {
     // is still relevant since they may have no plan at the business level
     if (q.id==="biz_retirement_plan" && (hasDB || hasNoQP)) return false;
     if (q.id==="biz_buysell_funding"    && skipBuySellFund)  return false;
+    if ((q.id==="minor_children_count"||q.id==="adult_children_count") && skipChildrenFollowUp) return false;
+    if (q.id==="adult_children_count" && skipAdultChildren) return false;
     seen.add(q.id); return true;
   });
 }
@@ -727,7 +751,28 @@ function NumberInput({value,onChange,placeholder,onNext}) {
 
 // ── Question Screen ──
 // Anchored motivation questions get a split layout: fact block above, then question + choices below
-function QuestionScreen({question,answer,onAnswer,onNext,onBack,stepNum,totalSteps}) {
+function QuestionScreen({question:questionProp,answer,onAnswer,onNext,onBack,stepNum,totalSteps,allAnswers={}}) {
+
+  // Filter options based on prior answers so contextually invalid choices are hidden
+  const filterOptions = (q) => {
+    if (!q.options) return q.options;
+    const marital = allAnswers.marital || '';
+    const noSpouse = ['single','divorced','widowed'].includes(marital);
+    const noChildren = allAnswers.children_count === 'ch_none';
+    return q.options.filter(o => {
+      if (q.id === 'qp_beneficiary') {
+        if (noSpouse && (o.id === 'qp_spouse' || o.id === 'qp_mixed')) return false;
+        if (noChildren && (o.id === 'qp_children' || o.id === 'qp_mixed')) return false;
+      }
+      if (q.id === 'estate_concern') {
+        if (noSpouse && o.id === 'ec_survivor') return false;
+        if (noChildren && o.id === 'ec_equalize') return false;
+      }
+      return true;
+    });
+  };
+  const question = { ...questionProp, options: filterOptions(questionProp) };
+
   const [showWhy,setShowWhy]=useState(false);
   const [textVal,setTextVal]=useState(answer||"");
   const [multiSel,setMultiSel]=useState(Array.isArray(answer)?answer:[]);
@@ -759,7 +804,7 @@ function QuestionScreen({question,answer,onAnswer,onNext,onBack,stepNum,totalSte
   const isMotivation=question.phase==="motivations";
 
   return (
-    <div style={{display:"flex",flexDirection:"column",height:"100vh",background:"#0E1824",position:"relative",overflow:"hidden",fontFamily:"'DM Sans',sans-serif"}}>
+    <div style={{display:"flex",flexDirection:"column",height:"100dvh",minHeight:"-webkit-fill-available",background:"#0E1824",position:"relative",overflow:"hidden",fontFamily:"'DM Sans',sans-serif"}}>
       <div style={{position:"absolute",top:-100,right:-100,width:380,height:380,borderRadius:"50%",background:"radial-gradient(circle,rgba(200,169,110,.06) 0%,transparent 70%)",pointerEvents:"none"}}/>
 
       {/* Header */}
@@ -830,7 +875,7 @@ function QuestionScreen({question,answer,onAnswer,onNext,onBack,stepNum,totalSte
       </div>
 
       {/* Body */}
-      <div style={{flex:1,padding:"20px 20px 0",overflowY:"auto"}}>
+      <div style={{flex:1,padding:"20px 20px 0",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
 
         {/* Anchor fact block if present */}
         {question.anchor&&<AnchorFact text={question.anchor}/>}
@@ -842,12 +887,12 @@ function QuestionScreen({question,answer,onAnswer,onNext,onBack,stepNum,totalSte
         </div>
 
         {question.type==="single"&&question.options.map((o,i)=>
-          <ChoiceBtn key={o.id} label={o.label} selected={answer===o.id} index={i} onClick={()=>onAnswer(o.id)}/>
+          <ChoiceBtn key={o.id} label={o.label} selected={answer===o.id} index={i} onClick={()=>{onAnswer(o.id);setTimeout(()=>continueRef.current&&continueRef.current.scrollIntoView({behavior:'smooth',block:'nearest'}),80);}}/>
         )}
         {question.type==="multi"&&<>
           <p style={{fontSize:11,color:"#6E8299",marginBottom:10,fontWeight:500}}>Select all that apply</p>
           {question.options.map((o,i)=>
-            <ChoiceBtn key={o.id} label={o.label} selected={multiSel.includes(o.id)} index={i} onClick={()=>toggleMulti(o.id)}/>
+            <ChoiceBtn key={o.id} label={o.label} selected={multiSel.includes(o.id)} index={i} onClick={()=>{toggleMulti(o.id);if(multiSel.length===0)setTimeout(()=>continueRef.current&&continueRef.current.scrollIntoView({behavior:'smooth',block:'nearest'}),80);}}/>
           )}
         </>}
         {(question.type==="text"||question.type==="email")&&(
@@ -876,14 +921,14 @@ function QuestionScreen({question,answer,onAnswer,onNext,onBack,stepNum,totalSte
       </div>
 
       {/* Footer */}
-      <div style={{padding:"16px 20px 24px",flexShrink:0}}>
+      <div style={{padding:"16px 20px 24px",flexShrink:0,paddingBottom:"max(24px, env(safe-area-inset-bottom, 24px))"}}>
         {question.why&&(
           <button onClick={()=>setShowWhy(true)} style={{display:"flex",alignItems:"center",gap:7,marginBottom:12,color:"#6E8299",fontSize:12,fontWeight:500}}>
             <span style={{width:17,height:17,borderRadius:"50%",border:"1px solid #4A6070",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,color:"#6E8299"}}>?</span>
             Why are we asking this?
           </button>
         )}
-        <button onClick={()=>{if(question.type==="text"||question.type==="number")onAnswer(textVal||answer);onNext();}} disabled={!canContinue} style={{
+        <button ref={continueRef} onClick={()=>{if(question.type==="text"||question.type==="number")onAnswer(textVal||answer);onNext();}} disabled={!canContinue} style={{
           width:"100%",padding:"15px",borderRadius:11,fontSize:14,fontWeight:700,letterSpacing:".03em",
           background:canContinue?"#C8A96E":"rgba(255,255,255,.06)",
           color:canContinue?"#0E1824":"#3A5268",
@@ -978,6 +1023,127 @@ function CompletionScreen({onReport,onAdvisor,answers,report}) {
   const EMAILJS_TEMPLATE_ADVISOR = "template_qxximsu";
   const EMAILJS_PUBLIC_KEY  = "XyWTKKWFoeYOhfFbV";
 
+  // Build styled HTML for client email
+  const buildClientEmailHtml = () => {
+    const firstName = report.firstName || answers.first_name || "there";
+    const trackLabels = {
+      qp: { label: "Qualified Plan Strategy", color: "#C47A7A",
+        desc: "Your retirement accounts carry a deferred tax obligation that grows with the account. There are strategies available to reposition this into tax-free income, care protection, and a more efficient legacy — before RMDs dictate the timing." },
+      le: { label: "Liquidity Event Planning", color: "#7BAF84",
+        desc: "A capital gains event is an opportunity — but only if the right structure is in place before or shortly after closing. Keeping the full gross amount working for you rather than paying tax out of pocket is a permanent, compounding difference." },
+      business: { label: "Business Owner Planning", color: "#C8A030",
+        desc: "Business owners have planning tools available that W-2 employees don't — tax deduction strategies, retirement plan design, key person protection, and exit structuring can each significantly improve the financial outcome." },
+      estate: { label: "Estate Planning", color: "#9B7EC8",
+        desc: "At your asset level, how wealth transfers to the next generation matters. Estate tax exposure, beneficiary structure, and the tax character of inherited assets can all be meaningfully improved with the right approach." },
+    };
+
+    const trackRows = report.tracks.map(t => {
+      const info = trackLabels[t];
+      if (!info) return "";
+      return `
+        <tr>
+          <td style="padding:0 0 16px 0;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#1a2a3a;border-radius:8px;overflow:hidden;">
+              <tr>
+                <td style="padding:4px 0 0 0;">
+                  <div style="width:100%;height:3px;background:${info.color};"></div>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:16px 20px;">
+                  <p style="margin:0 0 6px 0;font-family:Georgia,serif;font-size:15px;font-weight:400;color:#F5F2EC;">${info.label}</p>
+                  <p style="margin:0;font-size:13px;line-height:1.6;color:#8EA4B8;">${info.desc}</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>`;
+    }).join("");
+
+    const hasHighFlags = report.flags.some(f => f.priority === "high");
+    const urgencyBlock = hasHighFlags ? `
+      <tr>
+        <td style="padding:0 0 24px 0;">
+          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#1E1010;border:1px solid rgba(196,122,122,0.3);border-radius:8px;">
+            <tr><td style="padding:14px 18px;">
+              <p style="margin:0 0 6px 0;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#C47A7A;font-weight:600;">Time-Sensitive</p>
+              <p style="margin:0;font-size:13px;line-height:1.6;color:#C8BFA8;">One or more planning areas in your review have a time-sensitive component. Your advisor will walk you through the specifics in your StructureReview™ conversation.</p>
+            </td></tr>
+          </table>
+        </td>
+      </tr>` : "";
+
+    const tracksLabel = report.tracks.length > 0
+      ? report.tracks.map(t => trackLabels[t]?.label || t).join(" · ")
+      : "General Planning";
+
+    return `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#0E1824;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#0E1824;">
+    <tr><td align="center" style="padding:32px 16px;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
+
+        <!-- Header -->
+        <tr>
+          <td style="background:#162032;border-bottom:1px solid rgba(200,169,110,0.25);border-radius:10px 10px 0 0;padding:24px 28px;">
+            <p style="margin:0 0 8px 0;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:#C8A96E;">StructureReview™</p>
+            <p style="margin:0 0 4px 0;font-family:Georgia,serif;font-size:24px;font-weight:400;color:#F5F2EC;">Your Planning Overview</p>
+            <p style="margin:0;font-size:12px;color:#6E8299;">Prepared by Integrated Planning Partners</p>
+          </td>
+        </tr>
+
+        <!-- Greeting -->
+        <tr>
+          <td style="background:#0F1D2E;padding:24px 28px 8px 28px;">
+            <p style="margin:0 0 14px 0;font-size:15px;line-height:1.65;color:#C8BFA8;">Hi ${firstName},</p>
+            <p style="margin:0 0 14px 0;font-size:14px;line-height:1.7;color:#8EA4B8;">Thank you for completing your StructureReview™. Based on your responses, we've identified the planning areas most relevant to your situation. Your advisor will walk through each of these in your upcoming conversation.</p>
+          </td>
+        </tr>
+
+        <!-- Planning Areas -->
+        <tr>
+          <td style="background:#0F1D2E;padding:8px 28px 8px 28px;">
+            <p style="margin:0 0 14px 0;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#C8A96E;font-weight:600;">Your Planning Areas</p>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              ${trackRows || `<tr><td style="padding:0 0 16px 0;font-size:13px;color:#8EA4B8;">General financial planning review.</td></tr>`}
+            </table>
+          </td>
+        </tr>
+
+        ${urgencyBlock ? `<tr><td style="background:#0F1D2E;padding:0 28px 8px 28px;">${urgencyBlock.trim().replace(/^<tr><td[^>]*>/,'').replace(/<\/td><\/tr>$/,'')}</td></tr>` : ""}
+
+        <!-- Next Step CTA -->
+        <tr>
+          <td style="background:#162032;border-top:1px solid rgba(200,169,110,0.15);padding:24px 28px;">
+            <p style="margin:0 0 8px 0;font-family:Georgia,serif;font-size:17px;color:#F5F2EC;">Your next step</p>
+            <p style="margin:0 0 18px 0;font-size:13px;line-height:1.7;color:#8EA4B8;">A StructureReview™ conversation is typically 30–45 minutes. We'll walk through the areas identified, show you what the numbers look like for your specific situation, and answer any questions you have. There is no obligation.</p>
+            <table cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="background:#C8A96E;border-radius:7px;padding:12px 24px;">
+                  <a href="mailto:StructureReview@IntegratedPlanningPartners.com" style="font-size:13px;font-weight:700;color:#0E1824;text-decoration:none;letter-spacing:.03em;">Schedule Your Conversation →</a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background:#0A1520;border-radius:0 0 10px 10px;padding:18px 28px;">
+            <p style="margin:0 0 4px 0;font-size:11px;color:#3A5268;">Integrated Planning Partners · StructureReview™</p>
+            <p style="margin:0;font-size:10px;color:#2A3D50;">This summary was prepared based on your responses and is intended for planning conversation purposes only. It does not constitute financial, tax, or legal advice.</p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+  };
+
   const sendEmails = async () => {
     if (!answers.email) { onReport(); return; }
     setSending(true);
@@ -1003,6 +1169,7 @@ function CompletionScreen({onReport,onAdvisor,answers,report}) {
             tracks: trackList||"General Planning",
             vision: answers.retirement_vision||"(not provided)",
             retire_age: answers.retire_age||"(not provided)",
+            html_content: buildClientEmailHtml(),
           }
         })
       });
@@ -1313,7 +1480,19 @@ function App() {
   const currentQ=sequence[step];
 
   const handleAnswer=val=>{
-    const na={...answers,[currentQ.id]:val};
+    let na={...answers,[currentQ.id]:val};
+
+    // When marital status changes to single/divorced/widowed, clear any spouse-dependent answers
+    if(currentQ.id==='marital' && ['single','divorced','widowed'].includes(val)){
+      if(['qp_spouse','qp_mixed'].includes(na.qp_beneficiary)) delete na.qp_beneficiary;
+      if(Array.isArray(na.estate_concern)) na.estate_concern=na.estate_concern.filter(x=>x!=='ec_survivor');
+    }
+    // When children_count changes to none, clear any children-dependent answers
+    if(currentQ.id==='children_count' && val==='ch_none'){
+      if(['qp_children','qp_mixed'].includes(na.qp_beneficiary)) delete na.qp_beneficiary;
+      if(Array.isArray(na.estate_concern)) na.estate_concern=na.estate_concern.filter(x=>x!=='ec_equalize');
+    }
+
     setAnswers(na);
     // Rebuild sequence on universal questions AND any question that gates a conditional branch
     const rebuildTriggers = ["universal","has_qp","biz_has_partners","biz_buysell","biz_retirement_plan"];
@@ -1332,7 +1511,7 @@ function App() {
   if(view==="advisor") return (<AdvisorBrief answers={answers} report={report} onBack={start}/>);
   if(view==="flow"&&currentQ)return(
     <QuestionScreen question={currentQ} answer={answers[currentQ.id]} onAnswer={handleAnswer} onNext={next}
-      onBack={step>0?()=>setStep(s=>s-1):null} stepNum={step+1} totalSteps={sequence.length}/>
+      onBack={step>0?()=>setStep(s=>s-1):null} stepNum={step+1} totalSteps={sequence.length} allAnswers={answers}/>
   );
   return null;
 }
