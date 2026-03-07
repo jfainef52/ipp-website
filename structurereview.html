@@ -1269,7 +1269,7 @@ function CompletionScreen({onReport,onAdvisor,answers,report}) {
         {answers.email&&(
           <div style={{marginBottom:20,padding:"9px 14px",borderRadius:8,background:sent?"rgba(123,175,132,.1)":sendError?"rgba(196,122,122,.08)":"rgba(255,255,255,.04)",border:`1px solid ${sent?"rgba(123,175,132,.3)":sendError?"rgba(196,122,122,.2)":"rgba(255,255,255,.08)"}`}}>
             {sending&&<p style={{fontSize:12,color:"#6E8299"}}>Sending your summary to {answers.email}...</p>}
-            {sent&&<p style={{fontSize:12,color:"#7BAF84"}}>✓ Summary sent to {answers.email}</p>}
+            {sent&&<p style={{fontSize:12,color:"#7BAF84"}}>✓ Summary sent to {answers.email}<br/><span style={{color:"#6E8299"}}>Don&#39;t see it? Check your spam folder and mark it as not spam.</span></p>}
             {sendError&&<p style={{fontSize:12,color:"#C47A7A"}}>Couldn't send email — you can still view your summary below.</p>}
           </div>
         )}
