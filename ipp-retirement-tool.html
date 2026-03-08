@@ -575,9 +575,12 @@ function projectArc(inputs) {
       trad = Math.max(0, trad - convAmt);
       row.rothConversionEvent = true;
       row.rothConversionAmount = convAmt;
-      // Entire conversion is a taxable IRA distribution — elevates marginal rate this year
+      // Entire conversion is a taxable IRA distribution — elevates marginal rate this year.
+      // Book into sources now so calcAnnualTax sees the full income stack including this conversion.
       row.sources.rmd = (row.sources.rmd || 0) + convAmt;
       row.totalIncome += convAmt;
+      // Flag for post-tax overage gross-up — resolved after calcAnnualTax runs below with full income.
+      row._conversionOveragePending = { convAmt, financed: Math.min(rothConversionFinanced || 0, convAmt) };
     }
 
     // ── LTC Policy Funding Draw ──
@@ -1015,6 +1018,30 @@ function projectArc(inputs) {
       ? `LTC draws grossed up — $${Math.round((row.ltcGrossUpTax||0)/1000)}K additional tax this year`
       : null;
 
+    // ── Roth Conversion Overage Gross-Up (resolved post-tax with actual marginal rate) ──
+    // Now that calcAnnualTax has run with the full income stack (including the conversion amount),
+    // we know the real marginal rate for this year. Use it to:
+    //   1. Compute actual tax on the conversion:  convTax = convAmt × marginalRate
+    //   2. Subtract financed portion (bank loan — no IRA draw needed): overage = convTax − financed
+    //   3. Gross up the overage: grossUp = overage / (1 − marginalRate)
+    // This is the additional IRA withdrawal needed to net exactly the overage tax after taxes.
+    if (row._conversionOveragePending) {
+      const { convAmt, financed } = row._conversionOveragePending;
+      const allInRate = row.allInMarginalRate || taxResult.marginalRate;
+      const convTax = convAmt * allInRate;                         // actual tax on conversion at marginal rate
+      const overageTax = Math.max(0, convTax - financed);         // unfinanced portion — must come from IRA
+      if (overageTax > 0 && trad > 0) {
+        const grossUp = Math.min(trad, overageTax / (1 - allInRate)); // gross-up so net covers the overage
+        trad = Math.max(0, trad - grossUp);
+        row.sources.rmd = (row.sources.rmd || 0) + grossUp;
+        row.totalIncome += grossUp;
+        row.rothConversionOverage = grossUp;
+        row.rothConversionOverageTax = overageTax;
+        row.rothConversionMarginalRate = allInRate;
+      }
+      delete row._conversionOveragePending;
+    }
+
     // Combined all-in tax (federal + state; IRMAA already in expenses)
     const totalAllInTax = taxResult.totalTax + stateTax;
 
@@ -1433,7 +1460,7 @@ function DataTable({ data }) {
               <td style={{padding:'5px 8px',textAlign:'right',color:'#C8A96E',fontWeight:600}}>
                 {d.age}
                 {d.etaFundingEvent && <span title={`ETA funding — $${Math.round((d.etaFundingAmount||0)/1000)}K IRA repositioned`} style={{color:'#A8C5D8',marginLeft:3,cursor:'help'}}>⚡</span>}
-                {d.rothConversionEvent && <span title={`Roth conversion — $${Math.round((d.rothConversionAmount||0)/1000)}K IRA converted`} style={{color:'#7BAF84',marginLeft:3,cursor:'help'}}>✦</span>}
+                {d.rothConversionEvent && <span title={`Roth conversion — $${Math.round((d.rothConversionAmount||0)/1000)}K converted${d.rothConversionOverage>0?' | Tax: $'+Math.round((d.rothConversionOverageTax||0)/1000)+'K − $'+Math.round(((d.rothConversionAmount||0)*(d.rothConversionMarginalRate||0)-(d.rothConversionOverageTax||0))/1000)+'K financed = $'+Math.round((d.rothConversionOverageTax||0)/1000)+'K overage → $'+Math.round((d.rothConversionOverage||0)/1000)+'K gross-up draw':''}`} style={{color:'#7BAF84',marginLeft:3,cursor:'help'}}>✦</span>}
                 {d.ltcFundingEvent && <span title={`LTC policy funding — $${Math.round((d.ltcFundingAmount||0)/1000)}K IRA draw`} style={{color:'#9B7EC8',marginLeft:3,cursor:'help'}}>♥</span>}
               </td>
               <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.ss.fill}}>{fmt$(d.sources.ss||0)}</td>
@@ -2331,7 +2358,12 @@ function App() {
                 {inputs.rothConversionAmount > 0 && inputs.rothConversionAge > 0 && (()=>{
                   const amt = inputs.rothConversionAmount;
                   const financed = inputs.rothConversionFinanced || 0;
-                  const overage = Math.max(0, amt - financed);
+                  // Use peak marginal rate from projection if available, else fallback to 30%
+                  const peakRate = peakMarginalRow ? (peakMarginalRow.allInMarginalRate || 0.30) : 0.30;
+                  const convTax = amt * peakRate;                          // tax on conversion at marginal rate
+                  const overageTax = Math.max(0, convTax - financed);     // unfinanced portion
+                  const grossOverage = overageTax > 0 ? overageTax / (1 - peakRate) : 0;
+                  const totalIraReduction = amt + grossOverage;
                   return (
                     <div style={{background:'rgba(123,175,132,.05)',border:'1px solid rgba(123,175,132,.2)',borderRadius:7,padding:'10px 12px',marginBottom:6}}>
                       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
@@ -2340,15 +2372,15 @@ function App() {
                         </Field>
                         <div>
                           <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:4}}>Overage Tax (est.)</div>
-                          <div style={{fontSize:15,fontWeight:600,color:overage>0?'#C47A7A':'#4A9B7A',fontFamily:"'Cormorant Garamond',serif"}}>{overage>0?'$'+Math.round(overage/1000)+'K':'None'}</div>
-                          <div style={{fontSize:11,color:'#8DAFC8',marginTop:2}}>Grossed-up IRA withdrawal</div>
+                          <div style={{fontSize:15,fontWeight:600,color:overageTax>0?'#C47A7A':'#4A9B7A',fontFamily:"'Cormorant Garamond',serif"}}>{overageTax>0?'$'+Math.round(grossOverage/1000)+'K gross-up':'None'}</div>
+                          <div style={{fontSize:11,color:'#8DAFC8',marginTop:2}}>{overageTax>0?`$${Math.round(overageTax/1000)}K tax ÷ (1 − ${Math.round(peakRate*100)}%) rate`:'Bank loan covers full tax liability'}</div>
                         </div>
                       </div>
                       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,paddingTop:8,borderTop:'1px solid rgba(123,175,132,.15)'}}>
                         <div style={{textAlign:'center'}}>
                           <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Total IRA Reduction</div>
-                          <div style={{fontSize:15,fontWeight:600,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif"}}>−${amt>=1000000?(amt/1000000).toFixed(1)+'M':Math.round(amt/1000)+'K'}</div>
-                          <div style={{fontSize:11,color:'#8DAFC8'}}>Conversion + overage tax</div>
+                          <div style={{fontSize:15,fontWeight:600,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif"}}>−${totalIraReduction>=1000000?(totalIraReduction/1000000).toFixed(1)+'M':Math.round(totalIraReduction/1000)+'K'}</div>
+                          <div style={{fontSize:11,color:'#8DAFC8'}}>Conversion + grossed-up overage tax</div>
                         </div>
                         <div style={{textAlign:'center'}}>
                           <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Financed</div>
