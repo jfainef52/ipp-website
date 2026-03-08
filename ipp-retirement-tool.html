@@ -745,7 +745,16 @@ function projectArc(inputs) {
     }
 
     row.totalExpense = expenses;
-    row.gap = row.totalIncome - expenses;
+    // Gap uses only spendable income — purpose-driven events (ETA funding, Roth conversion,
+    // LTC policy premium draw) are non-spendable IRA distributions that go directly to
+    // the policy/conversion, not into the client's pocket to pay living expenses.
+    // Treating them as spendable would cause the model to skip the gap-fill in event years,
+    // making living expenses appear "free" and understating portfolio draws.
+    const nonSpendableEvents = (row.etaFundingAmount || 0)
+      + (row.rothConversionAmount || 0)
+      + (row.ltcFundingAmount || 0);
+    row.spendableIncome = row.totalIncome - nonSpendableEvents;
+    row.gap = row.spendableIncome - expenses;
 
     // ── Shared gross-up utilities — hoisted outside gap block so IRMAA fill can also use them ──
     const isMFJeff = effectiveStatus === 'mfj';
@@ -792,9 +801,20 @@ function projectArc(inputs) {
     };
 
     // ── Gap-fill with bracket-creep-aware gross-up ──
+    // For LTC years: compute how much of the gap is specifically due to LTC cost,
+    // so we can accurately report gross-up tax attributable to the care event.
+    const baseGapWithoutLtc = row.ltcEvent
+      ? row.totalIncome - (row.totalExpense - (row.ltcUncovered || 0))
+      : null;
+    const ltcDrivenGap = row.ltcEvent ? (row.ltcUncovered || 0) : 0;
+
     if (row.gap < 0) {
       const needed = Math.abs(row.gap);
       let remaining = needed;
+      // Track how much of the draw is attributable to LTC vs baseline gap
+      const baselineGapAmt = Math.max(0, baseGapWithoutLtc !== null ? -baseGapWithoutLtc : needed);
+      const ltcPortionOfGap = Math.min(needed, ltcDrivenGap);
+      let ltcRemaining = ltcPortionOfGap; // track LTC-specific portion
 
       // --- Taxable brokerage: LTCG gross-up, stacked on ordinary income ---
       if (taxable > 0 && remaining > 0) {
@@ -3109,14 +3129,16 @@ function App() {
             // True total cost = care cost + gross-up tax friction
             const trueTotalCost = totalLtcCost + grossUpTaxTotal;
 
-            // Portfolio preserved = full ending balance difference (already captures gross-up
-            // AND compounding loss — both projections ran full engine with all tax friction)
+            // Portfolio preserved = full ending balance difference — captures gross-up AND compounding
             const portfolioDiff = insuredFinal && uninsuredFinal
               ? (insuredFinal.totalPortfolio - uninsuredFinal.totalPortfolio)
               : 0;
 
-            // Compounding loss = portfolioDiff minus true total cost (the "multiplier" effect)
-            const compoundingLoss = Math.max(0, portfolioDiff - trueTotalCost);
+            // Compounding loss = what the true total cost would have grown to by plan-to age
+            // minus the true total cost itself — the pure "growth stolen" effect
+            const yearsToEnd = inputs.planToAge - ltcAge;
+            const fvTrueCost = trueTotalCost * Math.pow(1 + inputs.portfolioReturn, yearsToEnd);
+            const compoundingLoss = Math.max(0, fvTrueCost - trueTotalCost);
 
             const fmtD = v => v >= 1000000 ? `$${(v/1000000).toFixed(2)}M` : `$${Math.round(v/1000)}K`;
             return (
@@ -3133,9 +3155,9 @@ function App() {
                   {[
                     { label:'Net Care Cost', value: fmtD(totalLtcCost), sub:'Direct uninsured expense', color:'#C47A7A' },
                     { label:'Gross-Up Tax Cost', value: grossUpTaxTotal > 0 ? fmtD(grossUpTaxTotal) : '—', sub:'Extra tax on forced IRA draws', color:'#C47A7A' },
-                    { label:'True Total Cost', value: fmtD(trueTotalCost), sub:'Care + tax friction', color:'#C8A030' },
-                    { label:'Compounding Loss', value: compoundingLoss > 0 ? fmtD(compoundingLoss) : '—', sub:`Growth lost age ${ltcAge}→${inputs.planToAge}`, color:'#C47A7A' },
-                    { label:'Portfolio Preserved', value: fmtD(portfolioDiff), sub:`Layer 2 benefit at age ${inputs.planToAge}`, color: portfolioDiff > 0 ? '#4A9B7A' : '#C47A7A' },
+                    { label:'True Total Cost', value: fmtD(trueTotalCost), sub:'Care + tax friction combined', color:'#C8A030' },
+                    { label:'Compounding Loss', value: compoundingLoss > 0 ? fmtD(compoundingLoss) : '—', sub:`FV growth stolen age ${ltcAge}→${inputs.planToAge}`, color:'#C47A7A' },
+                    { label:'Portfolio Preserved', value: fmtD(portfolioDiff), sub:`Actual ending balance diff at ${inputs.planToAge}`, color: portfolioDiff > 0 ? '#4A9B7A' : '#C47A7A' },
                   ].map(s => (
                     <div key={s.label} style={{background:'rgba(255,255,255,.03)',borderRadius:8,padding:'10px 12px',border:'1px solid rgba(255,255,255,.06)'}}>
                       <div style={{fontSize:12,color:'#8DAFC8',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:4}}>{s.label}</div>
