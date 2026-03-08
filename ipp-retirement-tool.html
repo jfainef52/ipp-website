@@ -1670,9 +1670,9 @@ function App() {
   // Insured comparison — run second projection with benefit covering LTC costs
   // Tied to architecture toggle: Layer 2 comparison only shows when architecture is enabled
   const showLtcComparison = inputs.architectureEnabled && inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
-  const { years: yearsInsured } = showLtcComparison
+  const { years: yearsInsured, confidence: confidenceInsured } = showLtcComparison
     ? projectArc({ ...baseProjectionInputs, ltcInsured: true })
-    : { years: null };
+    : { years: null, confidence: null };
 
   const isMarried = inputs.filingStatus === 'mfj';
 
@@ -3227,6 +3227,51 @@ function App() {
                   <span style={{color:'#4A9B7A',fontWeight:700}}>{fmtD(portfolioDiff)}</span>
                   <span style={{color:'#4A9B7A'}}>Portfolio Preserved</span>
                 </div>
+                {/* Dual Monte Carlo Confidence Comparison */}
+                {confidenceInsured !== null && (() => {
+                  const delta = confidenceInsured - confidence;
+                  const deltaColor = delta > 0 ? '#4A9B7A' : delta < 0 ? '#C47A7A' : '#8DAFC8';
+                  const barW = (pct) => `${Math.max(4, pct)}%`;
+                  return (
+                    <div style={{background:'rgba(255,255,255,.02)',border:'1px solid rgba(255,255,255,.07)',borderRadius:10,padding:'14px 16px',marginBottom:14}}>
+                      <div style={{fontSize:12,fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'#8DAFC8',marginBottom:12}}>
+                        Monte Carlo Confidence — With vs. Without Layer 2
+                        <span style={{fontWeight:400,marginLeft:8,color:'#5A7A8A'}}>500 trials · starts post-event age {ltcEnd}</span>
+                      </div>
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:10}}>
+                        {/* Without Layer 2 */}
+                        <div>
+                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:6}}>
+                            <span style={{fontSize:12,color:'#C47A7A',fontWeight:600}}>WITHOUT Layer 2</span>
+                            <span style={{fontSize:22,fontWeight:700,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif"}}>{confidence}%</span>
+                          </div>
+                          <div style={{height:8,background:'rgba(255,255,255,.06)',borderRadius:4,overflow:'hidden'}}>
+                            <div style={{height:'100%',width:barW(confidence),background:'#C47A7A',borderRadius:4,transition:'width .6s ease'}}/>
+                          </div>
+                          <div style={{fontSize:11,color:'#8DAFC8',marginTop:4}}>Portfolio depleted by {fmtD(trueTotalCost)} in care years</div>
+                        </div>
+                        {/* With Layer 2 */}
+                        <div>
+                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:6}}>
+                            <span style={{fontSize:12,color:'#4A9B7A',fontWeight:600}}>WITH Layer 2</span>
+                            <span style={{fontSize:22,fontWeight:700,color:'#4A9B7A',fontFamily:"'Cormorant Garamond',serif"}}>{confidenceInsured}%</span>
+                          </div>
+                          <div style={{height:8,background:'rgba(255,255,255,.06)',borderRadius:4,overflow:'hidden'}}>
+                            <div style={{height:'100%',width:barW(confidenceInsured),background:'#4A9B7A',borderRadius:4,transition:'width .6s ease'}}/>
+                          </div>
+                          <div style={{fontSize:11,color:'#8DAFC8',marginTop:4}}>Care costs covered by dedicated benefit pool</div>
+                        </div>
+                      </div>
+                      <div style={{textAlign:'center',fontSize:13,color:deltaColor,fontWeight:700,borderTop:'1px solid rgba(255,255,255,.06)',paddingTop:10}}>
+                        {delta > 0
+                          ? `Layer 2 improves plan survival confidence by +${delta} percentage points`
+                          : delta < 0
+                          ? `Layer 2 reduces confidence by ${delta} pts (review benefit sizing)`
+                          : 'No confidence difference — benefit fully offset by premium cost'}
+                      </div>
+                    </div>
+                  );
+                })()}
                 <p style={{fontSize:13,color:'#DDD6C4',lineHeight:1.65}}>
                   The <strong style={{color:'#C47A7A'}}>solid red line</strong> shows expenses when the care event draws directly from your retirement portfolio — permanently reducing the compounding base. The <strong style={{color:'#4A9B7A'}}>dashed green line</strong> shows the same retirement with a Living Benefits IUL (Layer 2) covering the event: care costs draw from a dedicated pool, your income architecture remains intact, and the portfolio difference compounds for the remainder of retirement.
                 </p>
