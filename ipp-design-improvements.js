@@ -81,5 +81,14 @@
     var ls=document.querySelector('.layers-section');
     if (ls&&ls.parentNode) ls.parentNode.insertBefore(sec,ls.nextSibling);
   }
-  if (document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();
+  // Run on DOMContentLoaded, load, AND immediately (covers all timing scenarios)
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+  // Extra safety: also run on full load in case images/scripts delayed DOM
+  window.addEventListener('load', function() {
+    applyHeroImages();
+  });
 })();
