@@ -1520,11 +1520,14 @@ function App() {
   })();
   const peakMarginalRate = peakMarginalRow ? (peakMarginalRow.allInMarginalRate || 0) : 0;
   const peakFedMarginalRate = peakMarginalRow ? (peakMarginalRow.marginalFedRate || 0) : 0;
-  const guaranteedPct = retireData ? Math.round(
-    ((retireData.sources.ss||0) + (retireData.sources.pension||0)
-    + (retireData.rothAnnuityIncome||0) + (retireData.nonQualAnnuityIncome||0))
-    / Math.max(1,retireData.totalIncome) * 100
-  ) : 0;
+  const guaranteedPct = (() => {
+    const retirementYears = years.filter(y => y.age >= inputs.retireAge);
+    if (!retirementYears.length) return 0;
+    const totalGuaranteed = retirementYears.reduce((sum, y) =>
+      sum + (y.sources.ss||0) + (y.sources.pension||0) + (y.rothAnnuityIncome||0) + (y.nonQualAnnuityIncome||0), 0);
+    const totalIncome = retirementYears.reduce((sum, y) => sum + Math.max(1, y.totalIncome||0), 0);
+    return Math.round(totalGuaranteed / totalIncome * 100);
+  })();
 
   useEffect(() => {
     const s = document.createElement('style');
@@ -1652,7 +1655,7 @@ function App() {
           ['Monte Carlo Confidence','#4A9B7A',confidence+'%'],
           ['Portfolio at Retirement','#C8A96E',fmtM(totalPortfolioAtRetire)],
           ['Portfolio at Age 90','#7BAF84',age90Data?fmtM(age90Data.totalPortfolio):'—'],
-          ['Guaranteed Income (Yr 1)','#7BAF84',guaranteedPct+'%'],
+          ['Guaranteed Income (Lifetime Avg)','#7BAF84',guaranteedPct+'%'],
           ['Est. Lifetime Federal Tax','#C47A7A',totalFedTax>=1000000?'$'+(totalFedTax/1000000).toFixed(1)+'M':'$'+Math.round(totalFedTax/1000)+'K'],
           ['Est. Lifetime State Tax','#C47A7A',totalStateTax>=1000000?'$'+(totalStateTax/1000000).toFixed(1)+'M':'$'+Math.round(totalStateTax/1000)+'K'],
           ['Est. Lifetime Total Tax','#C47A7A',totalEstTax>=1000000?'$'+(totalEstTax/1000000).toFixed(1)+'M':'$'+Math.round(totalEstTax/1000)+'K'],
@@ -2583,7 +2586,7 @@ function App() {
           <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:20}}>
             {[
               { label:'Portfolio at Retirement', value: fmtM(totalPortfolioAtRetire), sub:'Starting balance', color:'#C8A96E' },
-              { label:'Guaranteed Income', value: guaranteedPct+'%', sub: inputs.ssClaimAge > inputs.retireAge ? `at retirement (SS starts age ${inputs.ssClaimAge})` : 'of year-1 income', color: guaranteedPct>=50?'#4A9B7A':'#C8A030' },
+              { label:'Guaranteed Income', value: guaranteedPct+'%', sub: `of total retirement income (age ${inputs.retireAge}–${inputs.planToAge})`, color: guaranteedPct>=50?'#4A9B7A':'#C8A030' },
               { label:'Total IRMAA Exposure', value: totalIrmaa>0?'$'+Math.round(totalIrmaa/1000)+'K':'None', sub: isMarried ? 'Est. surcharges (MFJ brackets)' : 'Est. Medicare surcharges', color: totalIrmaa>0?'#E8943A':'#4A9B7A' },
               { label:'Portfolio at Age 90', value: age90Data?fmtM(age90Data.totalPortfolio):'—', sub:'Est. remaining balance', color: age90Data&&age90Data.totalPortfolio>0?'#7BAF84':'#C47A7A' },
               { label:'Est. Lifetime Tax', value: totalEstTax>0?(totalEstTax>=1000000?'$'+(totalEstTax/1000000).toFixed(1)+'M':'$'+Math.round(totalEstTax/1000)+'K'):'—', sub:'Fed '+(totalFedTax>=1000000?'$'+(totalFedTax/1000000).toFixed(1)+'M':'$'+Math.round(totalFedTax/1000)+'K')+' · State '+(totalStateTax>=1000000?'$'+(totalStateTax/1000000).toFixed(1)+'M':'$'+Math.round(totalStateTax/1000)+'K')+(inputs.taxRateStressAdder>0?' · ⚠ stress +'+inputs.taxRateStressAdder+'%':''), color:'#C47A7A' },
@@ -2861,7 +2864,7 @@ function App() {
             <div style={{background:'rgba(74,155,122,.05)',border:'1px solid rgba(74,155,122,.15)',borderRadius:10,padding:'14px 16px'}}>
               <div style={{fontSize:13,fontWeight:700,letterSpacing:'.14em',textTransform:'uppercase',color:'#4A9B7A',marginBottom:8}}>Guaranteed Income Floor</div>
               <p style={{fontSize:14,lineHeight:1.65,color:'#DDD6C4'}}>
-                <strong style={{color:'#4A9B7A'}}>{guaranteedPct}%</strong> of your projected year-1 retirement income comes from guaranteed sources (Social Security{inputs.pensionMonthly > 0 ? ', pension' : ''}{inputs.annuityMonthly > 0 ? ', annuity' : ''}). {guaranteedPct < 50 ? 'Increasing this floor through a Roth Fixed Indexed Annuity with GLWB rider (Layer 1) reduces sequence risk and future IRMAA exposure. The ETA structure (Layer 3) can fund the conversion by eliminating the distribution tax via bank non-recourse loan.' : 'A strong floor provides stability against market volatility. Every dollar repositioned into the Roth Annuity (Layer 1) or ETA IUL policy (Layer 3) permanently reduces the future RMD base — lowering mandatory income and IRMAA exposure year after year.'}
+                <strong style={{color:'#4A9B7A'}}>{guaranteedPct}%</strong> of total projected retirement income (age {inputs.retireAge}–{inputs.planToAge}) comes from guaranteed sources (Social Security{inputs.pensionMonthly > 0 ? ', pension' : ''}{inputs.annuityMonthly > 0 ? ', annuity' : ''}). {guaranteedPct < 50 ? 'Increasing this floor through a Roth Fixed Indexed Annuity with GLWB rider (Layer 1) reduces sequence risk and future IRMAA exposure. The ETA structure (Layer 3) can fund the conversion by eliminating the distribution tax via bank non-recourse loan.' : 'A strong floor provides stability against market volatility. Every dollar repositioned into the Roth Annuity (Layer 1) or ETA IUL policy (Layer 3) permanently reduces the future RMD base — lowering mandatory income and IRMAA exposure year after year.'}
               </p>
             </div>
           </div>
