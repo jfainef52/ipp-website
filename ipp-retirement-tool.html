@@ -478,6 +478,8 @@ function projectArc(inputs) {
     etaAnnualIncome = 0, etaStartAge = 70, etaColaRate = 0,
     etaFundingAmount = 0, etaFundingAge = 0,
     architectureEnabled = true,
+    rothConversionAmount = 0, rothConversionAge = 0, rothConversionFinanced = 0,
+    ltcFundingAmount = 0, ltcFundingAge = 0,
     nonQualAnnuityMonthly = 0, nonQualAnnuityStartAge = 65,
     nonQualAnnuityBasis = 0, nonQualAnnuityTotalValue = 0,
     partTimeMonthly, partTimeEndAge,
@@ -511,6 +513,8 @@ function projectArc(inputs) {
   const archAnnualTradDrawdown   = architectureEnabled ? annualTradDrawdown   : 0;
   const archAnnualTaxableDrawdown= architectureEnabled ? annualTaxableDrawdown: 0;
   const archAnnualRothDrawdown   = architectureEnabled ? annualRothDrawdown   : 0;
+  const archRothConversionAmount = architectureEnabled ? rothConversionAmount : 0;
+  const archLtcFundingAmount     = architectureEnabled ? ltcFundingAmount     : 0;
 
   // ── Pre-retirement accumulation: grow balances from currentAge to retireAge ──
   // Apply portfolio return each year and add contributions if modeled.
@@ -528,6 +532,14 @@ function projectArc(inputs) {
       // ETA funding event — reduce trad balance in the funding year (pre-retirement)
       if (archEtaFundingAmount > 0 && etaFundingAge > 0 && a === etaFundingAge) {
         trad = Math.max(0, trad - archEtaFundingAmount);
+      }
+      // Roth conversion event — reduce trad balance in conversion year (pre-retirement)
+      if (archRothConversionAmount > 0 && rothConversionAge > 0 && a === rothConversionAge) {
+        trad = Math.max(0, trad - archRothConversionAmount);
+      }
+      // LTC policy funding draw — reduce trad balance (pre-retirement)
+      if (archLtcFundingAmount > 0 && ltcFundingAge > 0 && a === ltcFundingAge) {
+        trad = Math.max(0, trad - archLtcFundingAmount);
       }
       // Grow existing balance then add contribution (end-of-year)
       trad    = trad    * (1 + portfolioReturn) + tradContrib;
@@ -548,18 +560,37 @@ function projectArc(inputs) {
     row.yearReturn = yearReturn; // stored for chart annotation
 
     // ── ETA Lump-Sum Funding Event ──
-    // Reduces traditional balance in the funding year. Tax on distribution is financed
-    // (bank non-recourse loan) — no cash leaves portfolio. The lump sum IS added to
-    // ordinary income for tax purposes, elevating the marginal rate this year only.
     if (archEtaFundingAmount > 0 && etaFundingAge > 0 && age === etaFundingAge) {
       const fundAmt = Math.min(archEtaFundingAmount, trad);
       trad = Math.max(0, trad - fundAmt);
       row.etaFundingEvent = true;
       row.etaFundingAmount = fundAmt;
-      // Add the distribution to ordinary income (taxable event — marginal rate impact)
-      // Tax is financed — NOT deducted from any account balance
-      row.sources.rmd = (row.sources.rmd || 0) + fundAmt; // treated as ordinary IRA distribution
+      row.sources.rmd = (row.sources.rmd || 0) + fundAmt;
       row.totalIncome += fundAmt;
+    }
+
+    // ── Roth Annuity Conversion Event (Layer 1) ──
+    // Full conversion amount is ordinary income (taxable). Tax partially financed (no cash out),
+    // overage tax paid via grossed-up IRA withdrawal — both reduce the traditional balance.
+    if (archRothConversionAmount > 0 && rothConversionAge > 0 && age === rothConversionAge) {
+      const convAmt = Math.min(archRothConversionAmount, trad);
+      trad = Math.max(0, trad - convAmt);
+      row.rothConversionEvent = true;
+      row.rothConversionAmount = convAmt;
+      // Entire conversion is a taxable IRA distribution — elevates marginal rate this year
+      row.sources.rmd = (row.sources.rmd || 0) + convAmt;
+      row.totalIncome += convAmt;
+    }
+
+    // ── LTC Policy Funding Draw ──
+    // Fully taxable IRA withdrawal — cannot be financed. Flows through ordinary income.
+    if (archLtcFundingAmount > 0 && ltcFundingAge > 0 && age === ltcFundingAge) {
+      const ltcFund = Math.min(archLtcFundingAmount, trad);
+      trad = Math.max(0, trad - ltcFund);
+      row.ltcFundingEvent = true;
+      row.ltcFundingAmount = ltcFund;
+      row.sources.rmd = (row.sources.rmd || 0) + ltcFund;
+      row.totalIncome += ltcFund;
     }
 
     // Determine effective filing status this year (spouse death changes it)
@@ -1118,6 +1149,28 @@ function ArcChart({ data, view, insuredData, sorrEnabled }) {
                 </text>
               </g>
             )}
+            {/* Roth Conversion Event marker */}
+            {d.rothConversionEvent && (
+              <g>
+                <line x1={xScale(i)} x2={xScale(i)} y1={PAD.t} y2={PAD.t+chartH}
+                  stroke="rgba(123,175,132,.6)" strokeWidth="2" strokeDasharray="4,3"/>
+                <text x={xScale(i)+4} y={PAD.t+26} textAnchor="start"
+                  fill="#7BAF84" fontSize="9" fontFamily="DM Sans" fontWeight="700">
+                  ✦ ROTH
+                </text>
+              </g>
+            )}
+            {/* LTC Funding Event marker */}
+            {d.ltcFundingEvent && (
+              <g>
+                <line x1={xScale(i)} x2={xScale(i)} y1={PAD.t} y2={PAD.t+chartH}
+                  stroke="rgba(155,126,200,.5)" strokeWidth="2" strokeDasharray="4,3"/>
+                <text x={xScale(i)+4} y={PAD.t+38} textAnchor="start"
+                  fill="#9B7EC8" fontSize="9" fontFamily="DM Sans" fontWeight="700">
+                  ♥ LTC
+                </text>
+              </g>
+            )}
             {/* SORR year overlay — shade the first 5 retirement years, only when SORR active */}
             {sorrEnabled && d.yearReturn !== undefined && i < 5 && (() => {
               const isNeg = d.yearReturn < 0;
@@ -1285,9 +1338,12 @@ function DataTable({ data }) {
         </thead>
         <tbody>
           {data.map((d,i)=>(
-            <tr key={d.age} style={{background: d.etaFundingEvent ? 'rgba(168,197,216,.07)' : d.ltcEvent ? 'rgba(196,106,106,.06)' : i%2===0?'rgba(255,255,255,.015)':'transparent'}}>
+            <tr key={d.age} style={{background: d.rothConversionEvent ? 'rgba(123,175,132,.07)' : d.ltcFundingEvent ? 'rgba(155,126,200,.07)' : d.etaFundingEvent ? 'rgba(168,197,216,.07)' : d.ltcEvent ? 'rgba(196,106,106,.06)' : i%2===0?'rgba(255,255,255,.015)':'transparent'}}>
               <td style={{padding:'5px 8px',textAlign:'right',color:'#C8A96E',fontWeight:600}}>
-                {d.age}{d.etaFundingEvent && <span title={`ETA funding year — $${Math.round((d.etaFundingAmount||0)/1000)}K IRA repositioned`} style={{color:'#A8C5D8',marginLeft:3,cursor:'help'}}>⚡</span>}
+                {d.age}
+                {d.etaFundingEvent && <span title={`ETA funding — $${Math.round((d.etaFundingAmount||0)/1000)}K IRA repositioned`} style={{color:'#A8C5D8',marginLeft:3,cursor:'help'}}>⚡</span>}
+                {d.rothConversionEvent && <span title={`Roth conversion — $${Math.round((d.rothConversionAmount||0)/1000)}K IRA converted`} style={{color:'#7BAF84',marginLeft:3,cursor:'help'}}>✦</span>}
+                {d.ltcFundingEvent && <span title={`LTC policy funding — $${Math.round((d.ltcFundingAmount||0)/1000)}K IRA draw`} style={{color:'#9B7EC8',marginLeft:3,cursor:'help'}}>♥</span>}
               </td>
               <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.ss.fill}}>{fmt$(d.sources.ss||0)}</td>
               <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.pension.fill}}>{fmt$(d.sources.pension||0)}</td>
@@ -1499,6 +1555,8 @@ function App() {
     etaAnnualIncome: 0, etaStartAge: 70, etaFundingDraw: 0, etaColaRate: 0,
     etaFundingAmount: 0, etaFundingAge: 0,
     architectureEnabled: true,
+    rothConversionAmount: 0, rothConversionAge: 0, rothConversionFinanced: 0,
+    ltcFundingAmount: 0, ltcFundingAge: 0,
     nonQualAnnuityMonthly: 0, nonQualAnnuityStartAge: 65, nonQualAnnuityBasis: 0, nonQualAnnuityTotalValue: 0,
     partTimeMonthly: 0, partTimeEndAge: 68,
     fixedExpenses: 5000, lifestyleExpenses: 3500,
@@ -2242,150 +2300,183 @@ function App() {
                 <div style={{fontSize:13,color:'#8DAFC8',marginBottom:10,lineHeight:1.55}}>
                   Bank-leveraged IUL · IRC 7702 policy loans · TAX-FREE · Zero MAGI impact · No IRMAA exposure
                 </div>
-                {/* ⓘ collapsible info — toggled by icon */}
-                {(() => {
+                {(()=>{
                   const [etaInfoOpen, setEtaInfoOpen] = React.useState(false);
                   return (
                     <div style={{marginBottom:10}}>
-                      <button
-                        onClick={()=>setEtaInfoOpen(o=>!o)}
-                        title="How to use · Tax treatment"
-                        style={{
-                          display:'inline-flex',alignItems:'center',gap:5,
-                          background:'none',border:'1px solid rgba(168,197,216,.25)',
-                          borderRadius:20,padding:'3px 10px',cursor:'pointer',
-                          color:'#A8C5D8',fontSize:12,fontFamily:"'DM Sans',sans-serif",
-                          transition:'background .15s',
-                        }}>
-                        <span style={{fontSize:14,lineHeight:1}}>ⓘ</span>
-                        <span>{etaInfoOpen ? 'Hide info' : 'How to use · Tax treatment'}</span>
+                      <button onClick={()=>setEtaInfoOpen(o=>!o)} style={{fontSize:12,background:'rgba(168,197,216,.08)',border:'1px solid rgba(168,197,216,.2)',borderRadius:20,padding:'3px 10px',color:'#A8C5D8',cursor:'pointer',fontFamily:"'DM Sans',sans-serif",letterSpacing:'.04em'}}>
+                        ⓘ How ETA works {etaInfoOpen ? '▲' : '▼'}
                       </button>
                       {etaInfoOpen && (
-                        <div style={{marginTop:8,padding:'10px 12px',background:'rgba(168,197,216,.05)',border:'1px solid rgba(168,197,216,.15)',borderRadius:7}}>
-                          <div style={{fontSize:13,color:'#8DAFC8',lineHeight:1.7,marginBottom:8}}>
-                            Run the IUL illustration outside the app using the client's <strong style={{color:'#DDD6C4'}}>age, gender, and health rating</strong> (Preferred Plus → Table-rated). Enter the projected annual policy loan income from the illustration and the age it begins. The illustration already reflects all underwriting variables — this field captures the output.
-                          </div>
-                          <div style={{paddingTop:8,borderTop:'1px solid rgba(168,197,216,.10)',fontSize:13,color:'#8DAFC8',lineHeight:1.65}}>
-                            <span style={{color:'#A8C5D8',fontWeight:600}}>Tax treatment:</span> Policy loans under IRC 7702 are not taxable income — they do not appear in MAGI, do not trigger IRMAA, and do not affect SS taxability thresholds. Shown separately from Roth draws in the arc and number table.
-                          </div>
+                        <div style={{marginTop:8,padding:'10px 12px',background:'rgba(168,197,216,.04)',border:'1px solid rgba(168,197,216,.12)',borderRadius:7,fontSize:13,color:'#8DAFC8',lineHeight:1.65}}>
+                          <strong style={{color:'#A8C5D8'}}>ETA (Employer-owned Tax Advantage)</strong> is a bank-leveraged IUL strategy. A lump-sum IRA distribution is repositioned into an IUL policy. The bank provides a non-recourse loan to cover the income tax — so the full gross amount enters the policy. Policy loans in retirement are tax-free and have zero MAGI impact, permanently eliminating IRMAA exposure on that income. The IRA balance is reduced, shrinking future RMDs and lifetime ordinary income.
                         </div>
                       )}
                     </div>
                   );
                 })()}
-                <Field label="Annual Policy Loan Income" hint="From illustration — projected income the IUL policy delivers via tax-free policy loans">
+                <Field label="Annual Policy Loan Income" hint="From advisor-run IUL illustration — enter the annual tax-free income from policy loans">
                   <NumInput value={inputs.etaAnnualIncome} onChange={v=>set('etaAnnualIncome',v)} prefix="$" suffix="/yr"/>
                 </Field>
                 {inputs.etaAnnualIncome > 0 && (<>
-                  <Field label="Income Start Age" hint="Deferred — MC simulation reflects the accumulation window before loans begin">
+                  <Field label="Income Start Age">
                     <NumInput value={inputs.etaStartAge} onChange={v=>set('etaStartAge',v)} suffix="yrs"/>
                   </Field>
-                  <Field label="Annual COLA" hint="Optional — income increases by this % each year after start age · 0% = flat illustration amount">
+                  <Field label="COLA Rate (optional)" hint="Annual growth rate on policy loan income — from illustration">
                     <NumInput value={inputs.etaColaRate} onChange={v=>set('etaColaRate',v)} suffix="%"/>
                   </Field>
-                  {inputs.etaColaRate > 0 && (() => {
+                  {inputs.etaColaRate > 0 && (()=>{
                     const y5  = inputs.etaAnnualIncome * Math.pow(1 + inputs.etaColaRate/100, 5);
                     const y10 = inputs.etaAnnualIncome * Math.pow(1 + inputs.etaColaRate/100, 10);
                     const y20 = inputs.etaAnnualIncome * Math.pow(1 + inputs.etaColaRate/100, 20);
                     return (
                       <div style={{padding:'9px 12px',background:'rgba(168,197,216,.05)',border:'1px solid rgba(168,197,216,.15)',borderRadius:7,marginTop:2,marginBottom:4}}>
-                        <div style={{fontSize:11,fontWeight:700,color:'#A8C5D8',letterSpacing:'.07em',textTransform:'uppercase',marginBottom:6}}>
-                          COLA Growth Preview
-                        </div>
+                        <div style={{fontSize:11,fontWeight:700,color:'#A8C5D8',letterSpacing:'.07em',textTransform:'uppercase',marginBottom:6}}>COLA Growth Preview</div>
                         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6}}>
-                          {[{label:'Yr 5', val:y5},{label:'Yr 10', val:y10},{label:'Yr 20', val:y20}].map(s=>(
+                          {[{label:'Yr 5',val:y5},{label:'Yr 10',val:y10},{label:'Yr 20',val:y20}].map(s=>(
                             <div key={s.label} style={{textAlign:'center'}}>
                               <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:1}}>{s.label}</div>
                               <div style={{fontSize:14,fontWeight:600,color:'#A8C5D8',fontFamily:"'Cormorant Garamond',serif"}}>${Math.round(s.val/1000)}K</div>
                             </div>
                           ))}
                         </div>
-                        <div style={{fontSize:11,color:'#8DAFC8',marginTop:6,lineHeight:1.5}}>
-                          Annual amounts · MC confidence uses Year 1 base (conservative stress floor)
-                        </div>
-                      </div>
-                    );
-                  })()}
-                  <Field label="IRA Funding Draw (optional)" hint="Annual IRA/traditional draw used to fund premiums — enter here to see it in the Strategic Drawdown section; ETA bank structure eliminates the distribution tax on this amount">
-                    <NumInput value={inputs.etaFundingDraw} onChange={v=>set('etaFundingDraw',v)} prefix="$" suffix="/yr"/>
-                  </Field>
-
-                  {/* ── ETA Lump-Sum Repositioning Event ── */}
-                  <div style={{marginTop:10,paddingTop:10,borderTop:'1px solid rgba(168,197,216,.12)'}}>
-                    <div style={{fontSize:12,fontWeight:700,color:'#A8C5D8',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:8}}>
-                      IRA → ETA Repositioning Event
-                    </div>
-                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
-                      <Field label="Lump-Sum Amount" hint="One-time IRA distribution repositioned into ETA policy. Reduces traditional balance permanently. Tax is financed via bank non-recourse loan — no cash flow impact.">
-                        <NumInput value={inputs.etaFundingAmount} onChange={v=>set('etaFundingAmount',v)} prefix="$"/>
-                      </Field>
-                      <Field label="Funding Age" hint="Age at which the repositioning occurs. Seasoning period before income begins is controlled by ETA Income Start Age above.">
-                        <NumInput value={inputs.etaFundingAge} onChange={v=>set('etaFundingAge',v)} suffix="yrs"/>
-                      </Field>
-                    </div>
-                    {inputs.etaFundingAmount > 0 && inputs.etaFundingAge > 0 && (() => {
-                      const amt = inputs.etaFundingAmount;
-                      const seasoning = Math.max(0, inputs.etaStartAge - inputs.etaFundingAge);
-                      const warn = seasoning < 10;
-                      return (
-                        <div style={{padding:'10px 12px',background:'rgba(168,197,216,.05)',border:`1px solid ${warn?'rgba(200,160,48,.35)':'rgba(168,197,216,.18)'}`,borderRadius:7}}>
-                          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginBottom:warn?8:0}}>
-                            <div style={{textAlign:'center'}}>
-                              <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>IRA Reduction</div>
-                              <div style={{fontSize:15,fontWeight:600,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif"}}>−${amt>=1000000?(amt/1000000).toFixed(1)+'M':Math.round(amt/1000)+'K'}</div>
-                              <div style={{fontSize:11,color:'#8DAFC8'}}>Pre-tax balance</div>
-                            </div>
-                            <div style={{textAlign:'center'}}>
-                              <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Tax Financed</div>
-                              <div style={{fontSize:15,fontWeight:600,color:'#4A9B7A',fontFamily:"'Cormorant Garamond',serif"}}>Bank loan</div>
-                              <div style={{fontSize:11,color:'#8DAFC8'}}>No cash flow impact</div>
-                            </div>
-                            <div style={{textAlign:'center'}}>
-                              <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Seasoning</div>
-                              <div style={{fontSize:15,fontWeight:600,color:warn?'#C8A030':'#A8C5D8',fontFamily:"'Cormorant Garamond',serif"}}>{seasoning} yrs</div>
-                              <div style={{fontSize:11,color:'#8DAFC8'}}>Age {inputs.etaFundingAge} → {inputs.etaStartAge}</div>
-                            </div>
-                          </div>
-                          {warn && <div style={{fontSize:11,color:'#C8A030',paddingTop:6,borderTop:'1px solid rgba(200,160,48,.2)'}}>⚠ Seasoning period under 10 years — confirm policy illustration supports this timeline.</div>}
-                          <div style={{fontSize:11,color:'#8DAFC8',marginTop:6,lineHeight:1.5}}>
-                            "Take your medicine today, so you don't have to hurt tomorrow." — Marginal rate elevated in funding year only. IRA reduction cascades into smaller RMDs and lower lifetime tax exposure.
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  {inputs.etaFundingDraw > 0 && (() => {
-                    const gross = inputs.etaFundingDraw;
-                    const estTaxRate = 0.24; // conservative illustration — advisor adjusts based on actual bracket
-                    const wouldHavePaid = Math.round(gross * estTaxRate);
-                    const netWithoutETA = gross - wouldHavePaid;
-                    return (
-                      <div style={{padding:'10px 12px',background:'rgba(168,197,216,.06)',border:'1px solid rgba(168,197,216,.18)',borderRadius:7,marginTop:4}}>
-                        <div style={{fontSize:13,fontWeight:700,color:'#A8C5D8',letterSpacing:'.07em',textTransform:'uppercase',marginBottom:6}}>
-                          ETA Funding Advantage (est. 24% bracket)
-                        </div>
-                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
-                          <div style={{textAlign:'center'}}>
-                            <div style={{fontSize:13,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:2}}>Gross Draw</div>
-                            <div style={{fontSize:14,fontWeight:600,color:'#F5F2EC',fontFamily:"'Cormorant Garamond',serif"}}>${Math.round(gross/1000)}K</div>
-                            <div style={{fontSize:13,color:'#8DAFC8'}}>Full amount into IUL</div>
-                          </div>
-                          <div style={{textAlign:'center'}}>
-                            <div style={{fontSize:13,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:2}}>Tax Eliminated</div>
-                            <div style={{fontSize:14,fontWeight:600,color:'#4A9B7A',fontFamily:"'Cormorant Garamond',serif"}}>${Math.round(wouldHavePaid/1000)}K</div>
-                            <div style={{fontSize:13,color:'#8DAFC8'}}>Bank covers via loan</div>
-                          </div>
-                          <div style={{textAlign:'center'}}>
-                            <div style={{fontSize:13,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:2}}>Without ETA</div>
-                            <div style={{fontSize:14,fontWeight:600,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif"}}>${Math.round(netWithoutETA/1000)}K</div>
-                            <div style={{fontSize:13,color:'#8DAFC8'}}>Net into policy</div>
-                          </div>
-                        </div>
+                        <div style={{fontSize:11,color:'#8DAFC8',marginTop:6,lineHeight:1.5}}>Annual amounts · MC uses Year 1 base</div>
                       </div>
                     );
                   })()}
                 </>)}
+
+                {/* ── IRA → ETA Lump-Sum Repositioning Event ── */}
+                <div style={{marginTop:12,paddingTop:12,borderTop:'1px solid rgba(168,197,216,.1)'}}>
+                  <div style={{fontSize:12,fontWeight:700,color:'#A8C5D8',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:8}}>IRA → ETA Repositioning Event</div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:6}}>
+                    <Field label="Lump-Sum Amount" hint="One-time IRA distribution repositioned into ETA. Tax financed via bank non-recourse loan — no cash-flow impact. IRA balance reduced permanently.">
+                      <NumInput value={inputs.etaFundingAmount} onChange={v=>set('etaFundingAmount',v)} prefix="$"/>
+                    </Field>
+                    <Field label="Funding Age" hint="Age at which repositioning occurs. Seasoning period = Income Start Age minus Funding Age.">
+                      <NumInput value={inputs.etaFundingAge} onChange={v=>set('etaFundingAge',v)} suffix="yrs"/>
+                    </Field>
+                  </div>
+                  {inputs.etaFundingAmount > 0 && inputs.etaFundingAge > 0 && (()=>{
+                    const amt = inputs.etaFundingAmount;
+                    const seasoning = Math.max(0, (inputs.etaStartAge||0) - inputs.etaFundingAge);
+                    const warn = seasoning < 10;
+                    return (
+                      <div style={{padding:'10px 12px',background:'rgba(168,197,216,.05)',border:`1px solid ${warn?'rgba(200,160,48,.35)':'rgba(168,197,216,.18)'}`,borderRadius:7,marginBottom:6}}>
+                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginBottom:warn?8:0}}>
+                          <div style={{textAlign:'center'}}>
+                            <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>IRA Reduction</div>
+                            <div style={{fontSize:15,fontWeight:600,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif"}}>−${amt>=1000000?(amt/1000000).toFixed(1)+'M':Math.round(amt/1000)+'K'}</div>
+                            <div style={{fontSize:11,color:'#8DAFC8'}}>Pre-tax balance</div>
+                          </div>
+                          <div style={{textAlign:'center'}}>
+                            <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Tax Financed</div>
+                            <div style={{fontSize:15,fontWeight:600,color:'#4A9B7A',fontFamily:"'Cormorant Garamond',serif"}}>Bank loan</div>
+                            <div style={{fontSize:11,color:'#8DAFC8'}}>No cash-flow impact</div>
+                          </div>
+                          <div style={{textAlign:'center'}}>
+                            <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Seasoning</div>
+                            <div style={{fontSize:15,fontWeight:600,color:warn?'#C8A030':'#A8C5D8',fontFamily:"'Cormorant Garamond',serif"}}>{seasoning} yrs</div>
+                            <div style={{fontSize:11,color:'#8DAFC8'}}>Age {inputs.etaFundingAge} → {inputs.etaStartAge}</div>
+                          </div>
+                        </div>
+                        {warn && <div style={{fontSize:11,color:'#C8A030',paddingTop:6,borderTop:'1px solid rgba(200,160,48,.2)'}}>⚠ Seasoning under 10 years — confirm illustration supports this timeline.</div>}
+                        <div style={{fontSize:11,color:'#8DAFC8',marginTop:6,lineHeight:1.5,fontStyle:'italic'}}>"Take your medicine today, so you don't have to hurt tomorrow." — Rate elevated this year only. Smaller IRA = lower lifetime RMDs.</div>
+                      </div>
+                    );
+                  })()}
+                </div>
               </div>
 
+              {/* ── Roth Annuity Conversion Event (Layer 1) ── */}
+              <div style={{marginBottom:14,paddingBottom:14,borderBottom:'1px solid rgba(255,255,255,.06)'}}>
+                <div style={{fontSize:14,fontWeight:700,color:'#7BAF84',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:4}}>
+                  Layer 1 — Roth Annuity Conversion Event
+                </div>
+                <div style={{fontSize:13,color:'#8DAFC8',marginBottom:10,lineHeight:1.55}}>
+                  Single-premium Roth FIA conversion · Lump-sum IRA distribution · One-time taxable event
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:6}}>
+                  <Field label="Conversion Amount" hint="Gross IRA amount converted to fund the single-premium Roth annuity. Full amount is taxable ordinary income in conversion year.">
+                    <NumInput value={inputs.rothConversionAmount} onChange={v=>set('rothConversionAmount',v)} prefix="$"/>
+                  </Field>
+                  <Field label="Conversion Age" hint="Age at which the conversion occurs. Can differ from ETA funding age for tax planning purposes.">
+                    <NumInput value={inputs.rothConversionAge} onChange={v=>set('rothConversionAge',v)} suffix="yrs"/>
+                  </Field>
+                </div>
+                {inputs.rothConversionAmount > 0 && inputs.rothConversionAge > 0 && (()=>{
+                  const amt = inputs.rothConversionAmount;
+                  const financed = inputs.rothConversionFinanced || 0;
+                  const overage = Math.max(0, amt - financed);
+                  return (
+                    <div style={{background:'rgba(123,175,132,.05)',border:'1px solid rgba(123,175,132,.2)',borderRadius:7,padding:'10px 12px',marginBottom:6}}>
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
+                        <Field label="Tax Amount Financed" hint="Portion of the conversion tax covered by the bank non-recourse loan — no cash-flow impact for this amount.">
+                          <NumInput value={inputs.rothConversionFinanced} onChange={v=>set('rothConversionFinanced',v)} prefix="$"/>
+                        </Field>
+                        <div>
+                          <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:4}}>Overage Tax (est.)</div>
+                          <div style={{fontSize:15,fontWeight:600,color:overage>0?'#C47A7A':'#4A9B7A',fontFamily:"'Cormorant Garamond',serif"}}>{overage>0?'$'+Math.round(overage/1000)+'K':'None'}</div>
+                          <div style={{fontSize:11,color:'#8DAFC8',marginTop:2}}>Grossed-up IRA withdrawal</div>
+                        </div>
+                      </div>
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,paddingTop:8,borderTop:'1px solid rgba(123,175,132,.15)'}}>
+                        <div style={{textAlign:'center'}}>
+                          <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Total IRA Reduction</div>
+                          <div style={{fontSize:15,fontWeight:600,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif"}}>−${amt>=1000000?(amt/1000000).toFixed(1)+'M':Math.round(amt/1000)+'K'}</div>
+                          <div style={{fontSize:11,color:'#8DAFC8'}}>Conversion + overage tax</div>
+                        </div>
+                        <div style={{textAlign:'center'}}>
+                          <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Financed</div>
+                          <div style={{fontSize:15,fontWeight:600,color:'#4A9B7A',fontFamily:"'Cormorant Garamond',serif"}}>{financed>0?'$'+Math.round(financed/1000)+'K':'—'}</div>
+                          <div style={{fontSize:11,color:'#8DAFC8'}}>Bank covers via loan</div>
+                        </div>
+                        <div style={{textAlign:'center'}}>
+                          <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Rate Impact</div>
+                          <div style={{fontSize:15,fontWeight:600,color:'#C8A030',fontFamily:"'Cormorant Garamond',serif"}}>Year {inputs.rothConversionAge} only</div>
+                          <div style={{fontSize:11,color:'#8DAFC8'}}>One-time marginal spike</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* ── LTC Policy Funding Draw ── */}
+              <div style={{marginBottom:14,paddingBottom:14,borderBottom:'1px solid rgba(255,255,255,.06)'}}>
+                <div style={{fontSize:14,fontWeight:700,color:'#9B7EC8',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:4}}>
+                  LTC Policy Funding Draw
+                </div>
+                <div style={{fontSize:13,color:'#8DAFC8',marginBottom:10,lineHeight:1.55}}>
+                  One-time taxable IRA withdrawal to fund LTC policy premium · Cannot be financed · Full gross amount reduces IRA
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:6}}>
+                  <Field label="Gross Draw Amount" hint="Enter the full gross IRA withdrawal needed. This is a taxable event — flows through ordinary income and marginal rate calculation in the draw year. IRA balance reduced by this amount.">
+                    <NumInput value={inputs.ltcFundingAmount} onChange={v=>set('ltcFundingAmount',v)} prefix="$"/>
+                  </Field>
+                  <Field label="Draw Age" hint="Age at which the LTC policy is funded from the IRA.">
+                    <NumInput value={inputs.ltcFundingAge} onChange={v=>set('ltcFundingAge',v)} suffix="yrs"/>
+                  </Field>
+                </div>
+                {inputs.ltcFundingAmount > 0 && inputs.ltcFundingAge > 0 && (
+                  <div style={{padding:'9px 12px',background:'rgba(155,126,200,.05)',border:'1px solid rgba(155,126,200,.2)',borderRadius:7}}>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                      <div style={{textAlign:'center'}}>
+                        <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>IRA Reduction</div>
+                        <div style={{fontSize:15,fontWeight:600,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif"}}>−${Math.round(inputs.ltcFundingAmount/1000)}K</div>
+                        <div style={{fontSize:11,color:'#8DAFC8'}}>Age {inputs.ltcFundingAge}</div>
+                      </div>
+                      <div style={{textAlign:'center'}}>
+                        <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Tax Treatment</div>
+                        <div style={{fontSize:15,fontWeight:600,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif"}}>Fully taxable</div>
+                        <div style={{fontSize:11,color:'#8DAFC8'}}>Marginal rate impact — cannot finance</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Part-Time Income */}
               {/* Part-Time Income */}
               <div style={{marginBottom:14,paddingBottom:14,borderBottom:'none'}}>
                 <div style={{fontSize:14,fontWeight:700,color:'#7BAF84',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:4}}>
