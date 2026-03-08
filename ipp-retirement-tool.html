@@ -3170,7 +3170,7 @@ function App() {
             {view === 'visual' ? (
               <>
                 <Legend insuredData={yearsInsured}/>
-                <ArcChart data={years} view={view} insuredData={yearsInsured} sorrEnabled={inputs.sorrEnabled}/>
+                <ArcChart data={yearsUninsured || years} view={view} insuredData={yearsInsured} sorrEnabled={inputs.sorrEnabled}/>
               </>
             ) : (
               <DataTable data={years}/>
@@ -3178,10 +3178,12 @@ function App() {
           </div>
 
           {/* LTC With vs Without Comparison Panel */}
-          {showLtcComparison && yearsInsured && (() => {
+          {showLtcComparison && yearsInsured && yearsUninsured && (() => {
             const ltcAge = inputs.ltcEventAge;
             const ltcEnd = ltcAge + inputs.ltcDuration;
-            const uninsuredFinal = years[years.length-1];
+            // IMPORTANT: all uninsured calculations must use yearsUninsured (with LTC shock),
+            // NOT years (which is now the clean baseline with ltcEventAge:0)
+            const uninsuredFinal = yearsUninsured[yearsUninsured.length-1];
             const insuredFinal = yearsInsured[yearsInsured.length-1];
 
             // Raw care cost (net expense, before tax friction)
@@ -3190,7 +3192,7 @@ function App() {
 
             // Gross-up tax actually incurred in the uninsured projection during LTC years
             // This is the real additional tax burden caused by forced grossed-up withdrawals
-            const grossUpTaxTotal = years
+            const grossUpTaxTotal = yearsUninsured
               .filter(r => r.age >= ltcAge && r.age < ltcEnd)
               .reduce((sum, r) => sum + (r.ltcGrossUpTax || 0), 0);
 
@@ -3214,7 +3216,7 @@ function App() {
             //   - row.totalExpense includes living expenses + LTC cost
             //   - Income surplus after living expenses = spendableIncome - (totalExpense - ltcUncovered)
             //   - That surplus (if any) absorbs part of the LTC cost before portfolio is touched
-            const incomeOffset = years
+            const incomeOffset = yearsUninsured
               .filter(r => r.age >= ltcAge && r.age < ltcEnd)
               .reduce((sum, r) => {
                 const livingExpenses = (r.totalExpense || 0) - (r.ltcUncovered || 0);
@@ -3227,7 +3229,7 @@ function App() {
             const benefitGap = Math.max(0, totalLtcCost - totalBenefit);
             // Forced portfolio draws = care cost not covered by income surplus (gross, before tax)
             // For display we use the engine-computed draw difference between projections
-            const uninsuredLtcYearDraws = years
+            const uninsuredLtcYearDraws = yearsUninsured
               .filter(r => r.age >= ltcAge && r.age < ltcEnd)
               .reduce((sum, r) => sum + (r.sources.rmd || 0) + (r.sources.taxable || 0), 0);
             const insuredLtcYearDraws = yearsInsured
