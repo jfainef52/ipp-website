@@ -203,16 +203,13 @@ function seededRandom(seed) {
   };
 }
 
-function runMonteCarlo(startBalance, annualWithdraw, years, trials=500, mean=0.065, inflation=0.028, ssIncome=0, fixedStreams=[], totalExpensesY1=0) {
+function runMonteCarlo(startBalance, annualWithdraw, years, trials=500, mean=0.065, inflation=0.028, ssIncome=0, fixedStreams=[], totalExpensesY1=0, ltcShockYear=-1, ltcShockAnnual=0, ltcShockDuration=0) {
   let successes = 0;
   const stddev = 0.12;
-  // Back-compat: if fixedStreams is a plain number (legacy call), wrap it as an immediate stream
   const streams = Array.isArray(fixedStreams)
     ? fixedStreams
     : (fixedStreams > 0 ? [{ yearOffset: 0, annual: fixedStreams }] : []);
 
-  // Derive a stable seed from the actual simulation inputs — UI-only state changes (section
-  // open/close, tab toggles) do not affect these values and therefore do not change the score.
   const seedVal = Math.round(
     (startBalance * 0.001)
     + (annualWithdraw * 0.1)
@@ -221,6 +218,8 @@ function runMonteCarlo(startBalance, annualWithdraw, years, trials=500, mean=0.0
     + (inflation * 77777)
     + (ssIncome * 0.01)
     + (totalExpensesY1 * 0.007)
+    + (ltcShockAnnual * 0.0013)
+    + (ltcShockYear * 333)
     + streams.reduce((a, s) => a + s.annual * 0.003 + s.yearOffset * 17, 0)
   ) ^ 0xDEADBEEF;
   const rand = seededRandom(seedVal);
@@ -231,15 +230,14 @@ function runMonteCarlo(startBalance, annualWithdraw, years, trials=500, mean=0.0
     for (let y = 0; y < years; y++) {
       const r = mean + stddev * (Math.sqrt(-2*Math.log(rand())) * Math.cos(2*Math.PI*rand()));
       const inflFactor = Math.pow(1 + inflation, y);
-      // Expenses grow with inflation
       const expensesThisYear = totalExpensesY1 * inflFactor;
-      // SS gets full COLA (tracks inflation assumption)
       const ssThisYear = ssIncome * inflFactor;
-      // Fixed streams activate at their yearOffset — no COLA, purchasing power erodes
       const fixedThisYear = streams.reduce((sum, s) => sum + (y >= s.yearOffset ? s.annual : 0), 0);
-      // Net portfolio draw = inflated expenses minus guaranteed income floor
       const netDraw = Math.max(0, expensesThisYear - ssThisYear - fixedThisYear);
-      bal = bal * (1 + r) - netDraw;
+      // Apply care cost shock: grossed-up portfolio draw during uninsured care years
+      const ltcShock = (ltcShockYear >= 0 && y >= ltcShockYear && y < ltcShockYear + ltcShockDuration)
+        ? ltcShockAnnual : 0;
+      bal = bal * (1 + r) - netDraw - ltcShock;
       if (bal <= 0) { failed = true; break; }
     }
     if (!failed) successes++;
@@ -1043,23 +1041,16 @@ function projectArc(inputs) {
   const totalExpensesY1 = (fixedExpenses + lifestyleExpenses) * 12;
   const spouseSsAtRetire = filingStatus === 'mfj' ? (spouseSsMonthly > 0 ? ssBenefitAtAge(spouseSsMonthly, spouseFra, spouseSsClaimAge)*12 : ssBenefitAtAge(ssMonthly, fra, fra)*0.5*12) : 0;
   const ssIncomeY1 = (ssBenefitAtAge(ssMonthly, fra, ssClaimAge) * 12) + spouseSsAtRetire;
-  // Use portfolio balance at end of LTC event if one exists, otherwise use retirement balance.
-  // This ensures the LTC drawdown is reflected in the simulation starting point.
-  const ltcEndAge = (ltcEventAge > 0 && ltcDuration > 0) ? ltcEventAge + ltcDuration - 1 : 0;
-  const postLtcRow = ltcEndAge > 0 ? years.find(y => y.age === ltcEndAge) : null;
-  const mcStartAge = postLtcRow ? ltcEndAge : retireAge;
-  const mcStartBalance = postLtcRow
-    ? postLtcRow.totalPortfolio
-    : (years[0] ? years[0].totalPortfolio : (traditionalBalance + rothBalance + taxableBalance));
-  // Years remaining after LTC event ends (or full retirement if no LTC)
-  const mcYears = postLtcRow
-    ? Math.max(1, planToAge - ltcEndAge)
-    : planToAge - retireAge;
-  // SS and expenses at the point Monte Carlo begins (inflation-adjusted to MC start)
-  const ltcYrOffset = mcStartAge - retireAge;
-  const ltcInflFactor = Math.pow(1 + inflation, ltcYrOffset);
-  const ssAtMcStart = ssIncomeY1 * ltcInflFactor;
-  const expensesAtMcStart = totalExpensesY1 * ltcInflFactor;
+
+  // MC always runs from retirement for the FULL span — this correctly captures the
+  // compounding impact of a mid-retirement care event. Running from post-LTC only tests
+  // a short tail (e.g. 8 years) where even a depleted portfolio usually survives,
+  // making insured vs uninsured look nearly identical — which is wrong.
+  const mcStartAge = retireAge;
+  const mcStartBalance = years[0] ? years[0].totalPortfolio : (traditionalBalance + rothBalance + taxableBalance);
+  const mcYears = planToAge - retireAge;
+  const ssAtMcStart = ssIncomeY1; // MC starts at retirement — no inflation offset needed
+  const expensesAtMcStart = totalExpensesY1;
 
   // Build fixed income streams — each stream has a yearOffset (years after MC start age
   // when it begins). Pension is always immediate (started at retirement).
@@ -1090,6 +1081,15 @@ function projectArc(inputs) {
     fixedStreams.push({ yearOffset: offset, annual: etaAnnualIncome });
   }
 
+  // LTC shock: gross-up annual draw spread over care years, starting at ltcShockYear
+  // For uninsured: inject the actual grossed-up portfolio draw per year during the care event
+  // For insured: no shock (ltcInsured=true means policy covers it)
+  const ltcShockYear = (ltcEventAge > 0 && !ltcInsured) ? ltcEventAge - retireAge : -1;
+  const ltcShockAnnual = (ltcShockYear >= 0 && ltcDuration > 0)
+    ? years.filter(r => r.age >= ltcEventAge && r.age < ltcEventAge + ltcDuration)
+           .reduce((sum, r) => sum + (r.sources.rmd||0) + (r.sources.taxable||0), 0) / ltcDuration
+    : 0;
+
   const confidence = runMonteCarlo(
     mcStartBalance,
     0,
@@ -1097,9 +1097,12 @@ function projectArc(inputs) {
     500,
     portfolioReturn,
     inflation,
-    ssAtMcStart,       // SS at MC start year (already COLA-adjusted)
-    fixedStreams,       // deferred-aware fixed income streams
-    expensesAtMcStart  // expenses at MC start year (already inflation-adjusted)
+    ssAtMcStart,
+    fixedStreams,
+    expensesAtMcStart,
+    ltcShockYear,
+    ltcShockAnnual,
+    ltcDuration
   );
 
   return { years, confidence, fixedStreams, mcStartAge };
@@ -3234,16 +3237,22 @@ function App() {
                   const barW = (pct) => `${Math.max(4, pct)}%`;
                   return (
                     <div style={{background:'rgba(255,255,255,.02)',border:'1px solid rgba(255,255,255,.07)',borderRadius:10,padding:'14px 16px',marginBottom:14}}>
-                      <div style={{fontSize:12,fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'#8DAFC8',marginBottom:12}}>
-                        Monte Carlo Confidence — With vs. Without Layer 2
-                        <span style={{fontWeight:400,marginLeft:8,color:'#5A7A8A'}}>500 trials · starts post-event age {ltcEnd}</span>
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:10}}>
+                        {/* Column headers aligned with data below */}
+                        <div style={{fontSize:12,fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'#C47A7A'}}>
+                          WITHOUT LAYER 2
+                          <span style={{fontWeight:400,marginLeft:6,color:'#5A7A8A',fontSize:11}}>· 500 trials · full retirement span</span>
+                        </div>
+                        <div style={{fontSize:12,fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'#4A9B7A'}}>
+                          WITH LAYER 2
+                          <span style={{fontWeight:400,marginLeft:6,color:'#5A7A8A',fontSize:11}}>· care cost shock removed</span>
+                        </div>
                       </div>
                       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:10}}>
                         {/* Without Layer 2 */}
                         <div>
                           <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:6}}>
-                            <span style={{fontSize:12,color:'#C47A7A',fontWeight:600}}>WITHOUT Layer 2</span>
-                            <span style={{fontSize:22,fontWeight:700,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif"}}>{confidence}%</span>
+                            <span style={{fontSize:28,fontWeight:700,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif"}}>{confidence}%</span>
                           </div>
                           <div style={{height:8,background:'rgba(255,255,255,.06)',borderRadius:4,overflow:'hidden'}}>
                             <div style={{height:'100%',width:barW(confidence),background:'#C47A7A',borderRadius:4,transition:'width .6s ease'}}/>
@@ -3253,8 +3262,7 @@ function App() {
                         {/* With Layer 2 */}
                         <div>
                           <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:6}}>
-                            <span style={{fontSize:12,color:'#4A9B7A',fontWeight:600}}>WITH Layer 2</span>
-                            <span style={{fontSize:22,fontWeight:700,color:'#4A9B7A',fontFamily:"'Cormorant Garamond',serif"}}>{confidenceInsured}%</span>
+                            <span style={{fontSize:28,fontWeight:700,color:'#4A9B7A',fontFamily:"'Cormorant Garamond',serif"}}>{confidenceInsured}%</span>
                           </div>
                           <div style={{height:8,background:'rgba(255,255,255,.06)',borderRadius:4,overflow:'hidden'}}>
                             <div style={{height:'100%',width:barW(confidenceInsured),background:'#4A9B7A',borderRadius:4,transition:'width .6s ease'}}/>
