@@ -3164,11 +3164,11 @@ function App() {
                 </div>
                 <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:10,marginBottom:14}}>
                   {[
-                    { label:'Total Care Cost', value: fmtD(totalLtcCost), sub:'Gross uninsured care expense', color:'#C47A7A' },
-                    { label:'Offset by Income', value: incomeOffset > 0 ? fmtD(incomeOffset) : '—', sub:'SS + RMDs absorbed this portion', color:'#8DAFC8' },
-                    { label:'Extra Portfolio Draws', value: fmtD(extraGrossDraws), sub:'Gross forced above normal income', color:'#C47A7A' },
-                    { label:'Gross-Up Tax Cost', value: grossUpTaxTotal > 0 ? fmtD(grossUpTaxTotal) : '—', sub:'Tax friction on forced IRA draws', color:'#C47A7A' },
-                    { label:'Portfolio Preserved', value: fmtD(portfolioDiff), sub:`Extra draws + tax + compounding loss`, color: portfolioDiff > 0 ? '#4A9B7A' : '#C47A7A' },
+                    { label:'Total Care Cost', value: fmtD(totalLtcCost), sub:'Full uninsured event cost', color:'#C47A7A' },
+                    { label:'Covered by Income', value: incomeOffset > 0 ? fmtD(incomeOffset) : '—', sub:'SS/RMDs absorb this — no extra draw needed', color:'#8DAFC8' },
+                    { label:'Forced Portfolio Draws', value: fmtD(extraGrossDraws), sub:'Gross IRA/taxable drawn above normal income', color:'#C47A7A' },
+                    { label:'Gross-Up Tax Cost', value: grossUpTaxTotal > 0 ? fmtD(grossUpTaxTotal) : '—', sub:'Extra tax on forced IRA withdrawals', color:'#C47A7A' },
+                    { label:'Portfolio Preserved', value: fmtD(portfolioDiff), sub:`Draws + tax + compounding — full Layer 2 benefit`, color: portfolioDiff > 0 ? '#4A9B7A' : '#C47A7A' },
                   ].map(s => (
                     <div key={s.label} style={{background:'rgba(255,255,255,.03)',borderRadius:8,padding:'10px 12px',border:'1px solid rgba(255,255,255,.06)'}}>
                       <div style={{fontSize:12,color:'#8DAFC8',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:4}}>{s.label}</div>
