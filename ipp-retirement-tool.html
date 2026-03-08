@@ -551,6 +551,15 @@ function projectArc(inputs) {
   // When computing IRMAA for age X, we look up magiHistory[X - 2].
   const magiHistory = {};
 
+  // Pre-seed magiHistory for ages before retirement so the first two retirement years
+  // don't fall back to current MAGI. Pre-retirement MAGI estimate: SS not yet started
+  // (if claiming at/after retireAge), pension may have started, no RMDs, part-time may be active.
+  // Conservative: use pension + part-time income as a floor for pre-retirement MAGI.
+  const preRetireMagi = (pensionMonthly > 0 ? pensionMonthly * 12 : 0)
+    + (partTimeMonthly > 0 ? partTimeMonthly * 12 : 0);
+  magiHistory[retireAge - 2] = preRetireMagi;
+  magiHistory[retireAge - 1] = preRetireMagi;
+
   for (let age = retireAge; age <= planToAge; age++) {
     const yr = age - retireAge;
     const inflFactor = Math.pow(1 + inflation, yr);
@@ -965,9 +974,9 @@ function projectArc(inputs) {
     // IRMAA 2-year lookback: Medicare uses MAGI from 2 years prior.
     // If lookback year has no data (e.g. pre-retirement), fall back to current MAGI
     // so the tool is conservative and doesn't under-estimate in early retirement years.
-    const irmaaMagi = magiHistory[age - 2] !== undefined ? magiHistory[age - 2] : magi;
+    const irmaaMagi = magiHistory[age - 2] !== undefined ? magiHistory[age - 2] : preRetireMagi;
     row.irmaaMagi = irmaaMagi; // stored for display/debug
-    row.irmaaMagiYear = magiHistory[age - 2] !== undefined ? age - 2 : age;
+    row.irmaaMagiYear = magiHistory[age - 2] !== undefined ? age - 2 : retireAge - 2;
     // After spouse death: single IRMAA brackets apply immediately (no year of death grace on brackets)
     const personsOnMedicare = spouseAlive
       ? (age >= 65 ? 1 : 0) + ((age - spouseDobOffset) >= 65 ? 1 : 0)
