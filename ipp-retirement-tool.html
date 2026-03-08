@@ -843,6 +843,62 @@ function projectArc(inputs) {
       }
 
       row.gap = 0;
+    } else if (row.ltcEvent && row.ltcUncovered > 0 && !ltcInsured) {
+      // ── Dedicated LTC gross-up draw (surplus year with care costs) ──
+      // When regular income covers living expenses but NOT care costs, row.gap may be >= 0
+      // because the care cost was added to expenses. But if income exceeds base expenses
+      // enough to offset the LTC cost, gap stays positive and the gross-up never fires.
+      // We need to force a grossed-up IRA draw specifically for the uncovered care cost
+      // so the full tax friction is captured in both the projection and the comparison.
+      const ltcNeeded = row.ltcUncovered;
+      let ltcRemaining = ltcNeeded;
+
+      // Draw from Roth first (no gross-up)
+      if (roth > 0 && ltcRemaining > 0) {
+        const draw = Math.min(roth, ltcRemaining);
+        row.sources.roth = (row.sources.roth || 0) + draw;
+        row.totalIncome += draw;
+        roth = Math.max(0, roth - draw); // no growth — already accounted in surplus
+        ltcRemaining -= draw;
+      }
+
+      // Draw from taxable (LTCG gross-up)
+      if (taxable > 0 && ltcRemaining > 0) {
+        const ltcgBracketsEff = (isMFJeff ? LTCG_MFJ_2025 : LTCG_SINGLE_2025)
+          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
+        const netToDraw = Math.min(ltcRemaining, taxable * 0.9);
+        const { grossDraw, taxOnDraw } = grossUpIterative(netToDraw, ltcgBracketsEff, baseOrdAGI);
+        const actualGross = Math.min(taxable, grossDraw);
+        const taxProportion = grossDraw > 0 ? taxOnDraw / grossDraw : 0;
+        const actualTax = actualGross * taxProportion;
+        const actualNet = actualGross - actualTax;
+        row.sources.taxable = (row.sources.taxable || 0) + actualGross;
+        row.totalIncome += actualGross;
+        row.ltcGrossUpTax = (row.ltcGrossUpTax || 0) + actualTax;
+        taxable = Math.max(0, taxable - actualGross); // remove draw; growth applied below in surplus
+        ltcRemaining -= actualNet;
+      }
+
+      // Draw from traditional IRA (ordinary income gross-up) — the primary vehicle
+      if (trad > 0 && ltcRemaining > 0) {
+        const ordBracketsEff = (isMFJeff ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025)
+          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
+        const adjOrdAGI = baseOrdAGI + (row.sources.taxable || 0) * 0.15;
+        const netToDraw = Math.min(ltcRemaining, trad);
+        const { grossDraw, taxOnDraw } = grossUpIterative(netToDraw, ordBracketsEff, adjOrdAGI);
+        const actualGross = Math.min(trad, grossDraw);
+        const taxProportion = grossDraw > 0 ? taxOnDraw / grossDraw : 0;
+        const actualTax = actualGross * taxProportion;
+        row.sources.rmd = (row.sources.rmd || 0) + actualGross;
+        row.totalIncome += actualGross;
+        row.ltcGrossUpTax = (row.ltcGrossUpTax || 0) + actualTax;
+        trad = Math.max(0, trad - actualGross); // remove draw; growth applied below in surplus
+      }
+
+      // Grow remaining balances (surplus path)
+      taxable = taxable * (1 + yearReturn);
+      roth = roth * (1 + yearReturn);
+      trad = trad * (1 + yearReturn);
     } else {
       // Surplus — invest surplus in taxable, grow all three buckets
       taxable = taxable * (1 + yearReturn);
