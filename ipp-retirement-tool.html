@@ -3134,11 +3134,22 @@ function App() {
               ? (insuredFinal.totalPortfolio - uninsuredFinal.totalPortfolio)
               : 0;
 
-            // Compounding loss = what the true total cost would have grown to by plan-to age
-            // minus the true total cost itself — the pure "growth stolen" effect
-            const yearsToEnd = inputs.planToAge - ltcAge;
-            const fvTrueCost = trueTotalCost * Math.pow(1 + inputs.portfolioReturn, yearsToEnd);
-            const compoundingLoss = Math.max(0, fvTrueCost - trueTotalCost);
+            // Compounding loss = portfolioDiff minus the direct costs (care + gross-up tax)
+            // This is the pure growth the depleted portfolio never earned from event age → plan-to age
+            // portfolioDiff is the authoritative number — both projections ran full engine independently
+            const compoundingLoss = Math.max(0, portfolioDiff - trueTotalCost);
+
+            // How much of the care cost was offset by existing income (SS + RMDs already in flow)
+            // = raw care cost minus the extra portfolio draws made in LTC years
+            // Extra portfolio draws in LTC years = difference in total draws between insured and uninsured
+            const uninsuredLtcYearDraws = years
+              .filter(r => r.age >= ltcAge && r.age < ltcEnd)
+              .reduce((sum, r) => sum + (r.sources.rmd || 0) + (r.sources.taxable || 0), 0);
+            const insuredLtcYearDraws = yearsInsured
+              .filter(r => r.age >= ltcAge && r.age < ltcEnd)
+              .reduce((sum, r) => sum + (r.sources.rmd || 0) + (r.sources.taxable || 0), 0);
+            const extraGrossDraws = Math.max(0, uninsuredLtcYearDraws - insuredLtcYearDraws);
+            const incomeOffset = Math.max(0, totalLtcCost - extraGrossDraws);
 
             const fmtD = v => v >= 1000000 ? `$${(v/1000000).toFixed(2)}M` : `$${Math.round(v/1000)}K`;
             return (
@@ -3153,11 +3164,11 @@ function App() {
                 </div>
                 <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:10,marginBottom:14}}>
                   {[
-                    { label:'Net Care Cost', value: fmtD(totalLtcCost), sub:'Direct uninsured expense', color:'#C47A7A' },
-                    { label:'Gross-Up Tax Cost', value: grossUpTaxTotal > 0 ? fmtD(grossUpTaxTotal) : '—', sub:'Extra tax on forced IRA draws', color:'#C47A7A' },
-                    { label:'True Total Cost', value: fmtD(trueTotalCost), sub:'Care + tax friction combined', color:'#C8A030' },
-                    { label:'Compounding Loss', value: compoundingLoss > 0 ? fmtD(compoundingLoss) : '—', sub:`FV growth stolen age ${ltcAge}→${inputs.planToAge}`, color:'#C47A7A' },
-                    { label:'Portfolio Preserved', value: fmtD(portfolioDiff), sub:`Actual ending balance diff at ${inputs.planToAge}`, color: portfolioDiff > 0 ? '#4A9B7A' : '#C47A7A' },
+                    { label:'Total Care Cost', value: fmtD(totalLtcCost), sub:'Gross uninsured care expense', color:'#C47A7A' },
+                    { label:'Offset by Income', value: incomeOffset > 0 ? fmtD(incomeOffset) : '—', sub:'SS + RMDs absorbed this portion', color:'#8DAFC8' },
+                    { label:'Extra Portfolio Draws', value: fmtD(extraGrossDraws), sub:'Gross forced above normal income', color:'#C47A7A' },
+                    { label:'Gross-Up Tax Cost', value: grossUpTaxTotal > 0 ? fmtD(grossUpTaxTotal) : '—', sub:'Tax friction on forced IRA draws', color:'#C47A7A' },
+                    { label:'Portfolio Preserved', value: fmtD(portfolioDiff), sub:`Extra draws + tax + compounding loss`, color: portfolioDiff > 0 ? '#4A9B7A' : '#C47A7A' },
                   ].map(s => (
                     <div key={s.label} style={{background:'rgba(255,255,255,.03)',borderRadius:8,padding:'10px 12px',border:'1px solid rgba(255,255,255,.06)'}}>
                       <div style={{fontSize:12,color:'#8DAFC8',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:4}}>{s.label}</div>
@@ -3165,6 +3176,20 @@ function App() {
                       <div style={{fontSize:12,color:'#8DAFC8',marginTop:3}}>{s.sub}</div>
                     </div>
                   ))}
+                </div>
+                {/* Equation line explaining how Portfolio Preserved is composed */}
+                <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:12,flexWrap:'wrap',fontSize:12,color:'#8DAFC8',background:'rgba(255,255,255,.02)',borderRadius:6,padding:'7px 12px',border:'1px solid rgba(255,255,255,.05)'}}>
+                  <span style={{color:'#C47A7A',fontWeight:600}}>{fmtD(extraGrossDraws)}</span>
+                  <span>extra portfolio draws</span>
+                  <span style={{color:'#8DAFC8',margin:'0 2px'}}>+</span>
+                  <span style={{color:'#C47A7A',fontWeight:600}}>{grossUpTaxTotal > 0 ? fmtD(grossUpTaxTotal) : '$0'}</span>
+                  <span>gross-up tax</span>
+                  <span style={{color:'#8DAFC8',margin:'0 2px'}}>+</span>
+                  <span style={{color:'#C47A7A',fontWeight:600}}>{fmtD(compoundingLoss)}</span>
+                  <span>compounding loss (age {ltcEnd}→{inputs.planToAge})</span>
+                  <span style={{color:'#8DAFC8',margin:'0 2px'}}>=</span>
+                  <span style={{color:'#4A9B7A',fontWeight:700}}>{fmtD(portfolioDiff)}</span>
+                  <span style={{color:'#4A9B7A'}}>Portfolio Preserved</span>
                 </div>
                 <p style={{fontSize:13,color:'#DDD6C4',lineHeight:1.65}}>
                   The <strong style={{color:'#C47A7A'}}>solid red line</strong> shows expenses when the care event draws directly from your retirement portfolio — permanently reducing the compounding base. The <strong style={{color:'#4A9B7A'}}>dashed green line</strong> shows the same retirement with a Living Benefits IUL (Layer 2) covering the event: care costs draw from a dedicated pool, your income architecture remains intact, and the portfolio difference compounds for the remainder of retirement.
