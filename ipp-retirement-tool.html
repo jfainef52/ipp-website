@@ -829,7 +829,12 @@ function projectArc(inputs) {
         const actualNet = actualGross - actualTax;
         row.sources.taxable = (row.sources.taxable || 0) + actualGross;
         row.totalIncome += actualGross;
-        row.ltcGrossUpTax = (row.ltcGrossUpTax || 0) + actualTax;
+        // Only attribute gross-up tax to LTC for the LTC-driven portion of this draw
+        if (row.ltcEvent && ltcRemaining > 0 && !ltcInsured) {
+          const ltcShare = Math.min(actualNet, ltcRemaining) / Math.max(actualNet, 0.01);
+          row.ltcGrossUpTax = (row.ltcGrossUpTax || 0) + actualTax * ltcShare;
+          ltcRemaining -= Math.min(actualNet, ltcRemaining);
+        }
         taxable = Math.max(0, (taxable - actualGross) * (1 + yearReturn));
         remaining -= actualNet;
       }
@@ -839,6 +844,7 @@ function projectArc(inputs) {
         const draw = Math.min(roth, remaining);
         row.sources.roth = (row.sources.roth || 0) + draw;
         row.totalIncome += draw;
+        if (row.ltcEvent && ltcRemaining > 0) ltcRemaining -= Math.min(draw, ltcRemaining);
         roth = Math.max(0, (roth - draw) * (1 + yearReturn));
         remaining -= draw;
       }
@@ -857,7 +863,12 @@ function projectArc(inputs) {
         const actualNet = actualGross - actualTax;
         row.sources.rmd = (row.sources.rmd || 0) + actualGross;
         row.totalIncome += actualGross;
-        row.ltcGrossUpTax = (row.ltcGrossUpTax || 0) + actualTax;
+        // Only attribute gross-up tax to LTC for the LTC-driven portion of this draw
+        if (row.ltcEvent && ltcRemaining > 0 && !ltcInsured) {
+          const ltcShare = Math.min(actualNet, ltcRemaining) / Math.max(actualNet, 0.01);
+          row.ltcGrossUpTax = (row.ltcGrossUpTax || 0) + actualTax * ltcShare;
+          ltcRemaining -= Math.min(actualNet, ltcRemaining);
+        }
         trad = Math.max(0, (trad - actualGross) * (1 + yearReturn));
         remaining -= actualNet;
       }
