@@ -1055,30 +1055,31 @@ function projectArc(inputs) {
   // Build fixed income streams — each stream has a yearOffset (years after MC start age
   // when it begins). Pension is always immediate (started at retirement).
   // Annuities may be deferred — their start ages are compared to mcStartAge.
+  // IMPORTANT: use arch-gated values so MC respects Architecture ON/OFF toggle.
   const fixedStreams = [];
 
-  // Pension — starts at retirement, so it's already active at any MC start point
+  // Pension — always included regardless of architecture toggle (it's a guaranteed stream)
   if (pensionMonthly > 0) {
     fixedStreams.push({ yearOffset: 0, annual: pensionMonthly * 12 });
   }
 
-  // Roth annuity — deferred if start age > mcStartAge
-  if (rothAnnuityMonthly > 0) {
+  // Roth annuity — only when architecture is enabled (Layer 1 product)
+  if (archRothAnnuityMonthly > 0) {
     const offset = Math.max(0, rothAnnuityStartAge - mcStartAge);
-    fixedStreams.push({ yearOffset: offset, annual: rothAnnuityMonthly * 12 });
+    fixedStreams.push({ yearOffset: offset, annual: archRothAnnuityMonthly * 12 });
   }
 
-  // Non-qualified annuity — deferred if start age > mcStartAge
-  if (nonQualAnnuityMonthly > 0) {
+  // Non-qualified annuity — only when architecture is enabled
+  if (archNonQualAnnuityMonthly > 0) {
     const offset = Math.max(0, nonQualAnnuityStartAge - mcStartAge);
-    fixedStreams.push({ yearOffset: offset, annual: nonQualAnnuityMonthly * 12 });
+    fixedStreams.push({ yearOffset: offset, annual: archNonQualAnnuityMonthly * 12 });
   }
 
-  // ETA policy loan income — deferred if start age > mcStartAge (tax-free, no COLA in MC stress test)
+  // ETA policy loan income — only when architecture is enabled (Layer 3 product)
   // MC uses Year 1 amount as a conservative floor — COLA growth is reflected in the main projection arc
-  if (etaAnnualIncome > 0) {
+  if (archEtaAnnualIncome > 0) {
     const offset = Math.max(0, etaStartAge - mcStartAge);
-    fixedStreams.push({ yearOffset: offset, annual: etaAnnualIncome });
+    fixedStreams.push({ yearOffset: offset, annual: archEtaAnnualIncome });
   }
 
   // LTC shock: gross-up annual draw spread over care years, starting at ltcShockYear
