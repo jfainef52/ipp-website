@@ -3198,7 +3198,7 @@ function App() {
                     { label:'Total Care Cost', value: fmtD(totalLtcCost), sub:'Full cost if uninsured', color:'#C47A7A' },
                     showBenefitCard
                       ? { label:'Layer 2 Benefit', value: fmtD(totalBenefit), sub: benefitGap > 0 ? `$${Math.round(benefitGap/1000)}K gap remains` : 'Fully covers care cost', color:'#4A9B7A' }
-                      : { label:'Covered by Income', value: incomeOffset > 0 ? fmtD(incomeOffset) : '—', sub:'Income surplus after living expenses', color:'#8DAFC8' },
+                      : { label:'Covered by Income', value: incomeOffset > 0 ? fmtD(incomeOffset) : '—', sub:'Income surplus after living expenses (e.g. RMDs exceeding bills)', color:'#8DAFC8' },
                     { label:'Forced Portfolio Draws', value: extraGrossDraws > 0 ? fmtD(extraGrossDraws) : '—', sub: showBenefitCard && benefitGap === 0 ? 'None — policy absorbs all' : 'Gross IRA/taxable drawn above income', color: extraGrossDraws > 0 ? '#C47A7A' : '#4A9B7A' },
                     { label:'Gross-Up Tax Cost', value: grossUpTaxTotal > 0 ? fmtD(grossUpTaxTotal) : '—', sub: grossUpTaxTotal > 0 ? 'Extra tax on forced IRA draws' : 'None — no forced IRA draws', color: grossUpTaxTotal > 0 ? '#C47A7A' : '#4A9B7A' },
                     { label:'Portfolio Preserved', value: fmtD(portfolioDiff), sub:`Draws + tax + compounding — full Layer 2 benefit`, color: portfolioDiff > 0 ? '#4A9B7A' : '#C47A7A' },
@@ -3213,7 +3213,10 @@ function App() {
                 {/* Equation line explaining how Portfolio Preserved is composed */}
                 <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:12,flexWrap:'wrap',fontSize:12,color:'#8DAFC8',background:'rgba(255,255,255,.02)',borderRadius:6,padding:'7px 12px',border:'1px solid rgba(255,255,255,.05)'}}>
                   <span style={{color:'#C47A7A',fontWeight:600}}>{fmtD(extraGrossDraws)}</span>
-                  <span>extra portfolio draws</span>
+                  <span>forced draws</span>
+                  {incomeOffset > 0 && <><span style={{color:'#8DAFC8',margin:'0 2px'}}>+</span>
+                  <span style={{color:'#8DAFC8',fontWeight:600}}>{fmtD(incomeOffset)}</span>
+                  <span>covered by income surplus</span></>}
                   <span style={{color:'#8DAFC8',margin:'0 2px'}}>+</span>
                   <span style={{color:'#C47A7A',fontWeight:600}}>{grossUpTaxTotal > 0 ? fmtD(grossUpTaxTotal) : '$0'}</span>
                   <span>gross-up tax</span>
