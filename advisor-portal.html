@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Advisor Portal — Integrated Planning Partners</title>
+<title>Advisor Portal â Integrated Planning Partners</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&family=Barlow:wght@300;400;500;600&family=Barlow+Condensed:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -36,7 +36,7 @@
     grid-template-columns: 1fr 1fr;
   }
 
-  /* ── LEFT PANEL ── */
+  /* ââ LEFT PANEL ââ */
   .left-panel {
     background: var(--navy2);
     border-right: 1px solid var(--border);
@@ -86,7 +86,7 @@
   }
 
   .left-logo-back:hover { color: var(--gold); }
-  .left-logo-back::before { content: '←'; font-size: 12px; }
+  .left-logo-back::before { content: 'â'; font-size: 12px; }
 
   .left-main {
     position: relative;
@@ -178,7 +178,7 @@
     text-decoration: none;
   }
 
-  /* ── RIGHT PANEL ── */
+  /* ââ RIGHT PANEL ââ */
   .right-panel {
     display: flex;
     flex-direction: column;
@@ -414,7 +414,7 @@
 </head>
 <body>
 
-<!-- ── LEFT PANEL ── -->
+<!-- ââ LEFT PANEL ââ -->
 <div class="left-panel">
   <div class="left-logo">
     <div style="margin-bottom:24px;"><a href="index.html" style="display:block;line-height:0;"><svg id="Layer_3" style="height:56px;width:auto;display:block;cursor:pointer;" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="875 1789 3260 1462">
@@ -473,12 +473,12 @@
       Planning infrastructure<br>for firms that <em>execute.</em>
     </h1>
     <p class="left-body">
-      The Integrated Planning Partners advisor portal gives member firms access to co-branded StructureReview™ tools, advisor briefs, case resources, and The Planning Desk engagement platform — all in one place.
+      The Integrated Planning Partners advisor portal gives member firms access to co-branded StructureReviewâ¢ tools, advisor briefs, case resources, and The Planning Desk engagement platform â all in one place.
     </p>
     <div class="left-features">
       <div class="left-feature">
         <div class="left-feature-dot"></div>
-        <div>Co-branded StructureReview™ links for your client base</div>
+        <div>Co-branded StructureReviewâ¢ links for your client base</div>
       </div>
       <div class="left-feature">
         <div class="left-feature-dot"></div>
@@ -486,7 +486,7 @@
       </div>
       <div class="left-feature">
         <div class="left-feature-dot"></div>
-        <div>IncomeArc™ case resources and marketing materials</div>
+        <div>IncomeArcâ¢ case resources and marketing materials</div>
       </div>
       <div class="left-feature">
         <div class="left-feature-dot"></div>
@@ -507,7 +507,7 @@
   </div>
 </div>
 
-<!-- ── RIGHT PANEL ── -->
+<!-- ââ RIGHT PANEL ââ -->
 <div class="right-panel">
 
   <!-- Tab switcher -->
@@ -516,7 +516,7 @@
     <button class="tab-btn" onclick="switchTab('register')">Request Access</button>
   </div>
 
-  <!-- ── SIGN IN ── -->
+  <!-- ââ SIGN IN ââ -->
   <div class="form-panel active" id="panel-login">
     <div class="form-title">Welcome <em>back.</em></div>
     <p class="form-subtitle">Sign in to your Integrated Planning Partners advisor account.</p>
@@ -528,7 +528,7 @@
 
     <div class="form-group">
       <label>Password</label>
-      <input type="password" placeholder="••••••••" autocomplete="current-password">
+      <input type="password" placeholder="â¢â¢â¢â¢â¢â¢â¢â¢" autocomplete="current-password">
     </div>
 
     <div class="form-forgot">
@@ -541,11 +541,11 @@
 
     <p style="font-size: 13px; color: var(--warm); text-align: center;">
       Don't have access yet?
-      <a href="#" onclick="switchTab('register')" style="color: var(--gold); text-decoration: none;">Request an account →</a>
+      <a href="#" onclick="switchTab('register')" style="color: var(--gold); text-decoration: none;">Request an account â</a>
     </p>
   </div>
 
-  <!-- ── REQUEST ACCESS ── -->
+  <!-- ââ REQUEST ACCESS ââ -->
   <div class="form-panel" id="panel-register">
     <div class="form-title">Request <em>Access.</em></div>
     <p class="form-subtitle">Complete the form below. Access requests are reviewed by our team and typically approved within one business day.</p>
@@ -595,25 +595,25 @@
 
     <div class="form-group">
       <label>What brought you to Integrated Planning Partners?</label>
-      <textarea placeholder="Referral, seminar, StructureReview™, online — and anything you'd like us to know about your practice or what you're looking for."></textarea>
+      <textarea placeholder="Referral, seminar, StructureReviewâ¢, online â and anything you'd like us to know about your practice or what you're looking for."></textarea>
     </div>
 
     <button class="form-submit" onclick="handleRegister()">Submit Access Request</button>
   </div>
 
-  <!-- ── SUCCESS STATES ── -->
+  <!-- ââ SUCCESS STATES ââ -->
   <div class="success-msg" id="success-login">
-    <div class="success-icon">✦</div>
-    <div class="success-title">Signing you in…</div>
+    <div class="success-icon">â¦</div>
+    <div class="success-title">Signing you inâ¦</div>
     <p class="success-body">Redirecting to your advisor dashboard. If nothing happens, <a href="#" style="color: var(--gold);">click here.</a></p>
   </div>
 
   <div class="success-msg" id="success-register">
-    <div class="success-icon">✦</div>
+    <div class="success-icon">â¦</div>
     <div class="success-title">Request <em style="font-style:italic; color: var(--gold);">received.</em></div>
     <p class="success-body">
       We've received your access request and will review it within one business day. You'll hear from us directly at the email address you provided.<br><br>
-      In the meantime, feel free to <a href="index.html#structure-review" style="color: var(--gold);">begin a StructureReview™</a> or reach out directly at <a href="mailto:support@integratedplanningpartners.com" style="color: var(--gold);">support@integratedplanningpartners.com</a>.
+      In the meantime, feel free to <a href="index.html#structure-review" style="color: var(--gold);">begin a StructureReviewâ¢</a> or reach out directly at <a href="mailto:support@integratedplanningpartners.com" style="color: var(--gold);">support@integratedplanningpartners.com</a>.
     </p>
   </div>
 
@@ -635,5 +635,7 @@
     if (target) target.querySelectorAll('.reveal').forEach(el => el.classList.add('visible'));
   });
 </script>
+
+  <script src="ipp-design-improvements.js"></script>
 </body>
 </html>
