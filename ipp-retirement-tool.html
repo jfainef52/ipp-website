@@ -3035,18 +3035,33 @@ function App() {
 
           {/* LTC With vs Without Comparison Panel */}
           {showLtcComparison && yearsInsured && (() => {
-            // Find the LTC event years and portfolio impact
             const ltcAge = inputs.ltcEventAge;
             const ltcEnd = ltcAge + inputs.ltcDuration;
-            const uninsuredAtLtcEnd = years.find(r => r.age === ltcEnd);
-            const insuredAtLtcEnd = yearsInsured.find(r => r.age === ltcEnd);
             const uninsuredFinal = years[years.length-1];
             const insuredFinal = yearsInsured[yearsInsured.length-1];
+
+            // Raw care cost (net expense, before tax friction)
+            const totalLtcCost = inputs.ltcMonthlyCost * 12 * inputs.ltcDuration;
+            const coveredAmt = (inputs.ltcMonthlyBenefit||inputs.ltcMonthlyCost) * 12 * inputs.ltcDuration;
+
+            // Gross-up tax actually incurred in the uninsured projection during LTC years
+            // This is the real additional tax burden caused by forced grossed-up withdrawals
+            const grossUpTaxTotal = years
+              .filter(r => r.age >= ltcAge && r.age < ltcEnd)
+              .reduce((sum, r) => sum + (r.ltcGrossUpTax || 0), 0);
+
+            // True total cost = care cost + gross-up tax friction
+            const trueTotalCost = totalLtcCost + grossUpTaxTotal;
+
+            // Portfolio preserved = full ending balance difference (already captures gross-up
+            // AND compounding loss — both projections ran full engine with all tax friction)
             const portfolioDiff = insuredFinal && uninsuredFinal
               ? (insuredFinal.totalPortfolio - uninsuredFinal.totalPortfolio)
               : 0;
-            const totalLtcCost = inputs.ltcMonthlyCost * 12 * inputs.ltcDuration;
-            const coveredAmt = (inputs.ltcMonthlyBenefit||inputs.ltcMonthlyCost) * 12 * inputs.ltcDuration;
+
+            // Compounding loss = portfolioDiff minus true total cost (the "multiplier" effect)
+            const compoundingLoss = Math.max(0, portfolioDiff - trueTotalCost);
+
             const fmtD = v => v >= 1000000 ? `$${(v/1000000).toFixed(2)}M` : `$${Math.round(v/1000)}K`;
             return (
               <div style={{background:'rgba(74,155,122,.04)',border:'1px solid rgba(74,155,122,.2)',borderRadius:12,padding:'18px 20px',marginBottom:16}}>
@@ -3058,17 +3073,18 @@ function App() {
                     Age {ltcAge}–{ltcEnd} · {inputs.ltcDuration} yr event
                   </div>
                 </div>
-                <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:10,marginBottom:14}}>
                   {[
-                    { label:'Total Care Cost', value: fmtD(totalLtcCost), sub:'Uninsured — hits portfolio', color:'#C47A7A' },
-                    { label:'Layer 2 Benefit', value: fmtD(coveredAmt), sub:'Dedicated protection pool', color:'#4A9B7A' },
-                    { label:'Portfolio Preserved', value: fmtD(portfolioDiff), sub:`vs. uninsured at age ${inputs.planToAge}`, color: portfolioDiff > 0 ? '#4A9B7A' : '#C47A7A' },
-                    { label:'Uninsured Portfolio Drag', value: fmtD(Math.abs(portfolioDiff)), sub:'Permanent compounding loss', color:'#C47A7A' },
+                    { label:'Net Care Cost', value: fmtD(totalLtcCost), sub:'Direct uninsured expense', color:'#C47A7A' },
+                    { label:'Gross-Up Tax Cost', value: grossUpTaxTotal > 0 ? fmtD(grossUpTaxTotal) : '—', sub:'Extra tax on forced IRA draws', color:'#C47A7A' },
+                    { label:'True Total Cost', value: fmtD(trueTotalCost), sub:'Care + tax friction', color:'#C8A030' },
+                    { label:'Compounding Loss', value: compoundingLoss > 0 ? fmtD(compoundingLoss) : '—', sub:`Growth lost age ${ltcAge}→${inputs.planToAge}`, color:'#C47A7A' },
+                    { label:'Portfolio Preserved', value: fmtD(portfolioDiff), sub:`Layer 2 benefit at age ${inputs.planToAge}`, color: portfolioDiff > 0 ? '#4A9B7A' : '#C47A7A' },
                   ].map(s => (
                     <div key={s.label} style={{background:'rgba(255,255,255,.03)',borderRadius:8,padding:'10px 12px',border:'1px solid rgba(255,255,255,.06)'}}>
-                      <div style={{fontSize:13,color:'#8DAFC8',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:4}}>{s.label}</div>
+                      <div style={{fontSize:12,color:'#8DAFC8',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:4}}>{s.label}</div>
                       <div style={{fontSize:18,fontWeight:700,color:s.color,fontFamily:"'Cormorant Garamond',serif"}}>{s.value}</div>
-                      <div style={{fontSize:13,color:'#8DAFC8',marginTop:3}}>{s.sub}</div>
+                      <div style={{fontSize:12,color:'#8DAFC8',marginTop:3}}>{s.sub}</div>
                     </div>
                   ))}
                 </div>
