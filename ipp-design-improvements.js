@@ -4,53 +4,41 @@ function fixNav(){
   if(!nav)return;
   var items=Array.from(nav.querySelectorAll('li'));
   if(!items.length)return;
-  // Build desired order map by matching link text
-  var order=[
-    'what we do',
-    'structurereview',
-    'incomearc',
-    'ipp retirement tool',
-    'about us',
-    'contact us',
-    'architecture of retirement',
-    'begin your review',
-    'advisor portal'
-  ];
-  // Sort items according to desired order
+  // Remove "Home" li (logo already serves this purpose)
+  items.forEach(function(li){if(li.textContent.trim().toLowerCase()==='home')li.remove();});
+  items=Array.from(nav.querySelectorAll('li'));
+  // Determine base URL
+  var base=window.location.pathname.endsWith('incomearc.html')||window.location.pathname.endsWith('about.html')||window.location.pathname.endsWith('advisor-portal.html')?'index.html':'';
+  // Add IPP Retirement Tool if missing
+  if(!items.some(function(li){return li.textContent.toLowerCase().includes('ipp retirement');})){
+    var li=document.createElement('li');
+    li.innerHTML='<a href="ipp-retirement-tool.html">IPP Retirement Tool</a>';
+    var arcLi=items.find(function(li){return li.textContent.toLowerCase().includes('incomearc');});
+    if(arcLi&&arcLi.nextSibling)nav.insertBefore(li,arcLi.nextSibling);
+    else nav.appendChild(li);
+    items=Array.from(nav.querySelectorAll('li'));
+  }
+  // Add Architecture of Retirement if missing
+  if(!items.some(function(li){return li.textContent.toLowerCase().includes('architecture');})){
+    var li2=document.createElement('li');
+    li2.innerHTML='<a href="'+(base||'')+'index.html#book">Architecture of Retirement</a>';
+    var beginLi=items.find(function(li){return li.textContent.toLowerCase().includes('begin');});
+    if(beginLi)nav.insertBefore(li2,beginLi);
+    else nav.appendChild(li2);
+    items=Array.from(nav.querySelectorAll('li'));
+  }
+  // Sort into correct order
+  var order=['what we do','structurereview','incomearc','ipp retirement','about us','contact us','architecture','begin your review','advisor portal'];
   items.sort(function(a,b){
     var ta=a.textContent.toLowerCase().trim();
     var tb=b.textContent.toLowerCase().trim();
     var ia=order.findIndex(function(o){return ta.includes(o);});
     var ib=order.findIndex(function(o){return tb.includes(o);});
-    if(ia===-1)ia=99;
-    if(ib===-1)ib=99;
+    if(ia===-1)ia=99;if(ib===-1)ib=99;
     return ia-ib;
   });
-  // Re-append in sorted order
   items.forEach(function(li){nav.appendChild(li);});
-  // Also add IPP Retirement Tool if missing
-  var hasIPP=items.some(function(li){return li.textContent.toLowerCase().includes('ipp retirement');});
-  if(!hasIPP){
-    var li=document.createElement('li');
-    var isHome=window.location.pathname==='/'||window.location.pathname.endsWith('index.html');
-    li.innerHTML='<a href="ipp-retirement-tool.html">IPP Retirement Tool</a>';
-    // Insert after IncomeArc
-    var arcLi=items.find(function(li){return li.textContent.toLowerCase().includes('incomearc');});
-    if(arcLi&&arcLi.nextSibling)nav.insertBefore(li,arcLi.nextSibling);
-    else nav.appendChild(li);
-  }
-  // Add Architecture of Retirement if missing  
-  var hasArch=items.some(function(li){return li.textContent.toLowerCase().includes('architecture');});
-  if(!hasArch){
-    var li2=document.createElement('li');
-    li2.innerHTML='<a href="index.html#book">Architecture of Retirement</a>';
-    // Insert before Begin Your Review
-    var beginLi=items.find(function(li){return li.textContent.toLowerCase().includes('begin');});
-    if(beginLi)nav.insertBefore(li2,beginLi);
-    else nav.appendChild(li2);
-  }
 }
-
 function fixLayers(){
   var items=Array.from(document.querySelectorAll('.layer-item'));
   if(items.length!==4)return;
@@ -158,7 +146,7 @@ strict';function fixEncoding(){
   }
   if(document.body)fix(document.body);
   var t=document.title;map.forEach(function(p){t=t.replace(p[0],p[1]);});document.title=t;
-}function init(){applyHeroImage();applyFrameworkIcons();if(window.Chart){injectIRAChart();}else{var _ci=setInterval(function(){if(window.Chart){clearInterval(_ci);injectIRAChart();}},100);}applyIncomeArcHero();applyAboutHero();applyAdvisorPortalHero();injectLTCHomepage();injectLTCIncomeArc();fixNav();fixLayers();fixFooter();fixStructureReview();setTimeout(fixEncoding,50);}
+}function init(){applyHeroImage();applyFrameworkIcons();if(window.Chart){injectIRAChart();}else{var _ci=setInterval(function(){if(window.Chart){clearInterval(_ci);injectIRAChart();}},100);}applyIncomeArcHero();applyAboutHero();applyAdvisorPortalHero();injectLTCHomepage();injectLTCIncomeArc();setTimeout(function(){fixEncoding();fixNav();fixLayers();fixFooter();fixStructureReview();},150);}
 function applyHeroImage(){if(window.location.pathname.includes('incomearc')||window.location.pathname.includes('about')||window.location.pathname.includes('advisor'))return;var h=document.querySelector('.hero');if(!h)return;h.style.backgroundImage='linear-gradient(135deg,rgba(8,18,38,0.85) 0%,rgba(8,18,38,0.65) 50%,rgba(15,30,58,0.55) 100%), url("https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=1800&q=80&fit=crop")';h.style.backgroundSize='cover';h.style.backgroundPosition='center 40%';h.style.backgroundRepeat='no-repeat';}
 function applyIncomeArcHero(){if(!window.location.pathname.includes('incomearc'))return;var h=document.querySelector('.hero');if(!h)return;h.style.backgroundImage='linear-gradient(135deg,rgba(8,18,38,0.88) 0%,rgba(8,18,38,0.70) 55%,rgba(15,30,58,0.50) 100%), url("https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1800&q=80&fit=crop")';h.style.backgroundSize='cover';h.style.backgroundPosition='center 30%';h.style.backgroundRepeat='no-repeat';}
 function applyAboutHero(){if(!window.location.pathname.includes('about'))return;var h=document.querySelector('.page-header')||document.querySelector('section');if(!h)return;h.style.backgroundImage='linear-gradient(135deg,rgba(8,18,38,0.90) 0%,rgba(8,18,38,0.72) 50%,rgba(15,30,58,0.55) 100%), url("https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=1800&q=80&fit=crop")';h.style.backgroundSize='cover';h.style.backgroundPosition='center 20%';h.style.backgroundRepeat='no-repeat';}
