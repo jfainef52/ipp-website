@@ -477,7 +477,7 @@ function projectArc(inputs) {
     rothAnnuityMonthly = 0, rothAnnuityStartAge = 65,
     etaAnnualIncome = 0, etaStartAge = 70, etaColaRate = 0,
     etaFundingAmount = 0, etaFundingAge = 0,
-    architectureEnabled = true,
+    architectureEnabled = false,
     rothConversionAmount = 0, rothConversionAge = 0, rothConversionFinanced = 0,
     ltcFundingAmount = 0, ltcFundingAge = 0,
     nonQualAnnuityMonthly = 0, nonQualAnnuityStartAge = 65,
@@ -1554,7 +1554,7 @@ function App() {
     rothAnnuityMonthly: 0, rothAnnuityStartAge: 65,
     etaAnnualIncome: 0, etaStartAge: 70, etaFundingDraw: 0, etaColaRate: 0,
     etaFundingAmount: 0, etaFundingAge: 0,
-    architectureEnabled: true,
+    architectureEnabled: false,
     rothConversionAmount: 0, rothConversionAge: 0, rothConversionFinanced: 0,
     ltcFundingAmount: 0, ltcFundingAge: 0,
     nonQualAnnuityMonthly: 0, nonQualAnnuityStartAge: 65, nonQualAnnuityBasis: 0, nonQualAnnuityTotalValue: 0,
@@ -2381,7 +2381,6 @@ function App() {
                           </div>
                         </div>
                         {warn && <div style={{fontSize:11,color:'#C8A030',paddingTop:6,borderTop:'1px solid rgba(200,160,48,.2)'}}>⚠ Seasoning under 10 years — confirm illustration supports this timeline.</div>}
-                        <div style={{fontSize:11,color:'#8DAFC8',marginTop:6,lineHeight:1.5,fontStyle:'italic'}}>"Take your medicine today, so you don't have to hurt tomorrow." — Rate elevated this year only. Smaller IRA = lower lifetime RMDs.</div>
                       </div>
                     );
                   })()}
