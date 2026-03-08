@@ -3139,9 +3139,26 @@ function App() {
             // portfolioDiff is the authoritative number — both projections ran full engine independently
             const compoundingLoss = Math.max(0, portfolioDiff - trueTotalCost);
 
-            // How much of the care cost was offset by existing income (SS + RMDs already in flow)
-            // = raw care cost minus the extra portfolio draws made in LTC years
-            // Extra portfolio draws in LTC years = difference in total draws between insured and uninsured
+            // "Covered by Income" = how much of the care cost is absorbed by income surplus
+            // AFTER fixed + lifestyle expenses are already paid.
+            // We look at each LTC year in the UNINSURED projection:
+            //   - row.spendableIncome = SS + pension + RMDs + annuity (excluding arch events)
+            //   - row.totalExpense includes living expenses + LTC cost
+            //   - Income surplus after living expenses = spendableIncome - (totalExpense - ltcUncovered)
+            //   - That surplus (if any) absorbs part of the LTC cost before portfolio is touched
+            const incomeOffset = years
+              .filter(r => r.age >= ltcAge && r.age < ltcEnd)
+              .reduce((sum, r) => {
+                const livingExpenses = (r.totalExpense || 0) - (r.ltcUncovered || 0);
+                const surplusAfterLiving = Math.max(0, (r.spendableIncome || 0) - livingExpenses);
+                return sum + Math.min(surplusAfterLiving, r.ltcUncovered || 0);
+              }, 0);
+
+            const annualBenefit = (inputs.ltcMonthlyBenefit || inputs.ltcMonthlyCost) * 12;
+            const totalBenefit = annualBenefit * inputs.ltcDuration;
+            const benefitGap = Math.max(0, totalLtcCost - totalBenefit);
+            // Forced portfolio draws = care cost not covered by income surplus (gross, before tax)
+            // For display we use the engine-computed draw difference between projections
             const uninsuredLtcYearDraws = years
               .filter(r => r.age >= ltcAge && r.age < ltcEnd)
               .reduce((sum, r) => sum + (r.sources.rmd || 0) + (r.sources.taxable || 0), 0);
@@ -3149,11 +3166,6 @@ function App() {
               .filter(r => r.age >= ltcAge && r.age < ltcEnd)
               .reduce((sum, r) => sum + (r.sources.rmd || 0) + (r.sources.taxable || 0), 0);
             const extraGrossDraws = Math.max(0, uninsuredLtcYearDraws - insuredLtcYearDraws);
-            const incomeOffset = Math.max(0, totalLtcCost - extraGrossDraws);
-
-            const annualBenefit = (inputs.ltcMonthlyBenefit || inputs.ltcMonthlyCost) * 12;
-            const totalBenefit = annualBenefit * inputs.ltcDuration;
-            const benefitGap = Math.max(0, totalLtcCost - totalBenefit);
             // "Covered by Income" only meaningful when there's a benefit gap or no insurance.
             // When benefit fully covers care, this should be $0 — income doesn't need to absorb anything.
             const showBenefitCard = totalBenefit > 0; // insured scenario
@@ -3175,7 +3187,7 @@ function App() {
                     { label:'Total Care Cost', value: fmtD(totalLtcCost), sub:'Full cost if uninsured', color:'#C47A7A' },
                     showBenefitCard
                       ? { label:'Layer 2 Benefit', value: fmtD(totalBenefit), sub: benefitGap > 0 ? `$${Math.round(benefitGap/1000)}K gap remains` : 'Fully covers care cost', color:'#4A9B7A' }
-                      : { label:'Covered by Income', value: incomeOffset > 0 ? fmtD(incomeOffset) : '—', sub:'SS/RMDs absorb this — no extra draw', color:'#8DAFC8' },
+                      : { label:'Covered by Income', value: incomeOffset > 0 ? fmtD(incomeOffset) : '—', sub:'Income surplus after living expenses', color:'#8DAFC8' },
                     { label:'Forced Portfolio Draws', value: extraGrossDraws > 0 ? fmtD(extraGrossDraws) : '—', sub: showBenefitCard && benefitGap === 0 ? 'None — policy absorbs all' : 'Gross IRA/taxable drawn above income', color: extraGrossDraws > 0 ? '#C47A7A' : '#4A9B7A' },
                     { label:'Gross-Up Tax Cost', value: grossUpTaxTotal > 0 ? fmtD(grossUpTaxTotal) : '—', sub: grossUpTaxTotal > 0 ? 'Extra tax on forced IRA draws' : 'None — no forced IRA draws', color: grossUpTaxTotal > 0 ? '#C47A7A' : '#4A9B7A' },
                     { label:'Portfolio Preserved', value: fmtD(portfolioDiff), sub:`Draws + tax + compounding — full Layer 2 benefit`, color: portfolioDiff > 0 ? '#4A9B7A' : '#C47A7A' },
