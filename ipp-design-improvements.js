@@ -1,4 +1,36 @@
-(function(){'use strict';function fixEncoding(){var map=[[/ÃƒÂ¢Ã‚ÂÃ‚Â¢/g,'™'],[/ÃƒÂ¢Ã‚ÂÃ‚Â/g,'—'],[/Ã¢ÂÂ¢/g,'™'],[/Ã¢ÂÂ/g,'—'],[/Ã¢ÂÂ/g,'“'],[/Ã¢ÂÂ/g,'”']];function fix(n){if(n.nodeType===3){var v=n.nodeValue;map.forEach(function(p){v=v.replace(p[0],p[1]);});n.nodeValue=v;}else if(n.nodeType===1&&n.tagName!=='SCRIPT'&&n.tagName!=='STYLE'){Array.from(n.childNodes).forEach(fix);}}if(document.body)fix(document.body);var t=document.title;map.forEach(function(p){t=t.replace(p[0],p[1]);});document.title=t;}function init(){fixEncoding();applyHeroImage();applyFrameworkIcons();injectIRAChart();applyIncomeArcHero();applyAboutHero();applyAdvisorPortalHero();injectLTCHomepage();injectLTCIncomeArc();}
+(function(){'use strict';function fixEncoding(){
+  var map=[
+    // â¢ style: UTF-8 bytes of ™ (e2 84 a2) misread as Latin-1
+    [/â¢/g,'™'],
+    // Ã¢ÂÂ style: double-encoded UTF-8
+    [/Ã¢ÂÂ¬/g,'€'],
+    [/Ã¢ÂÂ¢/g,'™'],
+    [/Ã¢ÂÂ/g,'—'],
+    [/Ã¢ÂÂ/g,'–'],
+    [/Ã¢ÂÂ/g,'“'],
+    [/Ã¢ÂÂ/g,'”'],
+    [/Ã¢ÂÂ/g,'’'],
+    // ÃÂ style: simpler double-encoding 
+    [/ÃƒÂ¢Ã‚ÂÃ‚Â¢/g,'™'],
+    [/ÃƒÂ¢Ã‚ÂÃ‚Â/g,'—'],
+    // String-level patterns (as they appear in DOM text)
+    [/Ã¢ÂÂ¬/g,'€'],
+  ];
+  function fix(n){
+    if(n.nodeType===3){
+      var v=n.nodeValue;
+      var changed=false;
+      map.forEach(function(p){var n2=v.replace(p[0],p[1]);if(n2!==v){v=n2;changed=true;}});
+      if(changed)n.nodeValue=v;
+    }else if(n.nodeType===1&&n.tagName!=='SCRIPT'&&n.tagName!=='STYLE'){
+      Array.from(n.childNodes).forEach(fix);
+      // Also fix attributes like title, placeholder
+      if(n.title){var t=n.title;map.forEach(function(p){t=t.replace(p[0],p[1]);});n.title=t;}
+    }
+  }
+  if(document.body)fix(document.body);
+  var t=document.title;map.forEach(function(p){t=t.replace(p[0],p[1]);});document.title=t;
+}function init(){fixEncoding();applyHeroImage();applyFrameworkIcons();if(window.Chart){injectIRAChart();}else{var _ci=setInterval(function(){if(window.Chart){clearInterval(_ci);injectIRAChart();}},100);}applyIncomeArcHero();applyAboutHero();applyAdvisorPortalHero();injectLTCHomepage();injectLTCIncomeArc();}
 function applyHeroImage(){if(window.location.pathname.includes('incomearc')||window.location.pathname.includes('about')||window.location.pathname.includes('advisor'))return;var h=document.querySelector('.hero');if(!h)return;h.style.backgroundImage='linear-gradient(135deg,rgba(8,18,38,0.85) 0%,rgba(8,18,38,0.65) 50%,rgba(15,30,58,0.55) 100%), url("https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=1800&q=80&fit=crop")';h.style.backgroundSize='cover';h.style.backgroundPosition='center 40%';h.style.backgroundRepeat='no-repeat';}
 function applyIncomeArcHero(){if(!window.location.pathname.includes('incomearc'))return;var h=document.querySelector('.hero');if(!h)return;h.style.backgroundImage='linear-gradient(135deg,rgba(8,18,38,0.88) 0%,rgba(8,18,38,0.70) 55%,rgba(15,30,58,0.50) 100%), url("https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1800&q=80&fit=crop")';h.style.backgroundSize='cover';h.style.backgroundPosition='center 30%';h.style.backgroundRepeat='no-repeat';}
 function applyAboutHero(){if(!window.location.pathname.includes('about'))return;var h=document.querySelector('.page-header')||document.querySelector('section');if(!h)return;h.style.backgroundImage='linear-gradient(135deg,rgba(8,18,38,0.90) 0%,rgba(8,18,38,0.72) 50%,rgba(15,30,58,0.55) 100%), url("https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=1800&q=80&fit=crop")';h.style.backgroundSize='cover';h.style.backgroundPosition='center 20%';h.style.backgroundRepeat='no-repeat';}
