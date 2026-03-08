@@ -1581,7 +1581,8 @@ function App() {
   const { years, confidence, fixedStreams, mcStartAge } = projectArc({ ...baseProjectionInputs, ltcInsured: false });
 
   // Insured comparison — run second projection with benefit covering LTC costs
-  const showLtcComparison = inputs.ltcShowComparison && inputs.ltcEventAge > 0;
+  // Tied to architecture toggle: Layer 2 comparison only shows when architecture is enabled
+  const showLtcComparison = inputs.architectureEnabled && inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
   const { years: yearsInsured } = showLtcComparison
     ? projectArc({ ...baseProjectionInputs, ltcInsured: true })
     : { years: null };
@@ -2220,10 +2221,64 @@ function App() {
 
             <Section title="Income Sources" collapsed={sections.income} onToggle={()=>toggleSection('income')}>
 
+              {/* ── Roth Annuity Conversion Event (Layer 1) ── */}
+              <div style={{marginBottom:14,paddingBottom:14,borderBottom:'1px solid rgba(255,255,255,.06)'}}>
+                <div style={{fontSize:14,fontWeight:700,color:'#7BAF84',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:4}}>
+                  Layer 1 — Roth Annuity Funding
+                </div>
+                <div style={{fontSize:13,color:'#8DAFC8',marginBottom:10,lineHeight:1.55}}>
+                  Single-premium Roth FIA · Lump-sum IRA conversion · One-time taxable event
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:6}}>
+                  <Field label="Conversion Amount" hint="Gross IRA amount converted to fund the single-premium Roth annuity. Full amount is taxable ordinary income in conversion year.">
+                    <NumInput value={inputs.rothConversionAmount} onChange={v=>set('rothConversionAmount',v)} prefix="$"/>
+                  </Field>
+                  <Field label="Conversion Age" hint="Age at which the conversion occurs. Can differ from ETA funding age for tax planning purposes.">
+                    <NumInput value={inputs.rothConversionAge} onChange={v=>set('rothConversionAge',v)} suffix="yrs"/>
+                  </Field>
+                </div>
+                {inputs.rothConversionAmount > 0 && inputs.rothConversionAge > 0 && (()=>{
+                  const amt = inputs.rothConversionAmount;
+                  const financed = inputs.rothConversionFinanced || 0;
+                  const overage = Math.max(0, amt - financed);
+                  return (
+                    <div style={{background:'rgba(123,175,132,.05)',border:'1px solid rgba(123,175,132,.2)',borderRadius:7,padding:'10px 12px',marginBottom:6}}>
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
+                        <Field label="Tax Amount Financed" hint="Portion of the conversion tax covered by the bank non-recourse loan — no cash-flow impact for this amount.">
+                          <NumInput value={inputs.rothConversionFinanced} onChange={v=>set('rothConversionFinanced',v)} prefix="$"/>
+                        </Field>
+                        <div>
+                          <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:4}}>Overage Tax (est.)</div>
+                          <div style={{fontSize:15,fontWeight:600,color:overage>0?'#C47A7A':'#4A9B7A',fontFamily:"'Cormorant Garamond',serif"}}>{overage>0?'$'+Math.round(overage/1000)+'K':'None'}</div>
+                          <div style={{fontSize:11,color:'#8DAFC8',marginTop:2}}>Grossed-up IRA withdrawal</div>
+                        </div>
+                      </div>
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,paddingTop:8,borderTop:'1px solid rgba(123,175,132,.15)'}}>
+                        <div style={{textAlign:'center'}}>
+                          <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Total IRA Reduction</div>
+                          <div style={{fontSize:15,fontWeight:600,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif"}}>−${amt>=1000000?(amt/1000000).toFixed(1)+'M':Math.round(amt/1000)+'K'}</div>
+                          <div style={{fontSize:11,color:'#8DAFC8'}}>Conversion + overage tax</div>
+                        </div>
+                        <div style={{textAlign:'center'}}>
+                          <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Financed</div>
+                          <div style={{fontSize:15,fontWeight:600,color:'#4A9B7A',fontFamily:"'Cormorant Garamond',serif"}}>{financed>0?'$'+Math.round(financed/1000)+'K':'—'}</div>
+                          <div style={{fontSize:11,color:'#8DAFC8'}}>Bank covers via loan</div>
+                        </div>
+                        <div style={{textAlign:'center'}}>
+                          <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Rate Impact</div>
+                          <div style={{fontSize:15,fontWeight:600,color:'#C8A030',fontFamily:"'Cormorant Garamond',serif"}}>Year {inputs.rothConversionAge} only</div>
+                          <div style={{fontSize:11,color:'#8DAFC8'}}>One-time marginal spike</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
               {/* Roth Annuity — Layer 1 */}
               <div style={{marginBottom:14,paddingBottom:14,borderBottom:'1px solid rgba(255,255,255,.06)'}}>
                 <div style={{fontSize:14,fontWeight:700,color:'#4A9B7A',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:4}}>
-                  Layer 1 — Roth / Tax-Free Annuity
+                  Layer 1 — Roth Annuity Income
                 </div>
                 <div style={{fontSize:13,color:'#8DAFC8',marginBottom:10,lineHeight:1.55}}>
                   Roth FIA with GLWB rider · TAX-FREE · Zero MAGI impact · No IRMAA exposure
@@ -2387,94 +2442,6 @@ function App() {
                 </div>
               </div>
 
-              {/* ── Roth Annuity Conversion Event (Layer 1) ── */}
-              <div style={{marginBottom:14,paddingBottom:14,borderBottom:'1px solid rgba(255,255,255,.06)'}}>
-                <div style={{fontSize:14,fontWeight:700,color:'#7BAF84',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:4}}>
-                  Layer 1 — Roth Annuity Conversion Event
-                </div>
-                <div style={{fontSize:13,color:'#8DAFC8',marginBottom:10,lineHeight:1.55}}>
-                  Single-premium Roth FIA conversion · Lump-sum IRA distribution · One-time taxable event
-                </div>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:6}}>
-                  <Field label="Conversion Amount" hint="Gross IRA amount converted to fund the single-premium Roth annuity. Full amount is taxable ordinary income in conversion year.">
-                    <NumInput value={inputs.rothConversionAmount} onChange={v=>set('rothConversionAmount',v)} prefix="$"/>
-                  </Field>
-                  <Field label="Conversion Age" hint="Age at which the conversion occurs. Can differ from ETA funding age for tax planning purposes.">
-                    <NumInput value={inputs.rothConversionAge} onChange={v=>set('rothConversionAge',v)} suffix="yrs"/>
-                  </Field>
-                </div>
-                {inputs.rothConversionAmount > 0 && inputs.rothConversionAge > 0 && (()=>{
-                  const amt = inputs.rothConversionAmount;
-                  const financed = inputs.rothConversionFinanced || 0;
-                  const overage = Math.max(0, amt - financed);
-                  return (
-                    <div style={{background:'rgba(123,175,132,.05)',border:'1px solid rgba(123,175,132,.2)',borderRadius:7,padding:'10px 12px',marginBottom:6}}>
-                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
-                        <Field label="Tax Amount Financed" hint="Portion of the conversion tax covered by the bank non-recourse loan — no cash-flow impact for this amount.">
-                          <NumInput value={inputs.rothConversionFinanced} onChange={v=>set('rothConversionFinanced',v)} prefix="$"/>
-                        </Field>
-                        <div>
-                          <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:4}}>Overage Tax (est.)</div>
-                          <div style={{fontSize:15,fontWeight:600,color:overage>0?'#C47A7A':'#4A9B7A',fontFamily:"'Cormorant Garamond',serif"}}>{overage>0?'$'+Math.round(overage/1000)+'K':'None'}</div>
-                          <div style={{fontSize:11,color:'#8DAFC8',marginTop:2}}>Grossed-up IRA withdrawal</div>
-                        </div>
-                      </div>
-                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,paddingTop:8,borderTop:'1px solid rgba(123,175,132,.15)'}}>
-                        <div style={{textAlign:'center'}}>
-                          <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Total IRA Reduction</div>
-                          <div style={{fontSize:15,fontWeight:600,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif"}}>−${amt>=1000000?(amt/1000000).toFixed(1)+'M':Math.round(amt/1000)+'K'}</div>
-                          <div style={{fontSize:11,color:'#8DAFC8'}}>Conversion + overage tax</div>
-                        </div>
-                        <div style={{textAlign:'center'}}>
-                          <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Financed</div>
-                          <div style={{fontSize:15,fontWeight:600,color:'#4A9B7A',fontFamily:"'Cormorant Garamond',serif"}}>{financed>0?'$'+Math.round(financed/1000)+'K':'—'}</div>
-                          <div style={{fontSize:11,color:'#8DAFC8'}}>Bank covers via loan</div>
-                        </div>
-                        <div style={{textAlign:'center'}}>
-                          <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Rate Impact</div>
-                          <div style={{fontSize:15,fontWeight:600,color:'#C8A030',fontFamily:"'Cormorant Garamond',serif"}}>Year {inputs.rothConversionAge} only</div>
-                          <div style={{fontSize:11,color:'#8DAFC8'}}>One-time marginal spike</div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* ── LTC Policy Funding Draw ── */}
-              <div style={{marginBottom:14,paddingBottom:14,borderBottom:'1px solid rgba(255,255,255,.06)'}}>
-                <div style={{fontSize:14,fontWeight:700,color:'#9B7EC8',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:4}}>
-                  LTC Policy Funding Draw
-                </div>
-                <div style={{fontSize:13,color:'#8DAFC8',marginBottom:10,lineHeight:1.55}}>
-                  One-time taxable IRA withdrawal to fund LTC policy premium · Cannot be financed · Full gross amount reduces IRA
-                </div>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:6}}>
-                  <Field label="Gross Draw Amount" hint="Enter the full gross IRA withdrawal needed. This is a taxable event — flows through ordinary income and marginal rate calculation in the draw year. IRA balance reduced by this amount.">
-                    <NumInput value={inputs.ltcFundingAmount} onChange={v=>set('ltcFundingAmount',v)} prefix="$"/>
-                  </Field>
-                  <Field label="Draw Age" hint="Age at which the LTC policy is funded from the IRA.">
-                    <NumInput value={inputs.ltcFundingAge} onChange={v=>set('ltcFundingAge',v)} suffix="yrs"/>
-                  </Field>
-                </div>
-                {inputs.ltcFundingAmount > 0 && inputs.ltcFundingAge > 0 && (
-                  <div style={{padding:'9px 12px',background:'rgba(155,126,200,.05)',border:'1px solid rgba(155,126,200,.2)',borderRadius:7}}>
-                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-                      <div style={{textAlign:'center'}}>
-                        <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>IRA Reduction</div>
-                        <div style={{fontSize:15,fontWeight:600,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif"}}>−${Math.round(inputs.ltcFundingAmount/1000)}K</div>
-                        <div style={{fontSize:11,color:'#8DAFC8'}}>Age {inputs.ltcFundingAge}</div>
-                      </div>
-                      <div style={{textAlign:'center'}}>
-                        <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Tax Treatment</div>
-                        <div style={{fontSize:15,fontWeight:600,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif"}}>Fully taxable</div>
-                        <div style={{fontSize:11,color:'#8DAFC8'}}>Marginal rate impact — cannot finance</div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
               {/* Part-Time Income */}
               {/* Part-Time Income */}
               <div style={{marginBottom:14,paddingBottom:14,borderBottom:'none'}}>
@@ -2621,29 +2588,59 @@ function App() {
                   <NumInput value={inputs.ltcDuration} onChange={v=>set('ltcDuration',v)} suffix="yrs"/>
                 </Field>
 
-                {/* Show comparison toggle */}
+                {/* Layer 2 Comparison — tied to architecture toggle */}
                 <div style={{marginTop:10,padding:'10px 12px',background:'rgba(74,155,122,.05)',border:'1px solid rgba(74,155,122,.18)',borderRadius:8}}>
                   <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
                     <div style={{fontSize:14,fontWeight:700,color:'#4A9B7A',letterSpacing:'.06em',textTransform:'uppercase'}}>
                       Layer 2 Comparison
                     </div>
-                    <button onClick={()=>set('ltcShowComparison',!inputs.ltcShowComparison)} style={{
-                      padding:'3px 10px',borderRadius:5,fontSize:14,fontWeight:600,cursor:'pointer',
-                      fontFamily:"'DM Sans',sans-serif",
-                      background: inputs.ltcShowComparison ? 'rgba(74,155,122,.2)' : 'rgba(255,255,255,.05)',
-                      border: inputs.ltcShowComparison ? '1px solid rgba(74,155,122,.4)' : '1px solid rgba(255,255,255,.1)',
-                      color: inputs.ltcShowComparison ? '#4A9B7A' : '#9EB8CC',
-                    }}>{inputs.ltcShowComparison ? 'On' : 'Off'}</button>
+                    <div style={{fontSize:12,color: inputs.architectureEnabled ? '#4A9B7A' : '#8DAFC8',fontWeight:600}}>
+                      {inputs.architectureEnabled ? '✓ Active (Architecture On)' : 'Enable Architecture to compare'}
+                    </div>
                   </div>
-                  <p style={{fontSize:13,color:'#DDD6C4',lineHeight:1.55,marginBottom: inputs.ltcShowComparison ? 10 : 0}}>
+                  <p style={{fontSize:13,color:'#DDD6C4',lineHeight:1.55,marginBottom: inputs.architectureEnabled ? 10 : 0}}>
                     Show a second projection where a <strong style={{color:'#4A9B7A'}}>Living Benefits IUL (Layer 2)</strong> covers the care cost — portfolio untouched, income architecture intact.
                   </p>
-                  {inputs.ltcShowComparison && <>
+                  {inputs.architectureEnabled && <>
                     <Field label="Monthly Benefit (Layer 2)" hint="Match or offset the care cost">
                       <NumInput value={inputs.ltcMonthlyBenefit||inputs.ltcMonthlyCost} onChange={v=>set('ltcMonthlyBenefit',v)} prefix="$" suffix="/mo"/>
                     </Field>
                   </>}
                 </div>
+
+              {/* ── Layer 2 — LTC Policy Funding Draw ── */}
+              <div style={{marginBottom:14,paddingBottom:14,borderBottom:'1px solid rgba(255,255,255,.06)'}}>
+                <div style={{fontSize:14,fontWeight:700,color:'#9B7EC8',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:4}}>
+                  Layer 2 — LTC Policy Funding Draw
+                </div>
+                <div style={{fontSize:13,color:'#8DAFC8',marginBottom:10,lineHeight:1.55}}>
+                  Taxable IRA withdrawal to fund LTC policy premium · Cannot be financed · Full gross amount reduces IRA
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:6}}>
+                  <Field label="Gross Draw Amount" hint="Enter the full gross IRA withdrawal needed. This is a taxable event — flows through ordinary income and marginal rate calculation in the draw year. IRA balance reduced by this amount.">
+                    <NumInput value={inputs.ltcFundingAmount} onChange={v=>set('ltcFundingAmount',v)} prefix="$"/>
+                  </Field>
+                  <Field label="Draw Age" hint="Age at which the LTC policy is funded from the IRA.">
+                    <NumInput value={inputs.ltcFundingAge} onChange={v=>set('ltcFundingAge',v)} suffix="yrs"/>
+                  </Field>
+                </div>
+                {inputs.ltcFundingAmount > 0 && inputs.ltcFundingAge > 0 && (
+                  <div style={{padding:'9px 12px',background:'rgba(155,126,200,.05)',border:'1px solid rgba(155,126,200,.2)',borderRadius:7}}>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                      <div style={{textAlign:'center'}}>
+                        <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>IRA Reduction</div>
+                        <div style={{fontSize:15,fontWeight:600,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif"}}>−${Math.round(inputs.ltcFundingAmount/1000)}K</div>
+                        <div style={{fontSize:11,color:'#8DAFC8'}}>Age {inputs.ltcFundingAge}</div>
+                      </div>
+                      <div style={{textAlign:'center'}}>
+                        <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Tax Treatment</div>
+                        <div style={{fontSize:15,fontWeight:600,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif"}}>Fully taxable</div>
+                        <div style={{fontSize:11,color:'#8DAFC8'}}>Marginal rate impact — cannot finance</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
 
                 <div style={{padding:'10px 12px',background:'rgba(196,106,106,.06)',border:'1px solid rgba(196,106,106,.2)',borderRadius:7,marginTop:8}}>
                   <div style={{fontSize:14,color:'#C47A7A',fontWeight:600,marginBottom:4}}>Uninsured Event — Portfolio Impact</div>
