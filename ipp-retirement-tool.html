@@ -546,6 +546,11 @@ function projectArc(inputs) {
     }
   }
 
+  // IRMAA 2-year lookback — Medicare uses MAGI from 2 years prior to set premiums.
+  // magiHistory[age] = that year's MAGI, stored as the loop runs.
+  // When computing IRMAA for age X, we look up magiHistory[X - 2].
+  const magiHistory = {};
+
   for (let age = retireAge; age <= planToAge; age++) {
     const yr = age - retireAge;
     const inflFactor = Math.pow(1 + inflation, yr);
@@ -955,11 +960,19 @@ function projectArc(inputs) {
       + (row.sources.annuity||0)       // gain portion only (exclusion already applied)
       + (row.sources.taxable||0)*0.85; // conservative — treat most of taxable as gain
     row.magi = magi;
+    magiHistory[age] = magi; // store for IRMAA lookback in future years
+
+    // IRMAA 2-year lookback: Medicare uses MAGI from 2 years prior.
+    // If lookback year has no data (e.g. pre-retirement), fall back to current MAGI
+    // so the tool is conservative and doesn't under-estimate in early retirement years.
+    const irmaaMagi = magiHistory[age - 2] !== undefined ? magiHistory[age - 2] : magi;
+    row.irmaaMagi = irmaaMagi; // stored for display/debug
+    row.irmaaMagiYear = magiHistory[age - 2] !== undefined ? age - 2 : age;
     // After spouse death: single IRMAA brackets apply immediately (no year of death grace on brackets)
     const personsOnMedicare = spouseAlive
       ? (age >= 65 ? 1 : 0) + ((age - spouseDobOffset) >= 65 ? 1 : 0)
       : (age >= 65 ? 1 : 0);
-    row.irmaa = personsOnMedicare > 0 ? calcIRMAA(magi, effectiveStatus, personsOnMedicare) : 0;
+    row.irmaa = personsOnMedicare > 0 ? calcIRMAA(irmaaMagi, effectiveStatus, personsOnMedicare) : 0;
     // IRMAA is a real expense — subtract from net spendable income
     // IRMAA spikes in LTC years because grossed-up draws push MAGI higher.
     // We need to fill the IRMAA gap from the portfolio too (gross it up from trad if available).
@@ -1479,7 +1492,7 @@ function DataTable({ data }) {
               <td style={{padding:'5px 8px',textAlign:'right',color:'#9B7EC8'}}>{d.magi>0?fmt$(d.magi):'—'}</td>
               <td style={{padding:'5px 8px',textAlign:'right',color:'#F5F2EC',fontWeight:600}}>{fmt$(d.totalIncome)}</td>
               <td style={{padding:'5px 8px',textAlign:'right',color:'#C47A7A'}}>{fmt$(d.totalExpense)}</td>
-              <td style={{padding:'5px 8px',textAlign:'right',color: d.irmaa>0?'#E8943A':'#2A4060'}}>{d.irmaa>0?'$'+d.irmaa.toLocaleString():'-'}</td>
+              <td title={d.irmaa>0?`IRMAA based on age ${d.irmaaMagiYear} MAGI ($${Math.round((d.irmaaMagi||0)/1000)}K) — 2-yr lookback`:'No IRMAA'} style={{padding:'5px 8px',textAlign:'right',color: d.irmaa>0?'#E8943A':'#2A4060',cursor:d.irmaa>0?'help':'default'}}>{d.irmaa>0?'$'+d.irmaa.toLocaleString():'-'}</td>
               <td style={{padding:'5px 8px',textAlign:'right',color:'#9EB8CC'}}>{fmtM(d.totalPortfolio)}</td>
             </tr>
           ))}
