@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>IncomeArc™ — Integrated Planning Partners</title>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script>window.addEventListener('load',()=>{ if(typeof emailjs!=='undefined') emailjs.init('XyWTKKWFoeYOhfFbV'); });</script>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -1421,6 +1423,13 @@ function DisclaimerModal({ onAccept }) {
 function App() {
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
   const [view, setView] = useState('visual'); // 'visual' | 'numbers'
+  const [reportModal, setReportModal] = useState(false);
+  const [reportSending, setReportSending] = useState(false);
+  const [reportSent, setReportSent] = useState(false);
+  const [reportError, setReportError] = useState(false);
+  const [clientInfo, setClientInfo] = useState({
+    primaryName: '', spouseName: '', advisorEmail: '',
+  });
   const [sections, setSections] = useState({
     basic: true, ss: true, spouseSs: true, pension: true, portfolio: true, income: true,
     expenses: true, drawdown: true, ltc: true, tax: true, advanced: true
@@ -1519,6 +1528,211 @@ function App() {
       {/* Disclaimer modal — blocks app until accepted */}
       {!disclaimerAccepted && <DisclaimerModal onAccept={()=>setDisclaimerAccepted(true)}/>}
 
+      {/* ── Send Report Modal ── */}
+      {reportModal && (
+        <div style={{
+          position:'fixed',inset:0,zIndex:9998,
+          background:'rgba(7,16,26,.88)',backdropFilter:'blur(4px)',
+          display:'flex',alignItems:'center',justifyContent:'center',padding:20,
+        }}>
+          <div style={{
+            background:'#0D1E2E',border:'1px solid rgba(200,169,110,.22)',
+            borderRadius:14,padding:'28px 26px',maxWidth:500,width:'100%',
+            animation:'modalIn .25s ease both',boxShadow:'0 24px 80px rgba(0,0,0,.55)',
+          }}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
+              <div>
+                <div style={{fontSize:11,letterSpacing:'.2em',textTransform:'uppercase',color:'#C8A96E',marginBottom:4}}>Integrated Planning Partners</div>
+                <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:22,fontWeight:400,color:'#F5F2EC'}}>Send IncomeArc™ Report</div>
+              </div>
+              <button onClick={()=>setReportModal(false)} style={{fontSize:20,color:'#8DAFC8',padding:4,cursor:'pointer',lineHeight:1}}>✕</button>
+            </div>
+
+            <div style={{height:1,background:'rgba(200,169,110,.12)',marginBottom:20}}/>
+
+            {/* Report summary preview */}
+            <div style={{background:'rgba(255,255,255,.03)',border:'1px solid rgba(255,255,255,.07)',borderRadius:8,padding:'14px 16px',marginBottom:18}}>
+              <div style={{fontSize:11,letterSpacing:'.12em',textTransform:'uppercase',color:'#8DAFC8',marginBottom:10}}>Report Summary</div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px 16px'}}>
+                {[
+                  ['Client', clientInfo.primaryName || '(not set)'],
+                  ...(inputs.filingStatus==='mfj' && clientInfo.spouseName ? [['Spouse', clientInfo.spouseName]] : []),
+                  ['Filing Status', inputs.filingStatus==='mfj'?'Married (MFJ)':'Single'],
+                  ['Current Age', `${inputs.currentAge}`],
+                  ['Retirement Age', `${inputs.retireAge}`],
+                  ['State', inputs.stateCode],
+                  ['Confidence Score', `${confidence}%`],
+                  ['Est. Lifetime Tax', totalEstTax>=1000000?'$'+(totalEstTax/1000000).toFixed(1)+'M':'$'+Math.round(totalEstTax/1000)+'K'],
+                  ['Portfolio at Retire', fmtM(totalPortfolioAtRetire)],
+                  ['Guaranteed Income', guaranteedPct+'% of Yr 1'],
+                ].map(([k,v],i)=>(
+                  <div key={i} style={{fontSize:13}}>
+                    <span style={{color:'#8DAFC8'}}>{k}: </span>
+                    <span style={{color:'#F5F2EC',fontWeight:500}}>{v}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Recipient fields */}
+            <div style={{display:'flex',flexDirection:'column',gap:10,marginBottom:20}}>
+              <div>
+                <div style={{fontSize:12,color:'#8DAFC8',marginBottom:4,letterSpacing:'.04em',textTransform:'uppercase'}}>Send To (Advisor Email)</div>
+                <input
+                  type="email"
+                  value={clientInfo.advisorEmail}
+                  onChange={e=>setClientInfo(p=>({...p,advisorEmail:e.target.value}))}
+                  placeholder="advisor@firm.com"
+                  style={{width:'100%',background:'rgba(255,255,255,.05)',border:'1px solid rgba(255,255,255,.12)',borderRadius:6,padding:'9px 12px',fontSize:13,color:'#F5F2EC',outline:'none',fontFamily:"'DM Sans',sans-serif"}}
+                />
+              </div>
+              {!clientInfo.primaryName && (
+                <div style={{fontSize:12,color:'#C8A030',padding:'8px 10px',background:'rgba(200,160,48,.07)',border:'1px solid rgba(200,160,48,.2)',borderRadius:6}}>
+                  💡 Add the client's name in the Client Information panel for a personalized report.
+                </div>
+              )}
+            </div>
+
+            {/* Status messages */}
+            {reportSent && (
+              <div style={{padding:'12px 14px',background:'rgba(74,155,122,.08)',border:'1px solid rgba(74,155,122,.25)',borderRadius:8,marginBottom:16,fontSize:13,color:'#4A9B7A',display:'flex',alignItems:'center',gap:8}}>
+                <span style={{fontSize:16}}>✓</span> Report sent successfully to {clientInfo.advisorEmail}
+              </div>
+            )}
+            {reportError && (
+              <div style={{padding:'12px 14px',background:'rgba(196,106,106,.08)',border:'1px solid rgba(196,106,106,.25)',borderRadius:8,marginBottom:16,fontSize:13,color:'#C47A7A',display:'flex',alignItems:'center',gap:8}}>
+                <span>⚠</span> Something went wrong. Please try again or email support@integratedplanningpartners.com
+              </div>
+            )}
+
+            {/* Buttons */}
+            <div style={{display:'flex',gap:10}}>
+              <button
+                onClick={()=>setReportModal(false)}
+                style={{flex:1,padding:'11px',borderRadius:7,fontSize:13,fontWeight:500,fontFamily:"'DM Sans',sans-serif",cursor:'pointer',background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.08)',color:'#9EB8CC'}}>
+                Cancel
+              </button>
+              <button
+                onClick={async()=>{
+                  if(!clientInfo.advisorEmail || reportSending) return;
+                  setReportSending(true); setReportSent(false); setReportError(false);
+                  const clientLabel = clientInfo.primaryName || 'Client';
+                  const spouseLabel = inputs.filingStatus==='mfj'&&clientInfo.spouseName ? ` & ${clientInfo.spouseName}` : '';
+                  const fullName = clientLabel + spouseLabel;
+                  const stateInfo2 = STATE_TAX_DATA[inputs.stateCode];
+                  const yr1 = years[0];
+                  const htmlContent = `
+<div style="font-family:'DM Sans',Arial,sans-serif;max-width:620px;margin:0 auto;background:#07101A;color:#F5F2EC;border-radius:12px;overflow:hidden;border:1px solid rgba(200,169,110,.2);">
+  <div style="background:#0B1928;padding:24px 28px;border-bottom:1px solid rgba(200,169,110,.18);">
+    <div style="font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#C8A96E;margin-bottom:6px;">Integrated Planning Partners</div>
+    <div style="font-size:26px;font-family:Georgia,serif;font-weight:400;color:#F5F2EC;margin-bottom:4px;">IncomeArc™ Projection Report</div>
+    <div style="font-size:13px;color:#8DAFC8;">Retirement Income Architecture · Conceptual Illustration</div>
+  </div>
+  <div style="padding:24px 28px;">
+    <div style="margin-bottom:20px;">
+      <div style="font-size:13px;color:#8DAFC8;margin-bottom:2px;">Prepared for</div>
+      <div style="font-size:20px;font-family:Georgia,serif;color:#C8A96E;">${fullName}</div>
+      <div style="font-size:12px;color:#8DAFC8;margin-top:4px;">${inputs.filingStatus==='mfj'?'Married Filing Jointly':'Single'} · Age ${inputs.currentAge} · ${stateInfo2?stateInfo2.name:inputs.stateCode} · Retire Age ${inputs.retireAge}</div>
+    </div>
+    <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:18px;margin-bottom:20px;">
+      <div style="font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:#C8A96E;margin-bottom:14px;">Key Projections</div>
+      <table style="width:100%;border-collapse:collapse;">
+        ${[
+          ['Monte Carlo Confidence','#4A9B7A',confidence+'%'],
+          ['Portfolio at Retirement','#C8A96E',fmtM(totalPortfolioAtRetire)],
+          ['Portfolio at Age 90','#7BAF84',age90Data?fmtM(age90Data.totalPortfolio):'—'],
+          ['Guaranteed Income (Yr 1)','#7BAF84',guaranteedPct+'%'],
+          ['Est. Lifetime Federal Tax','#C47A7A',totalFedTax>=1000000?'$'+(totalFedTax/1000000).toFixed(1)+'M':'$'+Math.round(totalFedTax/1000)+'K'],
+          ['Est. Lifetime State Tax','#C47A7A',totalStateTax>=1000000?'$'+(totalStateTax/1000000).toFixed(1)+'M':'$'+Math.round(totalStateTax/1000)+'K'],
+          ['Est. Lifetime Total Tax','#C47A7A',totalEstTax>=1000000?'$'+(totalEstTax/1000000).toFixed(1)+'M':'$'+Math.round(totalEstTax/1000)+'K'],
+          ...(totalIrmaa>0?[['Total IRMAA Exposure','#E8943A','$'+Math.round(totalIrmaa/1000)+'K']]:[] ),
+          ['Year 1 All-In Marginal Rate','#9B7EC8',Math.round(allInMarginalRate*100)+'%'],
+          ['Year 1 All-In Effective Rate','#9B7EC8',Math.round(allInEffectiveRate*100)+'%'],
+        ].map(([label,color,val])=>`
+        <tr style="border-bottom:1px solid rgba(255,255,255,.05);">
+          <td style="padding:8px 0;font-size:13px;color:#8DAFC8;">${label}</td>
+          <td style="padding:8px 0;font-size:15px;font-weight:600;color:${color};text-align:right;">${val}</td>
+        </tr>`).join('')}
+      </table>
+    </div>
+    <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:18px;margin-bottom:20px;">
+      <div style="font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:#C8A96E;margin-bottom:14px;">Income Architecture (Year 1 of Retirement)</div>
+      <table style="width:100%;border-collapse:collapse;">
+        ${yr1 ? Object.entries(COLORS).filter(([k])=>k!=='expense'&&yr1.sources&&yr1.sources[k]>0).map(([k,c])=>`
+        <tr style="border-bottom:1px solid rgba(255,255,255,.05);">
+          <td style="padding:7px 0;font-size:13px;color:#8DAFC8;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${c.fill};margin-right:8px;vertical-align:middle;"></span>${c.label}</td>
+          <td style="padding:7px 0;font-size:13px;color:#F5F2EC;text-align:right;">$${Math.round((yr1.sources[k]||0)/12/1000*10)/10}K/mo</td>
+        </tr>`).join('') : '' }
+      </table>
+    </div>
+    <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:18px;margin-bottom:20px;">
+      <div style="font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:#C8A96E;margin-bottom:14px;">Assumptions</div>
+      <table style="width:100%;border-collapse:collapse;">
+        ${[
+          ['Portfolio Return',inputs.portfolioReturn+'%'],
+          ['Inflation Rate',inputs.inflation+'%'],
+          ['Fixed Monthly Expenses','$'+inputs.fixedExpenses.toLocaleString()],
+          ['Lifestyle Monthly Expenses','$'+inputs.lifestyleExpenses.toLocaleString()],
+          ['Traditional Balance',fmtM(inputs.traditionalBalance)],
+          ['Roth Balance',fmtM(inputs.rothBalance)],
+          ['Taxable Balance',fmtM(inputs.taxableBalance)],
+          ...(inputs.sorrEnabled?[['SORR Stress Scenario','Active — First 5 Yrs']]:[] ),
+          ...(inputs.taxRateStressAdder>0?[['Tax Rate Stress Adder','+'+inputs.taxRateStressAdder+'%']]:[] ),
+        ].map(([l,v])=>`
+        <tr style="border-bottom:1px solid rgba(255,255,255,.05);">
+          <td style="padding:7px 0;font-size:13px;color:#8DAFC8;">${l}</td>
+          <td style="padding:7px 0;font-size:13px;color:#F5F2EC;text-align:right;">${v}</td>
+        </tr>`).join('')}
+      </table>
+    </div>
+    <div style="padding:14px 16px;background:rgba(196,106,106,.06);border:1px solid rgba(196,106,106,.2);border-radius:8px;font-size:11px;color:#8DAFC8;line-height:1.7;">
+      <strong style="color:#C47A7A;">Important Disclosure:</strong> These projections are hypothetical illustrations for conceptual and educational purposes only. They are not a guarantee, prediction, or promise of future performance, results, or returns. Actual results will vary based on market conditions, tax law changes, and individual circumstances. This report is intended for use by licensed financial professionals in conjunction with a comprehensive financial planning engagement.
+    </div>
+  </div>
+  <div style="padding:16px 28px;background:#0B1928;border-top:1px solid rgba(255,255,255,.06);font-size:11px;color:#8DAFC8;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+    <span>Integrated Planning Partners · support@integratedplanningpartners.com</span>
+    <span>Generated ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</span>
+  </div>
+</div>`;
+                  try {
+                    const res = await fetch('https://api.emailjs.com/api/v1.0/email/send',{
+                      method:'POST',headers:{'Content-Type':'application/json'},
+                      body:JSON.stringify({
+                        service_id:'IPP Support',
+                        template_id:'template_qxximsu',
+                        user_id:'XyWTKKWFoeYOhfFbV',
+                        template_params:{
+                          to_email: clientInfo.advisorEmail,
+                          client_name: fullName,
+                          html_content: htmlContent,
+                        }
+                      })
+                    });
+                    if(!res.ok) throw new Error(await res.text());
+                    setReportSent(true);
+                  } catch(e) {
+                    console.error('Report email error:',e);
+                    setReportError(true);
+                  }
+                  setReportSending(false);
+                }}
+                disabled={!clientInfo.advisorEmail || reportSending}
+                style={{
+                  flex:2,padding:'11px',borderRadius:7,fontSize:13,fontWeight:600,
+                  fontFamily:"'DM Sans',sans-serif",
+                  cursor:(!clientInfo.advisorEmail||reportSending)?'not-allowed':'pointer',
+                  background:(!clientInfo.advisorEmail||reportSending)?'rgba(255,255,255,.04)':'rgba(200,169,110,.15)',
+                  border:(!clientInfo.advisorEmail||reportSending)?'1px solid rgba(255,255,255,.08)':'1px solid rgba(200,169,110,.4)',
+                  color:(!clientInfo.advisorEmail||reportSending)?'rgba(255,255,255,.25)':'#C8A96E',
+                  transition:'all .2s',letterSpacing:'.04em',
+                }}>
+                {reportSending ? 'Sending…' : reportSent ? '✓ Sent' : '📤 Send Report'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Mobile / small-screen warning banner */}
       <div className="mobile-warning" style={{
         display:'none', // overridden by CSS media query below 768px
@@ -1546,9 +1760,22 @@ function App() {
           </h1>
           <p style={{fontSize:13,color:'#8DAFC8',marginTop:2}}>Retirement Income Architecture Modeler</p>
         </div>
-        <div style={{display:'flex',gap:6,background:'rgba(255,255,255,.03)',borderRadius:8,padding:4,border:'1px solid rgba(255,255,255,.06)'}}>
-          <button className={`tab-btn ${view==='visual'?'active':''}`} onClick={()=>setView('visual')}>Visual Arc</button>
-          <button className={`tab-btn ${view==='numbers'?'active':''}`} onClick={()=>setView('numbers')}>Number Table</button>
+        <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+          <div style={{display:'flex',gap:6,background:'rgba(255,255,255,.03)',borderRadius:8,padding:4,border:'1px solid rgba(255,255,255,.06)'}}>
+            <button className={`tab-btn ${view==='visual'?'active':''}`} onClick={()=>setView('visual')}>Visual Arc</button>
+            <button className={`tab-btn ${view==='numbers'?'active':''}`} onClick={()=>setView('numbers')}>Number Table</button>
+          </div>
+          <button
+            onClick={()=>{ setReportSent(false); setReportError(false); setReportModal(true); }}
+            style={{
+              padding:'8px 16px',borderRadius:7,fontSize:13,fontWeight:600,
+              fontFamily:"'DM Sans',sans-serif",cursor:'pointer',
+              background:'rgba(200,169,110,.12)',border:'1px solid rgba(200,169,110,.35)',
+              color:'#C8A96E',letterSpacing:'.05em',display:'flex',alignItems:'center',gap:7,
+              transition:'all .2s',
+            }}>
+            <span style={{fontSize:15}}>📤</span> Send Report
+          </button>
         </div>
       </div>
 
@@ -1556,6 +1783,43 @@ function App() {
 
         {/* ── LEFT: Inputs ── */}
         <div className="left-panel" style={{background:'#0B1928',borderRight:'1px solid rgba(255,255,255,.06)',padding:'16px 14px',overflowY:'auto',maxHeight:'calc(100vh - 69px)'}}>
+          {/* Client Info Panel */}
+          <div style={{marginBottom:10,padding:'10px 12px',background:'rgba(200,169,110,.06)',border:'1px solid rgba(200,169,110,.18)',borderRadius:10}}>
+            <div style={{fontSize:14,fontWeight:600,letterSpacing:'.08em',textTransform:'uppercase',color:'#C8A96E',marginBottom:8}}>Client Information</div>
+            <div style={{display:'flex',flexDirection:'column',gap:7}}>
+              <div>
+                <div style={{fontSize:12,color:'#8DAFC8',marginBottom:3,letterSpacing:'.04em'}}>PRIMARY CLIENT NAME</div>
+                <input
+                  value={clientInfo.primaryName}
+                  onChange={e=>setClientInfo(p=>({...p,primaryName:e.target.value}))}
+                  placeholder="e.g. John Smith"
+                  style={{width:'100%',background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.1)',borderRadius:6,padding:'7px 10px',fontSize:13,color:'#F5F2EC',outline:'none',fontFamily:"'DM Sans',sans-serif"}}
+                />
+              </div>
+              {inputs.filingStatus==='mfj' && (
+                <div>
+                  <div style={{fontSize:12,color:'#8DAFC8',marginBottom:3,letterSpacing:'.04em'}}>SPOUSE NAME</div>
+                  <input
+                    value={clientInfo.spouseName}
+                    onChange={e=>setClientInfo(p=>({...p,spouseName:e.target.value}))}
+                    placeholder="e.g. Jane Smith"
+                    style={{width:'100%',background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.1)',borderRadius:6,padding:'7px 10px',fontSize:13,color:'#F5F2EC',outline:'none',fontFamily:"'DM Sans',sans-serif"}}
+                  />
+                </div>
+              )}
+              <div>
+                <div style={{fontSize:12,color:'#8DAFC8',marginBottom:3,letterSpacing:'.04em'}}>ADVISOR EMAIL (SEND REPORT TO)</div>
+                <input
+                  type="email"
+                  value={clientInfo.advisorEmail}
+                  onChange={e=>setClientInfo(p=>({...p,advisorEmail:e.target.value}))}
+                  placeholder="advisor@firm.com"
+                  style={{width:'100%',background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.1)',borderRadius:6,padding:'7px 10px',fontSize:13,color:'#F5F2EC',outline:'none',fontFamily:"'DM Sans',sans-serif"}}
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Filing Status Toggle */}
           <div style={{marginBottom:10,padding:'10px 12px',background:'rgba(200,169,110,.06)',border:'1px solid rgba(200,169,110,.18)',borderRadius:10}}>
             <div style={{fontSize:14,fontWeight:600,letterSpacing:'.08em',textTransform:'uppercase',color:'#C8A96E',marginBottom:8}}>Filing Status</div>
