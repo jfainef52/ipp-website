@@ -476,6 +476,8 @@ function projectArc(inputs) {
     traditionalBalance, rothBalance, taxableBalance,
     rothAnnuityMonthly = 0, rothAnnuityStartAge = 65,
     etaAnnualIncome = 0, etaStartAge = 70, etaColaRate = 0,
+    etaFundingAmount = 0, etaFundingAge = 0,
+    architectureEnabled = true,
     nonQualAnnuityMonthly = 0, nonQualAnnuityStartAge = 65,
     nonQualAnnuityBasis = 0, nonQualAnnuityTotalValue = 0,
     partTimeMonthly, partTimeEndAge,
@@ -501,6 +503,15 @@ function projectArc(inputs) {
 
   const years = [];
 
+  // ── Architecture toggle — when disabled, zero out all IncomeArc™ layers ──
+  const archRothAnnuityMonthly   = architectureEnabled ? rothAnnuityMonthly   : 0;
+  const archEtaAnnualIncome      = architectureEnabled ? etaAnnualIncome      : 0;
+  const archEtaFundingAmount     = architectureEnabled ? etaFundingAmount     : 0;
+  const archNonQualAnnuityMonthly= architectureEnabled ? nonQualAnnuityMonthly: 0;
+  const archAnnualTradDrawdown   = architectureEnabled ? annualTradDrawdown   : 0;
+  const archAnnualTaxableDrawdown= architectureEnabled ? annualTaxableDrawdown: 0;
+  const archAnnualRothDrawdown   = architectureEnabled ? annualRothDrawdown   : 0;
+
   // ── Pre-retirement accumulation: grow balances from currentAge to retireAge ──
   // Apply portfolio return each year and add contributions if modeled.
   // Contributions stop at tradContributionEndAge / taxableContributionEndAge (default: retireAge).
@@ -514,6 +525,10 @@ function projectArc(inputs) {
     for (let a = currentAge; a < retireAge; a++) {
       const tradContrib    = (annualTradContribution    > 0 && a < tradStopAge)    ? annualTradContribution    : 0;
       const taxableContrib = (annualTaxableContribution > 0 && a < taxableStopAge) ? annualTaxableContribution : 0;
+      // ETA funding event — reduce trad balance in the funding year (pre-retirement)
+      if (archEtaFundingAmount > 0 && etaFundingAge > 0 && a === etaFundingAge) {
+        trad = Math.max(0, trad - archEtaFundingAmount);
+      }
       // Grow existing balance then add contribution (end-of-year)
       trad    = trad    * (1 + portfolioReturn) + tradContrib;
       taxable = taxable * (1 + portfolioReturn) + taxableContrib;
@@ -531,6 +546,21 @@ function projectArc(inputs) {
       : portfolioReturn;
     const row = { age, sources: {}, totalIncome: 0, totalExpense: 0, gap: 0 };
     row.yearReturn = yearReturn; // stored for chart annotation
+
+    // ── ETA Lump-Sum Funding Event ──
+    // Reduces traditional balance in the funding year. Tax on distribution is financed
+    // (bank non-recourse loan) — no cash leaves portfolio. The lump sum IS added to
+    // ordinary income for tax purposes, elevating the marginal rate this year only.
+    if (archEtaFundingAmount > 0 && etaFundingAge > 0 && age === etaFundingAge) {
+      const fundAmt = Math.min(archEtaFundingAmount, trad);
+      trad = Math.max(0, trad - fundAmt);
+      row.etaFundingEvent = true;
+      row.etaFundingAmount = fundAmt;
+      // Add the distribution to ordinary income (taxable event — marginal rate impact)
+      // Tax is financed — NOT deducted from any account balance
+      row.sources.rmd = (row.sources.rmd || 0) + fundAmt; // treated as ordinary IRA distribution
+      row.totalIncome += fundAmt;
+    }
 
     // Determine effective filing status this year (spouse death changes it)
     const spouseAlive = filingStatus === 'mfj' && (spouseDeathAge === 0 || age <= spouseDeathAge);
@@ -587,8 +617,8 @@ function projectArc(inputs) {
     }
 
     // Roth Annuity (Layer 1 — GLWB, tax-free)
-    if (rothAnnuityMonthly > 0 && age >= rothAnnuityStartAge) {
-      const raAnnual = rothAnnuityMonthly * 12;
+    if (archRothAnnuityMonthly > 0 && age >= rothAnnuityStartAge) {
+      const raAnnual = archRothAnnuityMonthly * 12;
       row.sources.roth = (row.sources.roth || 0) + raAnnual;
       row.totalIncome += raAnnual;
       row.rothAnnuityIncome = raAnnual;
@@ -597,8 +627,8 @@ function projectArc(inputs) {
     // Non-Qualified Annuity (taxable over basis — exclusion ratio)
     // Exclusion ratio = basis / total contract value; that fraction of each payment is tax-free return of basis.
     // The remainder (gain portion) is ordinary income.
-    if (nonQualAnnuityMonthly > 0 && age >= nonQualAnnuityStartAge) {
-      const nqAnnual = nonQualAnnuityMonthly * 12;
+    if (archNonQualAnnuityMonthly > 0 && age >= nonQualAnnuityStartAge) {
+      const nqAnnual = archNonQualAnnuityMonthly * 12;
       // Exclusion ratio: if basis and total value provided, compute; else default 50% (conservative)
       const exclusionRatio = (nonQualAnnuityBasis > 0 && nonQualAnnuityTotalValue > 0)
         ? Math.min(nonQualAnnuityBasis / nonQualAnnuityTotalValue, 1.0)
@@ -614,10 +644,10 @@ function projectArc(inputs) {
 
     // ETA — Layer 3 IUL Policy Loan Income (IRC 7702 — tax-free, zero MAGI impact)
     // Income amount entered from advisor-run illustration (age, gender, health rating baked into illustration)
-    if (etaAnnualIncome > 0 && age >= etaStartAge) {
+    if (archEtaAnnualIncome > 0 && age >= etaStartAge) {
       const etaYrs = age - etaStartAge; // years since income started
       const etaThisYear = etaColaRate > 0
-        ? etaAnnualIncome * Math.pow(1 + etaColaRate, etaYrs)
+        ? archEtaAnnualIncome * Math.pow(1 + etaColaRate, etaYrs)
         : etaAnnualIncome;
       row.sources.eta = (row.sources.eta || 0) + etaThisYear;
       row.totalIncome += etaThisYear;
@@ -638,8 +668,8 @@ function projectArc(inputs) {
     // Traditional / IRA intentional draw (pre-RMD Roth Annuity conversion; ETA helps fund the tax cost)
     const tradDrawStart = tradDrawdownStartAge || retireAge;
     const tradDrawEnd = tradDrawdownEndAge || 72; // default: stop when RMDs begin
-    if (annualTradDrawdown > 0 && age >= tradDrawStart && age <= tradDrawEnd && trad > 0) {
-      const draw = Math.min(annualTradDrawdown, trad);
+    if (archAnnualTradDrawdown > 0 && age >= tradDrawStart && age <= tradDrawEnd && trad > 0) {
+      const draw = Math.min(archAnnualTradDrawdown, trad);
       row.sources.rmd = (row.sources.rmd || 0) + draw; // shows as trad/ordinary income
       row.totalIncome += draw;
       trad = Math.max(0, trad - draw);
@@ -648,8 +678,8 @@ function projectArc(inputs) {
     // Taxable brokerage intentional draw
     const taxableDrawStart = taxableDrawdownStartAge || retireAge;
     const taxableDrawEnd = taxableDrawdownEndAge || planToAge;
-    if (annualTaxableDrawdown > 0 && age >= taxableDrawStart && age <= taxableDrawEnd && taxable > 0) {
-      const draw = Math.min(annualTaxableDrawdown, taxable);
+    if (archAnnualTaxableDrawdown > 0 && age >= taxableDrawStart && age <= taxableDrawEnd && taxable > 0) {
+      const draw = Math.min(archAnnualTaxableDrawdown, taxable);
       row.sources.taxable = (row.sources.taxable || 0) + draw;
       row.totalIncome += draw;
       taxable = Math.max(0, taxable - draw);
@@ -658,8 +688,8 @@ function projectArc(inputs) {
     // Roth intentional draw
     const rothDrawStart = rothDrawdownStartAge || retireAge;
     const rothDrawEnd = rothDrawdownEndAge || planToAge;
-    if (annualRothDrawdown > 0 && age >= rothDrawStart && age <= rothDrawEnd && roth > 0) {
-      const draw = Math.min(annualRothDrawdown, roth);
+    if (archAnnualRothDrawdown > 0 && age >= rothDrawStart && age <= rothDrawEnd && roth > 0) {
+      const draw = Math.min(archAnnualRothDrawdown, roth);
       row.sources.roth = (row.sources.roth || 0) + draw;
       row.totalIncome += draw;
       roth = Math.max(0, roth - draw);
@@ -1077,6 +1107,17 @@ function ArcChart({ data, view, insuredData, sorrEnabled }) {
               <line x1={xScale(i)} x2={xScale(i)} y1={PAD.t} y2={PAD.t+chartH}
                 stroke="rgba(196,106,106,.4)" strokeWidth="1.5" strokeDasharray="3,3"/>
             )}
+            {/* ETA Funding Event marker */}
+            {d.etaFundingEvent && (
+              <g>
+                <line x1={xScale(i)} x2={xScale(i)} y1={PAD.t} y2={PAD.t+chartH}
+                  stroke="rgba(168,197,216,.6)" strokeWidth="2" strokeDasharray="4,3"/>
+                <text x={xScale(i)+4} y={PAD.t+14} textAnchor="start"
+                  fill="#A8C5D8" fontSize="9" fontFamily="DM Sans" fontWeight="700">
+                  ⚡ ETA
+                </text>
+              </g>
+            )}
             {/* SORR year overlay — shade the first 5 retirement years, only when SORR active */}
             {sorrEnabled && d.yearReturn !== undefined && i < 5 && (() => {
               const isNeg = d.yearReturn < 0;
@@ -1244,8 +1285,10 @@ function DataTable({ data }) {
         </thead>
         <tbody>
           {data.map((d,i)=>(
-            <tr key={d.age} style={{background: d.ltcEvent ? 'rgba(196,106,106,.06)' : i%2===0?'rgba(255,255,255,.015)':'transparent'}}>
-              <td style={{padding:'5px 8px',textAlign:'right',color:'#C8A96E',fontWeight:600}}>{d.age}</td>
+            <tr key={d.age} style={{background: d.etaFundingEvent ? 'rgba(168,197,216,.07)' : d.ltcEvent ? 'rgba(196,106,106,.06)' : i%2===0?'rgba(255,255,255,.015)':'transparent'}}>
+              <td style={{padding:'5px 8px',textAlign:'right',color:'#C8A96E',fontWeight:600}}>
+                {d.age}{d.etaFundingEvent && <span title={`ETA funding year — $${Math.round((d.etaFundingAmount||0)/1000)}K IRA repositioned`} style={{color:'#A8C5D8',marginLeft:3,cursor:'help'}}>⚡</span>}
+              </td>
               <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.ss.fill}}>{fmt$(d.sources.ss||0)}</td>
               <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.pension.fill}}>{fmt$(d.sources.pension||0)}</td>
               <td style={{padding:'5px 8px',textAlign:'right',color:'#4A9B7A'}}>{d.rothAnnuityIncome>0?fmt$(d.rothAnnuityIncome):'—'}</td>
@@ -1454,6 +1497,8 @@ function App() {
     traditionalBalance: 1000000, rothBalance: 0, taxableBalance: 250000,
     rothAnnuityMonthly: 0, rothAnnuityStartAge: 65,
     etaAnnualIncome: 0, etaStartAge: 70, etaFundingDraw: 0, etaColaRate: 0,
+    etaFundingAmount: 0, etaFundingAge: 0,
+    architectureEnabled: true,
     nonQualAnnuityMonthly: 0, nonQualAnnuityStartAge: 65, nonQualAnnuityBasis: 0, nonQualAnnuityTotalValue: 0,
     partTimeMonthly: 0, partTimeEndAge: 68,
     fixedExpenses: 5000, lifestyleExpenses: 3500,
@@ -1788,6 +1833,41 @@ function App() {
             <button className={`tab-btn ${view==='visual'?'active':''}`} onClick={()=>setView('visual')}>Visual Arc</button>
             <button className={`tab-btn ${view==='numbers'?'active':''}`} onClick={()=>setView('numbers')}>Number Table</button>
           </div>
+
+          {/* ── Architecture Toggle ── */}
+          <div
+            onClick={()=>set('architectureEnabled', !inputs.architectureEnabled)}
+            style={{
+              display:'flex',alignItems:'center',gap:8,
+              padding:'7px 13px',borderRadius:7,cursor:'pointer',
+              background: inputs.architectureEnabled ? 'rgba(200,169,110,.12)' : 'rgba(255,255,255,.04)',
+              border: inputs.architectureEnabled ? '1px solid rgba(200,169,110,.4)' : '1px solid rgba(255,255,255,.12)',
+              transition:'all .25s',userSelect:'none',
+            }}>
+            {/* Toggle pill */}
+            <div style={{
+              width:34,height:18,borderRadius:9,position:'relative',
+              background: inputs.architectureEnabled ? '#C8A96E' : 'rgba(255,255,255,.15)',
+              transition:'background .25s',flexShrink:0,
+            }}>
+              <div style={{
+                position:'absolute',top:2,
+                left: inputs.architectureEnabled ? 18 : 2,
+                width:14,height:14,borderRadius:'50%',background:'#fff',
+                transition:'left .2s',boxShadow:'0 1px 3px rgba(0,0,0,.3)',
+              }}/>
+            </div>
+            <div>
+              <div style={{fontSize:12,fontWeight:700,letterSpacing:'.06em',textTransform:'uppercase',
+                color: inputs.architectureEnabled ? '#C8A96E' : '#8DAFC8',lineHeight:1.1}}>
+                {inputs.architectureEnabled ? 'Architecture On' : 'Status Quo'}
+              </div>
+              <div style={{fontSize:10,color:'#8DAFC8',lineHeight:1.1,marginTop:1}}>
+                {inputs.architectureEnabled ? 'All layers active' : 'Layers disabled'}
+              </div>
+            </div>
+          </div>
+
           <button
             onClick={()=>{ setReportSent(false); setReportError(false); setReportModal(true); }}
             style={{
@@ -2229,6 +2309,50 @@ function App() {
                   <Field label="IRA Funding Draw (optional)" hint="Annual IRA/traditional draw used to fund premiums — enter here to see it in the Strategic Drawdown section; ETA bank structure eliminates the distribution tax on this amount">
                     <NumInput value={inputs.etaFundingDraw} onChange={v=>set('etaFundingDraw',v)} prefix="$" suffix="/yr"/>
                   </Field>
+
+                  {/* ── ETA Lump-Sum Repositioning Event ── */}
+                  <div style={{marginTop:10,paddingTop:10,borderTop:'1px solid rgba(168,197,216,.12)'}}>
+                    <div style={{fontSize:12,fontWeight:700,color:'#A8C5D8',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:8}}>
+                      IRA → ETA Repositioning Event
+                    </div>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
+                      <Field label="Lump-Sum Amount" hint="One-time IRA distribution repositioned into ETA policy. Reduces traditional balance permanently. Tax is financed via bank non-recourse loan — no cash flow impact.">
+                        <NumInput value={inputs.etaFundingAmount} onChange={v=>set('etaFundingAmount',v)} prefix="$"/>
+                      </Field>
+                      <Field label="Funding Age" hint="Age at which the repositioning occurs. Seasoning period before income begins is controlled by ETA Income Start Age above.">
+                        <NumInput value={inputs.etaFundingAge} onChange={v=>set('etaFundingAge',v)} suffix="yrs"/>
+                      </Field>
+                    </div>
+                    {inputs.etaFundingAmount > 0 && inputs.etaFundingAge > 0 && (() => {
+                      const amt = inputs.etaFundingAmount;
+                      const seasoning = Math.max(0, inputs.etaStartAge - inputs.etaFundingAge);
+                      const warn = seasoning < 10;
+                      return (
+                        <div style={{padding:'10px 12px',background:'rgba(168,197,216,.05)',border:`1px solid ${warn?'rgba(200,160,48,.35)':'rgba(168,197,216,.18)'}`,borderRadius:7}}>
+                          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginBottom:warn?8:0}}>
+                            <div style={{textAlign:'center'}}>
+                              <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>IRA Reduction</div>
+                              <div style={{fontSize:15,fontWeight:600,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif"}}>−${amt>=1000000?(amt/1000000).toFixed(1)+'M':Math.round(amt/1000)+'K'}</div>
+                              <div style={{fontSize:11,color:'#8DAFC8'}}>Pre-tax balance</div>
+                            </div>
+                            <div style={{textAlign:'center'}}>
+                              <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Tax Financed</div>
+                              <div style={{fontSize:15,fontWeight:600,color:'#4A9B7A',fontFamily:"'Cormorant Garamond',serif"}}>Bank loan</div>
+                              <div style={{fontSize:11,color:'#8DAFC8'}}>No cash flow impact</div>
+                            </div>
+                            <div style={{textAlign:'center'}}>
+                              <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Seasoning</div>
+                              <div style={{fontSize:15,fontWeight:600,color:warn?'#C8A030':'#A8C5D8',fontFamily:"'Cormorant Garamond',serif"}}>{seasoning} yrs</div>
+                              <div style={{fontSize:11,color:'#8DAFC8'}}>Age {inputs.etaFundingAge} → {inputs.etaStartAge}</div>
+                            </div>
+                          </div>
+                          {warn && <div style={{fontSize:11,color:'#C8A030',paddingTop:6,borderTop:'1px solid rgba(200,160,48,.2)'}}>⚠ Seasoning period under 10 years — confirm policy illustration supports this timeline.</div>}
+                          <div style={{fontSize:11,color:'#8DAFC8',marginTop:6,lineHeight:1.5}}>
+                            "Take your medicine today, so you don't have to hurt tomorrow." — Marginal rate elevated in funding year only. IRA reduction cascades into smaller RMDs and lower lifetime tax exposure.
+                          </div>
+                        </div>
+                      );
+                    })()}
                   {inputs.etaFundingDraw > 0 && (() => {
                     const gross = inputs.etaFundingDraw;
                     const estTaxRate = 0.24; // conservative illustration — advisor adjusts based on actual bracket
@@ -2584,6 +2708,25 @@ function App() {
                 </div>
                 <div style={{fontSize:13,color:'#DDD6C4',lineHeight:1.6}}>
                   Returns overridden for first 5 retirement years: <strong style={{color:'#C47A7A'}}>−18%, +4%, −14%, +5%, −10%</strong>. This illustrates how early negative returns — while withdrawals are ongoing — can permanently impair portfolio longevity far beyond what average-return projections suggest. Compare portfolio balance at age 90 vs the base scenario.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Status Quo Banner */}
+          {!inputs.architectureEnabled && (
+            <div style={{
+              marginBottom:16,padding:'12px 16px',borderRadius:10,
+              background:'rgba(255,255,255,.03)',border:'1px solid rgba(255,255,255,.12)',
+              display:'flex',alignItems:'center',gap:12,
+            }}>
+              <div style={{fontSize:22}}>⚪</div>
+              <div>
+                <div style={{fontSize:13,fontWeight:700,color:'#8DAFC8',letterSpacing:'.07em',textTransform:'uppercase',marginBottom:2}}>
+                  Status Quo View — IncomeArc™ Layers Disabled
+                </div>
+                <div style={{fontSize:13,color:'#8DAFC8',lineHeight:1.5}}>
+                  Showing retirement without Roth Annuity (L1), ETA (L3), or strategic drawdown. Toggle <strong style={{color:'#C8A96E'}}>Architecture On</strong> to restore the full plan and compare.
                 </div>
               </div>
             </div>
