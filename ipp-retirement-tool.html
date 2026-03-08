@@ -1696,11 +1696,19 @@ function App() {
     portfolioReturn: inputs.portfolioReturn / 100,
     inflation: inputs.inflation / 100,
   };
-  const { years, confidence, fixedStreams, mcStartAge } = projectArc({ ...baseProjectionInputs, ltcInsured: false });
+  // Primary projection — NO LTC shock. This is the clean baseline plan survival score
+  // regardless of any healthcare event inputs. The main confidence score reflects the
+  // plan's fundamental strength (income, portfolio, architecture) without a care shock.
+  const { years, confidence, fixedStreams, mcStartAge } = projectArc({ ...baseProjectionInputs, ltcInsured: false, ltcEventAge: 0 });
 
-  // Insured comparison — run second projection with benefit covering LTC costs
-  // Tied to architecture toggle: Layer 2 comparison only shows when architecture is enabled
+  // LTC comparison projections — only when architecture is enabled and LTC inputs are set.
+  // These two scores are used exclusively in the Layer 2 Healthcare panel comparison.
+  // confidenceUninsured = plan survival WITH a care event and NO policy (shock applied)
+  // confidenceInsured   = plan survival WITH a care event and Layer 2 policy (shock absorbed)
   const showLtcComparison = inputs.architectureEnabled && inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
+  const { years: yearsUninsured, confidence: confidenceUninsured } = showLtcComparison
+    ? projectArc({ ...baseProjectionInputs, ltcInsured: false })
+    : { years: null, confidence: null };
   const { years: yearsInsured, confidence: confidenceInsured } = showLtcComparison
     ? projectArc({ ...baseProjectionInputs, ltcInsured: true })
     : { years: null, confidence: null };
@@ -3264,8 +3272,8 @@ function App() {
                   <span style={{color:'#4A9B7A'}}>Portfolio Preserved</span>
                 </div>
                 {/* Dual Monte Carlo Confidence Comparison */}
-                {confidenceInsured !== null && (() => {
-                  const delta = confidenceInsured - confidence;
+                {confidenceInsured !== null && confidenceUninsured !== null && (() => {
+                  const delta = confidenceInsured - confidenceUninsured;
                   const deltaColor = delta > 0 ? '#4A9B7A' : delta < 0 ? '#C47A7A' : '#8DAFC8';
                   const barW = (pct) => `${Math.max(4, pct)}%`;
                   return (
@@ -3274,25 +3282,25 @@ function App() {
                         {/* Column headers aligned with data below */}
                         <div style={{fontSize:12,fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'#C47A7A'}}>
                           WITHOUT LAYER 2
-                          <span style={{fontWeight:400,marginLeft:6,color:'#5A7A8A',fontSize:11}}>· 500 trials · full retirement span</span>
+                          <span style={{fontWeight:400,marginLeft:6,color:'#5A7A8A',fontSize:11}}>· care event, no policy</span>
                         </div>
                         <div style={{fontSize:12,fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'#4A9B7A'}}>
                           WITH LAYER 2
-                          <span style={{fontWeight:400,marginLeft:6,color:'#5A7A8A',fontSize:11}}>· care cost shock removed</span>
+                          <span style={{fontWeight:400,marginLeft:6,color:'#5A7A8A',fontSize:11}}>· care cost shock absorbed</span>
                         </div>
                       </div>
                       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:10}}>
-                        {/* Without Layer 2 */}
+                        {/* Without Layer 2 — uninsured shock applied */}
                         <div>
                           <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:6}}>
-                            <span style={{fontSize:28,fontWeight:700,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif"}}>{confidence}%</span>
+                            <span style={{fontSize:28,fontWeight:700,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif"}}>{confidenceUninsured}%</span>
                           </div>
                           <div style={{height:8,background:'rgba(255,255,255,.06)',borderRadius:4,overflow:'hidden'}}>
-                            <div style={{height:'100%',width:barW(confidence),background:'#C47A7A',borderRadius:4,transition:'width .6s ease'}}/>
+                            <div style={{height:'100%',width:barW(confidenceUninsured),background:'#C47A7A',borderRadius:4,transition:'width .6s ease'}}/>
                           </div>
                           <div style={{fontSize:11,color:'#8DAFC8',marginTop:4}}>Portfolio depleted by {fmtD(trueTotalCost)} in care years</div>
                         </div>
-                        {/* With Layer 2 */}
+                        {/* With Layer 2 — insured, no shock */}
                         <div>
                           <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:6}}>
                             <span style={{fontSize:28,fontWeight:700,color:'#4A9B7A',fontFamily:"'Cormorant Garamond',serif"}}>{confidenceInsured}%</span>
@@ -3307,7 +3315,7 @@ function App() {
                         {delta > 0
                           ? `Layer 2 improves plan survival confidence by +${delta} percentage points`
                           : delta < 0
-                          ? `Layer 2 reduces confidence by ${delta} pts (review benefit sizing)`
+                          ? `Layer 2 reduces confidence by ${Math.abs(delta)} pts (review benefit sizing)`
                           : 'No confidence difference — benefit fully offset by premium cost'}
                       </div>
                     </div>
