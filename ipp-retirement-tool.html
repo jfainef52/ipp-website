@@ -846,9 +846,7 @@ function projectArc(inputs) {
     // LTC event — net cost after any Layer 2 benefit coverage
     if (ltcEventAge > 0 && age >= ltcEventAge && age < ltcEventAge + ltcDuration) {
       const ltcAnnualCost = ltcMonthlyCost * 12;
-      const benefitCoverage = ltcInsured
-        ? Math.min((ltcMonthlyBenefit || ltcMonthlyCost) * 12, ltcAnnualCost)
-        : 0;
+      const benefitCoverage = ltcInsured ? ltcAnnualCost : 0;
       const uncoveredLtcCost = ltcAnnualCost - benefitCoverage;
       expenses += uncoveredLtcCost;
       row.ltcEvent = true;
@@ -860,9 +858,7 @@ function projectArc(inputs) {
     // Spouse LTC event — same mechanics, independent age/cost/duration
     if (spouseLtcEventAge > 0 && age >= spouseLtcEventAge && age < spouseLtcEventAge + spouseLtcDuration) {
       const spLtcAnnualCost = spouseLtcMonthlyCost * 12;
-      const spBenefitCoverage = spouseLtcInsured
-        ? Math.min((spouseLtcMonthlyBenefit || spouseLtcMonthlyCost) * 12, spLtcAnnualCost)
-        : 0;
+      const spBenefitCoverage = spouseLtcInsured ? spLtcAnnualCost : 0;
       const spUncoveredLtcCost = spLtcAnnualCost - spBenefitCoverage;
       expenses += spUncoveredLtcCost;
       row.spouseLtcEvent = true;
@@ -3199,9 +3195,9 @@ function App() {
                     </div>
                     {!inputs.architectureEnabled && <span style={{fontSize:11,color:'#6B8FA8',fontStyle:'italic'}}>activates with Architecture</span>}
                   </div>
-                  <Field label="Monthly Benefit" hint="Match or offset the care cost">
-                    <NumInput value={inputs.ltcMonthlyBenefit||inputs.ltcMonthlyCost} onChange={v=>set('ltcMonthlyBenefit',v)} prefix="$" suffix="/mo"/>
-                  </Field>
+                  <div style={{fontSize:12,color:'#8DAFC8',lineHeight:1.5}}>
+                    Full care cost covered · Policy benefit matches the monthly care cost entered above.
+                  </div>
                 </div>
 
                 {/* LTC Policy Funding Draw — always visible for pre-fill; engine gates on architectureEnabled */}
@@ -3287,9 +3283,9 @@ function App() {
                       </div>
                       {!inputs.architectureEnabled && <span style={{fontSize:11,color:'#6B8FA8',fontStyle:'italic'}}>activates with Architecture</span>}
                     </div>
-                    <Field label="Monthly Benefit" hint="Match or offset the spouse care cost">
-                      <NumInput value={inputs.spouseLtcMonthlyBenefit||inputs.spouseLtcMonthlyCost} onChange={v=>set('spouseLtcMonthlyBenefit',v)} prefix="$" suffix="/mo"/>
-                    </Field>
+                    <div style={{fontSize:12,color:'#8DAFC8',lineHeight:1.5}}>
+                      Full care cost covered · Policy benefit matches the monthly care cost entered above.
+                    </div>
                   </div>
 
                   {/* Spouse LTC Policy Funding Draw — always visible for pre-fill; engine gates on architectureEnabled */}
