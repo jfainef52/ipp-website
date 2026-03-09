@@ -2469,7 +2469,7 @@ function App() {
                 <div style={{marginTop:14,paddingTop:12,borderTop:'1px solid rgba(255,255,255,.06)',fontSize:13,fontWeight:700,color:'#9EB8CC',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:6}}>
                   Spouse
                 </div>
-                <Field label="Spouse Traditional / Pre-Tax" hint="Spouse's 401(k), IRA, 403(b) — RMD schedule based on spouse's age">
+                <Field label="Spouse Traditional / Pre-Tax" hint="Spouse's 401(k), IRA, 403(b) — grown to primary's retirement age. If spouse is significantly younger and still contributing, enter the projected value at primary's retirement date instead.">
                   <NumInput value={inputs.spouseTraditionalBalance} onChange={v=>set('spouseTraditionalBalance',v)} prefix="$"/>
                 </Field>
                 {inputs.spouseTraditionalBalance > 0 && (
@@ -2479,7 +2479,7 @@ function App() {
                 )}
                 {/* Spouse contributions — only if pre-retirement */}
                 {inputs.currentAge < inputs.retireAge && <>
-                  <Field label="Spouse Annual Contribution" hint="Spouse's annual 401(k) or IRA contribution — grows tax-deferred to retirement">
+                  <Field label="Spouse Annual Contribution" hint="Spouse's annual 401(k) or IRA contribution — applied through primary's retirement age. RMD schedule still runs on spouse's age regardless.">
                     <NumInput value={inputs.annualSpouseTradContribution} onChange={v=>set('annualSpouseTradContribution',v)} prefix="$" suffix="/yr"/>
                   </Field>
                   {inputs.annualSpouseTradContribution > 0 && (
