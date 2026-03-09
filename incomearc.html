@@ -739,8 +739,310 @@
     footer { flex-direction: column; padding: 40px 24px; }
     .footer-links { align-items: flex-start; }
   }
+
+  /* ── LTC SECTION ── */
+  .ltc-section {
+    background: var(--navy2);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .ltc-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 80px;
+    align-items: start;
+  }
+
+  .ltc-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-top: 48px;
+  }
+
+  .ltc-stat {
+    background: var(--navy3);
+    border: 1px solid var(--border);
+    border-top: 3px solid var(--gold);
+    padding: 28px 24px;
+  }
+
+  .ltc-stat-value {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 42px;
+    font-weight: 300;
+    color: var(--gold);
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+
+  .ltc-stat-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--off-white);
+    margin-bottom: 10px;
+  }
+
+  .ltc-stat-desc {
+    font-size: 13px;
+    color: var(--warm);
+    line-height: 1.6;
+  }
+
+  .ltc-stat-source {
+    font-size: 11px;
+    color: var(--gray);
+    margin-top: 8px;
+    font-style: italic;
+  }
+
+  .ltc-mechanism {
+    background: var(--navy3);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--gold);
+    padding: 40px;
+    margin-top: 0;
+  }
+
+  .ltc-mechanism-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--gold);
+    margin-bottom: 24px;
+    letter-spacing: 0.02em;
+  }
+
+  .ltc-scenario {
+    margin-bottom: 28px;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .ltc-scenario:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+
+  .ltc-scenario-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 8px;
+  }
+
+  .ltc-scenario-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--off-white);
+    margin-bottom: 8px;
+  }
+
+  .ltc-scenario-desc {
+    font-size: 14px;
+    color: var(--warm);
+    line-height: 1.7;
+  }
+
+  .ltc-affluent-box {
+    background: var(--navy);
+    border: 1px solid var(--gold-dim);
+    padding: 32px;
+    margin-top: 32px;
+  }
+
+  .ltc-affluent-box p {
+    font-size: 15px;
+    color: var(--warm);
+    line-height: 1.8;
+  }
+
+  .ltc-affluent-box p + p {
+    margin-top: 16px;
+  }
+
+  .ltc-quote {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 20px;
+    font-style: italic;
+    font-weight: 300;
+    color: var(--gold2);
+    line-height: 1.6;
+    margin-top: 32px;
+    padding-top: 32px;
+    border-top: 1px solid var(--border);
+  }
+
+  @media (max-width: 900px) {
+    .ltc-grid { grid-template-columns: 1fr; gap: 48px; }
+    .ltc-stats { grid-template-columns: 1fr 1fr; }
+  }
+
+  @media (max-width: 600px) {
+    .ltc-stats { grid-template-columns: 1fr; }
+  }
+
 </style>
-<style>.hero { background-image:linear-gradient(135deg,rgba(8,18,38,0.88) 0%,rgba(8,18,38,0.70) 55%,rgba(15,30,58,0.50) 100%), url('https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1800&q=80&fit=crop');background-size:cover;background-position:center 30%;background-repeat:no-repeat; }</style>
+<style>.hero { background-image:linear-gradient(135deg,rgba(8,18,38,0.88) 0%,rgba(8,18,38,0.70) 55%,rgba(15,30,58,0.50) 100%), url('https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1800&q=80&fit=crop');background-size:cover;background-position:center 30%;background-repeat:no-repeat; }
+  /* ── LTC SECTION ── */
+  .ltc-section {
+    background: var(--navy2);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .ltc-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 80px;
+    align-items: start;
+  }
+
+  .ltc-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-top: 48px;
+  }
+
+  .ltc-stat {
+    background: var(--navy3);
+    border: 1px solid var(--border);
+    border-top: 3px solid var(--gold);
+    padding: 28px 24px;
+  }
+
+  .ltc-stat-value {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 42px;
+    font-weight: 300;
+    color: var(--gold);
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+
+  .ltc-stat-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--off-white);
+    margin-bottom: 10px;
+  }
+
+  .ltc-stat-desc {
+    font-size: 13px;
+    color: var(--warm);
+    line-height: 1.6;
+  }
+
+  .ltc-stat-source {
+    font-size: 11px;
+    color: var(--gray);
+    margin-top: 8px;
+    font-style: italic;
+  }
+
+  .ltc-mechanism {
+    background: var(--navy3);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--gold);
+    padding: 40px;
+    margin-top: 0;
+  }
+
+  .ltc-mechanism-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--gold);
+    margin-bottom: 24px;
+    letter-spacing: 0.02em;
+  }
+
+  .ltc-scenario {
+    margin-bottom: 28px;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .ltc-scenario:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+
+  .ltc-scenario-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 8px;
+  }
+
+  .ltc-scenario-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--off-white);
+    margin-bottom: 8px;
+  }
+
+  .ltc-scenario-desc {
+    font-size: 14px;
+    color: var(--warm);
+    line-height: 1.7;
+  }
+
+  .ltc-affluent-box {
+    background: var(--navy);
+    border: 1px solid var(--gold-dim);
+    padding: 32px;
+    margin-top: 32px;
+  }
+
+  .ltc-affluent-box p {
+    font-size: 15px;
+    color: var(--warm);
+    line-height: 1.8;
+  }
+
+  .ltc-affluent-box p + p {
+    margin-top: 16px;
+  }
+
+  .ltc-quote {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 20px;
+    font-style: italic;
+    font-weight: 300;
+    color: var(--gold2);
+    line-height: 1.6;
+    margin-top: 32px;
+    padding-top: 32px;
+    border-top: 1px solid var(--border);
+  }
+
+  @media (max-width: 900px) {
+    .ltc-grid { grid-template-columns: 1fr; gap: 48px; }
+    .ltc-stats { grid-template-columns: 1fr 1fr; }
+  }
+
+  @media (max-width: 600px) {
+    .ltc-stats { grid-template-columns: 1fr; }
+  }
+
+</style>
 </head>
 <body>
 
@@ -754,7 +1056,158 @@
       .st0 {
         fill: #C8A96E;
       }
-    </style>
+    
+  /* ── LTC SECTION ── */
+  .ltc-section {
+    background: var(--navy2);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .ltc-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 80px;
+    align-items: start;
+  }
+
+  .ltc-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-top: 48px;
+  }
+
+  .ltc-stat {
+    background: var(--navy3);
+    border: 1px solid var(--border);
+    border-top: 3px solid var(--gold);
+    padding: 28px 24px;
+  }
+
+  .ltc-stat-value {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 42px;
+    font-weight: 300;
+    color: var(--gold);
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+
+  .ltc-stat-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--off-white);
+    margin-bottom: 10px;
+  }
+
+  .ltc-stat-desc {
+    font-size: 13px;
+    color: var(--warm);
+    line-height: 1.6;
+  }
+
+  .ltc-stat-source {
+    font-size: 11px;
+    color: var(--gray);
+    margin-top: 8px;
+    font-style: italic;
+  }
+
+  .ltc-mechanism {
+    background: var(--navy3);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--gold);
+    padding: 40px;
+    margin-top: 0;
+  }
+
+  .ltc-mechanism-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--gold);
+    margin-bottom: 24px;
+    letter-spacing: 0.02em;
+  }
+
+  .ltc-scenario {
+    margin-bottom: 28px;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .ltc-scenario:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+
+  .ltc-scenario-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 8px;
+  }
+
+  .ltc-scenario-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--off-white);
+    margin-bottom: 8px;
+  }
+
+  .ltc-scenario-desc {
+    font-size: 14px;
+    color: var(--warm);
+    line-height: 1.7;
+  }
+
+  .ltc-affluent-box {
+    background: var(--navy);
+    border: 1px solid var(--gold-dim);
+    padding: 32px;
+    margin-top: 32px;
+  }
+
+  .ltc-affluent-box p {
+    font-size: 15px;
+    color: var(--warm);
+    line-height: 1.8;
+  }
+
+  .ltc-affluent-box p + p {
+    margin-top: 16px;
+  }
+
+  .ltc-quote {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 20px;
+    font-style: italic;
+    font-weight: 300;
+    color: var(--gold2);
+    line-height: 1.6;
+    margin-top: 32px;
+    padding-top: 32px;
+    border-top: 1px solid var(--border);
+  }
+
+  @media (max-width: 900px) {
+    .ltc-grid { grid-template-columns: 1fr; gap: 48px; }
+    .ltc-stats { grid-template-columns: 1fr 1fr; }
+  }
+
+  @media (max-width: 600px) {
+    .ltc-stats { grid-template-columns: 1fr; }
+  }
+
+</style>
   </defs>
   <g>
     <rect class="st0" x="914.76" y="2074.65" width="228.09" height="228.09"/>
@@ -884,9 +1337,9 @@
       </div>
       <div class="problem-card reveal reveal-delay-2">
         <div class="problem-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/><line x1="12" y1="10" x2="12" y2="14"/><line x1="10" y1="12" x2="14" y2="12"/></svg></div>
-        <div class="problem-title">What happens if I need long-term care — and what does that do to my family?</div>
+        <div class="problem-title">What happens if I need long-term care — and am I handling it as efficiently as I think?</div>
         <p class="problem-desc">
-          Long-term care is the single most common financial catastrophe in retirement. It depletes assets rapidly, disrupts family dynamics, and often goes completely unplanned for. IncomeArc™ incorporates a structured approach to long-term care risk that doesn't require a separate, expensive standalone policy.
+          Nearly 70% of people who reach 65 will need long-term care. Annual nursing home costs now exceed $111,000 — rising 7–9% per year — and none of it is covered by Medicare. People with significant assets assume they can self-fund it. They're probably right. But every dollar withdrawn from an IRA or 401(k) to pay for care must first survive the IRS — meaning a $100,000 care bill may require a $140,000–$150,000 withdrawal. Then the compounding on that capital is gone permanently. IncomeArc™ addresses this with a structure where the premium is never wasted: care coverage if needed, tax-free wealth if not.
         </p>
       </div>
       <div class="problem-card reveal">
@@ -960,6 +1413,106 @@
         <div class="layer-content">
           <div class="layer-name">Liquidity & Income Bridge</div>
           <p class="layer-desc">The retained qualified plan balance that serves as your early-retirement income source while the long-horizon layers are building, and as a reserve for unplanned large expenses throughout retirement. Managed strategically to reduce future RMD exposure — every dollar drawn down now is a dollar that won't generate a mandatory, taxable distribution later.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── LTC SECTION ── -->
+<section class="ltc-section" id="long-term-care">
+  <div class="section-inner">
+    <div class="ltc-grid">
+      <div>
+        <div class="section-label reveal">The Risk Even Wealth Doesn't Eliminate</div>
+        <h2 class="section-title reveal reveal-delay-1">
+          Most affluent families assume<br>they can self-fund<br><em>long-term care.</em>
+        </h2>
+        <div class="body-text reveal reveal-delay-2">
+          <p>
+            They're probably right. A long-term care event likely won't bankrupt them. But here's what the math actually shows: when care costs are funded from a taxable IRA or 401(k), every dollar withdrawn must first survive the IRS. To net $100,000 for care, you may need to withdraw $140,000–$150,000 or more. Multiply that across a multi-year care event and you've permanently eliminated the compounding that capital would have generated for decades.
+          </p>
+          <p style="margin-top: 20px;">
+            According to Morningstar, a couple who experiences a long-term care event sees their wealth decline by an average of 21% over nine years. They don't go broke. But the financial architecture they spent a lifetime building takes a hit it never fully recovers from.
+          </p>
+        </div>
+
+        <div class="ltc-stats">
+          <div class="ltc-stat reveal">
+            <div class="ltc-stat-value">70%</div>
+            <div class="ltc-stat-label">Will need care</div>
+            <p class="ltc-stat-desc">Nearly 7 in 10 people reaching age 65 will develop a significant long-term care need before they die.</p>
+            <p class="ltc-stat-source">U.S. Dept. of Health & Human Services</p>
+          </div>
+          <div class="ltc-stat reveal reveal-delay-1">
+            <div class="ltc-stat-value">$138K</div>
+            <div class="ltc-stat-label">Average lifetime need</div>
+            <p class="ltc-stat-desc">Estimated average cost of long-term support services per person — with families paying 37% directly out of pocket.</p>
+            <p class="ltc-stat-source">HHS, 2022</p>
+          </div>
+          <div class="ltc-stat reveal reveal-delay-1">
+            <div class="ltc-stat-value">$111K+</div>
+            <div class="ltc-stat-label">Per year, nursing home</div>
+            <p class="ltc-stat-desc">2024 national median cost of a semi-private nursing home room — up 7% in a single year. A private room: $127,750.</p>
+            <p class="ltc-stat-source">Genworth/CareScout Cost of Care Survey, 2024</p>
+          </div>
+          <div class="ltc-stat reveal reveal-delay-2">
+            <div class="ltc-stat-value">21%</div>
+            <div class="ltc-stat-label">Wealth decline</div>
+            <p class="ltc-stat-desc">Average wealth reduction for a couple experiencing a long-term care event, measured over nine years.</p>
+            <p class="ltc-stat-source">Morningstar</p>
+          </div>
+        </div>
+
+        <div class="ltc-affluent-box reveal">
+          <p>
+            Washington State became the first in the nation to pass a mandatory long-term care payroll tax — because the burden on the state's Medicaid system had become unsustainable. That mandatory tax produces a lifetime benefit of $36,500. At current costs, that covers roughly <strong style="color: var(--off-white);">three months</strong> of nursing home care.
+          </p>
+          <p>
+            Medicaid is the backstop for those without a plan — but only after savings are spent down to $2,000. That threshold disqualifies nearly everyone reading this page.
+          </p>
+        </div>
+      </div>
+
+      <div>
+        <div class="ltc-mechanism reveal">
+          <div class="ltc-mechanism-title">The IncomeArc™ Approach to Long-Term Care</div>
+
+          <div class="ltc-scenario">
+            <div class="ltc-scenario-label">The Old Problem</div>
+            <div class="ltc-scenario-title">Use it or lose it</div>
+            <p class="ltc-scenario-desc">
+              Traditional standalone LTC insurance carried a legitimate objection: if you stayed healthy and never needed care, the premiums were gone. That concern was valid. It stopped millions of smart, otherwise well-insured people from addressing one of the largest financial risks they faced.
+            </p>
+          </div>
+
+          <div class="ltc-scenario">
+            <div class="ltc-scenario-label">If Care Is Needed</div>
+            <div class="ltc-scenario-title">The death benefit accelerates — tax-free</div>
+            <p class="ltc-scenario-desc">
+              When a qualifying care event occurs, the living benefit rider activates and allows the death benefit to be accelerated on a tax-free basis to fund care costs. The investment portfolio stays untouched. Income from the other layers continues uninterrupted. The care event doesn't collapse the plan.
+            </p>
+          </div>
+
+          <div class="ltc-scenario">
+            <div class="ltc-scenario-label">If Care Is Never Needed</div>
+            <div class="ltc-scenario-title">The policy builds wealth and legacy</div>
+            <p class="ltc-scenario-desc">
+              The policy's cash value accumulates tax-deferred with a 0% floor on indexed years. It can be accessed as tax-free supplemental income during retirement — or passes as a tax-free death benefit to heirs. No premium is ever wasted. Every scenario produces value.
+            </p>
+          </div>
+
+          <div class="ltc-scenario">
+            <div class="ltc-scenario-label">The Funding Reframe</div>
+            <div class="ltc-scenario-title">Dollars the IRS was already going to claim</div>
+            <p class="ltc-scenario-desc">
+              For clients with significant IRA or 401(k) assets, the funding mechanism changes the entire equation. A portion of those pre-tax dollars — assets already carrying a deferred tax liability — can be repositioned into this structure. You're not spending retirement money. You're converting dollars the government was already going to take into a dual-purpose asset: protected care coverage if needed, tax-free wealth if not.
+            </p>
+          </div>
+
+          <div class="ltc-quote">
+            "People who built real wealth got there by making efficient decisions when they saw them. This is one of them."
+          </div>
         </div>
       </div>
     </div>
@@ -1067,7 +1620,158 @@
       .st0 {
         fill: #C8A96E;
       }
-    </style>
+    
+  /* ── LTC SECTION ── */
+  .ltc-section {
+    background: var(--navy2);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .ltc-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 80px;
+    align-items: start;
+  }
+
+  .ltc-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-top: 48px;
+  }
+
+  .ltc-stat {
+    background: var(--navy3);
+    border: 1px solid var(--border);
+    border-top: 3px solid var(--gold);
+    padding: 28px 24px;
+  }
+
+  .ltc-stat-value {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 42px;
+    font-weight: 300;
+    color: var(--gold);
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+
+  .ltc-stat-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--off-white);
+    margin-bottom: 10px;
+  }
+
+  .ltc-stat-desc {
+    font-size: 13px;
+    color: var(--warm);
+    line-height: 1.6;
+  }
+
+  .ltc-stat-source {
+    font-size: 11px;
+    color: var(--gray);
+    margin-top: 8px;
+    font-style: italic;
+  }
+
+  .ltc-mechanism {
+    background: var(--navy3);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--gold);
+    padding: 40px;
+    margin-top: 0;
+  }
+
+  .ltc-mechanism-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--gold);
+    margin-bottom: 24px;
+    letter-spacing: 0.02em;
+  }
+
+  .ltc-scenario {
+    margin-bottom: 28px;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .ltc-scenario:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+
+  .ltc-scenario-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 8px;
+  }
+
+  .ltc-scenario-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--off-white);
+    margin-bottom: 8px;
+  }
+
+  .ltc-scenario-desc {
+    font-size: 14px;
+    color: var(--warm);
+    line-height: 1.7;
+  }
+
+  .ltc-affluent-box {
+    background: var(--navy);
+    border: 1px solid var(--gold-dim);
+    padding: 32px;
+    margin-top: 32px;
+  }
+
+  .ltc-affluent-box p {
+    font-size: 15px;
+    color: var(--warm);
+    line-height: 1.8;
+  }
+
+  .ltc-affluent-box p + p {
+    margin-top: 16px;
+  }
+
+  .ltc-quote {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 20px;
+    font-style: italic;
+    font-weight: 300;
+    color: var(--gold2);
+    line-height: 1.6;
+    margin-top: 32px;
+    padding-top: 32px;
+    border-top: 1px solid var(--border);
+  }
+
+  @media (max-width: 900px) {
+    .ltc-grid { grid-template-columns: 1fr; gap: 48px; }
+    .ltc-stats { grid-template-columns: 1fr 1fr; }
+  }
+
+  @media (max-width: 600px) {
+    .ltc-stats { grid-template-columns: 1fr; }
+  }
+
+</style>
   </defs>
   <g>
     <rect class="st0" x="914.76" y="2074.65" width="228.09" height="228.09"/>
@@ -1131,6 +1835,6 @@
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="ipp-design-improvements.js?v=10"></script>
+<script src="ipp-design-improvements.js?v=10"></script>
 </body>
 </html>
