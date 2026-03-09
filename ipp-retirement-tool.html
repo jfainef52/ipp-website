@@ -2547,6 +2547,7 @@ function App() {
               </Section>
             )}
 
+            {inputs.filingStatus === 'mfj' && (
             <Section title="Surviving Spouse Scenario" collapsed={sections.widower} onToggle={()=>toggleSection('widower')}>
               <Field label="Primary Dies at Age" hint="Enter 0 to exclude · Assumes primary has died at this age — surviving spouse receives SS survivor benefit, IRMAA shifts to single brackets, and tax brackets compress">
                 <NumInput value={inputs.primaryDeathAge} onChange={v=>set('primaryDeathAge',v)} suffix="yrs (primary age)"/>
@@ -2564,6 +2565,7 @@ function App() {
                 </div>
               )}
             </Section>
+            )}
 
             <Section title="Pension" collapsed={sections.pension} onToggle={()=>toggleSection('pension')}>
 
