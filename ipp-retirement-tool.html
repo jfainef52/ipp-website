@@ -1083,9 +1083,6 @@ function projectArc(inputs) {
       : undefined;
     const stateTax = calcStateTax(row.sources, stateCode, inflFactor, effectiveStateRate, stressAdder);
 
-    row.federalTax = taxResult.totalTax;
-    row.stateTax   = stateTax;
-    row.estimatedTax = taxResult.totalTax + stateTax;
     row.effectiveTaxRate = taxResult.effectiveRate;
     row.marginalFedRate = taxResult.marginalRate;
     // All-in marginal = federal marginal + state effective rate on top dollar
@@ -1123,6 +1120,14 @@ function projectArc(inputs) {
       }
       delete row._conversionOveragePending;
     }
+
+    // estimatedTax captured here — after overage gross-up resolves so the tax on
+    // the gross-up draw (which increased totalIncome) is fully reflected.
+    // grossUp tax ≈ grossUp × allInRate, already baked into the re-run of calcAnnualTax implicitly
+    // via the income stack. We approximate by adding overageTax to the base federal tax.
+    row.federalTax = taxResult.totalTax + (row.rothConversionOverageTax || 0);
+    row.stateTax   = stateTax + (row.rothConversionOverage || 0) * stateEffRate;
+    row.estimatedTax = row.federalTax + row.stateTax;
 
     // Capture gross income (pre-tax, excludes overage gross-up draw which is a tax-covering draw not spendable income)
     row.grossIncome = row.totalIncome - (row.rothConversionOverage || 0);
