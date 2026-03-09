@@ -844,6 +844,203 @@
     footer { flex-direction: column; align-items: flex-start; }
     .footer-links { align-items: flex-start; }
   }
+
+  /* ── LTC SECTION (HOMEPAGE) ── */
+  .ltc-home-section {
+    background: var(--navy2);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .ltc-home-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 100px 48px;
+  }
+
+  .ltc-home-header {
+    text-align: center;
+    max-width: 760px;
+    margin: 0 auto 72px;
+  }
+
+  .ltc-home-header .section-label {
+    display: inline-block;
+    margin-bottom: 20px;
+  }
+
+  .ltc-home-header h2 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(36px, 5vw, 56px);
+    font-weight: 300;
+    line-height: 1.15;
+    color: var(--off-white);
+    margin-bottom: 24px;
+  }
+
+  .ltc-home-header h2 em {
+    font-style: italic;
+    color: var(--gold);
+  }
+
+  .ltc-home-header p {
+    font-size: 17px;
+    color: var(--warm);
+    line-height: 1.8;
+  }
+
+  .ltc-home-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 2px;
+    margin-bottom: 64px;
+    background: var(--border);
+  }
+
+  .ltc-home-stat {
+    background: var(--navy3);
+    padding: 36px 28px;
+    text-align: center;
+  }
+
+  .ltc-home-stat-value {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 52px;
+    font-weight: 300;
+    color: var(--gold);
+    line-height: 1;
+    margin-bottom: 10px;
+  }
+
+  .ltc-home-stat-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--off-white);
+    margin-bottom: 12px;
+  }
+
+  .ltc-home-stat-desc {
+    font-size: 13px;
+    color: var(--warm);
+    line-height: 1.6;
+  }
+
+  .ltc-home-stat-source {
+    font-size: 11px;
+    color: var(--gray);
+    margin-top: 8px;
+    font-style: italic;
+  }
+
+  .ltc-home-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 64px;
+    align-items: start;
+    margin-bottom: 56px;
+  }
+
+  .ltc-home-body p {
+    font-size: 16px;
+    color: var(--warm);
+    line-height: 1.85;
+  }
+
+  .ltc-home-body p + p {
+    margin-top: 20px;
+  }
+
+  .ltc-home-callout {
+    background: var(--navy);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--gold);
+    padding: 36px 40px;
+  }
+
+  .ltc-home-callout-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 16px;
+  }
+
+  .ltc-home-callout p {
+    font-size: 15px;
+    color: var(--warm);
+    line-height: 1.8;
+  }
+
+  .ltc-home-callout p + p {
+    margin-top: 16px;
+  }
+
+  .ltc-home-callout strong {
+    color: var(--off-white);
+  }
+
+  .ltc-washington {
+    background: var(--navy3);
+    border: 1px solid var(--border);
+    padding: 32px 36px;
+    margin-top: 24px;
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+  }
+
+  .ltc-washington-num {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 48px;
+    font-weight: 300;
+    color: var(--gold);
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .ltc-washington-text {
+    font-size: 14px;
+    color: var(--warm);
+    line-height: 1.75;
+  }
+
+  .ltc-washington-text strong {
+    color: var(--off-white);
+    display: block;
+    margin-bottom: 6px;
+    font-size: 15px;
+  }
+
+  .ltc-home-cta {
+    text-align: center;
+    padding-top: 16px;
+  }
+
+  .ltc-home-cta p {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px;
+    font-style: italic;
+    font-weight: 300;
+    color: var(--gold2);
+    margin-bottom: 32px;
+    line-height: 1.5;
+  }
+
+  @media (max-width: 900px) {
+    .ltc-home-stats { grid-template-columns: repeat(2, 1fr); }
+    .ltc-home-body { grid-template-columns: 1fr; gap: 40px; }
+    .ltc-home-inner { padding: 72px 24px; }
+  }
+
+  @media (max-width: 500px) {
+    .ltc-home-stats { grid-template-columns: 1fr; }
+  }
+
 </style>
 <style>.hero { background-image:linear-gradient(135deg,rgba(8,18,38,0.85) 0%,rgba(8,18,38,0.65) 50%,rgba(15,30,58,0.55) 100%), url('https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=1800&q=80&fit=crop');background-size:cover;background-position:center 40%;background-repeat:no-repeat; }</style>
 </head>
@@ -1074,6 +1271,96 @@
   </div>
 </section>
 
+<!-- ── LTC SECTION ── -->
+<section class="ltc-home-section" id="ltc-risk">
+  <div class="ltc-home-inner">
+
+    <div class="ltc-home-header">
+      <div class="section-label reveal">The Hidden Destroyer of Retirement Portfolios</div>
+      <h2 class="reveal reveal-delay-1">
+        Most people won't know until<br>it's too late.<br>
+        <em>The numbers already do.</em>
+      </h2>
+      <p class="reveal reveal-delay-2">
+        You can't predict your health. You can't predict when or if a care event will arrive. What you can do is look honestly at the statistics — and make a decision now, while options still exist and health still qualifies you to act.
+      </p>
+    </div>
+
+    <div class="ltc-home-stats">
+      <div class="ltc-home-stat reveal">
+        <div class="ltc-home-stat-value">70%</div>
+        <div class="ltc-home-stat-label">Will need care</div>
+        <p class="ltc-home-stat-desc">Nearly 7 in 10 people reaching age 65 will need some form of long-term care before they die. This is not a tail risk — it is the expected experience.</p>
+        <p class="ltc-home-stat-source">U.S. Dept. of Health & Human Services</p>
+      </div>
+      <div class="ltc-home-stat reveal reveal-delay-1">
+        <div class="ltc-home-stat-value">$111K+</div>
+        <div class="ltc-home-stat-label">Per year, nursing home</div>
+        <p class="ltc-home-stat-desc">2024 national median cost of a semi-private nursing home room — up 7% in a single year. Costs have risen every single year without exception.</p>
+        <p class="ltc-home-stat-source">Genworth/CareScout Cost of Care Survey, 2024</p>
+      </div>
+      <div class="ltc-home-stat reveal reveal-delay-2">
+        <div class="ltc-home-stat-value">21%</div>
+        <div class="ltc-home-stat-label">Average wealth decline</div>
+        <p class="ltc-home-stat-desc">A couple who experiences a long-term care event sees their wealth decline by an average of 21% over nine years — even among those who can afford to pay.</p>
+        <p class="ltc-home-stat-source">Morningstar</p>
+      </div>
+      <div class="ltc-home-stat reveal reveal-delay-3">
+        <div class="ltc-home-stat-value">$2,000</div>
+        <div class="ltc-home-stat-label">Medicaid threshold</div>
+        <p class="ltc-home-stat-desc">Medicaid — the government backstop — only steps in after your savings are spent down to $2,000. It is not a plan. It is a last resort.</p>
+        <p class="ltc-home-stat-source">Medicaid.gov</p>
+      </div>
+    </div>
+
+    <div class="ltc-home-body">
+      <div>
+        <p class="reveal">
+          When people of significant means hear these numbers, the instinct is usually the same: <em style="color: var(--off-white);">I have enough. I can handle it.</em> And they're probably right — a long-term care event likely won't bankrupt them.
+        </p>
+        <p class="reveal">
+          But here's what the math actually shows. When care costs are funded from a traditional IRA or 401(k), every dollar withdrawn must first survive the IRS. To net $100,000 for care, you may need to withdraw $140,000–$150,000 at your marginal tax rate. Multiply that across a multi-year care event, and you've permanently eliminated the compounding that capital would have generated for decades. You don't go broke — but the financial architecture you spent a lifetime building takes a hit it never fully recovers from.
+        </p>
+        <p class="reveal">
+          For decades, the rational response was to decline long-term care coverage. The old standalone LTC policy came with a legitimate problem: if you stayed healthy and never needed care, the premiums were gone forever. Use it or lose it. That objection kept millions of smart, well-insured people unprotected.
+        </p>
+        <p class="reveal" style="color: var(--off-white); font-weight: 500;">
+          That objection no longer exists.
+        </p>
+      </div>
+      <div>
+        <div class="ltc-home-callout reveal">
+          <div class="ltc-home-callout-label">The Modern Solution</div>
+          <p>
+            The protection layer built into the IncomeArc™ system uses a Living Benefits IUL — a structure that works in both directions. <strong>If care is needed,</strong> the death benefit accelerates and delivers tax-free funds for care, leaving your investment portfolio untouched and your income plan intact.
+          </p>
+          <p>
+            <strong>If care is never needed,</strong> the policy builds cash value you can access as tax-free income during your lifetime — a supplement to your retirement income that doesn't touch MAGI or trigger IRMAA surcharges. And at death, the remaining value passes as a tax-free death benefit to your heirs. No premium is ever wasted — because the policy delivers real value regardless of what happens.
+          </p>
+          <p>
+            And the funding mechanism changes the equation entirely. A portion of the IRA or 401(k) assets you're already holding — dollars carrying a deferred tax liability that were always heading for a tax event — can be repositioned into this structure. <strong>You're not spending retirement money. You're converting dollars the government was already going to hit for tax</strong> into a dual-purpose asset: care coverage if needed, tax-free wealth if not.
+          </p>
+        </div>
+
+        <div class="ltc-washington reveal">
+          <div class="ltc-washington-num">$36.5K</div>
+          <div class="ltc-washington-text">
+            <strong>Washington State's mandatory LTC tax — and why it's still not enough</strong>
+            Washington became the first state to pass a mandatory long-term care payroll tax because its Medicaid system was buckling under the weight of uninsured care costs. The resulting lifetime benefit: $36,500. At current nursing home rates, that covers roughly <strong style="color: var(--off-white);">three months</strong> of care. Even government-mandated solutions acknowledge the crisis — and fall dramatically short.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ltc-home-cta reveal">
+      <p>"People who built real wealth got there by recognizing good decisions when they saw them.<br>This is one of them."</p>
+      <a href="incomearc.html#long-term-care" class="btn-primary" style="margin-right: 16px;">See How IncomeArc™ Addresses This</a>
+      <a href="#structure-review" class="btn-secondary">Begin Your StructureReview™</a>
+    </div>
+
+  </div>
+</section>
+
 <!-- ── BOOK ── -->
 <section class="book-section" id="book">
   <div class="book-inner">
@@ -1149,7 +1436,7 @@
     <span>Built for Planning. Designed for Execution.</span>
   </div>
   <div class="footer-contact">
-    <a href="mailto:support@integratedplanningpartners.com">support@integratedplanningpartners.com</a>
+    <a href="/cdn-cgi/l/email-protection#186b6d6868776a6c5871766c7d7f6a796c7d7c687479767671767f68796a6c767d6a6b367b7775"><span class="__cf_email__" data-cfemail="44373134342b3630042d2a30212336253021203428252a2a2d2a23342536302a2136376a272b29">[email&#160;protected]</span></a>
     <div><a href="tel:7733189608">773-318-9608</a></div>
     <div><a href="https://integratedplanningpartners.com">integratedplanningpartners.com</a></div>
   </div>
@@ -1169,7 +1456,7 @@
   </div>
 </footer>
 
-<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+<script>
   document.querySelectorAll('.reveal').forEach(el => el.classList.add('visible'));
   if (!window.location.hash) {
     document.querySelectorAll('.reveal').forEach(el => el.classList.remove('visible'));
@@ -1233,3 +1520,15 @@
   document.querySelectorAll(".reveal").forEach(el => el.classList.add("visible"));
   if (!window.location.hash) {
     document.querySelectorAll(".reveal").forEach(el => el.classList.remove("visible"));
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) entry.target.classList.add("visible");
+      });
+    }, { threshold: 0.05, rootMargin: "0px 0px -40px 0px" });
+    document.querySelectorAll(".reveal").forEach(el => observer.observe(el));
+  }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="ipp-design-improvements.js?v=10"></script>
+</body>
+</html>
