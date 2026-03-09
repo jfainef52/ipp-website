@@ -2397,6 +2397,15 @@ function App() {
               </div>
             </Section>
 
+            <Section title="Expenses" collapsed={sections.expenses} onToggle={()=>toggleSection('expenses')}>
+              <Field label="Fixed Monthly Expenses" hint="Housing, insurance, utilities, healthcare">
+                <NumInput value={inputs.fixedExpenses} onChange={v=>set('fixedExpenses',v)} prefix="$" suffix="/mo"/>
+              </Field>
+              <Field label="Lifestyle Monthly Expenses" hint="Travel, dining, family, discretionary">
+                <NumInput value={inputs.lifestyleExpenses} onChange={v=>set('lifestyleExpenses',v)} prefix="$" suffix="/mo"/>
+              </Field>
+            </Section>
+
 
             <Section title="Social Security" collapsed={sections.ss} onToggle={()=>toggleSection('ss')}>
               <Field label="Est. Monthly Benefit at FRA" hint="Find on your Social Security statement or ssa.gov">
@@ -2950,15 +2959,6 @@ function App() {
                 )}
               </div>
 
-            </Section>
-
-            <Section title="Expenses" collapsed={sections.expenses} onToggle={()=>toggleSection('expenses')}>
-              <Field label="Fixed Monthly Expenses" hint="Housing, insurance, utilities, healthcare">
-                <NumInput value={inputs.fixedExpenses} onChange={v=>set('fixedExpenses',v)} prefix="$" suffix="/mo"/>
-              </Field>
-              <Field label="Lifestyle Monthly Expenses" hint="Travel, dining, family, discretionary">
-                <NumInput value={inputs.lifestyleExpenses} onChange={v=>set('lifestyleExpenses',v)} prefix="$" suffix="/mo"/>
-              </Field>
             </Section>
 
             <Section title="Strategic Drawdown" collapsed={sections.drawdown} onToggle={()=>toggleSection('drawdown')}>
