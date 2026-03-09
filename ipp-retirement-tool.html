@@ -1260,13 +1260,14 @@ function projectArc(inputs) {
     fixedStreams.push({ yearOffset: offset, annual: archEtaAnnualIncome });
   }
 
-  // LTC shock: gross-up annual draw spread over care years, starting at ltcShockYear
-  // For uninsured: inject the actual grossed-up portfolio draw per year during the care event
-  // For insured: no shock (ltcInsured=true means policy covers it)
+  // LTC shock for Monte Carlo: only the EXTRA annual draw caused by the care event.
+  // ltcUncovered = net care cost not covered by income surplus.
+  // ltcGrossUpTax = additional tax from having to gross up the IRA draw.
+  // Together these represent the true incremental portfolio hit from being uninsured.
   const ltcShockYear = (ltcEventAge > 0 && !ltcInsured) ? ltcEventAge - retireAge : -1;
   const ltcShockAnnual = (ltcShockYear >= 0 && ltcDuration > 0)
     ? years.filter(r => r.age >= ltcEventAge && r.age < ltcEventAge + ltcDuration)
-           .reduce((sum, r) => sum + (r.sources.rmd||0) + (r.sources.taxable||0), 0) / ltcDuration
+           .reduce((sum, r) => sum + (r.ltcUncovered || 0) + (r.ltcGrossUpTax || 0), 0) / ltcDuration
     : 0;
 
   const confidence = runMonteCarlo(
