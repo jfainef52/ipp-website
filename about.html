@@ -562,11 +562,10 @@
 
   /* ── REVEAL ── */
   .reveal {
-    opacity: 0;
-    transform: translateY(24px);
+    opacity: 1;
+    transform: translateY(0);
     transition: opacity 0.7s ease, transform 0.7s ease;
   }
-  .reveal.visible { opacity: 1; transform: translateY(0); }
   .reveal-delay-1 { transition-delay: 0.1s; }
   .reveal-delay-2 { transition-delay: 0.2s; }
   .reveal-delay-3 { transition-delay: 0.3s; }
@@ -876,16 +875,7 @@
   </div>
 </footer>
 
-<script>
-  document.querySelectorAll('.reveal').forEach(el => el.classList.add('visible'));
-  if (!window.location.hash) {
-    document.querySelectorAll('.reveal').forEach(el => el.classList.remove('visible'));
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) entry.target.classList.add('visible');
-      });
-    }, { threshold: 0.05, rootMargin: '0px 0px -40px 0px' });
-    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
-  }
-  window.addEventListener('hashchange', () => {
-    const target = document.quer
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="ipp-design-improvements.js?v=10"></script>
+</body>
+</html>
