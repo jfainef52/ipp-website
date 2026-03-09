@@ -929,7 +929,10 @@ function projectArc(inputs) {
     const baseGapWithoutLtc = row.ltcEvent
       ? row.totalIncome - (row.totalExpense - (row.ltcUncovered || 0))
       : null;
-    const ltcDrivenGap = row.ltcEvent ? (row.ltcUncovered || 0) : 0;
+    // Include spouse LTC cost in the driven-gap calculation so portfolio draws are attributed
+    const ltcDrivenGap = (row.ltcEvent ? (row.ltcUncovered || 0) : 0)
+                       + (row.spouseLtcEvent ? (row.spouseLtcUncovered || 0) : 0);
+    const isAnyLtcEvent = row.ltcEvent || row.spouseLtcEvent;
 
     if (row.gap < 0) {
       const needed = Math.abs(row.gap);
@@ -953,9 +956,10 @@ function projectArc(inputs) {
         row.sources.taxable = (row.sources.taxable || 0) + actualGross;
         row.totalIncome += actualGross;
         // Only attribute gross-up tax to LTC for the LTC-driven portion of this draw
-        if (row.ltcEvent && ltcRemaining > 0 && !ltcInsured) {
+        if (isAnyLtcEvent && ltcRemaining > 0 && !ltcInsured) {
           const ltcShare = Math.min(actualNet, ltcRemaining) / Math.max(actualNet, 0.01);
           row.ltcGrossUpTax = (row.ltcGrossUpTax || 0) + actualTax * ltcShare;
+          row.ltcPortfolioDraw = (row.ltcPortfolioDraw || 0) + actualGross * ltcShare;
           ltcRemaining -= Math.min(actualNet, ltcRemaining);
         }
         taxable = Math.max(0, (taxable - actualGross) * (1 + yearReturn));
@@ -967,7 +971,7 @@ function projectArc(inputs) {
         const draw = Math.min(roth, remaining);
         row.sources.roth = (row.sources.roth || 0) + draw;
         row.totalIncome += draw;
-        if (row.ltcEvent && ltcRemaining > 0) ltcRemaining -= Math.min(draw, ltcRemaining);
+        if (isAnyLtcEvent && ltcRemaining > 0) ltcRemaining -= Math.min(draw, ltcRemaining);
         roth = Math.max(0, (roth - draw) * (1 + yearReturn));
         remaining -= draw;
       }
@@ -987,9 +991,10 @@ function projectArc(inputs) {
         row.sources.rmd = (row.sources.rmd || 0) + actualGross;
         row.totalIncome += actualGross;
         // Only attribute gross-up tax to LTC for the LTC-driven portion of this draw
-        if (row.ltcEvent && ltcRemaining > 0 && !ltcInsured) {
+        if (isAnyLtcEvent && ltcRemaining > 0 && !ltcInsured) {
           const ltcShare = Math.min(actualNet, ltcRemaining) / Math.max(actualNet, 0.01);
           row.ltcGrossUpTax = (row.ltcGrossUpTax || 0) + actualTax * ltcShare;
+          row.ltcPortfolioDraw = (row.ltcPortfolioDraw || 0) + actualGross * ltcShare;
           ltcRemaining -= Math.min(actualNet, ltcRemaining);
         }
         trad = Math.max(0, (trad - actualGross) * (1 + yearReturn));
@@ -1029,6 +1034,7 @@ function projectArc(inputs) {
         row.sources.taxable = (row.sources.taxable || 0) + actualGross;
         row.totalIncome += actualGross;
         row.ltcGrossUpTax = (row.ltcGrossUpTax || 0) + actualTax;
+        row.ltcPortfolioDraw = (row.ltcPortfolioDraw || 0) + actualGross; // track gross portfolio draw for LTC
         taxable = Math.max(0, taxable - actualGross); // remove draw; growth applied below in surplus
         ltcRemaining -= actualNet;
       }
@@ -1046,7 +1052,61 @@ function projectArc(inputs) {
         row.sources.rmd = (row.sources.rmd || 0) + actualGross;
         row.totalIncome += actualGross;
         row.ltcGrossUpTax = (row.ltcGrossUpTax || 0) + actualTax;
+        row.ltcPortfolioDraw = (row.ltcPortfolioDraw || 0) + actualGross; // track gross portfolio draw for LTC
         trad = Math.max(0, trad - actualGross); // remove draw; growth applied below in surplus
+      }
+
+      // Grow remaining balances (surplus path)
+      taxable = taxable * (1 + yearReturn);
+      roth = roth * (1 + yearReturn);
+      trad = trad * (1 + yearReturn);
+    } else if (row.spouseLtcEvent && row.spouseLtcUncovered > 0 && !spouseLtcInsured) {
+      // ── Dedicated Spouse LTC gross-up draw (surplus year with spouse care costs) ──
+      const ltcNeeded = row.spouseLtcUncovered;
+      let ltcRemaining = ltcNeeded;
+
+      // Draw from Roth first (no gross-up)
+      if (roth > 0 && ltcRemaining > 0) {
+        const draw = Math.min(roth, ltcRemaining);
+        row.sources.roth = (row.sources.roth || 0) + draw;
+        row.totalIncome += draw;
+        roth = Math.max(0, roth - draw);
+        ltcRemaining -= draw;
+      }
+
+      // Draw from taxable (LTCG gross-up)
+      if (taxable > 0 && ltcRemaining > 0) {
+        const ltcgBracketsEff = (isMFJeff ? LTCG_MFJ_2025 : LTCG_SINGLE_2025)
+          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
+        const netToDraw = Math.min(ltcRemaining, taxable * 0.9);
+        const { grossDraw, taxOnDraw } = grossUpIterative(netToDraw, ltcgBracketsEff, baseOrdAGI);
+        const actualGross = Math.min(taxable, grossDraw);
+        const taxProportion = grossDraw > 0 ? taxOnDraw / grossDraw : 0;
+        const actualTax = actualGross * taxProportion;
+        const actualNet = actualGross - actualTax;
+        row.sources.taxable = (row.sources.taxable || 0) + actualGross;
+        row.totalIncome += actualGross;
+        row.ltcGrossUpTax = (row.ltcGrossUpTax || 0) + actualTax;
+        row.ltcPortfolioDraw = (row.ltcPortfolioDraw || 0) + actualGross;
+        taxable = Math.max(0, taxable - actualGross);
+        ltcRemaining -= actualNet;
+      }
+
+      // Draw from traditional IRA (ordinary income gross-up)
+      if (trad > 0 && ltcRemaining > 0) {
+        const ordBracketsEff = (isMFJeff ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025)
+          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
+        const adjOrdAGI = baseOrdAGI + (row.sources.taxable || 0) * 0.15;
+        const netToDraw = Math.min(ltcRemaining, trad);
+        const { grossDraw, taxOnDraw } = grossUpIterative(netToDraw, ordBracketsEff, adjOrdAGI);
+        const actualGross = Math.min(trad, grossDraw);
+        const taxProportion = grossDraw > 0 ? taxOnDraw / grossDraw : 0;
+        const actualTax = actualGross * taxProportion;
+        row.sources.rmd = (row.sources.rmd || 0) + actualGross;
+        row.totalIncome += actualGross;
+        row.ltcGrossUpTax = (row.ltcGrossUpTax || 0) + actualTax;
+        row.ltcPortfolioDraw = (row.ltcPortfolioDraw || 0) + actualGross;
+        trad = Math.max(0, trad - actualGross);
       }
 
       // Grow remaining balances (surplus path)
@@ -1260,14 +1320,15 @@ function projectArc(inputs) {
     fixedStreams.push({ yearOffset: offset, annual: archEtaAnnualIncome });
   }
 
-  // LTC shock for Monte Carlo: only the EXTRA annual draw caused by the care event.
-  // ltcUncovered = net care cost not covered by income surplus.
-  // ltcGrossUpTax = additional tax from having to gross up the IRA draw.
-  // Together these represent the true incremental portfolio hit from being uninsured.
+  // LTC shock for Monte Carlo: the actual gross portfolio draws made during care years
+  // (tracked as ltcPortfolioDraw in each row) plus the gross-up tax friction.
+  // Using ltcPortfolioDraw is correct because it captures what was truly pulled from the
+  // portfolio — it's zero when income surplus fully absorbed the care cost, and reflects
+  // the actual IRA/taxable gross draws when a portfolio withdrawal was required.
   const ltcShockYear = (ltcEventAge > 0 && !ltcInsured) ? ltcEventAge - retireAge : -1;
   const ltcShockAnnual = (ltcShockYear >= 0 && ltcDuration > 0)
     ? years.filter(r => r.age >= ltcEventAge && r.age < ltcEventAge + ltcDuration)
-           .reduce((sum, r) => sum + (r.ltcUncovered || 0) + (r.ltcGrossUpTax || 0), 0) / ltcDuration
+           .reduce((sum, r) => sum + (r.ltcPortfolioDraw || 0) + (r.ltcGrossUpTax || 0), 0) / ltcDuration
     : 0;
 
   const confidence = runMonteCarlo(
@@ -3705,15 +3766,12 @@ function App() {
             const annualBenefit = (inputs.ltcMonthlyBenefit || inputs.ltcMonthlyCost) * 12;
             const totalBenefit = annualBenefit * inputs.ltcDuration;
             const benefitGap = Math.max(0, totalLtcCost - totalBenefit);
-            // Forced portfolio draws = care cost not covered by income surplus (gross, before tax)
-            // For display we use the engine-computed draw difference between projections
-            const uninsuredLtcYearDraws = yearsUninsured
+            // Forced portfolio draws = actual gross IRA/taxable drawn from portfolio during LTC years
+            // (tracked directly by the engine as ltcPortfolioDraw, which is 0 when income surplus
+            // fully absorbs the care cost and >0 only when the portfolio was actually tapped)
+            const extraGrossDraws = yearsUninsured
               .filter(r => r.age >= ltcAge && r.age < ltcEnd)
-              .reduce((sum, r) => sum + (r.sources.rmd || 0) + (r.sources.taxable || 0), 0);
-            const insuredLtcYearDraws = yearsInsured
-              .filter(r => r.age >= ltcAge && r.age < ltcEnd)
-              .reduce((sum, r) => sum + (r.sources.rmd || 0) + (r.sources.taxable || 0), 0);
-            const extraGrossDraws = Math.max(0, uninsuredLtcYearDraws - insuredLtcYearDraws);
+              .reduce((sum, r) => sum + (r.ltcPortfolioDraw || 0), 0);
             // "Covered by Income" only meaningful when there's a benefit gap or no insurance.
             // When benefit fully covers care, this should be $0 — income doesn't need to absorb anything.
             const showBenefitCard = totalBenefit > 0; // insured scenario
@@ -3846,7 +3904,7 @@ function App() {
 
             const grossUpTaxTotal = yearsSpouseUninsured
               .filter(r => r.age >= ltcAge && r.age < ltcEnd)
-              .reduce((sum, r) => sum + (r.spouseLtcGrossUpTax || 0), 0);
+              .reduce((sum, r) => sum + (r.ltcGrossUpTax || 0), 0);
 
             const portfolioDiff = insuredFinal && uninsuredFinal
               ? (insuredFinal.totalPortfolio - uninsuredFinal.totalPortfolio)
@@ -3857,11 +3915,8 @@ function App() {
 
             const uninsuredDraws = yearsSpouseUninsured
               .filter(r => r.age >= ltcAge && r.age < ltcEnd)
-              .reduce((sum, r) => sum + (r.sources.rmd||0) + (r.sources.taxable||0), 0);
-            const insuredDraws = yearsSpouseInsured
-              .filter(r => r.age >= ltcAge && r.age < ltcEnd)
-              .reduce((sum, r) => sum + (r.sources.rmd||0) + (r.sources.taxable||0), 0);
-            const extraGrossDraws = Math.max(0, uninsuredDraws - insuredDraws);
+              .reduce((sum, r) => sum + (r.ltcPortfolioDraw || 0), 0);
+            const extraGrossDraws = uninsuredDraws;
 
             const fmtD = v => v >= 1000000 ? `$${(v/1000000).toFixed(2)}M` : `$${Math.round(v/1000)}K`;
             const spouseName = inputs.spouseName || 'Spouse';
