@@ -480,13 +480,16 @@ function projectArc(inputs) {
     etaFundingAmount = 0, etaFundingAge = 0,
     architectureEnabled = false,
     rothConversionAmount = 0, rothConversionAge = 0, rothConversionFinanced = 0,
-    ltcFundingAmount = 0, ltcFundingAge = 0,
     nonQualAnnuityMonthly = 0, nonQualAnnuityStartAge = 65,
     nonQualAnnuityBasis = 0, nonQualAnnuityTotalValue = 0,
     partTimeMonthly, partTimeEndAge,
     fixedExpenses, lifestyleExpenses,
     stateCode = 'IL', customStateRate, taxRateStressAdder = 0,
     ltcEventAge, ltcMonthlyCost, ltcDuration, ltcShowComparison = true, ltcMonthlyBenefit, ltcBenefitDuration, ltcInsured = false,
+    spouseLtcEventAge = 0, spouseLtcMonthlyCost = 0, spouseLtcDuration = 3,
+    spouseLtcMonthlyBenefit = 0, spouseLtcBenefitDuration = 3, spouseLtcInsured = false,
+    ltcNetAmount = 0, ltcFundingAge = 0,
+    spouseLtcNetAmount = 0, spouseLtcFundingAge = 0,
     portfolioReturn = 0.065,
     inflation = 0.028,
     sorrEnabled = false,
@@ -517,7 +520,8 @@ function projectArc(inputs) {
   const archAnnualTaxableDrawdown= architectureEnabled ? annualTaxableDrawdown: 0;
   const archAnnualRothDrawdown   = architectureEnabled ? annualRothDrawdown   : 0;
   const archRothConversionAmount = architectureEnabled ? rothConversionAmount : 0;
-  const archLtcFundingAmount     = architectureEnabled ? ltcFundingAmount     : 0;
+  const archLtcNetAmount         = architectureEnabled ? (ltcNetAmount || 0)     : 0;
+  const archSpouseLtcNetAmount   = architectureEnabled ? (spouseLtcNetAmount || 0) : 0;
 
   // ── Pre-retirement accumulation: grow balances from currentAge to retireAge ──
   // Apply portfolio return each year and add contributions if modeled.
@@ -543,9 +547,16 @@ function projectArc(inputs) {
       if (archRothConversionAmount > 0 && rothConversionAge > 0 && a === rothConversionAge) {
         trad = Math.max(0, trad - archRothConversionAmount);
       }
-      // LTC policy funding draw — reduce trad balance (pre-retirement)
-      if (archLtcFundingAmount > 0 && ltcFundingAge > 0 && a === ltcFundingAge) {
-        trad = Math.max(0, trad - archLtcFundingAmount);
+      // LTC policy funding draw — reduce trad balance (pre-retirement, approximate gross-up at 24% + penalty)
+      if (archLtcNetAmount > 0 && ltcFundingAge > 0 && a === ltcFundingAge) {
+        const preRetPenalty = ltcFundingAge < 59.5 ? 0.10 : 0;
+        const approxGross = archLtcNetAmount / Math.max(0.01, 1 - 0.24 - preRetPenalty);
+        trad = Math.max(0, trad - approxGross - (approxGross * preRetPenalty));
+      }
+      if (archSpouseLtcNetAmount > 0 && spouseLtcFundingAge > 0 && a === spouseLtcFundingAge) {
+        const preRetPenaltySp = spouseLtcFundingAge < 59.5 ? 0.10 : 0;
+        const approxGrossSp = archSpouseLtcNetAmount / Math.max(0.01, 1 - 0.24 - preRetPenaltySp);
+        trad = Math.max(0, trad - approxGrossSp - (approxGrossSp * preRetPenaltySp));
       }
       // Grow existing balance then add contribution (end-of-year)
       trad    = trad    * (1 + portfolioReturn) + tradContrib;
@@ -608,20 +619,46 @@ function projectArc(inputs) {
       row._conversionOveragePending = { convAmt, financed: Math.min(rothConversionFinanced || 0, convAmt) };
     }
 
-    // ── LTC Policy Funding Draw ──
-    // Tax is NOT financed — ordinary income tax is captured by calcAnnualTax on the full income stack.
-    // Early withdrawal penalty (age < 59½) is also NOT financed — it is an additional hard cost
-    // (Form 5329) deducted directly from the IRA on top of the distribution. The gross distribution
-    // is still the full ltcFund amount (reported as income); the penalty is an extra IRA deduction.
-    if (archLtcFundingAmount > 0 && ltcFundingAge > 0 && age === ltcFundingAge) {
-      const ltcFund = Math.min(archLtcFundingAmount, trad);
-      const earlyPenalty = age < 59.5 ? ltcFund * 0.10 : 0;
-      trad = Math.max(0, trad - ltcFund - earlyPenalty); // penalty paid out of IRA, separate from income
+    // ── Primary LTC Policy Funding Draw ──
+    // User enters NET amount needed (policy premium after tax). We gross up from IRA to net that amount.
+    // Tax is NOT financed. Early withdrawal penalty (age < 59½) applied as additional IRA deduction.
+    if (archLtcNetAmount > 0 && ltcFundingAge > 0 && age === ltcFundingAge) {
+      // Build stressed ordinary brackets at this point in the loop
+      const ordBracketsLtc = (effectiveStatus === 'mfj' ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025)
+        .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
+      const currentAGI = (row.sources.ss||0)*0.85 + (row.sources.pension||0) + (row.sources.rmd||0) + (row.sources.parttime||0) + (row.sources.annuity||0);
+      const earlyPenaltyRate = age < 59.5 ? 0.10 : 0;
+      // Gross up: net needed / (1 - marginalRate - penaltyRate) approximation, refined iteratively
+      const { grossDraw: ltcGross, taxOnDraw: ltcTax } = grossUpIterative(archLtcNetAmount, ordBracketsLtc, currentAGI);
+      const ltcFund = Math.min(ltcGross, trad);
+      const earlyPenalty = ltcFund * earlyPenaltyRate;
+      trad = Math.max(0, trad - ltcFund - earlyPenalty);
       row.ltcFundingEvent = true;
       row.ltcFundingAmount = ltcFund;
+      row.ltcFundingNet = archLtcNetAmount;
+      row.ltcFundingTax = ltcTax;
       row.ltcEarlyPenalty = earlyPenalty;
       row.sources.rmd = (row.sources.rmd || 0) + ltcFund;
-      row.totalIncome += ltcFund; // income = gross distribution only; penalty is not additional income
+      row.totalIncome += ltcFund;
+    }
+
+    // ── Spouse LTC Policy Funding Draw ──
+    if (archSpouseLtcNetAmount > 0 && spouseLtcFundingAge > 0 && age === spouseLtcFundingAge) {
+      const ordBracketsSpLtc = (effectiveStatus === 'mfj' ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025)
+        .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
+      const currentAGISp = (row.sources.ss||0)*0.85 + (row.sources.pension||0) + (row.sources.rmd||0) + (row.sources.parttime||0) + (row.sources.annuity||0);
+      const earlyPenaltyRateSp = age < 59.5 ? 0.10 : 0;
+      const { grossDraw: spLtcGross, taxOnDraw: spLtcTax } = grossUpIterative(archSpouseLtcNetAmount, ordBracketsSpLtc, currentAGISp);
+      const spLtcFund = Math.min(spLtcGross, trad);
+      const spEarlyPenalty = spLtcFund * earlyPenaltyRateSp;
+      trad = Math.max(0, trad - spLtcFund - spEarlyPenalty);
+      row.spouseLtcFundingEvent = true;
+      row.spouseLtcFundingAmount = spLtcFund;
+      row.spouseLtcFundingNet = archSpouseLtcNetAmount;
+      row.spouseLtcFundingTax = spLtcTax;
+      row.spouseLtcEarlyPenalty = spEarlyPenalty;
+      row.sources.rmd = (row.sources.rmd || 0) + spLtcFund;
+      row.totalIncome += spLtcFund;
     }
 
     // Determine effective filing status this year (primary death triggers widow's penalty)
@@ -818,6 +855,20 @@ function projectArc(inputs) {
       row.ltcAnnualCost = ltcAnnualCost;
       row.ltcCoverage = benefitCoverage;
       row.ltcUncovered = uncoveredLtcCost;
+    }
+
+    // Spouse LTC event — same mechanics, independent age/cost/duration
+    if (spouseLtcEventAge > 0 && age >= spouseLtcEventAge && age < spouseLtcEventAge + spouseLtcDuration) {
+      const spLtcAnnualCost = spouseLtcMonthlyCost * 12;
+      const spBenefitCoverage = spouseLtcInsured
+        ? Math.min((spouseLtcMonthlyBenefit || spouseLtcMonthlyCost) * 12, spLtcAnnualCost)
+        : 0;
+      const spUncoveredLtcCost = spLtcAnnualCost - spBenefitCoverage;
+      expenses += spUncoveredLtcCost;
+      row.spouseLtcEvent = true;
+      row.spouseLtcAnnualCost = spLtcAnnualCost;
+      row.spouseLtcCoverage = spBenefitCoverage;
+      row.spouseLtcUncovered = spUncoveredLtcCost;
     }
 
     row.totalExpense = expenses;
@@ -1773,11 +1824,13 @@ function App() {
     etaFundingAmount: 0, etaFundingAge: 0,
     architectureEnabled: false,
     rothConversionAmount: 0, rothConversionAge: 0, rothConversionFinanced: 0,
-    ltcFundingAmount: 0, ltcFundingAge: 0,
+    ltcNetAmount: 0, ltcFundingAge: 0,
+    spouseLtcNetAmount: 0, spouseLtcFundingAge: 0,
     nonQualAnnuityMonthly: 0, nonQualAnnuityStartAge: 65, nonQualAnnuityBasis: 0, nonQualAnnuityTotalValue: 0,
     partTimeMonthly: 0, partTimeEndAge: 68,
     fixedExpenses: 15000, lifestyleExpenses: 8500,
     ltcEventAge: 0, ltcMonthlyCost: 7500, ltcDuration: 3, ltcShowComparison: false, ltcMonthlyBenefit: 7500, ltcBenefitDuration: 3,
+    spouseLtcEventAge: 0, spouseLtcMonthlyCost: 7500, spouseLtcDuration: 3, spouseLtcMonthlyBenefit: 7500, spouseLtcBenefitDuration: 3, spouseLtcInsured: false,
     stateCode: 'IL', customStateRate: '', taxRateStressAdder: 0,
     annualTradDrawdown: 0, tradDrawdownStartAge: 0, tradDrawdownEndAge: 0,
     annualTaxableDrawdown: 0, taxableDrawdownStartAge: 0, taxableDrawdownEndAge: 0,
@@ -3066,6 +3119,11 @@ function App() {
                   Layer 2 of the IncomeArc™ system is a <strong style={{color:'#5B8FA8'}}>Living Benefits IUL with chronic care rider</strong> — care needed, the death benefit accelerates tax-free to cover costs, portfolio untouched. Care not needed, the policy builds cash value and delivers tax-free income and a tax-free death benefit. No premium is ever wasted.
                 </p>
               </div>
+
+              {/* ── Primary Health Event ── */}
+              <div style={{fontSize:13,fontWeight:700,color:'#9EB8CC',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8}}>
+                {inputs.filingStatus === 'mfj' ? 'Primary' : 'Care Event'}
+              </div>
               <Field label="Model Care Event at Age" hint="Enter 0 to exclude · Shows portfolio impact without a dedicated Layer 2 protection layer">
                 <NumInput value={inputs.ltcEventAge} onChange={v=>set('ltcEventAge',v)} suffix="yrs"/>
               </Field>
@@ -3077,66 +3135,158 @@ function App() {
                   <NumInput value={inputs.ltcDuration} onChange={v=>set('ltcDuration',v)} suffix="yrs"/>
                 </Field>
 
-                {/* Layer 2 Comparison — tied to architecture toggle */}
-                <div style={{marginTop:10,padding:'10px 12px',background:'rgba(74,155,122,.05)',border:'1px solid rgba(74,155,122,.18)',borderRadius:8}}>
-                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
-                    <div style={{fontSize:14,fontWeight:700,color:'#4A9B7A',letterSpacing:'.06em',textTransform:'uppercase'}}>
-                      Layer 2 Comparison
+                {/* Layer 2 Insurance — architecture only */}
+                {inputs.architectureEnabled && (
+                  <div style={{marginTop:10,padding:'10px 12px',background:'rgba(74,155,122,.05)',border:'1px solid rgba(74,155,122,.18)',borderRadius:8}}>
+                    <div style={{fontSize:13,fontWeight:700,color:'#4A9B7A',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:6}}>
+                      Layer 2 — Insurance Option
                     </div>
-                    <div style={{fontSize:12,color: inputs.architectureEnabled ? '#4A9B7A' : '#8DAFC8',fontWeight:600}}>
-                      {inputs.architectureEnabled ? '✓ Active (Architecture On)' : 'Enable Architecture to compare'}
-                    </div>
-                  </div>
-                  <p style={{fontSize:13,color:'#DDD6C4',lineHeight:1.55,marginBottom: inputs.architectureEnabled ? 10 : 0}}>
-                    Show a second projection where a <strong style={{color:'#4A9B7A'}}>Living Benefits IUL (Layer 2)</strong> covers the care cost — portfolio untouched, income architecture intact.
-                  </p>
-                  {inputs.architectureEnabled && <>
-                    <Field label="Monthly Benefit (Layer 2)" hint="Match or offset the care cost">
+                    <Field label="Monthly Benefit" hint="Match or offset the care cost">
                       <NumInput value={inputs.ltcMonthlyBenefit||inputs.ltcMonthlyCost} onChange={v=>set('ltcMonthlyBenefit',v)} prefix="$" suffix="/mo"/>
                     </Field>
-                  </>}
-                </div>
-
-              {/* ── Layer 2 — LTC Policy Funding Draw ── */}
-              <div style={{marginBottom:14,paddingBottom:14,borderBottom:'1px solid rgba(255,255,255,.06)'}}>
-                <div style={{fontSize:14,fontWeight:700,color:'#9B7EC8',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:4}}>
-                  Layer 2 — LTC Policy Funding Draw
-                </div>
-                <div style={{fontSize:13,color:'#8DAFC8',marginBottom:10,lineHeight:1.55}}>
-                  Taxable IRA withdrawal to fund LTC policy premium · Cannot be financed · Full gross amount reduces IRA
-                </div>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:6}}>
-                  <Field label="Gross Draw Amount" hint="Enter the full gross IRA withdrawal needed. This is a taxable event — flows through ordinary income and marginal rate calculation in the draw year. IRA balance reduced by this amount.">
-                    <NumInput value={inputs.ltcFundingAmount} onChange={v=>set('ltcFundingAmount',v)} prefix="$"/>
-                  </Field>
-                  <Field label="Draw Age" hint="Age at which the LTC policy is funded from the IRA.">
-                    <NumInput value={inputs.ltcFundingAge} onChange={v=>set('ltcFundingAge',v)} suffix="yrs"/>
-                  </Field>
-                </div>
-                {inputs.ltcFundingAmount > 0 && inputs.ltcFundingAge > 0 && (
-                  <div style={{padding:'9px 12px',background:'rgba(155,126,200,.05)',border:'1px solid rgba(155,126,200,.2)',borderRadius:7}}>
-                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-                      <div style={{textAlign:'center'}}>
-                        <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>IRA Reduction</div>
-                        <div style={{fontSize:15,fontWeight:600,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif"}}>−${Math.round(inputs.ltcFundingAmount/1000)}K</div>
-                        <div style={{fontSize:11,color:'#8DAFC8'}}>Age {inputs.ltcFundingAge}</div>
-                      </div>
-                      <div style={{textAlign:'center'}}>
-                        <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Tax Treatment</div>
-                        <div style={{fontSize:15,fontWeight:600,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif"}}>Fully taxable</div>
-                        <div style={{fontSize:11,color:'#8DAFC8'}}>Marginal rate impact — cannot finance</div>
-                      </div>
-                    </div>
                   </div>
                 )}
-              </div>
+
+                {/* LTC Policy Funding Draw — architecture only */}
+                {inputs.architectureEnabled && (
+                  <div style={{marginTop:10,padding:'10px 12px',background:'rgba(155,126,200,.06)',border:'1px solid rgba(155,126,200,.2)',borderRadius:8}}>
+                    <div style={{fontSize:13,fontWeight:700,color:'#9B7EC8',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:6}}>
+                      Policy Funding Draw
+                    </div>
+                    <div style={{fontSize:12,color:'#8DAFC8',marginBottom:8,lineHeight:1.5}}>
+                      Enter the net amount needed — the model calculates the required gross IRA withdrawal to net that amount after tax.
+                    </div>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                      <Field label="Net Amount Needed" hint="Amount needed after tax to fund the LTC policy premium">
+                        <NumInput value={inputs.ltcNetAmount} onChange={v=>set('ltcNetAmount',v)} prefix="$"/>
+                      </Field>
+                      <Field label="Draw Age" hint="Primary's age at which the IRA distribution occurs">
+                        <NumInput value={inputs.ltcFundingAge} onChange={v=>set('ltcFundingAge',v)} suffix="yrs"/>
+                      </Field>
+                    </div>
+                    {inputs.ltcNetAmount > 0 && inputs.ltcFundingAge > 0 && (() => {
+                      // Preview gross-up using estimated marginal rate
+                      const estRate = inputs.taxRateStressAdder
+                        ? 0.24 + inputs.taxRateStressAdder / 100
+                        : 0.24;
+                      const estPenalty = inputs.ltcFundingAge < 59.5 ? 0.10 : 0;
+                      const estGross = inputs.ltcNetAmount / Math.max(0.01, 1 - estRate - estPenalty);
+                      const estTax = estGross - inputs.ltcNetAmount - (estGross * estPenalty);
+                      return (
+                        <div style={{marginTop:8,padding:'9px 12px',background:'rgba(155,126,200,.05)',border:'1px solid rgba(155,126,200,.15)',borderRadius:7}}>
+                          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,textAlign:'center'}}>
+                            <div>
+                              <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Net Needed</div>
+                              <div style={{fontSize:14,fontWeight:600,color:'#9B7EC8',fontFamily:"'Cormorant Garamond',serif"}}>${Math.round(inputs.ltcNetAmount/1000)}K</div>
+                            </div>
+                            <div>
+                              <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Est. Gross Draw</div>
+                              <div style={{fontSize:14,fontWeight:600,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif"}}>${Math.round(estGross/1000)}K</div>
+                            </div>
+                            <div>
+                              <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Est. Tax Cost</div>
+                              <div style={{fontSize:14,fontWeight:600,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif"}}>${Math.round(estTax/1000)}K</div>
+                            </div>
+                          </div>
+                          <div style={{fontSize:11,color:'#6B8FA8',marginTop:6,textAlign:'center'}}>
+                            Preview at ~{Math.round((estRate)*100)}% marginal rate{inputs.ltcFundingAge < 59.5 ? ' + 10% early withdrawal penalty' : ''} · Exact gross-up calculated in simulation
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
 
                 <div style={{padding:'10px 12px',background:'rgba(196,106,106,.06)',border:'1px solid rgba(196,106,106,.2)',borderRadius:7,marginTop:8}}>
-                  <div style={{fontSize:14,color:'#C47A7A',fontWeight:600,marginBottom:4}}>Uninsured Event — Portfolio Impact</div>
+                  <div style={{fontSize:13,color:'#C47A7A',fontWeight:600,marginBottom:4}}>Uninsured Event — Portfolio Impact</div>
                   <p style={{fontSize:13,color:'#DDD6C4',lineHeight:1.5}}>
-                    The solid red line shows care costs hitting the portfolio directly. The dashed green line shows the same retirement with Layer 2 covering the event — side by side on the chart above.
+                    Care costs hit the portfolio directly.{inputs.architectureEnabled ? ' The dashed green line shows the same retirement with Layer 2 covering the event.' : ''}
                   </p>
                 </div>
+              </>}
+
+              {/* ── Spouse Health Event — MFJ only ── */}
+              {inputs.filingStatus === 'mfj' && <>
+                <div style={{marginTop:14,paddingTop:12,borderTop:'1px solid rgba(255,255,255,.06)',fontSize:13,fontWeight:700,color:'#9EB8CC',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8}}>
+                  Spouse
+                </div>
+                <Field label="Model Spouse Care Event at Age" hint="Enter 0 to exclude · Uses primary's age as the projection axis">
+                  <NumInput value={inputs.spouseLtcEventAge} onChange={v=>set('spouseLtcEventAge',v)} suffix="yrs (primary age)"/>
+                </Field>
+                {inputs.spouseLtcEventAge > 0 && <>
+                  <Field label="Monthly Care Cost" hint="National median: $7,500–$10,000/mo for facility care">
+                    <NumInput value={inputs.spouseLtcMonthlyCost} onChange={v=>set('spouseLtcMonthlyCost',v)} prefix="$" suffix="/mo"/>
+                  </Field>
+                  <Field label="Duration">
+                    <NumInput value={inputs.spouseLtcDuration} onChange={v=>set('spouseLtcDuration',v)} suffix="yrs"/>
+                  </Field>
+
+                  {/* Spouse Layer 2 Insurance — architecture only */}
+                  {inputs.architectureEnabled && (
+                    <div style={{marginTop:10,padding:'10px 12px',background:'rgba(74,155,122,.05)',border:'1px solid rgba(74,155,122,.18)',borderRadius:8}}>
+                      <div style={{fontSize:13,fontWeight:700,color:'#4A9B7A',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:6}}>
+                        Layer 2 — Spouse Insurance Option
+                      </div>
+                      <Field label="Monthly Benefit" hint="Match or offset the spouse care cost">
+                        <NumInput value={inputs.spouseLtcMonthlyBenefit||inputs.spouseLtcMonthlyCost} onChange={v=>set('spouseLtcMonthlyBenefit',v)} prefix="$" suffix="/mo"/>
+                      </Field>
+                    </div>
+                  )}
+
+                  {/* Spouse LTC Policy Funding Draw — architecture only */}
+                  {inputs.architectureEnabled && (
+                    <div style={{marginTop:10,padding:'10px 12px',background:'rgba(155,126,200,.06)',border:'1px solid rgba(155,126,200,.2)',borderRadius:8}}>
+                      <div style={{fontSize:13,fontWeight:700,color:'#9B7EC8',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:6}}>
+                        Spouse Policy Funding Draw
+                      </div>
+                      <div style={{fontSize:12,color:'#8DAFC8',marginBottom:8,lineHeight:1.5}}>
+                        Enter the net amount needed — the model calculates the required gross IRA withdrawal to net that amount after tax.
+                      </div>
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                        <Field label="Net Amount Needed" hint="Amount needed after tax to fund the spouse LTC policy premium">
+                          <NumInput value={inputs.spouseLtcNetAmount} onChange={v=>set('spouseLtcNetAmount',v)} prefix="$"/>
+                        </Field>
+                        <Field label="Draw Age" hint="Primary's age at which this IRA distribution occurs">
+                          <NumInput value={inputs.spouseLtcFundingAge} onChange={v=>set('spouseLtcFundingAge',v)} suffix="yrs"/>
+                        </Field>
+                      </div>
+                      {inputs.spouseLtcNetAmount > 0 && inputs.spouseLtcFundingAge > 0 && (() => {
+                        const estRate = inputs.taxRateStressAdder ? 0.24 + inputs.taxRateStressAdder / 100 : 0.24;
+                        const estPenalty = inputs.spouseLtcFundingAge < 59.5 ? 0.10 : 0;
+                        const estGross = inputs.spouseLtcNetAmount / Math.max(0.01, 1 - estRate - estPenalty);
+                        const estTax = estGross - inputs.spouseLtcNetAmount - (estGross * estPenalty);
+                        return (
+                          <div style={{marginTop:8,padding:'9px 12px',background:'rgba(155,126,200,.05)',border:'1px solid rgba(155,126,200,.15)',borderRadius:7}}>
+                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,textAlign:'center'}}>
+                              <div>
+                                <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Net Needed</div>
+                                <div style={{fontSize:14,fontWeight:600,color:'#9B7EC8',fontFamily:"'Cormorant Garamond',serif"}}>${Math.round(inputs.spouseLtcNetAmount/1000)}K</div>
+                              </div>
+                              <div>
+                                <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Est. Gross Draw</div>
+                                <div style={{fontSize:14,fontWeight:600,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif"}}>${Math.round(estGross/1000)}K</div>
+                              </div>
+                              <div>
+                                <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Est. Tax Cost</div>
+                                <div style={{fontSize:14,fontWeight:600,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif"}}>${Math.round(estTax/1000)}K</div>
+                              </div>
+                            </div>
+                            <div style={{fontSize:11,color:'#6B8FA8',marginTop:6,textAlign:'center'}}>
+                              Preview at ~{Math.round((estRate)*100)}% marginal rate{inputs.spouseLtcFundingAge < 59.5 ? ' + 10% early withdrawal penalty' : ''} · Exact gross-up calculated in simulation
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+
+                  <div style={{padding:'10px 12px',background:'rgba(196,106,106,.06)',border:'1px solid rgba(196,106,106,.2)',borderRadius:7,marginTop:8}}>
+                    <div style={{fontSize:13,color:'#C47A7A',fontWeight:600,marginBottom:4}}>Spouse Uninsured Event — Portfolio Impact</div>
+                    <p style={{fontSize:13,color:'#DDD6C4',lineHeight:1.5}}>
+                      Spouse care costs draw directly from the shared portfolio.{inputs.architectureEnabled ? ' Layer 2 coverage keeps the portfolio intact.' : ''}
+                    </p>
+                  </div>
+                </>}
               </>}
             </Section>
 
