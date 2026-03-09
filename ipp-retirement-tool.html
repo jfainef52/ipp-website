@@ -661,7 +661,7 @@ function projectArc(inputs) {
       row.totalIncome += spLtcFund;
     }
 
-    // Determine effective filing status this year (primary death triggers widow's penalty)
+    // Determine effective filing status this year (primary death triggers surviving spouse scenario)
     const spouseAlive = filingStatus === 'mfj' && (primaryDeathAge === 0 || age <= primaryDeathAge);
     const effectiveStatus = spouseAlive ? 'mfj' : 'single';
     row.spouseAlive = spouseAlive;
@@ -1458,7 +1458,7 @@ function ArcChart({ data, view, insuredData, sorrEnabled }) {
                 <line x1={xScale(i)} x2={xScale(i)} y1={PAD.t} y2={PAD.t+chartH}
                   stroke="rgba(155,126,200,.7)" strokeWidth="2"/>
                 <text x={xScale(i)+4} y={PAD.t+14} fill="#9B7EC8" fontSize="10" fontFamily="DM Sans" fontWeight="700">
-                  Widow's Penalty
+                  Surviving Spouse
                 </text>
               </g>
             )}
@@ -1806,7 +1806,7 @@ function App() {
     primaryName: '', spouseName: '', advisorEmail: '',
   });
   const [sections, setSections] = useState({
-    basic: true, ss: true, spouseSs: true, pension: true, portfolio: true, income: true,
+    basic: true, ss: true, spouseSs: true, widower: true, pension: true, portfolio: true, income: true,
     expenses: true, drawdown: true, ltc: true, tax: true, advanced: true
   });
   const [inputs, setInputs] = useState({
@@ -2544,29 +2544,26 @@ function App() {
                   </div>
                 )}
 
-                {/* Widow/Widower Scenario */}
-                <div style={{marginTop:12,paddingTop:12,borderTop:'1px solid rgba(255,255,255,.06)'}}>
-                  <div style={{fontSize:14,fontWeight:700,letterSpacing:'.08em',textTransform:'uppercase',color:'#C47A7A',marginBottom:8}}>
-                    Widow/Widower Scenario
-                  </div>
-                  <Field label="Model Primary Death at Age" hint="Enter 0 to exclude · When primary dies, surviving spouse experiences SS survivor benefit, IRMAA bracket shift to single, and tax bracket compression">
-                    <NumInput value={inputs.primaryDeathAge} onChange={v=>set('primaryDeathAge',v)} suffix="yrs (primary age)"/>
-                  </Field>
-                  {inputs.primaryDeathAge > 0 && (
-                    <div style={{padding:'10px 12px',background:'rgba(196,106,106,.06)',border:'1px solid rgba(196,106,106,.2)',borderRadius:7,marginTop:4}}>
-                      <div style={{fontSize:14,color:'#C47A7A',fontWeight:600,marginBottom:5}}>Widow's Penalty — What Changes at Primary's Death</div>
-                      <div style={{fontSize:13,color:'#DDD6C4',lineHeight:1.75}}>
-                        <div>⟶ SS drops to <strong style={{color:'#F5F2EC'}}>one check</strong> (higher of the two)</div>
-                        <div>⟶ IRMAA brackets shift to <strong style={{color:'#F5F2EC'}}>single thresholds</strong> immediately</div>
-                        <div>⟶ Tax brackets <strong style={{color:'#F5F2EC'}}>compress to single</strong> — same income, higher rate</div>
-                        <div>⟶ Single life pension <strong style={{color:'#F5F2EC'}}>ceases</strong> · J&S reduces to elected %</div>
-                        <div>⟶ Modeled from age <strong style={{color:'#C47A7A'}}>{inputs.primaryDeathAge}</strong> forward</div>
-                      </div>
-                    </div>
-                  )}
-                </div>
               </Section>
             )}
+
+            <Section title="Surviving Spouse Scenario" collapsed={sections.widower} onToggle={()=>toggleSection('widower')}>
+              <Field label="Primary Dies at Age" hint="Enter 0 to exclude · Assumes primary has died at this age — surviving spouse receives SS survivor benefit, IRMAA shifts to single brackets, and tax brackets compress">
+                <NumInput value={inputs.primaryDeathAge} onChange={v=>set('primaryDeathAge',v)} suffix="yrs (primary age)"/>
+              </Field>
+              {inputs.primaryDeathAge > 0 && (
+                <div style={{padding:'10px 12px',background:'rgba(196,106,106,.06)',border:'1px solid rgba(196,106,106,.2)',borderRadius:7,marginTop:4}}>
+                  <div style={{fontSize:14,color:'#C47A7A',fontWeight:600,marginBottom:5}}>Surviving Spouse — What Changes</div>
+                  <div style={{fontSize:13,color:'#DDD6C4',lineHeight:1.75}}>
+                    <div>⟶ SS drops to <strong style={{color:'#F5F2EC'}}>one check</strong> (higher of the two)</div>
+                    <div>⟶ IRMAA brackets shift to <strong style={{color:'#F5F2EC'}}>single thresholds</strong> immediately</div>
+                    <div>⟶ Tax brackets <strong style={{color:'#F5F2EC'}}>compress to single</strong> — same income, higher rate</div>
+                    <div>⟶ Single life pension <strong style={{color:'#F5F2EC'}}>ceases</strong> · J&S reduces to elected %</div>
+                    <div>⟶ Primary assumed deceased from age <strong style={{color:'#C47A7A'}}>{inputs.primaryDeathAge}</strong> forward</div>
+                  </div>
+                </div>
+              )}
+            </Section>
 
             <Section title="Pension" collapsed={sections.pension} onToggle={()=>toggleSection('pension')}>
 
@@ -2605,7 +2602,7 @@ function App() {
 
                 {inputs.pensionType === 'single' && inputs.filingStatus === 'mfj' && (
                   <div style={{background:'rgba(196,122,122,.08)',border:'1px solid rgba(196,122,122,.2)',borderRadius:6,padding:'9px 12px',fontSize:13,color:'#C47A7A',lineHeight:1.5}}>
-                    ⚠ Single life — pension payments cease at the primary's death. Model with "Primary Death Age" in the Widow/Widower Scenario.
+                    ⚠ Single life — pension payments cease at the primary's death. Model with "Primary Dies at Age" in the Surviving Spouse Scenario.
                   </div>
                 )}
 
@@ -3342,7 +3339,7 @@ function App() {
               { label:'Total Net Income', value: totalNetIncome>=1000000?'$'+(totalNetIncome/1000000).toFixed(1)+'M':'$'+Math.round(totalNetIncome/1000)+'K', sub:'After fed · state · IRMAA', color:'#7BAF84' },
               { label:'Total Tax-Free Income', value: totalTaxFreeIncome>=1000000?'$'+(totalTaxFreeIncome/1000000).toFixed(1)+'M':'$'+Math.round(totalTaxFreeIncome/1000)+'K', sub:'Roth · ETA · Tax-free annuity', color:'#A8C5D8' },
               ...(isMarried && inputs.primaryDeathAge > 0 ? [{
-              label: 'Widow’s Penalty Year',
+              label: 'Surviving Spouse From',
               value: 'Age ' + inputs.primaryDeathAge,
               sub: 'SS ↓ · IRMAA single brackets · Tax compression',
               color: '#9B7EC8',
