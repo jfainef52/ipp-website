@@ -634,15 +634,4 @@
       entries.forEach(entry => {
         if (entry.isIntersecting) entry.target.classList.add('visible');
       });
-    }, { threshold: 0.05, rootMargin: '0px 0px -40px 0px' });
-    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
-  }
-  window.addEventListener('hashchange', () => {
-    const target = document.querySelector(window.location.hash);
-    if (target) target.querySelectorAll('.reveal').forEach(el => el.classList.add('visible'));
-  });
-</script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="ipp-design-improvements.js?v=10"></script>
-</body>
-</html>
+    }, { threshold: 0.05, rootMargin: '0px 0px -40p
