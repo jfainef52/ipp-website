@@ -1770,6 +1770,13 @@ function App() {
   // plan's fundamental strength (income, portfolio, architecture) without a care shock.
   const { years, confidence, fixedStreams, mcStartAge } = projectArc({ ...baseProjectionInputs, ltcInsured: false, ltcEventAge: 0 });
 
+  // Primary display projection — includes LTC event if entered (uninsured view)
+  // This is what the chart and number table show when architecture is OFF or no LTC comparison
+  const hasLtcEvent = inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
+  const { years: yearsWithLtc } = hasLtcEvent
+    ? projectArc({ ...baseProjectionInputs, ltcInsured: false })
+    : { years: years };
+
   // LTC comparison projections — only when architecture is enabled and LTC inputs are set.
   // These two scores are used exclusively in the Layer 2 Healthcare panel comparison.
   // confidenceUninsured = plan survival WITH a care event and NO policy (shock applied)
@@ -3306,10 +3313,10 @@ function App() {
             {view === 'visual' ? (
               <>
                 <Legend insuredData={yearsInsured}/>
-                <ArcChart data={yearsUninsured || years} view={view} insuredData={yearsInsured} sorrEnabled={inputs.sorrEnabled}/>
+                <ArcChart data={yearsUninsured || yearsWithLtc} view={view} insuredData={yearsInsured} sorrEnabled={inputs.sorrEnabled}/>
               </>
             ) : (
-              <DataTable data={years}/>
+              <DataTable data={yearsWithLtc}/>
             )}
           </div>
 
