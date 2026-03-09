@@ -475,6 +475,7 @@ function projectArc(inputs) {
     spousePensionMonthly = 0, spousePensionStartAge = 65,
     primaryDeathAge = 0,
     traditionalBalance, rothBalance, taxableBalance,
+    spouseTraditionalBalance = 0,
     rothAnnuityMonthly = 0, rothAnnuityStartAge = 65,
     etaAnnualIncome = 0, etaStartAge = 70, etaColaRate = 0,
     etaFundingAmount = 0, etaFundingAge = 0,
@@ -494,6 +495,8 @@ function projectArc(inputs) {
     tradContributionEndAge = 0,
     annualTaxableContribution = 0,
     taxableContributionEndAge = 0,
+    annualSpouseTradContribution = 0,
+    spouseTradContributionEndAge = 0,
   } = inputs;
 
   // Sequence of Returns Risk overrides — years 0-4 of retirement (index = age - retireAge)
@@ -523,13 +526,16 @@ function projectArc(inputs) {
   let trad = traditionalBalance;
   let roth = rothBalance;
   let taxable = taxableBalance;
+  let spouseTrad = (filingStatus === 'mfj') ? (spouseTraditionalBalance || 0) : 0;
 
   if (currentAge < retireAge) {
     const tradStopAge    = tradContributionEndAge    > 0 ? tradContributionEndAge    : retireAge;
     const taxableStopAge = taxableContributionEndAge > 0 ? taxableContributionEndAge : retireAge;
+    const spouseTradStopAge = spouseTradContributionEndAge > 0 ? spouseTradContributionEndAge : retireAge;
     for (let a = currentAge; a < retireAge; a++) {
       const tradContrib    = (annualTradContribution    > 0 && a < tradStopAge)    ? annualTradContribution    : 0;
       const taxableContrib = (annualTaxableContribution > 0 && a < taxableStopAge) ? annualTaxableContribution : 0;
+      const spouseTradContrib = (annualSpouseTradContribution > 0 && a < spouseTradStopAge) ? annualSpouseTradContribution : 0;
       // ETA funding event — reduce trad balance in the funding year (pre-retirement)
       if (archEtaFundingAmount > 0 && etaFundingAge > 0 && a === etaFundingAge) {
         trad = Math.max(0, trad - archEtaFundingAmount);
@@ -546,6 +552,7 @@ function projectArc(inputs) {
       trad    = trad    * (1 + portfolioReturn) + tradContrib;
       taxable = taxable * (1 + portfolioReturn) + taxableContrib;
       roth    = roth    * (1 + portfolioReturn);
+      spouseTrad = spouseTrad * (1 + portfolioReturn) + spouseTradContrib;
     }
   }
 
@@ -739,7 +746,7 @@ function projectArc(inputs) {
       row.etaIncome = etaThisYear;
     }
 
-    // RMD
+    // RMD — Primary
     if (age >= 73 && trad > 0) {
       const rmdAmt = trad / getRMDFactor(age);
       row.sources.rmd = rmdAmt;
@@ -747,6 +754,21 @@ function projectArc(inputs) {
       trad = Math.max(0, (trad - rmdAmt) * (1 + yearReturn));
     } else {
       trad = trad * (1 + yearReturn);
+    }
+
+    // RMD — Spouse (separate account, separate schedule based on spouse's age)
+    if (filingStatus === 'mfj' && spouseTrad > 0) {
+      const spouseAge = age - spouseDobOffset;
+      const spouseAliveForRmd = spouseDeathAge === 0 || age <= spouseDeathAge;
+      if (spouseAge >= 73 && spouseAliveForRmd) {
+        const spouseRmdAmt = spouseTrad / getRMDFactor(spouseAge);
+        row.sources.rmd = (row.sources.rmd || 0) + spouseRmdAmt;
+        row.totalIncome += spouseRmdAmt;
+        spouseTrad = Math.max(0, (spouseTrad - spouseRmdAmt) * (1 + yearReturn));
+      } else if (spouseAliveForRmd) {
+        spouseTrad = spouseTrad * (1 + yearReturn);
+      }
+      // If spouse has died, spouseTrad rolls into estate — stop growing/distributing
     }
 
     // Strategic drawdown — intentional pre-gap draws (Roth Annuity conversion window, bracket filling; ETA funds tax cost)
@@ -992,8 +1014,8 @@ function projectArc(inputs) {
     }
 
     // Portfolio snapshot
-    row.totalPortfolio = trad + roth + taxable;
-    row.trad = trad; row.roth = roth; row.taxable = taxable;
+    row.totalPortfolio = trad + roth + taxable + spouseTrad;
+    row.trad = trad; row.roth = roth; row.taxable = taxable; row.spouseTrad = spouseTrad;
 
     // IRMAA MAGI — only taxable sources count. Tax-free sources (Roth, ETA policy loans,
     // LTC benefit proceeds, Roth annuity) are explicitly excluded — they do not appear
@@ -1738,6 +1760,7 @@ function App() {
     spousePensionMonthly: 0, spousePensionStartAge: 65,
     primaryDeathAge: 0,
     traditionalBalance: 1000000, rothBalance: 0, taxableBalance: 250000,
+    spouseTraditionalBalance: 0,
     rothAnnuityMonthly: 0, rothAnnuityStartAge: 65,
     etaAnnualIncome: 0, etaStartAge: 70, etaFundingDraw: 0, etaColaRate: 0,
     etaFundingAmount: 0, etaFundingAge: 0,
@@ -1755,6 +1778,7 @@ function App() {
     portfolioReturn: 6.5, inflation: 2.8, sorrEnabled: false,
     annualTradContribution: 0, tradContributionEndAge: 0,
     annualTaxableContribution: 0, taxableContributionEndAge: 0,
+    annualSpouseTradContribution: 0, spouseTradContributionEndAge: 0,
   });
 
   const set = (k, v) => setInputs(prev => ({...prev, [k]: v}));
@@ -2003,6 +2027,8 @@ function App() {
           ['Traditional Balance (Today)',fmtM(inputs.traditionalBalance)],
           ['Roth Balance (Today)',fmtM(inputs.rothBalance)],
           ['Taxable Balance (Today)',fmtM(inputs.taxableBalance)],
+          ...(inputs.filingStatus==='mfj' && inputs.spouseTraditionalBalance > 0 ? [['Spouse Traditional (Today)', fmtM(inputs.spouseTraditionalBalance)]] : []),
+          ...(inputs.filingStatus==='mfj' && inputs.annualSpouseTradContribution > 0 ? [['Spouse Annual Contribution', fmtM(inputs.annualSpouseTradContribution)+'/yr']] : []),
           ['Portfolio at Retirement (Projected)',fmtM(totalPortfolioAtRetire)],
           ...(inputs.sorrEnabled?[['SORR Stress Scenario','Active — First 5 Yrs']]:[] ),
           ...(inputs.taxRateStressAdder>0?[['Tax Rate Stress Adder','+'+inputs.taxRateStressAdder+'%']]:[] ),
@@ -2423,6 +2449,11 @@ function App() {
               <div style={{fontSize:14,fontWeight:700,color:'#9EB8CC',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:10}}>
                 Current Balances (Today)
               </div>
+
+              {/* Primary balances */}
+              <div style={{fontSize:13,fontWeight:700,color:'#9EB8CC',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:6}}>
+                {inputs.filingStatus === 'mfj' ? 'Primary' : 'Balances'}
+              </div>
               <Field label="Traditional / Pre-Tax" hint="401(k), IRA, 403(b) — today's balance">
                 <NumInput value={inputs.traditionalBalance} onChange={v=>set('traditionalBalance',v)} prefix="$"/>
               </Field>
@@ -2432,6 +2463,32 @@ function App() {
               <Field label="Taxable / Brokerage" hint="Today's balance">
                 <NumInput value={inputs.taxableBalance} onChange={v=>set('taxableBalance',v)} prefix="$"/>
               </Field>
+
+              {/* Spouse qualified balance — MFJ only, separate RMD schedule */}
+              {inputs.filingStatus === 'mfj' && <>
+                <div style={{marginTop:14,paddingTop:12,borderTop:'1px solid rgba(255,255,255,.06)',fontSize:13,fontWeight:700,color:'#9EB8CC',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:6}}>
+                  Spouse
+                </div>
+                <Field label="Spouse Traditional / Pre-Tax" hint="Spouse's 401(k), IRA, 403(b) — RMD schedule based on spouse's age">
+                  <NumInput value={inputs.spouseTraditionalBalance} onChange={v=>set('spouseTraditionalBalance',v)} prefix="$"/>
+                </Field>
+                {inputs.spouseTraditionalBalance > 0 && (
+                  <div style={{background:'rgba(91,143,168,.07)',border:'1px solid rgba(91,143,168,.18)',borderRadius:6,padding:'8px 12px',fontSize:13,color:'#8DAFC8',lineHeight:1.5}}>
+                    RMDs calculated on spouse's age using their own Uniform Lifetime Table schedule — begins at age 73, separate from primary's RMDs.
+                  </div>
+                )}
+                {/* Spouse contributions — only if pre-retirement */}
+                {inputs.currentAge < inputs.retireAge && <>
+                  <Field label="Spouse Annual Contribution" hint="Spouse's annual 401(k) or IRA contribution — grows tax-deferred to retirement">
+                    <NumInput value={inputs.annualSpouseTradContribution} onChange={v=>set('annualSpouseTradContribution',v)} prefix="$" suffix="/yr"/>
+                  </Field>
+                  {inputs.annualSpouseTradContribution > 0 && (
+                    <Field label="Spouse Stop Contributing at Age" hint="Default: primary's retirement age">
+                      <NumInput value={inputs.spouseTradContributionEndAge||inputs.retireAge} onChange={v=>set('spouseTradContributionEndAge',v)} suffix="yrs"/>
+                    </Field>
+                  )}
+                </>}
+              </>}
 
               {/* Contributions — only show if pre-retirement */}
               {inputs.currentAge < inputs.retireAge && <>
@@ -2463,15 +2520,19 @@ function App() {
                   const yrs = inputs.retireAge - inputs.currentAge;
                   const tradStop = inputs.tradContributionEndAge > 0 ? inputs.tradContributionEndAge : inputs.retireAge;
                   const taxStop  = inputs.taxableContributionEndAge > 0 ? inputs.taxableContributionEndAge : inputs.retireAge;
+                  const spouseStop = inputs.spouseTradContributionEndAge > 0 ? inputs.spouseTradContributionEndAge : inputs.retireAge;
                   let t = inputs.traditionalBalance, x = inputs.taxableBalance, r = inputs.rothBalance;
+                  let st = (inputs.filingStatus === 'mfj') ? (inputs.spouseTraditionalBalance || 0) : 0;
                   for (let a = inputs.currentAge; a < inputs.retireAge; a++) {
                     const tc = (inputs.annualTradContribution > 0 && a < tradStop) ? inputs.annualTradContribution : 0;
                     const xc = (inputs.annualTaxableContribution > 0 && a < taxStop) ? inputs.annualTaxableContribution : 0;
+                    const sc = (inputs.annualSpouseTradContribution > 0 && a < spouseStop) ? inputs.annualSpouseTradContribution : 0;
                     t = t * (1 + ret) + tc;
                     x = x * (1 + ret) + xc;
                     r = r * (1 + ret);
+                    st = st * (1 + ret) + sc;
                   }
-                  const total = t + x + r;
+                  const total = t + x + r + st;
                   const fmtM = v => v >= 1000000 ? '$'+(v/1000000).toFixed(2)+'M' : '$'+Math.round(v/1000)+'K';
                   return (
                     <div style={{marginTop:10,padding:'12px 14px',background:'rgba(74,155,122,.06)',border:'1px solid rgba(74,155,122,.2)',borderRadius:8}}>
@@ -2483,6 +2544,7 @@ function App() {
                           { label:'Traditional', val: t },
                           { label:'Roth', val: r },
                           { label:'Taxable', val: x },
+                          ...(inputs.filingStatus === 'mfj' && st > 0 ? [{ label:'Spouse Trad', val: st }] : []),
                         ].map(item => (
                           <div key={item.label} style={{textAlign:'center'}}>
                             <div style={{fontSize:13,color:'#8DAFC8',letterSpacing:'.05em',textTransform:'uppercase',marginBottom:3}}>{item.label}</div>
