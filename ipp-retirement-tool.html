@@ -3358,70 +3358,104 @@ function App() {
           {/* IRMAA warning */}
           {totalIrmaa > 0 && <IrmaaBar years={yearsWithLtc}/>}
 
-          {/* All-In Tax Rate Panel — Year 1 + Peak side by side */}
+          {/* Tax Rate Panel — Year 1 + Peak side by side */}
           {retireData && (() => {
-            // Shared sub-component: renders one rate box (Year 1 or Peak)
-            const RateBox = ({ title, allInRate, fedMarginal, stateRate, fedEffective, stateTax, grossInc, irmaaAmt, magi, sources, peakAge, deltaVsY1, accentColor, stateInfo }) => {
+            const RateBox = ({ title, fedMarginal, stateRate, fedEffective, stateTax, grossInc, irmaaAmt, magi, sources, peakAge, deltaVsY1, accentColor, stateInfo, tooltipLines }) => {
+              const [showTip, setShowTip] = React.useState(false);
               const stateExempt = stateInfo?.treatment === 'none' || stateInfo?.treatment === 'exempt';
-              const statePct = grossInc > 0 ? (stateTax / grossInc * 100).toFixed(1) : '0.0';
-              const irmaaPct = grossInc > 0 ? (irmaaAmt / grossInc * 100).toFixed(1) : '0.0';
-              const taxableSources = [
-                { key:'ss',       label:'Soc Sec',     val: sources?.ss,      color: COLORS.ss.fill },
-                { key:'rmd',      label:'Trad / RMD',  val: sources?.rmd,     color: COLORS.rmd.fill },
-                { key:'pension',  label:'Pension',     val: sources?.pension, color: COLORS.pension.fill },
-                { key:'annuity',  label:'NQ Ann.',     val: sources?.annuity, color: COLORS.annuity.fill },
-                { key:'parttime', label:'Part-Time',   val: sources?.parttime,color: COLORS.parttime.fill },
+              // TRUE marginal = federal bracket rate + state marginal rate on the same dollar
+              const stateMarginal   = stateExempt ? 0 : stateRate;
+              const trueMarginal    = fedMarginal + stateMarginal;
+              // EFFECTIVE = (fed tax + state tax + IRMAA) / gross income — blended average
+              const allInEffective  = grossInc > 0 ? ((grossInc * fedEffective) + stateTax + irmaaAmt) / grossInc : 0;
+              const irmaaPct        = grossInc > 0 ? (irmaaAmt / grossInc * 100) : 0;
+              const taxableSources  = [
+                { key:'ss',       label:'Soc Sec',    val: sources?.ss,       color: COLORS.ss.fill },
+                { key:'rmd',      label:'Trad / RMD', val: sources?.rmd,      color: COLORS.rmd.fill },
+                { key:'pension',  label:'Pension',    val: sources?.pension,  color: COLORS.pension.fill },
+                { key:'annuity',  label:'NQ Ann.',    val: sources?.annuity,  color: COLORS.annuity.fill },
+                { key:'parttime', label:'Part-Time',  val: sources?.parttime, color: COLORS.parttime.fill },
               ].filter(s => (s.val||0) > 0);
               return (
-                <div style={{flex:1,minWidth:260,background:'rgba(255,255,255,.025)',border:`1px solid ${accentColor}33`,borderRadius:10,padding:'14px 16px'}}>
-                  {/* Title */}
+                <div style={{flex:1,minWidth:280,background:'rgba(255,255,255,.025)',border:`1px solid ${accentColor}33`,borderRadius:10,padding:'14px 16px',position:'relative'}}>
+
+                  {/* Title row with i button */}
                   <div style={{fontSize:13,fontWeight:700,color:accentColor,letterSpacing:'.1em',textTransform:'uppercase',marginBottom:6,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                    <span>{title}</span>
-                    {peakAge && <span style={{fontSize:13,color:'#8DAFC8'}}>Age {peakAge}</span>}
-                    {deltaVsY1 && <span style={{fontSize:13,color:accentColor}}>+{deltaVsY1}% vs Yr 1</span>}
+                    <div style={{display:'flex',alignItems:'center',gap:6}}>
+                      <span>{title}</span>
+                      <span
+                        onClick={() => setShowTip(v => !v)}
+                        style={{width:15,height:15,borderRadius:'50%',border:`1px solid ${accentColor}99`,display:'inline-flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700,color:accentColor,cursor:'pointer',flexShrink:0,userSelect:'none',opacity:.75,fontFamily:'sans-serif',lineHeight:1}}
+                      >i</span>
+                    </div>
+                    <div style={{display:'flex',gap:8}}>
+                      {peakAge   && <span style={{fontSize:12,color:'#8DAFC8'}}>Age {peakAge}</span>}
+                      {deltaVsY1 && <span style={{fontSize:12,color:accentColor}}>+{deltaVsY1}% vs Yr 1</span>}
+                    </div>
                   </div>
 
-                  {/* Big rate number */}
-                  <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:4}}>
-                    <span style={{fontSize:34,fontWeight:700,fontFamily:"'Cormorant Garamond',serif",color:accentColor,lineHeight:1}}>
-                      {(allInRate*100).toFixed(1)}%
+                  {/* Tooltip */}
+                  {showTip && (
+                    <div style={{position:'absolute',top:42,left:0,right:0,zIndex:200,background:'#0C1A27',border:`1px solid ${accentColor}44`,borderRadius:8,padding:'12px 14px',boxShadow:'0 6px 24px rgba(0,0,0,.65)'}}>
+                      {tooltipLines.map((line, i) => (
+                        <div key={i} style={{fontSize:12,color:i===0?'#F5F2EC':'#A0B4C4',lineHeight:1.7,fontWeight:i===0?600:400,marginBottom:i===0?5:0}}>{line}</div>
+                      ))}
+                      <div style={{marginTop:8,textAlign:'right'}}>
+                        <span onClick={()=>setShowTip(false)} style={{fontSize:11,color:'#8DAFC8',cursor:'pointer',textDecoration:'underline'}}>close</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* PRIMARY: true marginal rate (fed bracket + state on same dollar) */}
+                  <div style={{display:'flex',alignItems:'baseline',gap:6,marginBottom:1}}>
+                    <span style={{fontSize:36,fontWeight:700,fontFamily:"'Cormorant Garamond',serif",color:accentColor,lineHeight:1}}>
+                      {(trueMarginal*100).toFixed(1)}%
                     </span>
-                    <span style={{fontSize:14,color:'#8DAFC8'}}>all-in marginal</span>
+                    <span style={{fontSize:12,color:'#8DAFC8'}}>marginal rate</span>
+                  </div>
+                  <div style={{fontSize:12,color:'#7A9BB0',marginBottom:8}}>
+                    Fed {(fedMarginal*100).toFixed(0)}% bracket · {stateInfo?.name||'State'} {stateExempt ? '✓ exempt' : (stateMarginal*100).toFixed(2)+'%'}
                   </div>
 
-                  {/* Fed + State line */}
-                  <div style={{fontSize:14,color:'#9EB8CC',marginBottom:10}}>
-                    Fed {(fedMarginal*100).toFixed(0)}% marginal · {stateInfo?.name||'State'} {stateExempt ? '✓ exempt' : (stateRate*100).toFixed(2)+'%'}
+                  {/* SECONDARY: all-in effective — clearly labeled as blended */}
+                  <div style={{display:'flex',alignItems:'baseline',gap:6,marginBottom:10,paddingBottom:10,borderBottom:'1px solid rgba(255,255,255,.06)'}}>
+                    <span style={{fontSize:22,fontWeight:600,fontFamily:"'Cormorant Garamond',serif",color:'#6A8BA8'}}>
+                      {(allInEffective*100).toFixed(1)}%
+                    </span>
+                    <span style={{fontSize:11,color:'#506070'}}>effective (blended) · all taxes ÷ gross income</span>
                   </div>
 
-                  {/* 4-column breakdown grid */}
+                  {/* 4-col grid */}
                   <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:6,marginBottom:10,paddingBottom:10,borderBottom:'1px solid rgba(255,255,255,.06)'}}>
                     {[
-                      { label:'Fed Marginal', value:(fedMarginal*100).toFixed(0)+'%', color:'#C47A7A' },
-                      { label:'Fed Effective', value:(fedEffective*100).toFixed(1)+'%', color:'#C47A7A' },
-                      { label: stateInfo?.name||'State', value: stateExempt ? '0.0%' : statePct+'%', color:'#C8A030', badge: stateExempt ? '✓ exempt' : null },
-                      { label:'IRMAA', value: irmaaPct+'%', color:'#E8943A' },
+                      { label:'Fed Marginal',  value:(fedMarginal*100).toFixed(0)+'%',  color:'#C47A7A' },
+                      { label:'Fed Effective', value:(fedEffective*100).toFixed(1)+'%', color:'#C8A96E' },
+                      { label: stateInfo?.name||'State',
+                        value: stateExempt ? '—' : (stateMarginal*100).toFixed(2)+'%',
+                        color:'#C8A030',
+                        badge: stateExempt ? '✓ exempt' : null },
+                      { label:'IRMAA',         value: irmaaPct.toFixed(1)+'%',          color:'#E8943A' },
                     ].map(item => (
                       <div key={item.label} style={{textAlign:'center'}}>
-                        <div style={{fontSize:14,color:'#8DAFC8',letterSpacing:'.05em',textTransform:'uppercase',marginBottom:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{item.label}</div>
-                        <div style={{fontSize:14,fontWeight:600,color:item.color,fontFamily:"'Cormorant Garamond',serif"}}>{item.value}</div>
-                        {item.badge && <div style={{fontSize:14,color:'#4A9B7A'}}>{item.badge}</div>}
+                        <div style={{fontSize:10,color:'#6A8BA0',letterSpacing:'.05em',textTransform:'uppercase',marginBottom:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{item.label}</div>
+                        <div style={{fontSize:13,fontWeight:600,color:item.color,fontFamily:"'Cormorant Garamond',serif"}}>{item.value}</div>
+                        {item.badge && <div style={{fontSize:10,color:'#4A9B7A'}}>{item.badge}</div>}
                       </div>
                     ))}
                   </div>
 
-                  {/* Taxable income source breakdown */}
+                  {/* Income sources */}
                   {taxableSources.length > 0 && (
                     <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'flex-end'}}>
                       {taxableSources.map(s => (
                         <div key={s.key} style={{textAlign:'center'}}>
-                          <div style={{fontSize:14,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:1}}>{s.label}</div>
-                          <div style={{fontSize:14,fontWeight:600,color:s.color,fontFamily:"'Cormorant Garamond',serif"}}>${Math.round(s.val/1000)}K</div>
+                          <div style={{fontSize:10,color:'#6A8BA0',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:1}}>{s.label}</div>
+                          <div style={{fontSize:13,fontWeight:600,color:s.color,fontFamily:"'Cormorant Garamond',serif"}}>${Math.round(s.val/1000)}K</div>
                         </div>
                       ))}
                       <div style={{textAlign:'center',marginLeft:4}}>
-                        <div style={{fontSize:14,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:1}}>MAGI</div>
-                        <div style={{fontSize:14,fontWeight:600,color:'#9B7EC8',fontFamily:"'Cormorant Garamond',serif"}}>${Math.round((magi||0)/1000)}K</div>
+                        <div style={{fontSize:10,color:'#6A8BA0',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:1}}>MAGI</div>
+                        <div style={{fontSize:13,fontWeight:600,color:'#9B7EC8',fontFamily:"'Cormorant Garamond',serif"}}>${Math.round((magi||0)/1000)}K</div>
                       </div>
                     </div>
                   )}
@@ -3429,14 +3463,25 @@ function App() {
               );
             };
 
+            const y1Tooltip = [
+              'Marginal Rate — Year 1 of Retirement',
+              'The rate on the next additional dollar of ordinary income in your first retirement year. It equals your federal bracket rate plus your state rate on that same dollar.',
+              'This is what matters for Roth conversions, IRA withdrawal sequencing, and any income layered on top of guaranteed sources — it tells you the exact cost of the next dollar earned.',
+              'The smaller effective (blended) rate shows the average across all income in Year 1. It is always lower because earlier dollars fall into lower brackets.',
+            ];
+
+            const peakTooltip = [
+              'Peak Marginal Rate — Worst-Case Year',
+              'The highest federal bracket rate reached in any single year of the retirement projection. It typically occurs when RMDs are at their largest, often in the mid-to-late 70s.',
+              'This is the maximum rate at which any incremental income will be taxed across the plan — the ceiling of tax exposure.',
+              'The gap between Peak and Year 1 marginal rates shows how much bracket creep occurs as required minimum distributions compound, and reveals the urgency of pre-RMD Roth conversion planning.',
+            ];
+
             return (
               <div style={{marginBottom:12}}>
-                {/* Two boxes side by side */}
                 <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
-                  {/* Year 1 box */}
                   <RateBox
-                    title="All-In Marginal Rate · Year 1"
-                    allInRate={allInMarginalRate}
+                    title="Marginal Rate · Year 1"
                     fedMarginal={fedMarginalRate}
                     stateRate={retireData.stateTaxRate||0}
                     fedEffective={retireData.effectiveTaxRate||0}
@@ -3446,14 +3491,12 @@ function App() {
                     magi={retireData.magi||0}
                     sources={retireData.sources}
                     stateInfo={stateInfo}
+                    tooltipLines={y1Tooltip}
                     accentColor={allInMarginalRate > 0.40 ? '#C47A7A' : allInMarginalRate > 0.30 ? '#C8A030' : '#4A9B7A'}
                   />
-
-                  {/* Peak box — only if a later year is higher */}
                   {peakMarginalRow && (
                     <RateBox
-                      title="Peak All-In Marginal Rate"
-                      allInRate={peakMarginalRate}
+                      title="Peak Marginal Rate"
                       fedMarginal={peakFedMarginalRate}
                       stateRate={peakMarginalRow.stateTaxRate||0}
                       fedEffective={peakMarginalRow.effectiveTaxRate||0}
@@ -3465,6 +3508,7 @@ function App() {
                       peakAge={peakMarginalRow.age}
                       deltaVsY1={((peakMarginalRate - allInMarginalRate)*100).toFixed(1)}
                       stateInfo={stateInfo}
+                      tooltipLines={peakTooltip}
                       accentColor={peakMarginalRate > 0.40 ? '#C47A7A' : '#C8A030'}
                     />
                   )}
