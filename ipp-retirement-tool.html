@@ -1096,7 +1096,6 @@ function projectArc(inputs) {
     row.stateTaxRate = stateEffRate;
     row.ordinaryTax = taxResult.ordinaryTax;
     row.ltcgTax = taxResult.ltcgTax;
-    row.grossIncome = row.totalIncome;
     row.ltcGrossUpTaxNote = row.ltcEvent && row.ltcGrossUpTax > 0
       ? `LTC draws grossed up — $${Math.round((row.ltcGrossUpTax||0)/1000)}K additional tax this year`
       : null;
@@ -1124,6 +1123,9 @@ function projectArc(inputs) {
       }
       delete row._conversionOveragePending;
     }
+
+    // Capture gross income (pre-tax, excludes overage gross-up draw which is a tax-covering draw not spendable income)
+    row.grossIncome = row.totalIncome - (row.rothConversionOverage || 0);
 
     // Combined all-in tax (federal + state; IRMAA already in expenses)
     const totalAllInTax = taxResult.totalTax + stateTax;
@@ -1833,7 +1835,7 @@ function App() {
 
   // Lifetime income summaries (retirement years only)
   const retirementYears = years.filter(y => y.age >= inputs.retireAge);
-  const totalGrossIncome = retirementYears.reduce((sum, y) => sum + (y.totalIncome||0), 0);
+  const totalGrossIncome = retirementYears.reduce((sum, y) => sum + (y.grossIncome||0), 0);
   const totalTaxFreeIncome = retirementYears.reduce((sum, y) =>
     sum + (y.sources.roth||0) + (y.sources.eta||0) + (y.sources.annuityTaxFree||0), 0);
   const totalNetIncome = totalGrossIncome - totalEstTax - totalIrmaa;
