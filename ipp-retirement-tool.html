@@ -459,7 +459,6 @@ function projectArc(inputs) {
     filingStatus = 'single',
     spouseSsMonthly = 0, spouseSsClaimAge = 67, spouseFra = 67,
     spouseDobOffset = 0,
-    spouseDeathAge = 0,
     // Strategic drawdown
     annualTradDrawdown = 0,       // intentional IRA/trad draw per year (pre-RMD Roth Annuity conversion; ETA can fund conversion tax cost)
     tradDrawdownStartAge = 0,     // age to begin intentional draws
@@ -618,11 +617,11 @@ function projectArc(inputs) {
       row.totalIncome += ltcFund;
     }
 
-    // Determine effective filing status this year (spouse death changes it)
-    const spouseAlive = filingStatus === 'mfj' && (spouseDeathAge === 0 || age <= spouseDeathAge);
+    // Determine effective filing status this year (primary death triggers widow's penalty)
+    const spouseAlive = filingStatus === 'mfj' && (primaryDeathAge === 0 || age <= primaryDeathAge);
     const effectiveStatus = spouseAlive ? 'mfj' : 'single';
     row.spouseAlive = spouseAlive;
-    row.spouseDiedThisYear = (filingStatus === 'mfj' && spouseDeathAge > 0 && age === spouseDeathAge);
+    row.primaryDiedThisYear = (filingStatus === 'mfj' && primaryDeathAge > 0 && age === primaryDeathAge);
 
     // Social Security — primary
     let primarySS = 0, spouseSS = 0;
@@ -638,19 +637,15 @@ function projectArc(inputs) {
       } else if (spouseSsMonthly === 0 && age >= ssClaimAge) {
         spouseSS = ssBenefitAtAge(ssMonthly, fra, fra) * 0.5 * 12 * inflFactor;
       }
-    } else if (filingStatus === 'mfj' && spouseDeathAge > 0) {
-      // Survivor benefit: primary keeps their own check; receives higher of the two as survivor benefit
-      // SS already counted above — survivor gets max of own vs deceased spouse's benefit
-      // If spouse's benefit was higher, survivor steps up to that amount
-      const deceasedSpouseBenefit = spouseSsMonthly > 0
+    } else if (filingStatus === 'mfj' && primaryDeathAge > 0) {
+      // Primary has died — surviving spouse receives higher of their own benefit or deceased primary's
+      const deceasedPrimaryBenefit = ssBenefitAtAge(ssMonthly, fra, ssClaimAge) * 12 * inflFactor;
+      const survivorBenefit = Math.max(spouseSsMonthly > 0
         ? ssBenefitAtAge(spouseSsMonthly, spouseFra, spouseSsClaimAge) * 12 * inflFactor
-        : 0;
-      if (deceasedSpouseBenefit > primarySS) {
-        // Survivor steps up — replace primarySS with the higher survivor amount
-        primarySS = deceasedSpouseBenefit;
-        row.survivorBenefit = true;
-      }
-      // Either way, only ONE check in retirement after spouse death
+        : 0, deceasedPrimaryBenefit);
+      primarySS = survivorBenefit; // survivor receives one check — the higher of the two
+      row.survivorBenefit = true;
+      // Only ONE check in retirement after primary death
     }
     const totalSS = primarySS + spouseSS;
     if (totalSS > 0) {
@@ -677,8 +672,7 @@ function projectArc(inputs) {
             effectivePension = 0; // single life — ceases at primary's death
           } else {
             // Joint & Survivor — spouse receives the prescribed percentage
-            const spouseAliveAtPrimaryDeath = spouseDeathAge === 0 || age <= spouseDeathAge;
-            effectivePension = spouseAliveAtPrimaryDeath ? pensionMonthly * (pensionSurvivorPct / 100) : 0;
+            effectivePension = pensionMonthly * (pensionSurvivorPct / 100); // spouse receives survivor %
           }
         }
       }
@@ -690,11 +684,10 @@ function projectArc(inputs) {
       }
     }
 
-    // Spouse Pension — starts at spousePensionStartAge, runs to planToAge, stops if spouse dies
+    // Spouse Pension — starts at spousePensionStartAge, runs to planToAge
     if (spousePensionMonthly > 0 && filingStatus === 'mfj') {
       const spouseAge = age - spouseDobOffset;
-      const spouseAlive = spouseDeathAge === 0 || age <= spouseDeathAge;
-      if (spouseAge >= spousePensionStartAge && spouseAlive) {
+      if (spouseAge >= spousePensionStartAge) {
         const spPAnnual = spousePensionMonthly * 12 * inflFactor;
         row.sources.pension = (row.sources.pension || 0) + spPAnnual;
         row.totalIncome += spPAnnual;
@@ -759,16 +752,14 @@ function projectArc(inputs) {
     // RMD — Spouse (separate account, separate schedule based on spouse's age)
     if (filingStatus === 'mfj' && spouseTrad > 0) {
       const spouseAge = age - spouseDobOffset;
-      const spouseAliveForRmd = spouseDeathAge === 0 || age <= spouseDeathAge;
-      if (spouseAge >= 73 && spouseAliveForRmd) {
+      if (spouseAge >= 73) {
         const spouseRmdAmt = spouseTrad / getRMDFactor(spouseAge);
         row.sources.rmd = (row.sources.rmd || 0) + spouseRmdAmt;
         row.totalIncome += spouseRmdAmt;
         spouseTrad = Math.max(0, (spouseTrad - spouseRmdAmt) * (1 + yearReturn));
-      } else if (spouseAliveForRmd) {
+      } else {
         spouseTrad = spouseTrad * (1 + yearReturn);
       }
-      // If spouse has died, spouseTrad rolls into estate — stop growing/distributing
     }
 
     // Strategic drawdown — intentional pre-gap draws (Roth Annuity conversion window, bracket filling; ETA funds tax cost)
@@ -1755,7 +1746,7 @@ function App() {
     filingStatus: 'single',
     currentAge: 60, retireAge: 65, planToAge: 92, fra: 67,
     ssMonthly: 2800, ssClaimAge: 67,
-    spouseSsMonthly: 0, spouseSsClaimAge: 67, spouseFra: 67, spouseDobOffset: 0, spouseCurrentAge: null, spouseDeathAge: 0,
+    spouseSsMonthly: 0, spouseSsClaimAge: 67, spouseFra: 67, spouseDobOffset: 0, spouseCurrentAge: null,
     pensionMonthly: 0, pensionStartAge: 65, pensionType: 'single', pensionSurvivorPct: 50,
     spousePensionMonthly: 0, spousePensionStartAge: 65,
     primaryDeathAge: 0,
@@ -2346,25 +2337,23 @@ function App() {
                   </div>
                 )}
 
-                {/* Spouse death scenario */}
+                {/* Widow/Widower Scenario */}
                 <div style={{marginTop:12,paddingTop:12,borderTop:'1px solid rgba(255,255,255,.06)'}}>
                   <div style={{fontSize:14,fontWeight:700,letterSpacing:'.08em',textTransform:'uppercase',color:'#C47A7A',marginBottom:8}}>
                     Widow/Widower Scenario
                   </div>
-                  <Field label="Model Spouse Death at Age" hint="Enter 0 to exclude · Shows SS survivor benefit, IRMAA bracket shift to single, and tax bracket compression">
-                    <NumInput value={inputs.spouseDeathAge} onChange={v=>set('spouseDeathAge',v)} suffix="yrs (primary age)"/>
-                  </Field>
-                  <Field label="Model Primary Death at Age" hint="Enter 0 to exclude · Models pension single life cessation or J&S survivor reduction">
+                  <Field label="Model Primary Death at Age" hint="Enter 0 to exclude · When primary dies, surviving spouse experiences SS survivor benefit, IRMAA bracket shift to single, and tax bracket compression">
                     <NumInput value={inputs.primaryDeathAge} onChange={v=>set('primaryDeathAge',v)} suffix="yrs (primary age)"/>
                   </Field>
-                  {inputs.spouseDeathAge > 0 && (
+                  {inputs.primaryDeathAge > 0 && (
                     <div style={{padding:'10px 12px',background:'rgba(196,106,106,.06)',border:'1px solid rgba(196,106,106,.2)',borderRadius:7,marginTop:4}}>
-                      <div style={{fontSize:14,color:'#C47A7A',fontWeight:600,marginBottom:5}}>Widow's Penalty — What Changes</div>
+                      <div style={{fontSize:14,color:'#C47A7A',fontWeight:600,marginBottom:5}}>Widow's Penalty — What Changes at Primary's Death</div>
                       <div style={{fontSize:13,color:'#DDD6C4',lineHeight:1.75}}>
                         <div>⟶ SS drops to <strong style={{color:'#F5F2EC'}}>one check</strong> (higher of the two)</div>
                         <div>⟶ IRMAA brackets shift to <strong style={{color:'#F5F2EC'}}>single thresholds</strong> immediately</div>
                         <div>⟶ Tax brackets <strong style={{color:'#F5F2EC'}}>compress to single</strong> — same income, higher rate</div>
-                        <div>⟶ Modeled from age <strong style={{color:'#C47A7A'}}>{inputs.spouseDeathAge}</strong> forward</div>
+                        <div>⟶ Single life pension <strong style={{color:'#F5F2EC'}}>ceases</strong> · J&S reduces to elected %</div>
+                        <div>⟶ Modeled from age <strong style={{color:'#C47A7A'}}>{inputs.primaryDeathAge}</strong> forward</div>
                       </div>
                     </div>
                   )}
@@ -3185,9 +3174,9 @@ function App() {
               { label:'Total Gross Income', value: totalGrossIncome>=1000000?'$'+(totalGrossIncome/1000000).toFixed(1)+'M':'$'+Math.round(totalGrossIncome/1000)+'K', sub:`All sources · age ${inputs.retireAge}–${inputs.planToAge}`, color:'#C8A96E' },
               { label:'Total Net Income', value: totalNetIncome>=1000000?'$'+(totalNetIncome/1000000).toFixed(1)+'M':'$'+Math.round(totalNetIncome/1000)+'K', sub:'After fed · state · IRMAA', color:'#7BAF84' },
               { label:'Total Tax-Free Income', value: totalTaxFreeIncome>=1000000?'$'+(totalTaxFreeIncome/1000000).toFixed(1)+'M':'$'+Math.round(totalTaxFreeIncome/1000)+'K', sub:'Roth · ETA · Tax-free annuity', color:'#A8C5D8' },
-              ...(isMarried && inputs.spouseDeathAge > 0 ? [{
+              ...(isMarried && inputs.primaryDeathAge > 0 ? [{
               label: 'Widow’s Penalty Year',
-              value: 'Age ' + inputs.spouseDeathAge,
+              value: 'Age ' + inputs.primaryDeathAge,
               sub: 'SS ↓ · IRMAA single brackets · Tax compression',
               color: '#9B7EC8',
             }] : []),
