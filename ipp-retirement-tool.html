@@ -2033,6 +2033,56 @@ function App() {
     ? years.reduce((sum, y) => sum + (y.effectiveTaxRate||0), 0) / years.length
     : 0;
 
+  // ── Status Quo projection (Architecture OFF) — for report comparison ──
+  const { years: yearsStatusQuo, confidence: confidenceStatusQuo } = projectArc({
+    ...baseProjectionInputs, architectureEnabled: false, ltcEventAge: 0,
+  });
+  const sqRetireData = yearsStatusQuo[0];
+  const sqAge90Data = yearsStatusQuo.find(y => y.age === 90);
+  const sqTotalEstTax = yearsStatusQuo.reduce((sum, y) => sum + (y.estimatedTax||0), 0);
+  const sqTotalPortfolioAtRetire = sqRetireData ? sqRetireData.totalPortfolio : 0;
+  const sqRetirementYears = yearsStatusQuo.filter(y => y.age >= inputs.retireAge);
+  const sqGuaranteedPct = (() => {
+    if (!sqRetirementYears.length) return 0;
+    const totalGuaranteed = sqRetirementYears.reduce((sum, y) => sum + (y.grossGuaranteedIncome || 0), 0);
+    const totalGross = sqRetirementYears.reduce((sum, y) => sum + Math.max(1, y.grossIncome || 0), 0);
+    return Math.round(totalGuaranteed / totalGross * 100);
+  })();
+
+  // ── Architecture Commitment Amounts ──
+  // Roth Annuity conversion
+  const rothConvRow = years.find(y => y.rothConversionEvent);
+  const rothConvGross = rothConvRow ? (rothConvRow.rothConversionAmount || 0) : 0;
+  const rothConvFinanced = Math.min(inputs.rothConversionFinanced || 0, rothConvGross);
+  const rothConvTaxFinanced = rothConvFinanced > 0
+    ? years.filter(y => y.rothConversionEvent).reduce((s, y) => s + (y.rothConversionOverageTax || 0), 0)
+    : 0;
+  const rothConvTaxNotFinanced = rothConvGross > 0
+    ? years.filter(y => y.rothConversionEvent).reduce((s, y) => {
+        const totalTax = (y.estimatedTax || 0);
+        const baseTax = y._baselineTax || 0;
+        return s + Math.max(0, totalTax - baseTax - (y.rothConversionOverageTax || 0));
+      }, 0)
+    : 0;
+  // Simpler approach: tax on the non-financed portion of conversion
+  const rothConvNotFinancedAmt = Math.max(0, rothConvGross - rothConvFinanced);
+
+  // LTC Policy funding
+  const ltcFundRow = years.find(y => y.ltcFundingEvent);
+  const ltcGross = ltcFundRow ? (ltcFundRow.ltcFundingAmount || 0) : 0;
+  const ltcNet = ltcFundRow ? (ltcFundRow.ltcFundingNet || 0) : 0;
+  const ltcTaxNotFinanced = ltcFundRow ? (ltcFundRow.ltcFundingTax || 0) : 0;
+  const spouseLtcFundRow = years.find(y => y.spouseLtcFundingEvent);
+  const spouseLtcGross = spouseLtcFundRow ? (spouseLtcFundRow.spouseLtcFundingAmount || 0) : 0;
+  const spouseLtcNet = spouseLtcFundRow ? (spouseLtcFundRow.spouseLtcFundingNet || 0) : 0;
+  const spouseLtcTax = spouseLtcFundRow ? (spouseLtcFundRow.spouseLtcFundingTax || 0) : 0;
+
+  // ETA funding
+  const etaFundRow = years.find(y => y.etaFundingEvent);
+  const etaGross = etaFundRow ? (etaFundRow.etaFundingAmount || 0) : 0;
+  const etaTaxFinanced = etaFundRow ? (etaFundRow.etaFundingTax || 0) : 0; // ETA tax IS financed (policy loan)
+  const etaNetToPolicy = Math.max(0, etaGross - etaTaxFinanced);
+
   // Lifetime income summaries (retirement years only)
   const retirementYears = years.filter(y => y.age >= inputs.retireAge);
   const totalGrossIncome = retirementYears.reduce((sum, y) => sum + (y.grossIncome||0), 0);
@@ -2240,6 +2290,76 @@ function App() {
         </tr>`).join('')}
       </table>
     </div>
+
+    ${inputs.architectureEnabled ? `
+    <div style="background:rgba(155,126,200,.06);border:1px solid rgba(155,126,200,.18);border-radius:8px;padding:18px;margin-bottom:20px;">
+      <div style="font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:#9B7EC8;margin-bottom:14px;">Status Quo vs. IncomeArc™ Architecture</div>
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr>
+            <th style="padding:6px 0;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#5A7A8A;text-align:left;border-bottom:1px solid rgba(255,255,255,.08);">Metric</th>
+            <th style="padding:6px 0;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#8DAFC8;text-align:right;border-bottom:1px solid rgba(255,255,255,.08);">Status Quo</th>
+            <th style="padding:6px 0;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#C8A96E;text-align:right;border-bottom:1px solid rgba(255,255,255,.08);">Architecture</th>
+            <th style="padding:6px 0;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#4A9B7A;text-align:right;border-bottom:1px solid rgba(255,255,255,.08);">Delta</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${[
+            ['Monte Carlo Confidence', confidenceStatusQuo+'%', confidence+'%', (confidence-confidenceStatusQuo>=0?'+':'')+(confidence-confidenceStatusQuo)+'%', confidence>confidenceStatusQuo],
+            ['Portfolio at Retirement', fmtM(sqTotalPortfolioAtRetire), fmtM(totalPortfolioAtRetire), fmtM(totalPortfolioAtRetire-sqTotalPortfolioAtRetire), totalPortfolioAtRetire>sqTotalPortfolioAtRetire],
+            ['Portfolio at Age 90', sqAge90Data?fmtM(sqAge90Data.totalPortfolio):'—', age90Data?fmtM(age90Data.totalPortfolio):'—', (sqAge90Data&&age90Data)?fmtM(age90Data.totalPortfolio-sqAge90Data.totalPortfolio):'—', age90Data&&sqAge90Data&&age90Data.totalPortfolio>sqAge90Data.totalPortfolio],
+            ['Guaranteed Income %', sqGuaranteedPct+'%', guaranteedPct+'%', (guaranteedPct-sqGuaranteedPct>=0?'+':'')+(guaranteedPct-sqGuaranteedPct)+'%', guaranteedPct>sqGuaranteedPct],
+            ['Est. Lifetime Tax', sqTotalEstTax>=1e6?'$'+(sqTotalEstTax/1e6).toFixed(1)+'M':'$'+Math.round(sqTotalEstTax/1000)+'K', totalEstTax>=1e6?'$'+(totalEstTax/1e6).toFixed(1)+'M':'$'+Math.round(totalEstTax/1000)+'K', (()=>{const d=sqTotalEstTax-totalEstTax;return (d>=0?'−':'+')+' $'+(Math.abs(d)>=1e6?(Math.abs(d)/1e6).toFixed(1)+'M':Math.round(Math.abs(d)/1000)+'K');})(), sqTotalEstTax>totalEstTax],
+            ['Year 1 Monthly Income', sqRetireData?'$'+Math.round((sqRetireData.totalIncome||0)/12/100)/10+'K/mo':'—', retireData?'$'+Math.round((retireData.totalIncome||0)/12/100)/10+'K/mo':'—', (sqRetireData&&retireData)?'$'+Math.round(((retireData.totalIncome||0)-(sqRetireData.totalIncome||0))/12/100)/10+'K/mo':'—', retireData&&sqRetireData&&retireData.totalIncome>sqRetireData.totalIncome],
+          ].map(([label,sq,arch,delta,positive])=>`
+          <tr style="border-bottom:1px solid rgba(255,255,255,.04);">
+            <td style="padding:8px 0;font-size:13px;color:#8DAFC8;">${label}</td>
+            <td style="padding:8px 0;font-size:13px;color:#9EB8CC;text-align:right;">${sq}</td>
+            <td style="padding:8px 0;font-size:14px;font-weight:600;color:#C8A96E;text-align:right;">${arch}</td>
+            <td style="padding:8px 0;font-size:13px;font-weight:700;color:${positive?'#4A9B7A':'#C47A7A'};text-align:right;">${delta}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    ${(rothConvGross>0||ltcGross>0||spouseLtcGross>0||etaGross>0)?`
+    <div style="background:rgba(200,169,110,.04);border:1px solid rgba(200,169,110,.18);border-radius:8px;padding:18px;margin-bottom:20px;">
+      <div style="font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:#C8A96E;margin-bottom:14px;">Architecture Commitments &amp; Tax Financing</div>
+      <table style="width:100%;border-collapse:collapse;">
+        ${[
+          ...(rothConvGross>0?[
+            ['ROTH ANNUITY · Layer 1','','section','#9B7EC8'],
+            ['IRA → Roth Conversion (Gross)',fmtM(rothConvGross),'Full amount repositioned','#9B7EC8'],
+            ['Tax Financed (Policy Loan)',rothConvFinanced>0?fmtM(rothConvFinanced):'—',rothConvFinanced>0?'Financed externally — no portfolio draw':'No financing','#4A9B7A'],
+            ['Tax Paid From Portfolio (Est.)',rothConvNotFinancedAmt>0?fmtM(Math.round(rothConvNotFinancedAmt*(allInMarginalRate||0.28))):'—',rothConvNotFinancedAmt>0?'Gross-up IRA draw at marginal rate':'All tax financed','#C47A7A'],
+          ]:[]),
+          ...(ltcGross>0?[
+            ['LTC POLICY · Layer 2','','section','#5B8FA8'],
+            ['IRA Draw — Primary LTC Premium (Gross)',fmtM(ltcGross),'Gross IRA distribution for premium','#5B8FA8'],
+            ['Net to Policy',fmtM(ltcNet),'After-tax amount into policy','#8DAFC8'],
+            ['Tax — Not Financed',ltcTaxNotFinanced>0?fmtM(ltcTaxNotFinanced):'—',ltcTaxNotFinanced>0?'Tax friction — not financed':'No tax cost','#C47A7A'],
+          ]:[]),
+          ...(spouseLtcGross>0?[
+            ['IRA Draw — Spouse LTC Premium (Gross)',fmtM(spouseLtcGross),'Gross IRA distribution for spouse premium','#5B8FA8'],
+            ['Spouse Net to Policy',fmtM(spouseLtcNet),'After-tax amount into spouse policy','#8DAFC8'],
+            ['Spouse Tax — Not Financed',spouseLtcTax>0?fmtM(spouseLtcTax):'—',spouseLtcTax>0?'Tax friction — not financed':'No tax cost','#C47A7A'],
+          ]:[]),
+          ...(etaGross>0?[
+            ['ETA · Layer 3','','section','#A8C5D8'],
+            ['IRA Repositioned to ETA (Gross)',fmtM(etaGross),'Full IRA amount repositioned','#A8C5D8'],
+            ['Tax Financed (Bank/Policy Loan)',etaTaxFinanced>0?fmtM(etaTaxFinanced):'See advisor','Tax on IRA distribution financed externally','#4A9B7A'],
+            ['Net into ETA Policy',fmtM(etaNetToPolicy),'Net after financed tax','#8DAFC8'],
+          ]:[]),
+        ].map(([label,val,sub,color])=>sub==='section'?`
+        <tr><td colspan="2" style="padding:10px 0 4px;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:${color};border-top:1px solid rgba(255,255,255,.06);">${label}</td></tr>`:`
+        <tr style="border-bottom:1px solid rgba(255,255,255,.03);">
+          <td style="padding:7px 0;font-size:13px;color:#8DAFC8;">${label}<br/><span style="font-size:11px;color:#4A6070;">${sub}</span></td>
+          <td style="padding:7px 0;font-size:14px;font-weight:600;color:${color};text-align:right;vertical-align:top;">${val}</td>
+        </tr>`).join('')}
+      </table>
+    </div>` : ''}
+    ` : ''}
+
     <div style="padding:14px 16px;background:rgba(196,106,106,.06);border:1px solid rgba(196,106,106,.2);border-radius:8px;font-size:11px;color:#8DAFC8;line-height:1.7;">
       <strong style="color:#C47A7A;">Important Disclosure:</strong> These projections are hypothetical illustrations for conceptual and educational purposes only. They are not a guarantee, prediction, or promise of future performance, results, or returns. Actual results will vary based on market conditions, tax law changes, and individual circumstances. This report is intended for use by licensed financial professionals in conjunction with a comprehensive financial planning engagement.
     </div>
