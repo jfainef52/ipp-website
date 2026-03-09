@@ -779,7 +779,7 @@ function projectArc(inputs) {
       const etaYrs = age - etaStartAge; // years since income started
       const etaThisYear = etaColaRate > 0
         ? archEtaAnnualIncome * Math.pow(1 + etaColaRate, etaYrs)
-        : etaAnnualIncome;
+        : archEtaAnnualIncome;
       row.sources.eta = (row.sources.eta || 0) + etaThisYear;
       row.totalIncome += etaThisYear;
       row.etaIncome = etaThisYear;
@@ -1848,6 +1848,7 @@ function App() {
     ...inputs,
     portfolioReturn: inputs.portfolioReturn / 100,
     inflation: inputs.inflation / 100,
+    etaColaRate: (inputs.etaColaRate || 0) / 100,
   };
   // Primary projection — NO LTC shock. This is the clean baseline plan survival score
   // regardless of any healthcare event inputs. The main confidence score reflects the
