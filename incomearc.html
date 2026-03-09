@@ -358,16 +358,24 @@
   .problem-card:hover::before { transform: scaleX(1); }
 
   .problem-icon {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 52px;
-    font-weight: 300;
-    color: var(--border);
-    line-height: 1;
+    width: 48px;
+    height: 48px;
     margin-bottom: 20px;
-    transition: color 0.3s;
+    opacity: 0.35;
+    transition: opacity 0.3s;
   }
 
-  .problem-card:hover .problem-icon { color: var(--gold-dim); }
+  .problem-icon svg {
+    width: 48px;
+    height: 48px;
+    fill: none;
+    stroke: var(--gold);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .problem-card:hover .problem-icon { opacity: 0.9; }
 
   .problem-title {
     font-family: 'Barlow Condensed', sans-serif;
@@ -531,7 +539,6 @@
     font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.18em;
-    text-transform: uppercase;
     color: var(--gray);
     margin-bottom: 24px;
     padding-bottom: 16px;
@@ -868,42 +875,42 @@
     </p>
     <div class="problems-grid">
       <div class="problem-card reveal">
-        <div class="problem-icon">I</div>
+        <div class="problem-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M5 22h14M5 2h14M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12m5 10H7m10 0a5 5 0 0 0-10 0m3-14.172a2 2 0 0 1 .586-1.414L12 2m-5 0v4.172a2 2 0 0 0 .586 1.414L12 12"/></svg></div>
         <div class="problem-title">Will my money outlive me — or will I outlive my money?</div>
         <p class="problem-desc">
           Longevity is the risk no one plans for honestly. IncomeArc™ builds contractually guaranteed income that cannot be outlived — income you cannot spend down, cannot lose in a market correction, and doesn't depend on a withdrawal rate holding up for 30 years.
         </p>
       </div>
       <div class="problem-card reveal reveal-delay-1">
-        <div class="problem-icon">II</div>
+        <div class="problem-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
         <div class="problem-title">Am I going to lose everything in a bad market at the wrong time?</div>
         <p class="problem-desc">
           A major market loss in the first years of retirement can permanently impair a portfolio — even if the market recovers. This is sequence of returns risk, and it is one of the most underestimated threats to a retirement plan. IncomeArc™ is built to insulate retirement income from it.
         </p>
       </div>
       <div class="problem-card reveal reveal-delay-2">
-        <div class="problem-icon">III</div>
+        <div class="problem-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/><line x1="12" y1="10" x2="12" y2="14"/><line x1="10" y1="12" x2="14" y2="12"/></svg></div>
         <div class="problem-title">What happens if I need long-term care — and what does that do to my family?</div>
         <p class="problem-desc">
           Long-term care is the single most common financial catastrophe in retirement. It depletes assets rapidly, disrupts family dynamics, and often goes completely unplanned for. IncomeArc™ incorporates a structured approach to long-term care risk that doesn't require a separate, expensive standalone policy.
         </p>
       </div>
       <div class="problem-card reveal">
-        <div class="problem-icon">IV</div>
+        <div class="problem-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="7" y1="8" x2="17" y2="8"/><line x1="7" y1="12" x2="13" y2="12"/></svg></div>
         <div class="problem-title">How much of my retirement savings is actually mine — and how much belongs to the IRS?</div>
         <p class="problem-desc">
           Every dollar in a traditional IRA or 401(k) has a silent partner: the federal government. That partner's share grows every year. IncomeArc™ directly addresses the qualified plan tax problem before it becomes a forced distribution problem — while options still exist to act.
         </p>
       </div>
       <div class="problem-card reveal reveal-delay-1">
-        <div class="problem-icon">V</div>
+        <div class="problem-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="8 11 10.5 13.5 16 8"/></svg></div>
         <div class="problem-title">Will I have enough flexibility to handle the unexpected?</div>
         <p class="problem-desc">
           Retirement doesn't run on a straight line. Expenses change. Opportunities arise. Emergencies happen. IncomeArc™ incorporates a protected liquidity layer that ensures guaranteed income doesn't come at the cost of access — so the plan bends without breaking.
         </p>
       </div>
       <div class="problem-card reveal reveal-delay-2">
-        <div class="problem-icon">VI</div>
+        <div class="problem-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
         <div class="problem-title">What will I actually leave behind — and will it matter?</div>
         <p class="problem-desc">
           Legacy isn't just for the wealthy. It's about ensuring that what you've built doesn't get eroded by taxes, long-term care costs, or poor distribution planning before it reaches the people you intended. IncomeArc™ builds legacy efficiency into the architecture from the start.
@@ -1110,7 +1117,7 @@
     <span>Built for Planning. Designed for Execution.</span>
   </div>
   <div class="footer-contact">
-    <a href="/cdn-cgi/l/email-protection#285b5d5858475a5c6841465c4d4f5a495c4d4c584449464641464f58495a5c464d5a5b064b4745"><span class="__cf_email__" data-cfemail="9be8eeebebf4e9efdbf2f5effefce9faeffeffebf7faf5f5f2f5fcebfae9eff5fee9e8b5f8f4f6">[email&#160;protected]</span></a>
+    <a href="mailto:support@integratedplanningpartners.com">support@integratedplanningpartners.com</a>
     <div><a href="tel:7733189608">773-318-9608</a></div>
     <div><a href="https://integratedplanningpartners.com">integratedplanningpartners.com</a></div>
   </div>
