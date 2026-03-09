@@ -1183,6 +1183,14 @@ function projectArc(inputs) {
     // Capture gross income (pre-tax, excludes overage gross-up draw which is a tax-covering draw not spendable income)
     row.grossIncome = row.totalIncome - (row.rothConversionOverage || 0);
 
+    // Capture pre-tax guaranteed income for the stat card ratio
+    // (sources are reduced by tax apportionment below — capture them now while still gross)
+    row.grossGuaranteedIncome =
+      (row.sources.ss      || 0) +
+      (row.sources.pension || 0) +
+      (row.rothAnnuityIncome    || 0) +
+      (row.nonQualAnnuityIncome || 0);
+
     // Combined all-in tax (federal + state; IRMAA already in expenses)
     const totalAllInTax = taxResult.totalTax + stateTax;
 
@@ -1970,10 +1978,9 @@ function App() {
   const guaranteedPct = (() => {
     const retirementYears = years.filter(y => y.age >= inputs.retireAge);
     if (!retirementYears.length) return 0;
-    const totalGuaranteed = retirementYears.reduce((sum, y) =>
-      sum + (y.sources.ss||0) + (y.sources.pension||0) + (y.rothAnnuityIncome||0) + (y.nonQualAnnuityIncome||0), 0);
-    const totalIncome = retirementYears.reduce((sum, y) => sum + Math.max(1, y.totalIncome||0), 0);
-    return Math.round(totalGuaranteed / totalIncome * 100);
+    const totalGuaranteed = retirementYears.reduce((sum, y) => sum + (y.grossGuaranteedIncome || 0), 0);
+    const totalGross = retirementYears.reduce((sum, y) => sum + Math.max(1, y.grossIncome || 0), 0);
+    return Math.round(totalGuaranteed / totalGross * 100);
   })();
 
   useEffect(() => {
@@ -3383,7 +3390,7 @@ function App() {
           <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:20}}>
             {[
               { label:'Portfolio at Retirement', value: fmtM(totalPortfolioAtRetire), sub:'Starting balance', color:'#C8A96E' },
-              { label:'Guaranteed Income', value: guaranteedPct+'%', sub: `of total retirement income (age ${inputs.retireAge}–${inputs.planToAge})`, color: guaranteedPct>=50?'#4A9B7A':'#C8A030' },
+              { label:'Guaranteed Income', value: guaranteedPct+'%', sub: `SS · pension · annuity (age ${inputs.retireAge}–${inputs.planToAge})`, color: guaranteedPct>=50?'#4A9B7A':'#C8A030' },
               { label:'Total IRMAA Exposure', value: totalIrmaa>0?'$'+Math.round(totalIrmaa/1000)+'K':'None', sub: isMarried ? 'Est. surcharges (MFJ brackets)' : 'Est. Medicare surcharges', color: totalIrmaa>0?'#E8943A':'#4A9B7A' },
               { label:'Portfolio at Age 90', value: age90Data?fmtM(age90Data.totalPortfolio):'—', sub:'Est. remaining balance', color: age90Data&&age90Data.totalPortfolio>0?'#7BAF84':'#C47A7A' },
               { label:'Est. Lifetime Tax', value: totalEstTax>0?(totalEstTax>=1000000?'$'+(totalEstTax/1000000).toFixed(1)+'M':'$'+Math.round(totalEstTax/1000)+'K'):'—', sub:'Fed '+(totalFedTax>=1000000?'$'+(totalFedTax/1000000).toFixed(1)+'M':'$'+Math.round(totalFedTax/1000)+'K')+' · State '+(totalStateTax>=1000000?'$'+(totalStateTax/1000000).toFixed(1)+'M':'$'+Math.round(totalStateTax/1000)+'K')+(inputs.taxRateStressAdder>0?' · ⚠ stress +'+inputs.taxRateStressAdder+'%':''), color:'#C47A7A' },
