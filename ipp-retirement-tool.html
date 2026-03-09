@@ -1791,7 +1791,7 @@ function App() {
 
   const isMarried = inputs.filingStatus === 'mfj';
 
-  const totalPortfolioAtRetire = inputs.traditionalBalance + inputs.rothBalance + inputs.taxableBalance;
+  const totalPortfolioAtRetire = years[0] ? years[0].totalPortfolio : (inputs.traditionalBalance + inputs.rothBalance + inputs.taxableBalance);
   const fmt$ = v => '$' + Math.round(v||0).toLocaleString();
   const fmtM = v => v >= 1000000 ? '$'+(v/1000000).toFixed(1)+'M' : '$'+Math.round(v/1000)+'K';
 
@@ -2392,6 +2392,7 @@ function App() {
                       <option value={100}>100% — Full continuation</option>
                       <option value={75}>75% — Three-quarter survivor</option>
                       <option value={50}>50% — Half survivor</option>
+                      <option value={25}>25% — Quarter survivor</option>
                     </select>
                   </Field>
                 )}
