@@ -966,12 +966,16 @@ function projectArc(inputs) {
         remaining -= actualNet;
       }
 
-      // --- Roth / tax-free: no gross-up needed ---
+      // --- Roth / tax-free: no gross-up needed, but IS real portfolio depletion ---
       if (remaining > 0 && roth > 0) {
         const draw = Math.min(roth, remaining);
         row.sources.roth = (row.sources.roth || 0) + draw;
         row.totalIncome += draw;
-        if (isAnyLtcEvent && ltcRemaining > 0) ltcRemaining -= Math.min(draw, ltcRemaining);
+        if (isAnyLtcEvent && ltcRemaining > 0) {
+          const ltcShare = Math.min(draw, ltcRemaining);
+          row.ltcPortfolioDraw = (row.ltcPortfolioDraw || 0) + ltcShare;
+          ltcRemaining -= ltcShare;
+        }
         roth = Math.max(0, (roth - draw) * (1 + yearReturn));
         remaining -= draw;
       }
@@ -1012,12 +1016,13 @@ function projectArc(inputs) {
       const ltcNeeded = row.ltcUncovered;
       let ltcRemaining = ltcNeeded;
 
-      // Draw from Roth first (no gross-up)
+      // Draw from Roth first (tax-free, but still real portfolio depletion)
       if (roth > 0 && ltcRemaining > 0) {
         const draw = Math.min(roth, ltcRemaining);
         row.sources.roth = (row.sources.roth || 0) + draw;
         row.totalIncome += draw;
-        roth = Math.max(0, roth - draw); // no growth — already accounted in surplus
+        row.ltcPortfolioDraw = (row.ltcPortfolioDraw || 0) + draw;
+        roth = Math.max(0, roth - draw);
         ltcRemaining -= draw;
       }
 
@@ -1065,11 +1070,12 @@ function projectArc(inputs) {
       const ltcNeeded = row.spouseLtcUncovered;
       let ltcRemaining = ltcNeeded;
 
-      // Draw from Roth first (no gross-up)
+      // Draw from Roth first (tax-free, but still real portfolio depletion)
       if (roth > 0 && ltcRemaining > 0) {
         const draw = Math.min(roth, ltcRemaining);
         row.sources.roth = (row.sources.roth || 0) + draw;
         row.totalIncome += draw;
+        row.ltcPortfolioDraw = (row.ltcPortfolioDraw || 0) + draw;
         roth = Math.max(0, roth - draw);
         ltcRemaining -= draw;
       }
@@ -1320,15 +1326,25 @@ function projectArc(inputs) {
     fixedStreams.push({ yearOffset: offset, annual: archEtaAnnualIncome });
   }
 
-  // LTC shock for Monte Carlo: the actual gross portfolio draws made during care years
-  // (tracked as ltcPortfolioDraw in each row) plus the gross-up tax friction.
-  // Using ltcPortfolioDraw is correct because it captures what was truly pulled from the
-  // portfolio — it's zero when income surplus fully absorbed the care cost, and reflects
-  // the actual IRA/taxable gross draws when a portfolio withdrawal was required.
+  // LTC shock for Monte Carlo: captures the full portfolio impact of being uninsured.
+  // Two scenarios:
+  //   A) Gap path (row.gap < 0): portfolio was directly drawn down → ltcPortfolioDraw has the gross amount
+  //   B) Surplus path (row.gap >= 0): income covered LTC, but that income was diverted away from
+  //      reinvestment into the portfolio. The "lost savings" = ltcUncovered minus any income that
+  //      was truly surplus beyond LTC (i.e., would have been reinvested anyway).
+  //      We measure this as: ltcUncovered (the care cost) that was absorbed by income,
+  //      since that income would otherwise have compounded in the portfolio.
   const ltcShockYear = (ltcEventAge > 0 && !ltcInsured) ? ltcEventAge - retireAge : -1;
   const ltcShockAnnual = (ltcShockYear >= 0 && ltcDuration > 0)
     ? years.filter(r => r.age >= ltcEventAge && r.age < ltcEventAge + ltcDuration)
-           .reduce((sum, r) => sum + (r.ltcPortfolioDraw || 0) + (r.ltcGrossUpTax || 0), 0) / ltcDuration
+           .reduce((sum, r) => {
+             // Direct portfolio draw (taxable/IRA/Roth pulled specifically for LTC)
+             const directDraw = (r.ltcPortfolioDraw || 0);
+             // Lost reinvestment: care cost absorbed by income surplus that would otherwise
+             // have been reinvested into the portfolio. Captured as ltcUncovered minus directDraw.
+             const lostReinvestment = Math.max(0, (r.ltcUncovered || 0) - directDraw);
+             return sum + directDraw + lostReinvestment + (r.ltcGrossUpTax || 0);
+           }, 0) / ltcDuration
     : 0;
 
   const confidence = runMonteCarlo(
@@ -3260,12 +3276,12 @@ function App() {
                 </Field>
 
                 {/* Layer 2 Insurance Option — always visible for pre-fill; engine gates on architectureEnabled */}
-                <div style={{marginTop:10,padding:'10px 12px',background:'rgba(74,155,122,.05)',border:`1px solid ${inputs.architectureEnabled ? 'rgba(74,155,122,.35)' : 'rgba(74,155,122,.12)'}`,borderRadius:8,opacity: inputs.architectureEnabled ? 1 : 0.6}}>
+                <div style={{marginTop:10,padding:'10px 12px',background:'rgba(74,155,122,.05)',border:'1px solid rgba(74,155,122,.35)',borderRadius:8}}>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
                     <div style={{fontSize:13,fontWeight:700,color:'#4A9B7A',letterSpacing:'.06em',textTransform:'uppercase'}}>
                       Layer 2 — Insurance Option
                     </div>
-                    {!inputs.architectureEnabled && <span style={{fontSize:11,color:'#6B8FA8',fontStyle:'italic'}}>activates with Architecture</span>}
+                    {!inputs.architectureEnabled && <span style={{fontSize:11,color:'#4A9B7A',fontStyle:'italic'}}>data saved · visible when Architecture is On</span>}
                   </div>
                   <div style={{fontSize:12,color:'#8DAFC8',lineHeight:1.5}}>
                     Full care cost covered · Policy benefit matches the monthly care cost entered above.
@@ -3273,12 +3289,12 @@ function App() {
                 </div>
 
                 {/* LTC Policy Funding Draw — always visible for pre-fill; engine gates on architectureEnabled */}
-                <div style={{marginTop:10,padding:'10px 12px',background:'rgba(155,126,200,.06)',border:`1px solid ${inputs.architectureEnabled ? 'rgba(155,126,200,.35)' : 'rgba(155,126,200,.12)'}`,borderRadius:8,opacity: inputs.architectureEnabled ? 1 : 0.6}}>
+                <div style={{marginTop:10,padding:'10px 12px',background:'rgba(155,126,200,.06)',border:'1px solid rgba(155,126,200,.35)',borderRadius:8}}>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
                     <div style={{fontSize:13,fontWeight:700,color:'#9B7EC8',letterSpacing:'.06em',textTransform:'uppercase'}}>
                       Policy Funding Draw
                     </div>
-                    {!inputs.architectureEnabled && <span style={{fontSize:11,color:'#6B8FA8',fontStyle:'italic'}}>activates with Architecture</span>}
+                    {!inputs.architectureEnabled && <span style={{fontSize:11,color:'#9B7EC8',fontStyle:'italic'}}>data saved · activates with Architecture</span>}
                   </div>
                     <div style={{fontSize:12,color:'#8DAFC8',marginBottom:8,lineHeight:1.5}}>
                       Enter the net amount needed — the model calculates the required gross IRA withdrawal to net that amount after tax.
@@ -3348,12 +3364,12 @@ function App() {
                   </Field>
 
                   {/* Spouse Layer 2 Insurance — always visible for pre-fill; engine gates on architectureEnabled */}
-                  <div style={{marginTop:10,padding:'10px 12px',background:'rgba(74,155,122,.05)',border:`1px solid ${inputs.architectureEnabled ? 'rgba(74,155,122,.35)' : 'rgba(74,155,122,.12)'}`,borderRadius:8,opacity: inputs.architectureEnabled ? 1 : 0.6}}>
+                  <div style={{marginTop:10,padding:'10px 12px',background:'rgba(74,155,122,.05)',border:'1px solid rgba(74,155,122,.35)',borderRadius:8}}>
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
                       <div style={{fontSize:13,fontWeight:700,color:'#4A9B7A',letterSpacing:'.06em',textTransform:'uppercase'}}>
                         Layer 2 — Spouse Insurance Option
                       </div>
-                      {!inputs.architectureEnabled && <span style={{fontSize:11,color:'#6B8FA8',fontStyle:'italic'}}>activates with Architecture</span>}
+                      {!inputs.architectureEnabled && <span style={{fontSize:11,color:'#4A9B7A',fontStyle:'italic'}}>data saved · visible when Architecture is On</span>}
                     </div>
                     <div style={{fontSize:12,color:'#8DAFC8',lineHeight:1.5}}>
                       Full care cost covered · Policy benefit matches the monthly care cost entered above.
@@ -3361,12 +3377,12 @@ function App() {
                   </div>
 
                   {/* Spouse LTC Policy Funding Draw — always visible for pre-fill; engine gates on architectureEnabled */}
-                  <div style={{marginTop:10,padding:'10px 12px',background:'rgba(155,126,200,.06)',border:`1px solid ${inputs.architectureEnabled ? 'rgba(155,126,200,.35)' : 'rgba(155,126,200,.12)'}`,borderRadius:8,opacity: inputs.architectureEnabled ? 1 : 0.6}}>
+                  <div style={{marginTop:10,padding:'10px 12px',background:'rgba(155,126,200,.06)',border:'1px solid rgba(155,126,200,.35)',borderRadius:8}}>
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
                       <div style={{fontSize:13,fontWeight:700,color:'#9B7EC8',letterSpacing:'.06em',textTransform:'uppercase'}}>
                         Spouse Policy Funding Draw
                       </div>
-                      {!inputs.architectureEnabled && <span style={{fontSize:11,color:'#6B8FA8',fontStyle:'italic'}}>activates with Architecture</span>}
+                      {!inputs.architectureEnabled && <span style={{fontSize:11,color:'#4A9B7A',fontStyle:'italic'}}>data saved · visible when Architecture is On</span>}
                     </div>
                       <div style={{fontSize:12,color:'#8DAFC8',marginBottom:8,lineHeight:1.5}}>
                         Enter the net amount needed — the model calculates the required gross IRA withdrawal to net that amount after tax.
@@ -3764,8 +3780,10 @@ function App() {
               }, 0);
 
             const annualBenefit = (inputs.ltcMonthlyBenefit || inputs.ltcMonthlyCost) * 12;
-            const totalBenefit = annualBenefit * inputs.ltcDuration;
-            const benefitGap = Math.max(0, totalLtcCost - totalBenefit);
+            // Engine covers 100% of care cost when ltcInsured=true regardless of ltcMonthlyBenefit.
+            // Always show full coverage to match engine behavior.
+            const totalBenefit = totalLtcCost;
+            const benefitGap = 0;
             // Forced portfolio draws = actual gross IRA/taxable drawn from portfolio during LTC years
             // (tracked directly by the engine as ltcPortfolioDraw, which is 0 when income surplus
             // fully absorbs the care cost and >0 only when the portfolio was actually tapped)
