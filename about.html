@@ -734,6 +734,151 @@
     .faq-sidebar { position: static; }
   }
 
+
+  /* ── FOUNDER MESSAGE ── */
+  .founder-section {
+    background: var(--navy);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .founder-grid {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 80px;
+    align-items: start;
+  }
+
+  .founder-photo-col {
+    position: sticky;
+    top: 100px;
+    text-align: center;
+  }
+
+  .founder-photo {
+    width: 220px;
+    height: 280px;
+    border-radius: 2px;
+    background: var(--navy3);
+    border: 1px solid var(--border);
+    margin: 0 auto 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .founder-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top;
+  }
+
+  .founder-photo-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+  }
+
+  .founder-photo-placeholder svg {
+    width: 64px;
+    height: 64px;
+    stroke: var(--border);
+    fill: none;
+    stroke-width: 1;
+  }
+
+  .founder-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--off-white);
+    margin-bottom: 4px;
+  }
+
+  .founder-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 8px;
+  }
+
+  .founder-credentials {
+    font-size: 12px;
+    color: var(--gray);
+    line-height: 1.6;
+  }
+
+  .founder-message {
+    padding-top: 8px;
+  }
+
+  .founder-message-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 24px;
+  }
+
+  .founder-message p {
+    font-size: 16px;
+    color: var(--warm);
+    line-height: 1.9;
+  }
+
+  .founder-message p + p {
+    margin-top: 20px;
+  }
+
+  .founder-message .founder-direct {
+    color: var(--off-white);
+    font-style: italic;
+    font-size: 17px;
+    border-left: 2px solid var(--gold);
+    padding-left: 20px;
+    margin-top: 32px;
+    line-height: 1.8;
+  }
+
+  .founder-signature {
+    margin-top: 36px;
+    padding-top: 28px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .founder-signature-line {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px;
+    font-style: italic;
+    font-weight: 400;
+    color: var(--gold2);
+    margin-bottom: 4px;
+  }
+
+  .founder-signature-role {
+    font-size: 13px;
+    color: var(--gray);
+    letter-spacing: 0.05em;
+  }
+
+  @media (max-width: 900px) {
+    .founder-grid { grid-template-columns: 1fr; gap: 40px; }
+    .founder-photo-col { position: static; display: flex; align-items: center; gap: 24px; text-align: left; }
+    .founder-photo { width: 100px; height: 100px; margin: 0; flex-shrink: 0; }
+  }
+
 </style>
 <style>.page-header { background-image:linear-gradient(135deg,rgba(8,18,38,0.90) 0%,rgba(8,18,38,0.72) 50%,rgba(15,30,58,0.55) 100%), url('https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=1800&q=80&fit=crop');background-size:cover;background-position:center 20%;background-repeat:no-repeat; }</style>
 </head>
@@ -848,6 +993,55 @@
           But the order matters.
         </p>
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── FOUNDER MESSAGE ── -->
+<section class="founder-section">
+  <div class="section-inner">
+    <div class="founder-grid">
+
+      <div class="founder-photo-col reveal">
+        <div class="founder-photo">
+          <img src="jeff-faine.jpg" alt="Jeffrey Faine — Founder & Principal, Integrated Planning Partners">
+        </div>
+        <div class="founder-name">Jeffrey Faine</div>
+        <div class="founder-title">Founder & Principal</div>
+        <div class="founder-credentials">CLU · RICP<br>Integrated Planning Partners</div>
+      </div>
+
+      <div class="founder-message reveal reveal-delay-1">
+        <div class="founder-message-label">A Message from Our Founder</div>
+
+        <p>
+          I started Integrated Planning Partners because I kept seeing the same problem — not with clients, and not with other advisors, but with the order of the conversation.
+        </p>
+        <p>
+          Talented, well-intentioned financial professionals were arriving at client meetings with solutions already in mind. Investments. Insurance. Strategies. Many of those solutions were genuinely good ones. But they were being offered before anyone had taken the time to fully understand the client's situation — the tax exposure quietly building inside their qualified plans, the long-term care risk no one had addressed, the retirement income gap that wouldn't become visible until it was too late to solve it efficiently.
+        </p>
+        <p>
+          I built IPP around a different belief: that the most valuable thing we can do for a client isn't to sell them something. It's to show them something. To give them the clearest, most honest picture of their financial life they've ever seen — and then let the right solutions present themselves naturally from that understanding.
+        </p>
+        <p>
+          That sounds simple. In practice, it requires a different kind of discipline. It means resisting the impulse to recommend before you've truly listened. It means being willing to tell a client that their current plan is working well, even when that isn't the answer that generates revenue. And it means building frameworks rigorous enough to surface risks and opportunities that a less structured conversation would miss entirely.
+        </p>
+        <p>
+          StructureReview™ and IncomeArc™ are the products of that discipline — built over years of working with clients who deserved better than what the conventional planning conversation was giving them.
+        </p>
+
+        <div class="founder-direct">
+          If you've ever walked away from a financial meeting with more products than clarity, I built this firm for you. The StructureReview™ won't pitch you anything. It will simply show you where you stand — completely, honestly, and without an agenda. What you do with that picture is entirely up to you.
+        </div>
+
+        <div class="founder-signature">
+          <div>
+            <div class="founder-signature-line">Jeffrey Faine</div>
+            <div class="founder-signature-role">Founder & Principal, CLU · RICP — Integrated Planning Partners</div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 </section>
@@ -1117,7 +1311,7 @@
     <span>Built for Planning. Designed for Execution.</span>
   </div>
   <div class="footer-contact">
-    <a href="mailto:support@integratedplanningpartners.com">support@integratedplanningpartners.com</a>
+    <a href="/cdn-cgi/l/email-protection#99eaece9e9f6ebedd9f0f7edfcfeebf8edfcfde9f5f8f7f7f0f7fee9f8ebedf7fcebeab7faf6f4"><span class="__cf_email__" data-cfemail="f3808683839c8187b39a9d8796948192879697839f929d9d9a9d94839281879d968180dd909c9e">[email&#160;protected]</span></a>
     <div><a href="tel:7733189608">773-318-9608</a></div>
     <div><a href="https://integratedplanningpartners.com">integratedplanningpartners.com</a></div>
   </div>
@@ -1137,7 +1331,7 @@
   </div>
 </footer>
 
-<script>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
   // FAQ accordion
   document.querySelectorAll('.faq-item').forEach(item => {
     item.querySelector('.faq-question').addEventListener('click', () => {
