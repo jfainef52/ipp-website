@@ -458,7 +458,7 @@ function projectArc(inputs) {
     ssMonthly, ssClaimAge, fra,
     filingStatus = 'single',
     spouseSsMonthly = 0, spouseSsClaimAge = 67, spouseFra = 67,
-    spouseDobOffset = 0,
+    spouseDobOffset = 0, spouseCurrentAge = null,
     // Strategic drawdown
     annualTradDrawdown = 0,       // intentional IRA/trad draw per year (pre-RMD Roth Annuity conversion; ETA can fund conversion tax cost)
     tradDrawdownStartAge = 0,     // age to begin intentional draws
@@ -638,10 +638,12 @@ function projectArc(inputs) {
     const spouseAge = age - spouseDobOffset;
     if (spouseAlive) {
       if (spouseSsMonthly > 0 && spouseAge >= spouseSsClaimAge) {
+        // Spouse has own SS record — receives greater of own benefit or 50% spousal benefit
         const ownBenefit = ssBenefitAtAge(spouseSsMonthly, spouseFra, spouseSsClaimAge) * 12 * inflFactor;
         const spousalBenefit = ssBenefitAtAge(ssMonthly, fra, fra) * 0.5 * 12 * inflFactor;
         spouseSS = Math.max(ownBenefit, spousalBenefit);
-      } else if (spouseSsMonthly === 0 && age >= ssClaimAge) {
+      } else if (spouseSsMonthly === 0 && spouseCurrentAge !== null && age >= ssClaimAge) {
+        // Spouse has no own record — receives 50% spousal benefit while primary is alive
         spouseSS = ssBenefitAtAge(ssMonthly, fra, fra) * 0.5 * 12 * inflFactor;
       }
     } else if (filingStatus === 'mfj' && primaryDeathAge > 0) {
