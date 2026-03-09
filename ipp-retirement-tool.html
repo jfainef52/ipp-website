@@ -1753,7 +1753,7 @@ function App() {
   });
   const [inputs, setInputs] = useState({
     filingStatus: 'single',
-    currentAge: 60, retireAge: 65, planToAge: 92, fra: 67,
+    currentAge: 60, retireAge: 65, planToAge: 98, fra: 67,
     ssMonthly: 2800, ssClaimAge: 67,
     spouseSsMonthly: 0, spouseSsClaimAge: 67, spouseFra: 67, spouseDobOffset: 0, spouseCurrentAge: null,
     pensionMonthly: 0, pensionStartAge: 65, pensionType: 'single', pensionSurvivorPct: 50,
@@ -2261,6 +2261,135 @@ function App() {
               <Field label="Retirement Age"><NumInput value={inputs.retireAge} onChange={v=>set('retireAge',v)} suffix="yrs"/></Field>
               <Field label="Plan Through Age (Primary)"><NumInput value={inputs.planToAge} onChange={v=>set('planToAge',v)} suffix="yrs"/></Field>
             </Section>
+
+            <Section title="Tax &amp; State" collapsed={sections.tax} onToggle={()=>toggleSection('tax')}>
+              {/* State selector */}
+              <Field label="State of Residence" hint="Affects state tax treatment of retirement income">
+                <select
+                  value={inputs.stateCode}
+                  onChange={e=>set('stateCode', e.target.value)}
+                  style={{
+                    width:'100%', padding:'7px 10px', borderRadius:6, fontSize:14,
+                    background:'#0D1B2A', border:'1px solid rgba(255,255,255,.12)',
+                    color:'#F5F2EC', fontFamily:"'DM Sans',sans-serif", cursor:'pointer',
+                    appearance:'none', WebkitAppearance:'none',
+                  }}>
+                  {Object.entries(STATE_TAX_DATA).sort((a,b)=>a[1].name.localeCompare(b[1].name)).map(([code, s])=>(
+                    <option key={code} value={code}>
+                      {s.name} — {s.rate===0 ? 'No tax' : (s.rate*100).toFixed(2)+'%'} ({s.treatment==='none'?'No tax':s.treatment==='exempt'?'Retirement exempt':s.treatment==='partial'?'Partial exemption':'Fully taxed'})
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              {/* State tax note */}
+              {(() => {
+                const st = STATE_TAX_DATA[inputs.stateCode];
+                if (!st) return null;
+                const treatColor = st.treatment==='none'||st.treatment==='exempt' ? '#4A9B7A' : st.treatment==='partial' ? '#C8A030' : '#C47A7A';
+                return (
+                  <div style={{padding:'9px 12px',background:'rgba(255,255,255,.03)',border:'1px solid rgba(255,255,255,.07)',borderRadius:7,marginTop:4,marginBottom:8}}>
+                    <div style={{fontSize:14,fontWeight:700,color:treatColor,marginBottom:3,textTransform:'uppercase',letterSpacing:'.06em'}}>
+                      {st.treatment==='none'?'No State Income Tax':st.treatment==='exempt'?'Retirement Income Exempt':st.treatment==='partial'?'Partial Retirement Exemption':'All Retirement Income Taxed'}
+                    </div>
+                    <div style={{fontSize:13,color:'#DDD6C4',lineHeight:1.55}}>{st.note}</div>
+                  </div>
+                );
+              })()}
+
+              {/* Custom rate override */}
+              <Field label="Override State Rate" hint="Leave blank to use default · Enter custom % to override (e.g. future rate change)">
+                <NumInput value={inputs.customStateRate} onChange={v=>set('customStateRate',v===0?'':v)} suffix="%" placeholder="Default"/>
+              </Field>
+
+              {/* Tax Rate Risk — stress test adder */}
+              <div style={{marginTop:12,paddingTop:12,borderTop:'1px solid rgba(255,255,255,.06)'}}>
+                <div style={{fontSize:14,fontWeight:700,color:'#C8A030',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8}}>
+                  Tax Rate Risk
+                </div>
+                <div style={{fontSize:14,color:'#8DAFC8',marginBottom:8,lineHeight:1.55}}>
+                  Model a future tax rate increase across all income. Adds the selected percentage to all rates throughout retirement — showing the lifetime cost of higher future taxation.
+                </div>
+                <Field label="Rate Increase Stress Test" hint="Adds this % to all marginal rates — shows lifetime tax cost of rising rates">
+                  <NumInput value={inputs.taxRateStressAdder} onChange={v=>set('taxRateStressAdder',v)} suffix="% added"/>
+                </Field>
+                {inputs.taxRateStressAdder > 0 && (
+                  <div style={{padding:'8px 12px',background:'rgba(200,160,48,.06)',border:'1px solid rgba(200,160,48,.2)',borderRadius:7,marginTop:6,fontSize:13,color:'#DDD6C4',lineHeight:1.6}}>
+                    ⚠ Stress test active — all marginal rates increased by <strong style={{color:'#C8A030'}}>{inputs.taxRateStressAdder}%</strong>. Arc reflects higher-rate scenario.
+                  </div>
+                )}
+              </div>
+            </Section>
+
+            <Section title="Assumptions" collapsed={sections.advanced} onToggle={()=>toggleSection('advanced')}>
+              <Field label="Portfolio Return">
+                <NumInput value={inputs.portfolioReturn} onChange={v=>set('portfolioReturn',v)} suffix="%"/>
+              </Field>
+              <Field label="Inflation Rate">
+                <NumInput value={inputs.inflation} onChange={v=>set('inflation',v)} suffix="%"/>
+              </Field>
+
+              {/* Sequence of Returns Risk toggle */}
+              <div style={{marginTop:14,paddingTop:14,borderTop:'1px solid rgba(255,255,255,.06)'}}>
+                <div style={{fontSize:12,fontWeight:700,color:'#C47A7A',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:6}}>
+                  Sequence of Returns Risk
+                </div>
+                <div style={{fontSize:12,color:'#8DAFC8',lineHeight:1.6,marginBottom:10}}>
+                  Models a negative return sequence in the first 5 years of retirement — the most damaging timing for portfolio withdrawals. Overrides the return assumption for years 1–5 only.
+                </div>
+                {/* Toggle switch */}
+                <div style={{display:'flex',alignItems:'center',gap:12,marginBottom: inputs.sorrEnabled ? 12 : 0}}>
+                  <div
+                    onClick={()=>set('sorrEnabled', !inputs.sorrEnabled)}
+                    style={{
+                      width:44, height:24, borderRadius:12, cursor:'pointer',
+                      background: inputs.sorrEnabled ? '#C47A7A' : 'rgba(255,255,255,.1)',
+                      position:'relative', transition:'background .2s', flexShrink:0,
+                      border: inputs.sorrEnabled ? '1px solid #C47A7A' : '1px solid rgba(255,255,255,.15)',
+                    }}>
+                    <div style={{
+                      position:'absolute', top:3, left: inputs.sorrEnabled ? 22 : 3,
+                      width:16, height:16, borderRadius:8,
+                      background:'#F5F2EC', transition:'left .2s',
+                      boxShadow:'0 1px 3px rgba(0,0,0,.3)',
+                    }}/>
+                  </div>
+                  <span style={{fontSize:13,color: inputs.sorrEnabled ? '#C47A7A' : '#8DAFC8', fontWeight: inputs.sorrEnabled ? 700 : 400}}>
+                    {inputs.sorrEnabled ? 'SORR Stress Active' : 'Off — using base return assumption'}
+                  </span>
+                </div>
+
+                {/* Return schedule table — shown when enabled */}
+                {inputs.sorrEnabled && (
+                  <div style={{background:'rgba(196,106,106,.06)',border:'1px solid rgba(196,106,106,.2)',borderRadius:8,padding:'10px 12px'}}>
+                    <div style={{fontSize:11,fontWeight:700,color:'#C47A7A',letterSpacing:'.07em',textTransform:'uppercase',marginBottom:8}}>
+                      Return Override Schedule
+                    </div>
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:6,marginBottom:10}}>
+                      {[
+                        { yr:'Yr 1', ret:-18, label:'Crash' },
+                        { yr:'Yr 2', ret:+4,  label:'Partial' },
+                        { yr:'Yr 3', ret:-14, label:'Relapse' },
+                        { yr:'Yr 4', ret:+5,  label:'Partial' },
+                        { yr:'Yr 5', ret:-10, label:'Drag' },
+                      ].map(s => (
+                        <div key={s.yr} style={{textAlign:'center',padding:'6px 4px',background:'rgba(0,0,0,.15)',borderRadius:6,border:`1px solid ${s.ret < 0 ? 'rgba(196,106,106,.25)' : 'rgba(74,155,122,.2)'}`}}>
+                          <div style={{fontSize:11,color:'#8DAFC8',marginBottom:2}}>{s.yr}</div>
+                          <div style={{fontSize:15,fontWeight:700,fontFamily:"'Cormorant Garamond',serif",color: s.ret < 0 ? '#C47A7A' : '#4A9B7A'}}>
+                            {s.ret > 0 ? '+' : ''}{s.ret}%
+                          </div>
+                          <div style={{fontSize:10,color:'#8DAFC8',marginTop:1}}>{s.label}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{fontSize:12,color:'#8DAFC8',lineHeight:1.55}}>
+                      Year 6+ resumes your <strong style={{color:'#DDD6C4'}}>{inputs.portfolioReturn}%</strong> base return assumption. Cumulative 5-year drag: <strong style={{color:'#C47A7A'}}>−{(((1-0.18)*(1+0.04)*(1-0.14)*(1+0.05)*(1-0.10)-1)*100).toFixed(1)}%</strong> vs a flat-return scenario.
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Section>
+
 
             <Section title="Social Security" collapsed={sections.ss} onToggle={()=>toggleSection('ss')}>
               <Field label="Est. Monthly Benefit at FRA" hint="Find on your Social Security statement or ssa.gov">
@@ -3002,134 +3131,6 @@ function App() {
                   </p>
                 </div>
               </>}
-            </Section>
-
-            <Section title="Tax &amp; State" collapsed={sections.tax} onToggle={()=>toggleSection('tax')}>
-              {/* State selector */}
-              <Field label="State of Residence" hint="Affects state tax treatment of retirement income">
-                <select
-                  value={inputs.stateCode}
-                  onChange={e=>set('stateCode', e.target.value)}
-                  style={{
-                    width:'100%', padding:'7px 10px', borderRadius:6, fontSize:14,
-                    background:'#0D1B2A', border:'1px solid rgba(255,255,255,.12)',
-                    color:'#F5F2EC', fontFamily:"'DM Sans',sans-serif", cursor:'pointer',
-                    appearance:'none', WebkitAppearance:'none',
-                  }}>
-                  {Object.entries(STATE_TAX_DATA).sort((a,b)=>a[1].name.localeCompare(b[1].name)).map(([code, s])=>(
-                    <option key={code} value={code}>
-                      {s.name} — {s.rate===0 ? 'No tax' : (s.rate*100).toFixed(2)+'%'} ({s.treatment==='none'?'No tax':s.treatment==='exempt'?'Retirement exempt':s.treatment==='partial'?'Partial exemption':'Fully taxed'})
-                    </option>
-                  ))}
-                </select>
-              </Field>
-
-              {/* State tax note */}
-              {(() => {
-                const st = STATE_TAX_DATA[inputs.stateCode];
-                if (!st) return null;
-                const treatColor = st.treatment==='none'||st.treatment==='exempt' ? '#4A9B7A' : st.treatment==='partial' ? '#C8A030' : '#C47A7A';
-                return (
-                  <div style={{padding:'9px 12px',background:'rgba(255,255,255,.03)',border:'1px solid rgba(255,255,255,.07)',borderRadius:7,marginTop:4,marginBottom:8}}>
-                    <div style={{fontSize:14,fontWeight:700,color:treatColor,marginBottom:3,textTransform:'uppercase',letterSpacing:'.06em'}}>
-                      {st.treatment==='none'?'No State Income Tax':st.treatment==='exempt'?'Retirement Income Exempt':st.treatment==='partial'?'Partial Retirement Exemption':'All Retirement Income Taxed'}
-                    </div>
-                    <div style={{fontSize:13,color:'#DDD6C4',lineHeight:1.55}}>{st.note}</div>
-                  </div>
-                );
-              })()}
-
-              {/* Custom rate override */}
-              <Field label="Override State Rate" hint="Leave blank to use default · Enter custom % to override (e.g. future rate change)">
-                <NumInput value={inputs.customStateRate} onChange={v=>set('customStateRate',v===0?'':v)} suffix="%" placeholder="Default"/>
-              </Field>
-
-              {/* Tax Rate Risk — stress test adder */}
-              <div style={{marginTop:12,paddingTop:12,borderTop:'1px solid rgba(255,255,255,.06)'}}>
-                <div style={{fontSize:14,fontWeight:700,color:'#C8A030',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8}}>
-                  Tax Rate Risk
-                </div>
-                <div style={{fontSize:14,color:'#8DAFC8',marginBottom:8,lineHeight:1.55}}>
-                  Model a future tax rate increase across all income. Adds the selected percentage to all rates throughout retirement — showing the lifetime cost of higher future taxation.
-                </div>
-                <Field label="Rate Increase Stress Test" hint="Adds this % to all marginal rates — shows lifetime tax cost of rising rates">
-                  <NumInput value={inputs.taxRateStressAdder} onChange={v=>set('taxRateStressAdder',v)} suffix="% added"/>
-                </Field>
-                {inputs.taxRateStressAdder > 0 && (
-                  <div style={{padding:'8px 12px',background:'rgba(200,160,48,.06)',border:'1px solid rgba(200,160,48,.2)',borderRadius:7,marginTop:6,fontSize:13,color:'#DDD6C4',lineHeight:1.6}}>
-                    ⚠ Stress test active — all marginal rates increased by <strong style={{color:'#C8A030'}}>{inputs.taxRateStressAdder}%</strong>. Arc reflects higher-rate scenario.
-                  </div>
-                )}
-              </div>
-            </Section>
-
-            <Section title="Assumptions" collapsed={sections.advanced} onToggle={()=>toggleSection('advanced')}>
-              <Field label="Portfolio Return">
-                <NumInput value={inputs.portfolioReturn} onChange={v=>set('portfolioReturn',v)} suffix="%"/>
-              </Field>
-              <Field label="Inflation Rate">
-                <NumInput value={inputs.inflation} onChange={v=>set('inflation',v)} suffix="%"/>
-              </Field>
-
-              {/* Sequence of Returns Risk toggle */}
-              <div style={{marginTop:14,paddingTop:14,borderTop:'1px solid rgba(255,255,255,.06)'}}>
-                <div style={{fontSize:12,fontWeight:700,color:'#C47A7A',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:6}}>
-                  Sequence of Returns Risk
-                </div>
-                <div style={{fontSize:12,color:'#8DAFC8',lineHeight:1.6,marginBottom:10}}>
-                  Models a negative return sequence in the first 5 years of retirement — the most damaging timing for portfolio withdrawals. Overrides the return assumption for years 1–5 only.
-                </div>
-                {/* Toggle switch */}
-                <div style={{display:'flex',alignItems:'center',gap:12,marginBottom: inputs.sorrEnabled ? 12 : 0}}>
-                  <div
-                    onClick={()=>set('sorrEnabled', !inputs.sorrEnabled)}
-                    style={{
-                      width:44, height:24, borderRadius:12, cursor:'pointer',
-                      background: inputs.sorrEnabled ? '#C47A7A' : 'rgba(255,255,255,.1)',
-                      position:'relative', transition:'background .2s', flexShrink:0,
-                      border: inputs.sorrEnabled ? '1px solid #C47A7A' : '1px solid rgba(255,255,255,.15)',
-                    }}>
-                    <div style={{
-                      position:'absolute', top:3, left: inputs.sorrEnabled ? 22 : 3,
-                      width:16, height:16, borderRadius:8,
-                      background:'#F5F2EC', transition:'left .2s',
-                      boxShadow:'0 1px 3px rgba(0,0,0,.3)',
-                    }}/>
-                  </div>
-                  <span style={{fontSize:13,color: inputs.sorrEnabled ? '#C47A7A' : '#8DAFC8', fontWeight: inputs.sorrEnabled ? 700 : 400}}>
-                    {inputs.sorrEnabled ? 'SORR Stress Active' : 'Off — using base return assumption'}
-                  </span>
-                </div>
-
-                {/* Return schedule table — shown when enabled */}
-                {inputs.sorrEnabled && (
-                  <div style={{background:'rgba(196,106,106,.06)',border:'1px solid rgba(196,106,106,.2)',borderRadius:8,padding:'10px 12px'}}>
-                    <div style={{fontSize:11,fontWeight:700,color:'#C47A7A',letterSpacing:'.07em',textTransform:'uppercase',marginBottom:8}}>
-                      Return Override Schedule
-                    </div>
-                    <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:6,marginBottom:10}}>
-                      {[
-                        { yr:'Yr 1', ret:-18, label:'Crash' },
-                        { yr:'Yr 2', ret:+4,  label:'Partial' },
-                        { yr:'Yr 3', ret:-14, label:'Relapse' },
-                        { yr:'Yr 4', ret:+5,  label:'Partial' },
-                        { yr:'Yr 5', ret:-10, label:'Drag' },
-                      ].map(s => (
-                        <div key={s.yr} style={{textAlign:'center',padding:'6px 4px',background:'rgba(0,0,0,.15)',borderRadius:6,border:`1px solid ${s.ret < 0 ? 'rgba(196,106,106,.25)' : 'rgba(74,155,122,.2)'}`}}>
-                          <div style={{fontSize:11,color:'#8DAFC8',marginBottom:2}}>{s.yr}</div>
-                          <div style={{fontSize:15,fontWeight:700,fontFamily:"'Cormorant Garamond',serif",color: s.ret < 0 ? '#C47A7A' : '#4A9B7A'}}>
-                            {s.ret > 0 ? '+' : ''}{s.ret}%
-                          </div>
-                          <div style={{fontSize:10,color:'#8DAFC8',marginTop:1}}>{s.label}</div>
-                        </div>
-                      ))}
-                    </div>
-                    <div style={{fontSize:12,color:'#8DAFC8',lineHeight:1.55}}>
-                      Year 6+ resumes your <strong style={{color:'#DDD6C4'}}>{inputs.portfolioReturn}%</strong> base return assumption. Cumulative 5-year drag: <strong style={{color:'#C47A7A'}}>−{(((1-0.18)*(1+0.04)*(1-0.14)*(1+0.05)*(1-0.10)-1)*100).toFixed(1)}%</strong> vs a flat-return scenario.
-                    </div>
-                  </div>
-                )}
-              </div>
             </Section>
 
           </div>
