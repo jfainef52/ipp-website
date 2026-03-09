@@ -2000,9 +2000,10 @@ function App() {
           ['Inflation Rate',inputs.inflation+'%'],
           ['Fixed Monthly Expenses','$'+inputs.fixedExpenses.toLocaleString()],
           ['Lifestyle Monthly Expenses','$'+inputs.lifestyleExpenses.toLocaleString()],
-          ['Traditional Balance',fmtM(inputs.traditionalBalance)],
-          ['Roth Balance',fmtM(inputs.rothBalance)],
-          ['Taxable Balance',fmtM(inputs.taxableBalance)],
+          ['Traditional Balance (Today)',fmtM(inputs.traditionalBalance)],
+          ['Roth Balance (Today)',fmtM(inputs.rothBalance)],
+          ['Taxable Balance (Today)',fmtM(inputs.taxableBalance)],
+          ['Portfolio at Retirement (Projected)',fmtM(totalPortfolioAtRetire)],
           ...(inputs.sorrEnabled?[['SORR Stress Scenario','Active — First 5 Yrs']]:[] ),
           ...(inputs.taxRateStressAdder>0?[['Tax Rate Stress Adder','+'+inputs.taxRateStressAdder+'%']]:[] ),
         ].map(([l,v])=>`
@@ -3134,7 +3135,7 @@ function App() {
           </div>
 
           {/* IRMAA warning */}
-          {totalIrmaa > 0 && <IrmaaBar years={years}/>}
+          {totalIrmaa > 0 && <IrmaaBar years={yearsWithLtc}/>}
 
           {/* All-In Tax Rate Panel — Year 1 + Peak side by side */}
           {retireData && (() => {
