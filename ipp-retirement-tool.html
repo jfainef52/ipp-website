@@ -2464,6 +2464,31 @@ function App() {
                 <NumInput value={inputs.taxableBalance} onChange={v=>set('taxableBalance',v)} prefix="$"/>
               </Field>
 
+              {/* Primary contributions — only show if pre-retirement */}
+              {inputs.currentAge < inputs.retireAge && (
+                <div style={{marginTop:12,paddingTop:12,borderTop:'1px solid rgba(255,255,255,.06)'}}>
+                  <div style={{fontSize:13,fontWeight:700,color:'#9EB8CC',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8}}>
+                    {inputs.filingStatus === 'mfj' ? 'Primary Annual Contributions' : 'Annual Contributions'}
+                  </div>
+                  <Field label="Traditional / Pre-Tax Contribution" hint="Annual 401(k) or IRA contribution — grows tax-deferred to retirement">
+                    <NumInput value={inputs.annualTradContribution} onChange={v=>set('annualTradContribution',v)} prefix="$" suffix="/yr"/>
+                  </Field>
+                  {inputs.annualTradContribution > 0 && (
+                    <Field label="Stop Contributing at Age" hint="Default: retirement age">
+                      <NumInput value={inputs.tradContributionEndAge||inputs.retireAge} onChange={v=>set('tradContributionEndAge',v)} suffix="yrs"/>
+                    </Field>
+                  )}
+                  <Field label="Taxable / Brokerage Contribution" hint="Annual after-tax brokerage contribution">
+                    <NumInput value={inputs.annualTaxableContribution} onChange={v=>set('annualTaxableContribution',v)} prefix="$" suffix="/yr"/>
+                  </Field>
+                  {inputs.annualTaxableContribution > 0 && (
+                    <Field label="Stop Contributing at Age" hint="Default: retirement age">
+                      <NumInput value={inputs.taxableContributionEndAge||inputs.retireAge} onChange={v=>set('taxableContributionEndAge',v)} suffix="yrs"/>
+                    </Field>
+                  )}
+                </div>
+              )}
+
               {/* Spouse qualified balance — MFJ only, separate RMD schedule */}
               {inputs.filingStatus === 'mfj' && <>
                 <div style={{marginTop:14,paddingTop:12,borderTop:'1px solid rgba(255,255,255,.06)',fontSize:13,fontWeight:700,color:'#9EB8CC',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:6}}>
@@ -2492,27 +2517,6 @@ function App() {
 
               {/* Contributions — only show if pre-retirement */}
               {inputs.currentAge < inputs.retireAge && <>
-                <div style={{marginTop:16,paddingTop:14,borderTop:'1px solid rgba(255,255,255,.06)'}}>
-                  <div style={{fontSize:14,fontWeight:700,color:'#9EB8CC',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:10}}>
-                    Annual Contributions (Pre-Retirement)
-                  </div>
-                  <Field label="Traditional / Pre-Tax Contribution" hint="Annual 401(k) or IRA contribution — grows tax-deferred to retirement">
-                    <NumInput value={inputs.annualTradContribution} onChange={v=>set('annualTradContribution',v)} prefix="$" suffix="/yr"/>
-                  </Field>
-                  {inputs.annualTradContribution > 0 && (
-                    <Field label="Stop Contributing at Age" hint="Default: retirement age">
-                      <NumInput value={inputs.tradContributionEndAge||inputs.retireAge} onChange={v=>set('tradContributionEndAge',v)} suffix="yrs"/>
-                    </Field>
-                  )}
-                  <Field label="Taxable / Brokerage Contribution" hint="Annual after-tax brokerage contribution">
-                    <NumInput value={inputs.annualTaxableContribution} onChange={v=>set('annualTaxableContribution',v)} prefix="$" suffix="/yr"/>
-                  </Field>
-                  {inputs.annualTaxableContribution > 0 && (
-                    <Field label="Stop Contributing at Age" hint="Default: retirement age">
-                      <NumInput value={inputs.taxableContributionEndAge||inputs.retireAge} onChange={v=>set('taxableContributionEndAge',v)} suffix="yrs"/>
-                    </Field>
-                  )}
-                </div>
 
                 {/* Projected balance at retirement callout */}
                 {(() => {
