@@ -471,6 +471,9 @@ function projectArc(inputs) {
     rothDrawdownStartAge = 0,
     rothDrawdownEndAge = 0,
     pensionMonthly,
+    pensionStartAge = 65, pensionType = 'single', pensionSurvivorPct = 50,
+    spousePensionMonthly = 0, spousePensionStartAge = 65,
+    primaryDeathAge = 0,
     traditionalBalance, rothBalance, taxableBalance,
     rothAnnuityMonthly = 0, rothAnnuityStartAge = 65,
     etaAnnualIncome = 0, etaStartAge = 70, etaColaRate = 0,
@@ -648,11 +651,47 @@ function projectArc(inputs) {
       row.totalIncome += totalSS;
     }
 
-    // Pension
-    if (pensionMonthly > 0) {
-      const pAnnual = pensionMonthly * 12 * inflFactor;
-      row.sources.pension = pAnnual;
-      row.totalIncome += pAnnual;
+    // Primary Pension
+    if (pensionMonthly > 0 && age >= pensionStartAge) {
+      const primaryAlive = primaryDeathAge === 0 || age <= primaryDeathAge;
+      let effectivePension = 0;
+
+      if (filingStatus === 'single') {
+        // Single: pension runs entire time — no survivor scenario
+        effectivePension = pensionMonthly;
+      } else {
+        // Married
+        if (primaryAlive) {
+          // Primary is alive — full pension
+          effectivePension = pensionMonthly;
+        } else {
+          // Primary has died
+          if (pensionType === 'single') {
+            effectivePension = 0; // single life — ceases at primary's death
+          } else {
+            // Joint & Survivor — spouse receives the prescribed percentage
+            const spouseAliveAtPrimaryDeath = spouseDeathAge === 0 || age <= spouseDeathAge;
+            effectivePension = spouseAliveAtPrimaryDeath ? pensionMonthly * (pensionSurvivorPct / 100) : 0;
+          }
+        }
+      }
+
+      if (effectivePension > 0) {
+        const pAnnual = effectivePension * 12 * inflFactor;
+        row.sources.pension = (row.sources.pension || 0) + pAnnual;
+        row.totalIncome += pAnnual;
+      }
+    }
+
+    // Spouse Pension — starts at spousePensionStartAge, runs to planToAge, stops if spouse dies
+    if (spousePensionMonthly > 0 && filingStatus === 'mfj') {
+      const spouseAge = age - spouseDobOffset;
+      const spouseAlive = spouseDeathAge === 0 || age <= spouseDeathAge;
+      if (spouseAge >= spousePensionStartAge && spouseAlive) {
+        const spPAnnual = spousePensionMonthly * 12 * inflFactor;
+        row.sources.pension = (row.sources.pension || 0) + spPAnnual;
+        row.totalIncome += spPAnnual;
+      }
     }
 
     // Part-time income
@@ -1107,9 +1146,15 @@ function projectArc(inputs) {
   // IMPORTANT: use arch-gated values so MC respects Architecture ON/OFF toggle.
   const fixedStreams = [];
 
-  // Pension — always included regardless of architecture toggle (it's a guaranteed stream)
+  // Pension — respects start age relative to MC start (retirement age)
   if (pensionMonthly > 0) {
-    fixedStreams.push({ yearOffset: 0, annual: pensionMonthly * 12 });
+    const offset = Math.max(0, pensionStartAge - mcStartAge);
+    fixedStreams.push({ yearOffset: offset, annual: pensionMonthly * 12 });
+  }
+  // Spouse pension — added to fixed streams if married
+  if (spousePensionMonthly > 0 && filingStatus === 'mfj') {
+    const spOffset = Math.max(0, spousePensionStartAge - mcStartAge);
+    fixedStreams.push({ yearOffset: spOffset, annual: spousePensionMonthly * 12 });
   }
 
   // Roth annuity — only when architecture is enabled (Layer 1 product)
@@ -1689,7 +1734,9 @@ function App() {
     currentAge: 60, retireAge: 65, planToAge: 92, fra: 67,
     ssMonthly: 2800, ssClaimAge: 67,
     spouseSsMonthly: 0, spouseSsClaimAge: 67, spouseFra: 67, spouseDobOffset: 0, spouseCurrentAge: null, spouseDeathAge: 0,
-    pensionMonthly: 0,
+    pensionMonthly: 0, pensionStartAge: 65, pensionType: 'single', pensionSurvivorPct: 50,
+    spousePensionMonthly: 0, spousePensionStartAge: 65,
+    primaryDeathAge: 0,
     traditionalBalance: 1000000, rothBalance: 0, taxableBalance: 250000,
     rothAnnuityMonthly: 0, rothAnnuityStartAge: 65,
     etaAnnualIncome: 0, etaStartAge: 70, etaFundingDraw: 0, etaColaRate: 0,
@@ -2178,7 +2225,7 @@ function App() {
                 </Field>
               )}
               <Field label="Retirement Age"><NumInput value={inputs.retireAge} onChange={v=>set('retireAge',v)} suffix="yrs"/></Field>
-              <Field label="Plan Through Age"><NumInput value={inputs.planToAge} onChange={v=>set('planToAge',v)} suffix="yrs"/></Field>
+              <Field label="Plan Through Age (Primary)"><NumInput value={inputs.planToAge} onChange={v=>set('planToAge',v)} suffix="yrs"/></Field>
             </Section>
 
             <Section title="Social Security" collapsed={sections.ss} onToggle={()=>toggleSection('ss')}>
@@ -2273,6 +2320,9 @@ function App() {
                   <Field label="Model Spouse Death at Age" hint="Enter 0 to exclude · Shows SS survivor benefit, IRMAA bracket shift to single, and tax bracket compression">
                     <NumInput value={inputs.spouseDeathAge} onChange={v=>set('spouseDeathAge',v)} suffix="yrs (primary age)"/>
                   </Field>
+                  <Field label="Model Primary Death at Age" hint="Enter 0 to exclude · Models pension single life cessation or J&S survivor reduction">
+                    <NumInput value={inputs.primaryDeathAge} onChange={v=>set('primaryDeathAge',v)} suffix="yrs (primary age)"/>
+                  </Field>
                   {inputs.spouseDeathAge > 0 && (
                     <div style={{padding:'10px 12px',background:'rgba(196,106,106,.06)',border:'1px solid rgba(196,106,106,.2)',borderRadius:7,marginTop:4}}>
                       <div style={{fontSize:14,color:'#C47A7A',fontWeight:600,marginBottom:5}}>Widow's Penalty — What Changes</div>
@@ -2289,9 +2339,72 @@ function App() {
             )}
 
             <Section title="Pension" collapsed={sections.pension} onToggle={()=>toggleSection('pension')}>
+
+              {/* Primary pension */}
+              <div style={{fontSize:13,fontWeight:700,color:'#9EB8CC',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8}}>
+                Primary Pension
+              </div>
               <Field label="Monthly Pension Benefit" hint="Enter 0 if no pension">
                 <NumInput value={inputs.pensionMonthly} onChange={v=>set('pensionMonthly',v)} prefix="$" suffix="/mo"/>
               </Field>
+
+              {inputs.pensionMonthly > 0 && <>
+                <Field label="Pension Start Age">
+                  <NumInput value={inputs.pensionStartAge} onChange={v=>set('pensionStartAge',v)} suffix="yrs"/>
+                </Field>
+
+                {inputs.filingStatus === 'mfj' && (
+                  <Field label="Pension Type">
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                      {[{id:'single',label:'Single Life'},{id:'joint',label:'Joint & Survivor'}].map(opt=>(
+                        <button key={opt.id}
+                          onClick={()=>set('pensionType',opt.id)}
+                          style={{
+                            padding:'7px 6px',borderRadius:6,fontSize:13,fontWeight:500,
+                            fontFamily:"'DM Sans',sans-serif",cursor:'pointer',
+                            background: inputs.pensionType===opt.id ? 'rgba(200,169,110,.2)' : 'rgba(255,255,255,.04)',
+                            border: inputs.pensionType===opt.id ? '1px solid rgba(200,169,110,.4)' : '1px solid rgba(255,255,255,.08)',
+                            color: inputs.pensionType===opt.id ? '#C8A96E' : '#9EB8CC',
+                          }}>
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </Field>
+                )}
+
+                {inputs.pensionType === 'single' && inputs.filingStatus === 'mfj' && (
+                  <div style={{background:'rgba(196,122,122,.08)',border:'1px solid rgba(196,122,122,.2)',borderRadius:6,padding:'9px 12px',fontSize:13,color:'#C47A7A',lineHeight:1.5}}>
+                    ⚠ Single life — pension payments cease at the primary's death. Model with "Primary Death Age" in the Widow/Widower Scenario.
+                  </div>
+                )}
+
+                {inputs.pensionType === 'joint' && inputs.filingStatus === 'mfj' && (
+                  <Field label="Survivor Benefit" hint="% of pension the surviving spouse receives after primary's death">
+                    <select className="ia-select" value={inputs.pensionSurvivorPct} onChange={e=>set('pensionSurvivorPct',Number(e.target.value))}>
+                      <option value={100}>100% — Full continuation</option>
+                      <option value={75}>75% — Three-quarter survivor</option>
+                      <option value={50}>50% — Half survivor</option>
+                    </select>
+                  </Field>
+                )}
+              </>}
+
+              {/* Spouse pension — only when married */}
+              {inputs.filingStatus === 'mfj' && <>
+                <div style={{marginTop:16,paddingTop:14,borderTop:'1px solid rgba(255,255,255,.06)',fontSize:13,fontWeight:700,color:'#9EB8CC',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8}}>
+                  Spouse Pension
+                </div>
+                <Field label="Spouse Monthly Pension" hint="Enter 0 if no spouse pension">
+                  <NumInput value={inputs.spousePensionMonthly} onChange={v=>set('spousePensionMonthly',v)} prefix="$" suffix="/mo"/>
+                </Field>
+                {inputs.spousePensionMonthly > 0 && (
+                  <Field label="Spouse Pension Start Age">
+                    <NumInput value={inputs.spousePensionStartAge} onChange={v=>set('spousePensionStartAge',v)} suffix="yrs"/>
+                  </Field>
+                )}
+              </>}
+
             </Section>
 
 {/* Portfolio Balances section */}
