@@ -598,6 +598,142 @@
     footer { flex-direction: column; padding: 40px 24px; }
     .footer-links { align-items: flex-start; }
   }
+
+  /* ── FAQ SECTION ── */
+  .faq-section {
+    background: var(--navy2);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .faq-grid {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 80px;
+    align-items: start;
+  }
+
+  .faq-sidebar {
+    position: sticky;
+    top: 100px;
+  }
+
+  .faq-sidebar-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 36px;
+    font-weight: 300;
+    line-height: 1.2;
+    color: var(--off-white);
+    margin-bottom: 20px;
+  }
+
+  .faq-sidebar-title em {
+    font-style: italic;
+    color: var(--gold);
+  }
+
+  .faq-sidebar-desc {
+    font-size: 14px;
+    color: var(--warm);
+    line-height: 1.75;
+  }
+
+  .faq-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .faq-item {
+    background: var(--navy3);
+    border: 1px solid var(--border);
+    border-left: 3px solid transparent;
+    transition: border-color 0.2s;
+    cursor: pointer;
+  }
+
+  .faq-item:hover {
+    border-left-color: var(--gold-dim);
+  }
+
+  .faq-item.open {
+    border-left-color: var(--gold);
+  }
+
+  .faq-question {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 24px 28px;
+    gap: 20px;
+  }
+
+  .faq-question-text {
+    font-family: 'Barlow', sans-serif;
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--off-white);
+    line-height: 1.4;
+  }
+
+  .faq-icon {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--gold);
+    font-size: 18px;
+    line-height: 1;
+    transition: transform 0.3s, background 0.2s;
+    font-family: 'Barlow', sans-serif;
+    font-weight: 300;
+  }
+
+  .faq-item.open .faq-icon {
+    transform: rotate(45deg);
+    background: rgba(200,169,110,0.1);
+    border-color: var(--gold-dim);
+  }
+
+  .faq-answer {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s ease, padding 0.3s ease;
+  }
+
+  .faq-item.open .faq-answer {
+    max-height: 600px;
+  }
+
+  .faq-answer-inner {
+    padding: 0 28px 28px;
+    border-top: 1px solid var(--border);
+    padding-top: 20px;
+  }
+
+  .faq-answer-inner p {
+    font-size: 15px;
+    color: var(--warm);
+    line-height: 1.8;
+  }
+
+  .faq-answer-inner p + p {
+    margin-top: 14px;
+  }
+
+  .faq-answer-inner strong {
+    color: var(--off-white);
+  }
+
+  @media (max-width: 900px) {
+    .faq-grid { grid-template-columns: 1fr; gap: 40px; }
+    .faq-sidebar { position: static; }
+  }
+
 </style>
 <style>.page-header { background-image:linear-gradient(135deg,rgba(8,18,38,0.90) 0%,rgba(8,18,38,0.72) 50%,rgba(15,30,58,0.55) 100%), url('https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=1800&q=80&fit=crop');background-size:cover;background-position:center 20%;background-repeat:no-repeat; }</style>
 </head>
@@ -798,6 +934,118 @@
   </div>
 </section>
 
+<!-- ── FAQ ── -->
+<section class="faq-section">
+  <div class="section-inner">
+    <div class="faq-grid">
+
+      <div class="faq-sidebar reveal">
+        <div class="section-label" style="margin-bottom: 20px;">Common Questions</div>
+        <div class="faq-sidebar-title">What most people<br>want to know<br><em>before they start.</em></div>
+        <p class="faq-sidebar-desc" style="margin-top: 20px;">
+          Straightforward answers to the questions we hear most often — about who we work with, how the process works, and what makes IPP different.
+        </p>
+      </div>
+
+      <div class="faq-list reveal reveal-delay-1">
+
+        <div class="faq-item open">
+          <div class="faq-question">
+            <div class="faq-question-text">Who does IPP typically work with?</div>
+            <div class="faq-icon">+</div>
+          </div>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">
+              <p>IPP's clients are typically pre-retirees and retirees — people with significant accumulated wealth in qualified retirement accounts who are beginning to think seriously about how that money gets distributed, taxed, and protected. Many are business owners, executives, or professionals who have done well at building wealth but haven't had a structured conversation about what happens next.</p>
+              <p>Our clients tend to be sophisticated. They're not looking to be sold a product — they're looking for someone who will genuinely examine their situation and tell them the truth about what they're exposed to and what they're missing.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-question">
+            <div class="faq-question-text">What exactly is a StructureReview™ — and what does it cost?</div>
+            <div class="faq-icon">+</div>
+          </div>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">
+              <p>The StructureReview™ is a no-cost, no-obligation analysis of your complete financial situation. It typically takes 10 to 15 minutes to complete. In return, you receive a structured written summary covering your tax exposure, retirement income gaps, protection vulnerabilities, and planning priorities — delivered the same day.</p>
+              <p><strong>There is no cost — ever.</strong> No products are sold during the process. The StructureReview™ exists to give you clarity about your situation, not to pitch you something. Whether or not you move forward with anything, the analysis is yours.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-question">
+            <div class="faq-question-text">How is IPP different from a traditional financial advisor?</div>
+            <div class="faq-icon">+</div>
+          </div>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">
+              <p>Most financial advisors are trained to recommend solutions — investments, insurance, planning strategies. Many of those solutions are excellent. The problem is the order: solutions get recommended before the full picture of a client's financial life has been properly understood. Assumptions fill the gaps. And assumptions lead to missed risks and misaligned advice.</p>
+              <p>IPP reverses that order. We start with structure — a rigorous examination of how the pieces of your financial life actually fit together — before anything is recommended. The result is advice that actually aligns with your situation, not advice shaped by what the advisor happened to be selling that year.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-question">
+            <div class="faq-question-text">What is IncomeArc™ and who is it designed for?</div>
+            <div class="faq-icon">+</div>
+          </div>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">
+              <p>IncomeArc™ is IPP's proprietary four-layer retirement income architecture. It's designed for people who want retirement income that holds regardless of what markets, taxes, or life events do — income that doesn't depend on withdrawal rates staying intact or portfolios performing on schedule.</p>
+              <p>The four layers address guaranteed income, long-term care and legacy, tax elimination, and liquidity — coordinated into a single system rather than a collection of separate products. It's built for clients who have accumulated significant assets and want to ensure those assets generate reliable, tax-efficient income for the rest of their lives.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-question">
+            <div class="faq-question-text">Does IPP address long-term care — and why does it matter so much?</div>
+            <div class="faq-icon">+</div>
+          </div>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">
+              <p>Yes — and we believe long-term care is one of the most underaddressed risks in retirement planning. Nearly 70% of people who reach 65 will need some form of long-term care. Annual nursing home costs now exceed $111,000 and rise 7–9% every year. Medicare doesn't cover it. Medicaid only steps in after savings are spent down to $2,000.</p>
+              <p>Most affluent clients assume they can self-fund it — and they're probably right. But when care is funded from an IRA or 401(k), every dollar withdrawn must first survive the IRS. To net $100,000 for care, you may need to withdraw $140,000–$150,000 or more. Across a multi-year care event, that permanently eliminates decades of compounding.</p>
+              <p>The Layer 2 component of IncomeArc™ uses a Living Benefits IUL that addresses this directly — and eliminates the old "use it or lose it" objection entirely. <strong>If care is needed, the death benefit accelerates tax-free. If care is never needed, the policy builds cash value accessible as tax-free income during your lifetime, or passes as a tax-free death benefit.</strong> Nothing is wasted.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-question">
+            <div class="faq-question-text">I already have a financial advisor. Can I still work with IPP?</div>
+            <div class="faq-icon">+</div>
+          </div>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">
+              <p>Absolutely. Many IPP clients have existing advisor relationships they value — and we have no interest in disrupting relationships that are working well. IPP specializes in areas that most generalist advisors don't focus on: qualified plan tax strategy, retirement income architecture, and long-term care planning using advanced structures.</p>
+              <p>In many cases, we work alongside a client's existing advisor, focusing on the specific exposures and strategies that fall outside the advisor's scope. We think of it as complementary — adding a layer of specialized analysis that most financial relationships simply don't include.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-question">
+            <div class="faq-question-text">What happens after the StructureReview™?</div>
+            <div class="faq-icon">+</div>
+          </div>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">
+              <p>You receive a structured written summary of your situation — your key exposures, planning tracks, and any areas that warrant a closer look. If what you see raises questions worth exploring, we offer a follow-up conversation at no cost and with no pressure.</p>
+              <p>Some clients move forward into a deeper engagement. Some take the analysis back to their existing advisor. Some simply appreciate having a clear picture of where they stand for the first time. All of those outcomes are fine with us. The StructureReview™ is designed to give you something useful regardless of what happens next.</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ── CTA ── -->
 <section class="cta-section">
   <div class="cta-inner">
@@ -889,6 +1137,16 @@
   </div>
 </footer>
 
+<script>
+  // FAQ accordion
+  document.querySelectorAll('.faq-item').forEach(item => {
+    item.querySelector('.faq-question').addEventListener('click', () => {
+      const isOpen = item.classList.contains('open');
+      document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
+      if (!isOpen) item.classList.add('open');
+    });
+  });
+</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="ipp-design-improvements.js?v=10"></script>
 </body>
