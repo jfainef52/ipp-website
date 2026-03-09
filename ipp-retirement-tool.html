@@ -2292,6 +2292,38 @@ function App() {
         {/* ── LEFT: Inputs ── */}
         <div className="left-panel" style={{background:'#0B1928',borderRight:'1px solid rgba(255,255,255,.06)',padding:'16px 14px',overflowY:'auto',maxHeight:'calc(100vh - 69px)'}}>
           {/* Client Info Panel */}
+          {/* Filing Status Toggle */}
+          <div style={{marginBottom:10,padding:'10px 12px',background:'rgba(200,169,110,.06)',border:'1px solid rgba(200,169,110,.18)',borderRadius:10}}>
+            <div style={{fontSize:14,fontWeight:600,letterSpacing:'.08em',textTransform:'uppercase',color:'#C8A96E',marginBottom:8}}>Filing Status</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+              {[{id:'single',label:'Single'},{id:'mfj',label:'Married (MFJ)'}].map(opt=>(
+                <button key={opt.id}
+                  onClick={()=>{
+                    set('filingStatus', opt.id);
+                    if(opt.id === 'mfj' && !inputs.spouseCurrentAge) {
+                      set('spouseCurrentAge', null);
+                      set('spouseDobOffset', 0);
+                    }
+                  }}
+                  style={{
+                    padding:'8px',borderRadius:7,fontSize:14,fontWeight:500,
+                    fontFamily:"'DM Sans',sans-serif",cursor:'pointer',
+                    background: inputs.filingStatus===opt.id ? 'rgba(200,169,110,.2)' : 'rgba(255,255,255,.04)',
+                    border: inputs.filingStatus===opt.id ? '1px solid rgba(200,169,110,.4)' : '1px solid rgba(255,255,255,.08)',
+                    color: inputs.filingStatus===opt.id ? '#C8A96E' : '#9EB8CC',
+                    transition:'all .2s',
+                  }}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            {inputs.filingStatus==='mfj' && (
+              <div style={{marginTop:8,fontSize:14,color:'#8DAFC8',lineHeight:1.5}}>
+                MFJ IRMAA brackets applied · Spousal SS calculated · Both spouses on Medicare at 65
+              </div>
+            )}
+          </div>
+
           <div style={{marginBottom:10,padding:'10px 12px',background:'rgba(200,169,110,.06)',border:'1px solid rgba(200,169,110,.18)',borderRadius:10}}>
             <div style={{fontSize:14,fontWeight:600,letterSpacing:'.08em',textTransform:'uppercase',color:'#C8A96E',marginBottom:8}}>Client Information</div>
             <div style={{display:'flex',flexDirection:'column',gap:7}}>
@@ -2326,38 +2358,6 @@ function App() {
                 />
               </div>
             </div>
-          </div>
-
-          {/* Filing Status Toggle */}
-          <div style={{marginBottom:10,padding:'10px 12px',background:'rgba(200,169,110,.06)',border:'1px solid rgba(200,169,110,.18)',borderRadius:10}}>
-            <div style={{fontSize:14,fontWeight:600,letterSpacing:'.08em',textTransform:'uppercase',color:'#C8A96E',marginBottom:8}}>Filing Status</div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
-              {[{id:'single',label:'Single'},{id:'mfj',label:'Married (MFJ)'}].map(opt=>(
-                <button key={opt.id}
-                  onClick={()=>{
-                    set('filingStatus', opt.id);
-                    if(opt.id === 'mfj' && !inputs.spouseCurrentAge) {
-                      set('spouseCurrentAge', null);
-                      set('spouseDobOffset', 0);
-                    }
-                  }}
-                  style={{
-                    padding:'8px',borderRadius:7,fontSize:14,fontWeight:500,
-                    fontFamily:"'DM Sans',sans-serif",cursor:'pointer',
-                    background: inputs.filingStatus===opt.id ? 'rgba(200,169,110,.2)' : 'rgba(255,255,255,.04)',
-                    border: inputs.filingStatus===opt.id ? '1px solid rgba(200,169,110,.4)' : '1px solid rgba(255,255,255,.08)',
-                    color: inputs.filingStatus===opt.id ? '#C8A96E' : '#9EB8CC',
-                    transition:'all .2s',
-                  }}>
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-            {inputs.filingStatus==='mfj' && (
-              <div style={{marginTop:8,fontSize:14,color:'#8DAFC8',lineHeight:1.5}}>
-                MFJ IRMAA brackets applied · Spousal SS calculated · Both spouses on Medicare at 65
-              </div>
-            )}
           </div>
 
           <div style={{display:'flex',flexDirection:'column',gap:3}}>
