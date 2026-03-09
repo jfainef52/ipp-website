@@ -581,6 +581,8 @@ function projectArc(inputs) {
     row.yearReturn = yearReturn; // stored for chart annotation
 
     // ── ETA Lump-Sum Funding Event ──
+    // Tax AND any early withdrawal penalty are financed externally (bank loan / policy financing).
+    // IRA is reduced by the gross funding amount only. No penalty hits the portfolio here.
     if (archEtaFundingAmount > 0 && etaFundingAge > 0 && age === etaFundingAge) {
       const fundAmt = Math.min(archEtaFundingAmount, trad);
       trad = Math.max(0, trad - fundAmt);
@@ -591,30 +593,35 @@ function projectArc(inputs) {
     }
 
     // ── Roth Annuity Conversion Event (Layer 1) ──
-    // Full conversion amount is ordinary income (taxable). Tax partially financed (no cash out),
-    // overage tax paid via grossed-up IRA withdrawal — both reduce the traditional balance.
+    // Full conversion amount is ordinary income. Tax is partially or fully financed (rothConversionFinanced).
+    // Unfinanced tax overage is grossed up from IRA after calcAnnualTax runs (see below).
+    // Early withdrawal penalty is NOT modeled here — 72(t) SEPP or other structuring handles it.
     if (archRothConversionAmount > 0 && rothConversionAge > 0 && age === rothConversionAge) {
       const convAmt = Math.min(archRothConversionAmount, trad);
       trad = Math.max(0, trad - convAmt);
       row.rothConversionEvent = true;
       row.rothConversionAmount = convAmt;
       // Entire conversion is a taxable IRA distribution — elevates marginal rate this year.
-      // Book into sources now so calcAnnualTax sees the full income stack including this conversion.
       row.sources.rmd = (row.sources.rmd || 0) + convAmt;
       row.totalIncome += convAmt;
-      // Flag for post-tax overage gross-up — resolved after calcAnnualTax runs below with full income.
+      // Flag for post-tax overage gross-up. financed covers as much of the tax as specified.
       row._conversionOveragePending = { convAmt, financed: Math.min(rothConversionFinanced || 0, convAmt) };
     }
 
     // ── LTC Policy Funding Draw ──
-    // Fully taxable IRA withdrawal — cannot be financed. Flows through ordinary income.
+    // Tax is NOT financed — ordinary income tax is captured by calcAnnualTax on the full income stack.
+    // Early withdrawal penalty (age < 59½) is also NOT financed — it is an additional hard cost
+    // (Form 5329) deducted directly from the IRA on top of the distribution. The gross distribution
+    // is still the full ltcFund amount (reported as income); the penalty is an extra IRA deduction.
     if (archLtcFundingAmount > 0 && ltcFundingAge > 0 && age === ltcFundingAge) {
       const ltcFund = Math.min(archLtcFundingAmount, trad);
-      trad = Math.max(0, trad - ltcFund);
+      const earlyPenalty = age < 59.5 ? ltcFund * 0.10 : 0;
+      trad = Math.max(0, trad - ltcFund - earlyPenalty); // penalty paid out of IRA, separate from income
       row.ltcFundingEvent = true;
       row.ltcFundingAmount = ltcFund;
+      row.ltcEarlyPenalty = earlyPenalty;
       row.sources.rmd = (row.sources.rmd || 0) + ltcFund;
-      row.totalIncome += ltcFund;
+      row.totalIncome += ltcFund; // income = gross distribution only; penalty is not additional income
     }
 
     // Determine effective filing status this year (primary death triggers widow's penalty)
@@ -1102,10 +1109,10 @@ function projectArc(inputs) {
     if (row._conversionOveragePending) {
       const { convAmt, financed } = row._conversionOveragePending;
       const allInRate = row.allInMarginalRate || taxResult.marginalRate;
-      const convTax = convAmt * allInRate;                         // actual tax on conversion at marginal rate
-      const overageTax = Math.max(0, convTax - financed);         // unfinanced portion — must come from IRA
+      const convTax = convAmt * allInRate;                              // actual tax on conversion
+      const overageTax = Math.max(0, convTax - financed);              // unfinanced portion — must come from IRA
       if (overageTax > 0 && trad > 0) {
-        const grossUp = Math.min(trad, overageTax / (1 - allInRate)); // gross-up so net covers the overage
+        const grossUp = Math.min(trad, overageTax / (1 - allInRate));  // gross-up so net covers the overage
         trad = Math.max(0, trad - grossUp);
         row.sources.rmd = (row.sources.rmd || 0) + grossUp;
         row.totalIncome += grossUp;
