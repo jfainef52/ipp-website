@@ -47,7 +47,7 @@ const GS = `
     border-radius: 8px;
     padding: 12px 14px;
     color: #F5F2EC;
-    font-size: 15px;
+    font-size: 13px;
     font-family: 'DM Sans', sans-serif;
     outline: none;
     transition: border-color .2s, background .2s;
@@ -65,7 +65,7 @@ const GS = `
     border-radius: 8px;
     padding: 12px 14px;
     color: #F5F2EC;
-    font-size: 15px;
+    font-size: 13px;
     font-family: 'DM Sans', sans-serif;
     outline: none;
     appearance: none;
@@ -1295,18 +1295,67 @@ function Field({ label, hint, children }) {
 }
 
 function NumInput({ value, onChange, placeholder, prefix, suffix }) {
+  const isDollar = prefix === '$';
+  const [focused, setFocused] = React.useState(false);
+  const [raw, setRaw] = React.useState('');
+
+  // Format a number with commas for display
+  const formatNum = v => {
+    if (v === 0 || v === '' || v === null || v === undefined) return '';
+    const n = Number(v);
+    if (isNaN(n)) return '';
+    return n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  };
+
+  // Strip commas and parse
+  const parseNum = str => {
+    const stripped = String(str).replace(/,/g, '').replace(/[^0-9.-]/g, '');
+    return stripped === '' ? 0 : Number(stripped);
+  };
+
+  const displayValue = focused
+    ? raw
+    : (isDollar ? formatNum(value) : (value || ''));
+
+  const handleFocus = () => {
+    setFocused(true);
+    setRaw(value ? String(value) : '');
+  };
+
+  const handleChange = e => {
+    const v = e.target.value;
+    if (isDollar) {
+      // Allow only digits, commas, dots, minus
+      const clean = v.replace(/[^0-9.,\-]/g, '');
+      setRaw(clean);
+      const parsed = parseNum(clean);
+      onChange(parsed);
+    } else {
+      setRaw(v);
+      onChange(v === '' ? 0 : Number(v));
+    }
+  };
+
+  const handleBlur = () => {
+    setFocused(false);
+    setRaw('');
+  };
+
   return (
     <div style={{position:'relative',display:'flex',alignItems:'center'}}>
-      {prefix && <span style={{position:'absolute',left:13,color:'#9EB8CC',fontSize:14,pointerEvents:'none'}}>{prefix}</span>}
+      {prefix && <span style={{position:'absolute',left:13,color:'#9EB8CC',fontSize:13,pointerEvents:'none'}}>{prefix}</span>}
       <input
         className="ia-input"
-        type="number"
-        value={value||''}
-        onChange={e=>onChange(e.target.value===''?0:Number(e.target.value))}
-        placeholder={placeholder||'0'}
+        type="text"
+        inputMode={isDollar ? 'numeric' : 'decimal'}
+        value={displayValue}
+        onChange={handleChange}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        placeholder={placeholder || '0'}
         style={{paddingLeft: prefix ? 26 : 14, paddingRight: suffix ? 40 : 14}}
       />
-      {suffix && <span style={{position:'absolute',right:13,color:'#9EB8CC',fontSize:14,pointerEvents:'none'}}>{suffix}</span>}
+      {suffix && <span style={{position:'absolute',right:13,color:'#9EB8CC',fontSize:13,pointerEvents:'none'}}>{suffix}</span>}
     </div>
   );
 }
