@@ -458,7 +458,7 @@ function projectArc(inputs) {
     ssMonthly, ssClaimAge, fra,
     filingStatus = 'single',
     spouseSsMonthly = 0, spouseSsClaimAge = 67, spouseFra = 67,
-    spouseDobOffset = 3,
+    spouseDobOffset = 0,
     spouseDeathAge = 0,
     // Strategic drawdown
     annualTradDrawdown = 0,       // intentional IRA/trad draw per year (pre-RMD Roth Annuity conversion; ETA can fund conversion tax cost)
@@ -1688,7 +1688,7 @@ function App() {
     filingStatus: 'single',
     currentAge: 60, retireAge: 65, planToAge: 92, fra: 67,
     ssMonthly: 2800, ssClaimAge: 67,
-    spouseSsMonthly: 0, spouseSsClaimAge: 67, spouseFra: 67, spouseDobOffset: 3, spouseDeathAge: 0,
+    spouseSsMonthly: 0, spouseSsClaimAge: 67, spouseFra: 67, spouseDobOffset: 0, spouseCurrentAge: null, spouseDeathAge: 0,
     pensionMonthly: 0,
     traditionalBalance: 1000000, rothBalance: 0, taxableBalance: 250000,
     rothAnnuityMonthly: 0, rothAnnuityStartAge: 65,
@@ -2136,7 +2136,13 @@ function App() {
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
               {[{id:'single',label:'Single'},{id:'mfj',label:'Married (MFJ)'}].map(opt=>(
                 <button key={opt.id}
-                  onClick={()=>set('filingStatus',opt.id)}
+                  onClick={()=>{
+                    set('filingStatus', opt.id);
+                    if(opt.id === 'mfj' && !inputs.spouseCurrentAge) {
+                      set('spouseCurrentAge', null);
+                      set('spouseDobOffset', 0);
+                    }
+                  }}
                   style={{
                     padding:'8px',borderRadius:7,fontSize:14,fontWeight:500,
                     fontFamily:"'DM Sans',sans-serif",cursor:'pointer',
@@ -2159,7 +2165,18 @@ function App() {
           <div style={{display:'flex',flexDirection:'column',gap:3}}>
 
             <Section title="Basic Info" collapsed={sections.basic} onToggle={()=>toggleSection('basic')}>
-              <Field label="Current Age"><NumInput value={inputs.currentAge} onChange={v=>set('currentAge',v)} suffix="yrs"/></Field>
+              <Field label="Current Age"><NumInput value={inputs.currentAge} onChange={v=>{
+                set('currentAge', v);
+                if(inputs.filingStatus === 'mfj') set('spouseDobOffset', v - inputs.spouseCurrentAge);
+              }} suffix="yrs"/></Field>
+              {inputs.filingStatus === 'mfj' && (
+                <Field label="Spouse's Current Age" hint="Required for accurate MFJ calculations">
+                  <NumInput value={inputs.spouseCurrentAge || ''} onChange={v=>{
+                    set('spouseCurrentAge', v);
+                    set('spouseDobOffset', inputs.currentAge - v);
+                  }} suffix="yrs"/>
+                </Field>
+              )}
               <Field label="Retirement Age"><NumInput value={inputs.retireAge} onChange={v=>set('retireAge',v)} suffix="yrs"/></Field>
               <Field label="Plan Through Age"><NumInput value={inputs.planToAge} onChange={v=>set('planToAge',v)} suffix="yrs"/></Field>
             </Section>
@@ -2199,9 +2216,6 @@ function App() {
             {/* Spouse SS — only shown if married */}
             {inputs.filingStatus === 'mfj' && (
               <Section title="Spouse — Social Security" collapsed={sections.spouseSs} onToggle={()=>toggleSection('spouseSs')}>
-                <Field label="Spouse Age Difference" hint="Positive = spouse is younger, negative = spouse is older">
-                  <NumInput value={inputs.spouseDobOffset} onChange={v=>set('spouseDobOffset',v)} suffix="yrs younger"/>
-                </Field>
                 <Field label="Spouse Est. Monthly Benefit at FRA" hint="Enter 0 if spouse has no work record — spousal benefit (50%) will be used">
                   <NumInput value={inputs.spouseSsMonthly} onChange={v=>set('spouseSsMonthly',v)} prefix="$" suffix="/mo"/>
                 </Field>
