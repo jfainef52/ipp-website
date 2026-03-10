@@ -211,8 +211,7 @@ function runMonteCarlo(startBalance, annualWithdraw, years, trials=500, mean=0.0
     : (fixedStreams > 0 ? [{ yearOffset: 0, annual: fixedStreams }] : []);
 
   const seedVal = Math.round(
-    (startBalance * 0.001)
-    + (annualWithdraw * 0.1)
+    (annualWithdraw * 0.1)
     + (years * 1000)
     + (mean * 99991)
     + (inflation * 77777)
