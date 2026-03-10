@@ -1957,6 +1957,203 @@ function DataTable({ data }) {
   );
 }
 
+// ── Debits Table ──
+function DebitsTable({ data }) {
+  if (!data || data.length === 0) return null;
+  const fmt$ = v => v >= 1000 ? '$'+Math.round(v/1000)+'K' : (v > 0 ? '$'+Math.round(v||0) : '—');
+  const fmtM = v => v >= 1000000 ? '$'+(v/1000000).toFixed(1)+'M' : fmt$(v);
+  const fmtPct = v => v > 0 ? (v*100).toFixed(1)+'%' : '—';
+  const red = '#C47A7A', amber = '#C8A96E', muted = '#9EB8CC', faint = 'rgba(255,255,255,.06)';
+  const hStyle = (c='#9EB8CC') => ({padding:'6px 8px',textAlign:'right',color:c,fontWeight:500,letterSpacing:'.04em',fontSize:13,borderBottom:'1px solid '+faint,whiteSpace:'nowrap'});
+  const cellStyle = (highlight) => ({padding:'5px 8px',textAlign:'right',color:highlight||muted,fontWeight:highlight?600:400});
+  const headers = ['Age','Fixed Exp.','Lifestyle','Care Event','Spouse Care','Exp. Shock','IRMAA','Fed Tax','State Tax','LTC Gross-Up Tax','L1 Premium','L2 Premium','Sp.L2 Premium','L3 Premium','Total Debits'];
+
+  return (
+    <div style={{overflowX:'auto'}}>
+      <div style={{padding:'8px 12px 4px',fontSize:12,color:'#8DAFC8',letterSpacing:'.05em'}}>
+        DEBITS — All portfolio outflows by category · Architecture {data[0]?.architectureEnabled ? 'ON' : 'varies'} · amounts in today-inflated dollars
+      </div>
+      <table style={{width:'100%',borderCollapse:'collapse',fontSize:13,fontFamily:'DM Sans'}}>
+        <thead>
+          <tr>
+            {headers.map(h=>(
+              <th key={h} style={hStyle(h==='Total Debits'?red:h.includes('Tax')||h==='Fed Tax'||h==='State Tax'?red:h.includes('Care')||h.includes('Shock')||h.includes('IRMAA')?amber:h.includes('Premium')?'#9B7EC8':muted)}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((d,i)=>{
+            const fixedExp   = d.totalExpense - (d.ltcUncovered||0) - (d.spouseLtcUncovered||0) - (d.expenseShockAmount||0) - (d.irmaaExpense||0);
+            // Split fixed/lifestyle — not stored separately, estimate from row.totalExpense baseline
+            // Use proportional split from inputs if available, else show as combined
+            const careEvent  = d.ltcAnnualCost || 0;      // full care cost (insured or not)
+            const spouseCare = d.spouseLtcAnnualCost || 0;
+            const expShock   = d.expenseShockAmount || 0;
+            const irmaa      = d.irmaaExpense || 0;
+            const fedTax     = d.federalTax || 0;
+            const stateTax   = d.stateTax || 0;
+            const ltcGrossUp = d.ltcGrossUpTax || 0;
+            const l1Premium  = d.rothConversionAmount > 0 ? (d.rothConversionAmount - (d.rothConversionOverage||0)) : 0; // Roth conversion
+            const l2Premium  = d.ltcFundingAmount || 0;
+            const spL2Premium= d.spouseLtcFundingAmount || 0;
+            const l3Premium  = d.etaFundingAmount || 0;
+            const totalDebits = fixedExp + careEvent + spouseCare + expShock + irmaa + fedTax + stateTax + ltcGrossUp + l1Premium + l2Premium + spL2Premium + l3Premium;
+            const isLtcYear  = d.ltcEvent || d.spouseLtcEvent;
+            const isPremYear = d.ltcFundingEvent || d.spouseLtcFundingEvent || d.etaFundingEvent || d.rothConversionEvent;
+            const rowBg = isLtcYear ? 'rgba(196,122,122,.07)' : isPremYear ? 'rgba(155,126,200,.06)' : i%2===0?'transparent':'rgba(255,255,255,.015)';
+            return (
+              <tr key={d.age} style={{background:rowBg}}>
+                <td style={{...cellStyle(),fontWeight:600,color:isLtcYear?amber:isPremYear?'#9B7EC8':muted}}>{d.age}</td>
+                <td style={cellStyle()}>{fmt$(fixedExp)}</td>
+                <td style={cellStyle()}>—</td>
+                <td style={cellStyle(careEvent>0?amber:null)}>{careEvent>0?fmt$(careEvent):'—'}</td>
+                <td style={cellStyle(spouseCare>0?amber:null)}>{spouseCare>0?fmt$(spouseCare):'—'}</td>
+                <td style={cellStyle(expShock>0?amber:null)}>{expShock>0?fmt$(expShock):'—'}</td>
+                <td style={cellStyle(irmaa>0?amber:null)}>{irmaa>0?fmt$(irmaa):'—'}</td>
+                <td style={cellStyle(fedTax>0?red:null)}>{fedTax>0?fmt$(fedTax):'—'}</td>
+                <td style={cellStyle(stateTax>0?red:null)}>{stateTax>0?fmt$(stateTax):'—'}</td>
+                <td style={cellStyle(ltcGrossUp>0?red:null)}>{ltcGrossUp>0?fmt$(ltcGrossUp):'—'}</td>
+                <td style={cellStyle(l1Premium>0?'#9B7EC8':null)}>{l1Premium>0?fmt$(l1Premium):'—'}</td>
+                <td style={cellStyle(l2Premium>0?'#9B7EC8':null)}>{l2Premium>0?fmt$(l2Premium):'—'}</td>
+                <td style={cellStyle(spL2Premium>0?'#9B7EC8':null)}>{spL2Premium>0?fmt$(spL2Premium):'—'}</td>
+                <td style={cellStyle(l3Premium>0?'#9B7EC8':null)}>{l3Premium>0?fmt$(l3Premium):'—'}</td>
+                <td style={{...cellStyle(red),fontWeight:700}}>{fmtM(totalDebits)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+        <tfoot>
+          <tr style={{borderTop:'1px solid rgba(255,255,255,.1)'}}>
+            <td style={{padding:'6px 8px',color:muted,fontWeight:600}}>TOTAL</td>
+            {[
+              data.reduce((s,d)=> s + (d.totalExpense-(d.ltcUncovered||0)-(d.spouseLtcUncovered||0)-(d.expenseShockAmount||0)-(d.irmaaExpense||0)), 0),
+              0, // lifestyle (not split)
+              data.reduce((s,d)=> s + (d.ltcAnnualCost||0), 0),
+              data.reduce((s,d)=> s + (d.spouseLtcAnnualCost||0), 0),
+              data.reduce((s,d)=> s + (d.expenseShockAmount||0), 0),
+              data.reduce((s,d)=> s + (d.irmaaExpense||0), 0),
+              data.reduce((s,d)=> s + (d.federalTax||0), 0),
+              data.reduce((s,d)=> s + (d.stateTax||0), 0),
+              data.reduce((s,d)=> s + (d.ltcGrossUpTax||0), 0),
+              data.reduce((s,d)=> s + (d.rothConversionAmount>0?(d.rothConversionAmount-(d.rothConversionOverage||0)):0), 0),
+              data.reduce((s,d)=> s + (d.ltcFundingAmount||0), 0),
+              data.reduce((s,d)=> s + (d.spouseLtcFundingAmount||0), 0),
+              data.reduce((s,d)=> s + (d.etaFundingAmount||0), 0),
+            ].map((v,i2)=>(
+              <td key={i2} style={{padding:'6px 8px',textAlign:'right',color:v>0?muted:'rgba(255,255,255,.2)',fontWeight:500,fontSize:13}}>{v>0?fmtM(v):'—'}</td>
+            ))}
+            <td style={{padding:'6px 8px',textAlign:'right',color:red,fontWeight:700,fontSize:13}}>
+              {fmtM(data.reduce((s,d)=>{
+                const fixedExp = d.totalExpense-(d.ltcUncovered||0)-(d.spouseLtcUncovered||0)-(d.expenseShockAmount||0)-(d.irmaaExpense||0);
+                return s + fixedExp + (d.ltcAnnualCost||0) + (d.spouseLtcAnnualCost||0) + (d.expenseShockAmount||0) + (d.irmaaExpense||0) + (d.federalTax||0) + (d.stateTax||0) + (d.ltcGrossUpTax||0) + (d.rothConversionAmount>0?(d.rothConversionAmount-(d.rothConversionOverage||0)):0) + (d.ltcFundingAmount||0) + (d.spouseLtcFundingAmount||0) + (d.etaFundingAmount||0);
+              }, 0))}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
+}
+
+// ── Credits Table ──
+function CreditsTable({ data }) {
+  if (!data || data.length === 0) return null;
+  const fmt$ = v => v >= 1000 ? '$'+Math.round(v/1000)+'K' : (v > 0 ? '$'+Math.round(v||0) : '—');
+  const fmtM = v => v >= 1000000 ? '$'+(v/1000000).toFixed(1)+'M' : fmt$(v);
+  const green = '#4A9B7A', muted = '#9EB8CC', faint = 'rgba(255,255,255,.06)';
+  const hStyle = (c=muted) => ({padding:'6px 8px',textAlign:'right',color:c,fontWeight:500,letterSpacing:'.04em',fontSize:13,borderBottom:'1px solid '+faint,whiteSpace:'nowrap'});
+  const cellStyle = (highlight) => ({padding:'5px 8px',textAlign:'right',color:highlight||muted,fontWeight:highlight?600:400});
+  const headers = ['Age','Soc Sec','Pension','Roth Ann. (L1)','NQ Ann.','ETA Loan (L3)','RMD / Trad','Roth IRA','Taxable','Part-Time','LTC Coverage','Sp. LTC Coverage','Portfolio Yield','Total Credits','Portfolio'];
+
+  return (
+    <div style={{overflowX:'auto'}}>
+      <div style={{padding:'8px 12px 4px',fontSize:12,color:'#8DAFC8',letterSpacing:'.05em'}}>
+        CREDITS — All portfolio inflows and income sources · gross (pre-tax) · LTC coverage = insurance benefit paying care cost
+      </div>
+      <table style={{width:'100%',borderCollapse:'collapse',fontSize:13,fontFamily:'DM Sans'}}>
+        <thead>
+          <tr>
+            {headers.map(h=>(
+              <th key={h} style={hStyle(h==='Total Credits'||h==='Portfolio Yield'?green:h.includes('LTC Coverage')?'#C8A96E':h.includes('L1')||h.includes('L3')||h.includes('NQ')?'#9B7EC8':muted)}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((d,i)=>{
+            const ss       = (d.grossSources?.ss || d.sources?.ss || 0) / (d.sources?.ss > 0 ? (d.sources.ss / (d.grossSources?.ss||d.sources?.ss||1)) : 1);
+            // Use grossSources for gross income, fall back to sources
+            const gs = d.grossSources || d.sources || {};
+            const ssSrc    = gs.ss || 0;
+            const penSrc   = gs.pension || 0;
+            const rothAnn  = d.rothAnnuityIncome || 0;
+            const nqAnn    = d.nonQualAnnuityIncome || 0;
+            const eta      = gs.eta || d.etaIncome || 0;
+            const rmd      = gs.rmd || 0;
+            const rothIra  = gs.roth || 0;
+            const taxable  = gs.taxable || 0;
+            const partTime = gs.parttime || 0;
+            const ltcCov   = d.ltcCoverage || 0;
+            const spLtcCov = d.spouseLtcCoverage || 0;
+            const yield_   = d.portfolioYield || 0;
+            const totalCr  = ssSrc + penSrc + rothAnn + nqAnn + eta + rmd + rothIra + taxable + partTime + ltcCov + spLtcCov + yield_;
+            const isLtcCovYear = ltcCov > 0 || spLtcCov > 0;
+            const rowBg = isLtcCovYear ? 'rgba(74,155,122,.07)' : i%2===0?'transparent':'rgba(255,255,255,.015)';
+            return (
+              <tr key={d.age} style={{background:rowBg}}>
+                <td style={{...cellStyle(),fontWeight:600,color:isLtcCovYear?'#C8A96E':muted}}>{d.age}</td>
+                <td style={cellStyle(ssSrc>0?muted:null)}>{fmt$(ssSrc)}</td>
+                <td style={cellStyle(penSrc>0?muted:null)}>{fmt$(penSrc)}</td>
+                <td style={cellStyle(rothAnn>0?'#9B7EC8':null)}>{rothAnn>0?fmt$(rothAnn):'—'}</td>
+                <td style={cellStyle(nqAnn>0?'#9B7EC8':null)}>{nqAnn>0?fmt$(nqAnn):'—'}</td>
+                <td style={cellStyle(eta>0?'#9B7EC8':null)}>{eta>0?fmt$(eta):'—'}</td>
+                <td style={cellStyle(rmd>0?muted:null)}>{fmt$(rmd)}</td>
+                <td style={cellStyle(rothIra>0?muted:null)}>{rothIra>0?fmt$(rothIra):'—'}</td>
+                <td style={cellStyle(taxable>0?muted:null)}>{taxable>0?fmt$(taxable):'—'}</td>
+                <td style={cellStyle(partTime>0?muted:null)}>{partTime>0?fmt$(partTime):'—'}</td>
+                <td style={cellStyle(ltcCov>0?'#C8A96E':null)}>{ltcCov>0?fmt$(ltcCov):'—'}</td>
+                <td style={cellStyle(spLtcCov>0?'#C8A96E':null)}>{spLtcCov>0?fmt$(spLtcCov):'—'}</td>
+                <td style={cellStyle(yield_>0?green:null)}>{yield_>0?fmt$(yield_):'—'}</td>
+                <td style={{...cellStyle(green),fontWeight:700}}>{fmtM(totalCr)}</td>
+                <td style={{...cellStyle(),color:d.totalPortfolio>0?muted:'#C47A7A',fontWeight:500}}>{fmtM(d.totalPortfolio||0)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+        <tfoot>
+          <tr style={{borderTop:'1px solid rgba(255,255,255,.1)'}}>
+            <td style={{padding:'6px 8px',color:muted,fontWeight:600}}>TOTAL</td>
+            {[
+              data.reduce((s,d)=>{const gs=d.grossSources||d.sources||{};return s+(gs.ss||0)},0),
+              data.reduce((s,d)=>{const gs=d.grossSources||d.sources||{};return s+(gs.pension||0)},0),
+              data.reduce((s,d)=>s+(d.rothAnnuityIncome||0),0),
+              data.reduce((s,d)=>s+(d.nonQualAnnuityIncome||0),0),
+              data.reduce((s,d)=>{const gs=d.grossSources||d.sources||{};return s+(gs.eta||d.etaIncome||0)},0),
+              data.reduce((s,d)=>{const gs=d.grossSources||d.sources||{};return s+(gs.rmd||0)},0),
+              data.reduce((s,d)=>{const gs=d.grossSources||d.sources||{};return s+(gs.roth||0)},0),
+              data.reduce((s,d)=>{const gs=d.grossSources||d.sources||{};return s+(gs.taxable||0)},0),
+              data.reduce((s,d)=>{const gs=d.grossSources||d.sources||{};return s+(gs.parttime||0)},0),
+              data.reduce((s,d)=>s+(d.ltcCoverage||0),0),
+              data.reduce((s,d)=>s+(d.spouseLtcCoverage||0),0),
+              data.reduce((s,d)=>s+(d.portfolioYield||0),0),
+            ].map((v,i2)=>(
+              <td key={i2} style={{padding:'6px 8px',textAlign:'right',color:v>0?muted:'rgba(255,255,255,.2)',fontWeight:500,fontSize:13}}>{v>0?fmtM(v):'—'}</td>
+            ))}
+            <td style={{padding:'6px 8px',textAlign:'right',color:green,fontWeight:700,fontSize:13}}>
+              {fmtM(data.reduce((s,d)=>{
+                const gs=d.grossSources||d.sources||{};
+                return s+(gs.ss||0)+(gs.pension||0)+(d.rothAnnuityIncome||0)+(d.nonQualAnnuityIncome||0)+(gs.eta||d.etaIncome||0)+(gs.rmd||0)+(gs.roth||0)+(gs.taxable||0)+(gs.parttime||0)+(d.ltcCoverage||0)+(d.spouseLtcCoverage||0)+(d.portfolioYield||0);
+              },0))}
+            </td>
+            <td style={{padding:'6px 8px',textAlign:'right',color:muted,fontWeight:500,fontSize:13}}>
+              {fmtM(data[data.length-1]?.totalPortfolio||0)}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
+}
+
 // ── Legend ──
 function Legend({ insuredData }) {
   return (
@@ -2118,7 +2315,7 @@ function DisclaimerModal({ onAccept }) {
 
 function App() {
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
-  const [view, setView] = useState('visual'); // 'visual' | 'numbers'
+  const [view, setView] = useState('visual'); // 'visual' | 'numbers' | 'debits' | 'credits'
   const [reportModal, setReportModal] = useState(false);
   const [reportSending, setReportSending] = useState(false);
   const [reportSent, setReportSent] = useState(false);
@@ -2213,7 +2410,10 @@ function App() {
   // and LTC inputs are set.
   const ltcCompareBase = {
     ...baseProjectionInputs,
-    ltcNetAmount: 0, spouseLtcNetAmount: 0,
+    // Keep all Architecture layers active — the comparison should show:
+    //   insured:   full architecture + insurance covers care
+    //   uninsured: full architecture + care costs hit portfolio directly
+    // Stripping layers would compare apples-to-oranges (low-income baseline vs real plan)
     ltcEventAge: hasLtcEvent ? inputs.ltcEventAge : 0,
     spouseLtcEventAge: hasSpouseLtcEvent ? inputs.spouseLtcEventAge : 0,
   };
@@ -2543,7 +2743,9 @@ function App() {
         <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
           <div style={{display:'flex',gap:6,background:'rgba(255,255,255,.03)',borderRadius:8,padding:4,border:'1px solid rgba(255,255,255,.06)'}}>
             <button className={`tab-btn ${view==='visual'?'active':''}`} onClick={()=>setView('visual')}>Visual Arc</button>
-            <button className={`tab-btn ${view==='numbers'?'active':''}`} onClick={()=>setView('numbers')}>Number Table</button>
+            <button className={`tab-btn ${view==='numbers'?'active':''}`} onClick={()=>setView('numbers')}>Totals Table</button>
+            <button className={`tab-btn ${view==='debits'?'active':''}`} onClick={()=>setView('debits')}>Debits</button>
+            <button className={`tab-btn ${view==='credits'?'active':''}`} onClick={()=>setView('credits')}>Credits</button>
           </div>
 
           {/* ── Architecture Toggle ── */}
@@ -4103,8 +4305,12 @@ function App() {
                 <Legend insuredData={yearsInsured}/>
                 <ArcChart data={yearsUninsured || yearsWithLtc} view={view} insuredData={yearsInsured} sorrEnabled={inputs.sorrEnabled}/>
               </>
-            ) : (
+            ) : view === 'numbers' ? (
               <DataTable data={yearsWithLtc}/>
+            ) : view === 'debits' ? (
+              <DebitsTable data={yearsWithLtc}/>
+            ) : (
+              <CreditsTable data={yearsWithLtc}/>
             )}
           </div>
 
