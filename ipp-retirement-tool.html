@@ -223,16 +223,19 @@ function runMonteCarlo(startBalance, annualWithdraw, years, trials=500, mean=0.0
     + streams.reduce((a, s) => a + s.annual * 0.003 + s.yearOffset * 17, 0)
   ) ^ 0xDEADBEEF;
   const rand = seededRandom(seedVal);
+  // Separate RNG for shock jitter — keeps the main return sequence identical
+  // whether or not expense shocks are active, so toggling shocks only changes
+  // the actual shock draws, not the underlying return paths.
+  const jitterRand = seededRandom((seedVal ^ 0x12345678) >>> 0);
 
   for (let t = 0; t < trials; t++) {
     let bal = startBalance;
     let failed = false;
-    // Randomized shock timing per trial: jitter each shock around its expected interval
-    // so MC timing is statistically honest rather than deterministic
+    // Randomized shock timing per trial using dedicated jitter RNG
     const shockYearsThisTrial = new Set();
     if (expShockAnnual > 0 && expShockFreq > 0) {
       for (let y = expShockFreq; y < years; y += expShockFreq) {
-        const jitter = Math.floor(rand() * expShockFreq) - Math.floor(expShockFreq / 2);
+        const jitter = Math.floor(jitterRand() * expShockFreq) - Math.floor(expShockFreq / 2);
         const shockY = Math.max(1, Math.min(years - 1, Math.round(y + jitter)));
         shockYearsThisTrial.add(shockY);
       }
@@ -908,16 +911,16 @@ function projectArc(inputs) {
       row.spouseLtcUncovered = spUncoveredLtcCost;
     }
 
-    row.totalExpense = expenses;
-
     // ── Expense Shock Event (deterministic — evenly spaced shock years) ──
+    // Applied BEFORE gap so the shock creates an actual portfolio draw
     if (SHOCK_YEARS && SHOCK_YEARS.has(yr)) {
-      const shockAmt = expenseShockAmount * inflFactor; // inflation-adjusted
+      const shockAmt = expenseShockAmount * inflFactor;
       expenses += shockAmt;
       row.expenseShockEvent = true;
       row.expenseShockAmount = shockAmt;
-      row.totalExpense = expenses; // update after shock
     }
+
+    row.totalExpense = expenses;
 
     // Gap uses only spendable income — purpose-driven events (ETA funding, Roth conversion,
     // LTC policy premium draw) are non-spendable IRA distributions that go directly to
