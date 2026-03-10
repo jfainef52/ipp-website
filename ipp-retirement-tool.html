@@ -4512,6 +4512,146 @@ function App() {
             );
           })()}
 
+          {/* ── Combined Household Layer 2 Summary — shown when both spouses have LTC panels ── */}
+          {showLtcComparison && showSpouseLtcComparison &&
+           yearsInsured && yearsUninsured &&
+           yearsSpouseInsured && yearsSpouseUninsured && (() => {
+
+            const fmtD = v => v >= 1000000 ? `$${(v/1000000).toFixed(2)}M` : `$${Math.round(v/1000)}K`;
+            const clientLabel = inputs.clientName || 'Client';
+            const spouseLabel = inputs.spouseName || 'Spouse';
+
+            // Client metrics
+            const cUninsuredFinal = yearsUninsured[yearsUninsured.length-1];
+            const cInsuredFinal   = yearsInsured[yearsInsured.length-1];
+            const cPortfolioDiff  = cInsuredFinal && cUninsuredFinal
+              ? cInsuredFinal.totalPortfolio - cUninsuredFinal.totalPortfolio : 0;
+            const cTotalCareCost  = inputs.ltcMonthlyCost * 12 * inputs.ltcDuration;
+            const cGrossUpTax     = yearsUninsured
+              .filter(r => r.age >= inputs.ltcEventAge && r.age < inputs.ltcEventAge + inputs.ltcDuration)
+              .reduce((s, r) => s + (r.ltcGrossUpTax || 0), 0);
+            const cForced = yearsUninsured
+              .filter(r => r.age >= inputs.ltcEventAge && r.age < inputs.ltcEventAge + inputs.ltcDuration)
+              .reduce((s, r) => s + (r.ltcPortfolioDraw || 0), 0);
+
+            // Spouse metrics
+            const sUninsuredFinal = yearsSpouseUninsured[yearsSpouseUninsured.length-1];
+            const sInsuredFinal   = yearsSpouseInsured[yearsSpouseInsured.length-1];
+            const sPortfolioDiff  = sInsuredFinal && sUninsuredFinal
+              ? sInsuredFinal.totalPortfolio - sUninsuredFinal.totalPortfolio : 0;
+            const sTotalCareCost  = inputs.spouseLtcMonthlyCost * 12 * inputs.spouseLtcDuration;
+            const sGrossUpTax     = yearsSpouseUninsured
+              .filter(r => r.age >= inputs.spouseLtcEventAge && r.age < inputs.spouseLtcEventAge + inputs.spouseLtcDuration)
+              .reduce((s, r) => s + (r.ltcGrossUpTax || 0), 0);
+            const sForced = yearsSpouseUninsured
+              .filter(r => r.age >= inputs.spouseLtcEventAge && r.age < inputs.spouseLtcEventAge + inputs.spouseLtcDuration)
+              .reduce((s, r) => s + (r.ltcPortfolioDraw || 0), 0);
+
+            // Combined totals
+            const totalCareCost    = cTotalCareCost + sTotalCareCost;
+            const totalGrossUpTax  = cGrossUpTax + sGrossUpTax;
+            const totalForcedDraws = cForced + sForced;
+            const totalPreserved   = cPortfolioDiff + sPortfolioDiff;
+            const totalCompounding = Math.max(0, totalPreserved - totalCareCost - totalGrossUpTax);
+
+            // Average confidence across both spouses
+            const bothInsuredConf   = confidenceInsured !== null && confidenceSpouseInsured !== null
+              ? Math.round((confidenceInsured + confidenceSpouseInsured) / 2) : null;
+            const bothUninsuredConf = confidenceUninsured !== null && confidenceSpouseUninsured !== null
+              ? Math.round((confidenceUninsured + confidenceSpouseUninsured) / 2) : null;
+            const confDelta = bothInsuredConf !== null && bothUninsuredConf !== null
+              ? bothInsuredConf - bothUninsuredConf : null;
+
+            return (
+              <div style={{background:'rgba(155,126,200,.06)',border:'2px solid rgba(155,126,200,.3)',borderRadius:12,padding:'18px 20px',marginBottom:16}}>
+                <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:6}}>
+                  <div style={{fontSize:13,fontWeight:700,letterSpacing:'.14em',textTransform:'uppercase',color:'#9B7EC8'}}>
+                    Combined Household — Total Layer 2 Economic Benefit
+                  </div>
+                  <div style={{fontSize:12,color:'#8DAFC8',background:'rgba(155,126,200,.1)',padding:'2px 8px',borderRadius:4,border:'1px solid rgba(155,126,200,.2)'}}>
+                    {clientLabel} + {spouseLabel}
+                  </div>
+                </div>
+                <div style={{fontSize:13,color:'#8DAFC8',marginBottom:14,lineHeight:1.5}}>
+                  Both care events draw from the same shared retirement portfolio. The totals below represent the combined household exposure and full economic benefit of insuring both spouses.
+                </div>
+
+                <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:10,marginBottom:14}}>
+                  {[
+                    { label:'Combined Care Cost', value: fmtD(totalCareCost), sub:`${clientLabel} ${fmtD(cTotalCareCost)} + ${spouseLabel} ${fmtD(sTotalCareCost)}`, color:'#C47A7A' },
+                    { label:'Total Forced Draws', value: totalForcedDraws > 0 ? fmtD(totalForcedDraws) : '—', sub:'Gross portfolio draws if both uninsured', color: totalForcedDraws > 0 ? '#C47A7A' : '#4A9B7A' },
+                    { label:'Total Gross-Up Tax', value: totalGrossUpTax > 0 ? fmtD(totalGrossUpTax) : '—', sub:'Extra tax friction on forced IRA draws', color: totalGrossUpTax > 0 ? '#C47A7A' : '#4A9B7A' },
+                    { label:'Compounding Loss', value: fmtD(totalCompounding), sub:'Growth never earned from depleted base', color:'#C47A7A' },
+                    { label:'Total Portfolio Preserved', value: fmtD(totalPreserved), sub:'Both events — full Layer 2 benefit', color:'#9B7EC8' },
+                  ].map(s => (
+                    <div key={s.label} style={{background:'rgba(255,255,255,.03)',borderRadius:8,padding:'10px 12px',border:'1px solid rgba(155,126,200,.12)'}}>
+                      <div style={{fontSize:12,color:'#8DAFC8',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:4}}>{s.label}</div>
+                      <div style={{fontSize:18,fontWeight:700,color:s.color,fontFamily:"'Cormorant Garamond',serif"}}>{s.value}</div>
+                      <div style={{fontSize:12,color:'#8DAFC8',marginTop:3}}>{s.sub}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
+                  {[
+                    { name: clientLabel, careCost: cTotalCareCost, forced: cForced, tax: cGrossUpTax, preserved: cPortfolioDiff },
+                    { name: spouseLabel, careCost: sTotalCareCost, forced: sForced, tax: sGrossUpTax, preserved: sPortfolioDiff },
+                  ].map(sp => (
+                    <div key={sp.name} style={{background:'rgba(255,255,255,.02)',border:'1px solid rgba(255,255,255,.07)',borderRadius:8,padding:'12px 14px'}}>
+                      <div style={{fontSize:12,fontWeight:700,color:'#9B7EC8',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:8}}>{sp.name}</div>
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                        {[
+                          { label:'Care Cost', value: fmtD(sp.careCost), color:'#C47A7A' },
+                          { label:'Forced Draws', value: sp.forced > 0 ? fmtD(sp.forced) : '—', color: sp.forced > 0 ? '#C47A7A' : '#4A9B7A' },
+                          { label:'Gross-Up Tax', value: sp.tax > 0 ? fmtD(sp.tax) : '—', color: sp.tax > 0 ? '#C47A7A' : '#4A9B7A' },
+                          { label:'Portfolio Preserved', value: fmtD(sp.preserved), color:'#9B7EC8' },
+                        ].map(m => (
+                          <div key={m.label}>
+                            <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.05em'}}>{m.label}</div>
+                            <div style={{fontSize:15,fontWeight:700,color:m.color,fontFamily:"'Cormorant Garamond',serif"}}>{m.value}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {confDelta !== null && (
+                  <div style={{background:'rgba(255,255,255,.02)',border:'1px solid rgba(255,255,255,.07)',borderRadius:10,padding:'14px 16px',marginBottom:14}}>
+                    <div style={{fontSize:12,fontWeight:700,color:'#9B7EC8',letterSpacing:'.1em',textTransform:'uppercase',marginBottom:10}}>Household Plan Survival — Average Monte Carlo Confidence</div>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:10}}>
+                      <div>
+                        <div style={{fontSize:12,color:'#C47A7A',fontWeight:700,letterSpacing:'.1em',textTransform:'uppercase',marginBottom:6}}>Without Layer 2 — Both Uninsured</div>
+                        <div style={{fontSize:28,fontWeight:700,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif",marginBottom:6}}>{bothUninsuredConf}%</div>
+                        <div style={{height:8,background:'rgba(255,255,255,.06)',borderRadius:4,overflow:'hidden'}}>
+                          <div style={{height:'100%',width:`${Math.max(4,bothUninsuredConf)}%`,background:'#C47A7A',borderRadius:4}}/>
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{fontSize:12,color:'#9B7EC8',fontWeight:700,letterSpacing:'.1em',textTransform:'uppercase',marginBottom:6}}>With Layer 2 — Both Insured</div>
+                        <div style={{fontSize:28,fontWeight:700,color:'#9B7EC8',fontFamily:"'Cormorant Garamond',serif",marginBottom:6}}>{bothInsuredConf}%</div>
+                        <div style={{height:8,background:'rgba(255,255,255,.06)',borderRadius:4,overflow:'hidden'}}>
+                          <div style={{height:'100%',width:`${Math.max(4,bothInsuredConf)}%`,background:'#9B7EC8',borderRadius:4}}/>
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{textAlign:'center',fontSize:13,fontWeight:700,color: confDelta > 0 ? '#9B7EC8' : '#C47A7A',borderTop:'1px solid rgba(255,255,255,.06)',paddingTop:10}}>
+                      {confDelta > 0
+                        ? `Insuring both spouses improves household plan survival confidence by +${confDelta} percentage points`
+                        : confDelta < 0
+                        ? `Review benefit sizing — combined premium cost exceeds confidence benefit`
+                        : 'No confidence difference at the household level'}
+                    </div>
+                  </div>
+                )}
+
+                <div style={{fontSize:13,color:'#DDD6C4',lineHeight:1.65,padding:'10px 14px',background:'rgba(155,126,200,.04)',borderRadius:8,border:'1px solid rgba(155,126,200,.12)'}}>
+                  Without Layer 2 coverage on both spouses, a sequential or overlapping care scenario could permanently impair the shared retirement portfolio by an estimated <strong style={{color:'#9B7EC8'}}>{fmtD(totalPreserved)}</strong> — including direct draws, tax gross-up friction, and compounding loss on the depleted base.
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Sequence of returns stress test callout */}
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:16}}>
             <div style={{background:'rgba(196,106,106,.05)',border:'1px solid rgba(196,106,106,.15)',borderRadius:10,padding:'14px 16px'}}>
