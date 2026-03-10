@@ -3546,14 +3546,9 @@ function App() {
               </>}
               </div>
 
-              {/* ── Spouse Health Event — MFJ only ── */}
-              {inputs.filingStatus === 'mfj' && <>
-                <div style={{opacity: inputs.ltcEventEnabled ? 1 : 0.45, transition:'opacity .3s'}}>
-                {!inputs.ltcEventEnabled && (
-                  <div style={{fontSize:11,color:'#5B8FA8',fontStyle:'italic',marginBottom:8,letterSpacing:'.04em'}}>
-                    Inputs staged — toggle on to activate
-                  </div>
-                )}
+              {/* ── Spouse Health Event — MFJ only, visible only when toggle is ON ── */}
+              {inputs.filingStatus === 'mfj' && inputs.ltcEventEnabled && <>
+                <div style={{transition:'opacity .3s'}}>
                 <div style={{marginTop:14,paddingTop:12,borderTop:'1px solid rgba(255,255,255,.06)',fontSize:13,fontWeight:700,color:'#9EB8CC',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8}}>
                   Spouse
                 </div>
