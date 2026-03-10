@@ -203,7 +203,7 @@ function seededRandom(seed) {
   };
 }
 
-function runMonteCarlo(startBalance, annualWithdraw, years, trials=500, mean=0.065, inflation=0.028, ssIncome=0, fixedStreams=[], totalExpensesY1=0, ltcShockYear=-1, ltcShockAnnual=0, ltcShockDuration=0) {
+function runMonteCarlo(startBalance, annualWithdraw, years, trials=500, mean=0.065, inflation=0.028, ssIncome=0, fixedStreams=[], totalExpensesY1=0, ltcShockYear=-1, ltcShockAnnual=0, ltcShockDuration=0, expShockAnnual=0, expShockFreq=0) {
   let successes = 0;
   const stddev = 0.12;
   const streams = Array.isArray(fixedStreams)
@@ -220,6 +220,8 @@ function runMonteCarlo(startBalance, annualWithdraw, years, trials=500, mean=0.0
     + (totalExpensesY1 * 0.007)
     + (ltcShockAnnual * 0.0013)
     + (ltcShockYear * 333)
+    + (expShockAnnual * 0.0019)
+    + (expShockFreq * 57)
     + streams.reduce((a, s) => a + s.annual * 0.003 + s.yearOffset * 17, 0)
   ) ^ 0xDEADBEEF;
   const rand = seededRandom(seedVal);
@@ -227,6 +229,16 @@ function runMonteCarlo(startBalance, annualWithdraw, years, trials=500, mean=0.0
   for (let t = 0; t < trials; t++) {
     let bal = startBalance;
     let failed = false;
+    // Randomized shock timing per trial: jitter each shock around its expected interval
+    // so MC timing is statistically honest rather than deterministic
+    const shockYearsThisTrial = new Set();
+    if (expShockAnnual > 0 && expShockFreq > 0) {
+      for (let y = expShockFreq; y < years; y += expShockFreq) {
+        const jitter = Math.floor(rand() * expShockFreq) - Math.floor(expShockFreq / 2);
+        const shockY = Math.max(1, Math.min(years - 1, Math.round(y + jitter)));
+        shockYearsThisTrial.add(shockY);
+      }
+    }
     for (let y = 0; y < years; y++) {
       const r = mean + stddev * (Math.sqrt(-2*Math.log(rand())) * Math.cos(2*Math.PI*rand()));
       const inflFactor = Math.pow(1 + inflation, y);
@@ -234,10 +246,14 @@ function runMonteCarlo(startBalance, annualWithdraw, years, trials=500, mean=0.0
       const ssThisYear = ssIncome * inflFactor;
       const fixedThisYear = streams.reduce((sum, s) => sum + (y >= s.yearOffset ? s.annual : 0), 0);
       const netDraw = Math.max(0, expensesThisYear - ssThisYear - fixedThisYear);
-      // Apply care cost shock: grossed-up portfolio draw during uninsured care years
+      // LTC shock: grossed-up portfolio draw during uninsured care years
       const ltcShock = (ltcShockYear >= 0 && y >= ltcShockYear && y < ltcShockYear + ltcShockDuration)
         ? ltcShockAnnual : 0;
-      bal = bal * (1 + r) - netDraw - ltcShock;
+      // Expense shock: guaranteed income surplus absorbs what it can; remainder hits portfolio
+      const rawShock = shockYearsThisTrial.has(y) ? expShockAnnual * inflFactor : 0;
+      const guaranteedSurplus = Math.max(0, ssThisYear + fixedThisYear - expensesThisYear);
+      const expShock = Math.max(0, rawShock - guaranteedSurplus);
+      bal = bal * (1 + r) - netDraw - ltcShock - expShock;
       if (bal <= 0) { failed = true; break; }
     }
     if (!failed) successes++;
@@ -493,6 +509,7 @@ function projectArc(inputs) {
     portfolioReturn = 0.065,
     inflation = 0.028,
     sorrEnabled = false,
+    expenseShockEnabled = false, expenseShockAmount = 0, expenseShockFrequency = 8,
     annualTradContribution = 0,
     tradContributionEndAge = 0,
     annualTaxableContribution = 0,
@@ -513,6 +530,20 @@ function projectArc(inputs) {
   // Year 6+ resumes normal portfolioReturn assumption
   const SORR_SCHEDULE = sorrEnabled
     ? [-0.18, 0.04, -0.14, 0.05, -0.10]
+    : null;
+
+  // ── Expense Shock Schedule (deterministic, evenly spaced for chart display) ──
+  // Shocks at retirement years: freq, 2*freq, 3*freq ... up to plan end
+  // e.g. frequency=8 → shocks at year 8, 16, 24 of retirement
+  const SHOCK_YEARS = (expenseShockEnabled && expenseShockAmount > 0 && expenseShockFrequency > 0)
+    ? (() => {
+        const s = new Set();
+        const totalYrs = planToAge - retireAge + 1;
+        for (let y = expenseShockFrequency; y < totalYrs; y += expenseShockFrequency) {
+          s.add(Math.round(y));
+        }
+        return s;
+      })()
     : null;
 
   const years = [];
@@ -874,6 +905,16 @@ function projectArc(inputs) {
     }
 
     row.totalExpense = expenses;
+
+    // ── Expense Shock Event (deterministic — evenly spaced shock years) ──
+    if (SHOCK_YEARS && SHOCK_YEARS.has(yr)) {
+      const shockAmt = expenseShockAmount * inflFactor; // inflation-adjusted
+      expenses += shockAmt;
+      row.expenseShockEvent = true;
+      row.expenseShockAmount = shockAmt;
+      row.totalExpense = expenses; // update after shock
+    }
+
     // Gap uses only spendable income — purpose-driven events (ETA funding, Roth conversion,
     // LTC policy premium draw) are non-spendable IRA distributions that go directly to
     // the policy/conversion, not into the client's pocket to pay living expenses.
@@ -1353,7 +1394,9 @@ function projectArc(inputs) {
     expensesAtMcStart,
     ltcShockYear,
     ltcShockAnnual,
-    ltcDuration
+    ltcDuration,
+    expenseShockEnabled ? expenseShockAmount : 0,
+    expenseShockEnabled ? expenseShockFrequency : 0
   );
 
   return { years, confidence, fixedStreams, mcStartAge };
@@ -1527,6 +1570,17 @@ function ArcChart({ data, view, insuredData, sorrEnabled }) {
             {d.ltcEvent && (
               <line x1={xScale(i)} x2={xScale(i)} y1={PAD.t} y2={PAD.t+chartH}
                 stroke="rgba(196,106,106,.4)" strokeWidth="1.5" strokeDasharray="3,3"/>
+            )}
+            {/* Expense Shock Event marker */}
+            {d.expenseShockEvent && (
+              <g>
+                <line x1={xScale(i)} x2={xScale(i)} y1={PAD.t} y2={PAD.t+chartH}
+                  stroke="rgba(200,169,110,.55)" strokeWidth="1.5" strokeDasharray="3,2"/>
+                <text x={xScale(i)+4} y={PAD.t+38} textAnchor="start"
+                  fill="#C8A96E" fontSize="9" fontFamily="DM Sans" fontWeight="700">
+                  💥 SHOCK
+                </text>
+              </g>
             )}
             {/* ETA Funding Event marker */}
             {d.etaFundingEvent && (
@@ -1728,7 +1782,7 @@ function DataTable({ data }) {
         </thead>
         <tbody>
           {data.map((d,i)=>(
-            <tr key={d.age} style={{background: d.rothConversionEvent ? 'rgba(123,175,132,.07)' : d.ltcFundingEvent ? 'rgba(155,126,200,.07)' : d.etaFundingEvent ? 'rgba(168,197,216,.07)' : d.ltcEvent ? 'rgba(196,106,106,.06)' : i%2===0?'rgba(255,255,255,.015)':'transparent'}}>
+            <tr key={d.age} style={{background: d.rothConversionEvent ? 'rgba(123,175,132,.07)' : d.ltcFundingEvent ? 'rgba(155,126,200,.07)' : d.etaFundingEvent ? 'rgba(168,197,216,.07)' : d.ltcEvent ? 'rgba(196,106,106,.06)' : d.expenseShockEvent ? 'rgba(200,169,110,.06)' : i%2===0?'rgba(255,255,255,.015)':'transparent'}}>
               <td style={{padding:'5px 8px',textAlign:'right',color:'#C8A96E',fontWeight:600}}>
                 {d.age}
                 {d.etaFundingEvent && <span title={`ETA funding — $${Math.round((d.etaFundingAmount||0)/1000)}K IRA repositioned`} style={{color:'#A8C5D8',marginLeft:3,cursor:'help'}}>⚡</span>}
@@ -1962,6 +2016,7 @@ function App() {
     annualTaxableDrawdown: 0, taxableDrawdownStartAge: 0, taxableDrawdownEndAge: 0,
     annualRothDrawdown: 0, rothDrawdownStartAge: 0, rothDrawdownEndAge: 0,
     portfolioReturn: 6.5, inflation: 2.8, sorrEnabled: false,
+    expenseShockEnabled: false, expenseShockAmount: 50000, expenseShockFrequency: 8,
     annualTradContribution: 0, tradContributionEndAge: 0,
     annualTaxableContribution: 0, taxableContributionEndAge: 0,
     annualSpouseTradContribution: 0, spouseTradContributionEndAge: 0,
@@ -1976,10 +2031,20 @@ function App() {
     inflation: inputs.inflation / 100,
     etaColaRate: (inputs.etaColaRate || 0) / 100,
   };
-  // Primary projection — NO LTC shock. This is the clean baseline plan survival score
-  // regardless of any healthcare event inputs. The main confidence score reflects the
-  // plan's fundamental strength (income, portfolio, architecture) without a care shock.
-  const { years, confidence, fixedStreams, mcStartAge } = projectArc({ ...baseProjectionInputs, ltcInsured: false, ltcEventAge: 0 });
+  // Primary projection — overall MC score reflects exactly what is toggled ON.
+  // Healthcare OFF → ltcEventAge:0 (no care shock in MC)
+  // Healthcare ON  → care event shock included in MC at the modeled age
+  // Expense shock  → flows through baseProjectionInputs (expenseShockEnabled gates it)
+  // This gives the advisor full toggle-based control:
+  //   Pure MC (both off) → add expense shock → add care event → full picture
+  // Architecture layers are always included when architectureEnabled is true —
+  // the overall ring shows the plan WITH architecture fighting all active risks.
+  const hasLtcForMC = inputs.ltcEventEnabled && inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
+  const { years, confidence, fixedStreams, mcStartAge } = projectArc({
+    ...baseProjectionInputs,
+    ltcInsured: false,
+    ltcEventAge: hasLtcForMC ? inputs.ltcEventAge : 0,
+  });
 
   // Primary display projection — includes LTC event only when the healthcare toggle is ON
   // ltcEventEnabled is a separate toggle from architectureEnabled — lets advisor show/hide
@@ -2591,6 +2656,45 @@ function App() {
               <Field label="Lifestyle Monthly Expenses" hint="Travel, dining, family, discretionary">
                 <NumInput value={inputs.lifestyleExpenses} onChange={v=>set('lifestyleExpenses',v)} prefix="$" suffix="/mo"/>
               </Field>
+
+              {/* ── Unexpected Major Expense Stress ── */}
+              <div style={{marginTop:14,padding:'12px 14px',background:'rgba(200,169,110,.04)',border:`1px solid ${inputs.expenseShockEnabled ? 'rgba(200,169,110,.35)' : 'rgba(255,255,255,.08)'}`,borderRadius:8}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom: inputs.expenseShockEnabled ? 12 : 0}}>
+                  <div>
+                    <div style={{fontSize:11,fontWeight:700,letterSpacing:'.1em',textTransform:'uppercase',color: inputs.expenseShockEnabled ? '#C8A96E' : '#6B8FA8',marginBottom:2}}>
+                      Unexpected Major Expense
+                    </div>
+                    <div style={{fontSize:12,color:'#5A7A8A'}}>
+                      {inputs.expenseShockEnabled ? `$${(inputs.expenseShockAmount/1000).toFixed(0)}K shock every ${inputs.expenseShockFrequency} yrs — randomized in MC` : 'Off — no expense shocks modeled'}
+                    </div>
+                  </div>
+                  <div
+                    onClick={()=>set('expenseShockEnabled', !inputs.expenseShockEnabled)}
+                    style={{
+                      width:44, height:24, borderRadius:12, cursor:'pointer', flexShrink:0,
+                      background: inputs.expenseShockEnabled ? '#C8A96E' : 'rgba(255,255,255,.1)',
+                      position:'relative', transition:'background .2s',
+                      border: inputs.expenseShockEnabled ? '1px solid #C8A96E' : '1px solid rgba(255,255,255,.15)',
+                    }}>
+                    <div style={{
+                      position:'absolute', top:3, left: inputs.expenseShockEnabled ? 22 : 3,
+                      width:16, height:16, borderRadius:8,
+                      background:'#F5F2EC', transition:'left .2s',
+                      boxShadow:'0 1px 3px rgba(0,0,0,.3)',
+                    }}/>
+                  </div>
+                </div>
+                {inputs.expenseShockEnabled && (
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                    <Field label="Shock Amount">
+                      <NumInput value={inputs.expenseShockAmount} onChange={v=>set('expenseShockAmount',v)} prefix="$"/>
+                    </Field>
+                    <Field label="Avg. Frequency">
+                      <NumInput value={inputs.expenseShockFrequency} onChange={v=>set('expenseShockFrequency',v)} suffix="yrs"/>
+                    </Field>
+                  </div>
+                )}
+              </div>
             </Section>
 
 
@@ -3464,6 +3568,21 @@ function App() {
             </div>
           )}
 
+          {/* Unexpected Major Expense active banner */}
+          {inputs.expenseShockEnabled && (
+            <div style={{padding:'12px 16px',background:'rgba(200,169,110,.07)',border:'1px solid rgba(200,169,110,.25)',borderRadius:8,marginBottom:14,display:'flex',alignItems:'flex-start',gap:12}}>
+              <div style={{fontSize:20,lineHeight:1,marginTop:1}}>⚡</div>
+              <div>
+                <div style={{fontSize:13,fontWeight:700,color:'#C8A96E',letterSpacing:'.07em',textTransform:'uppercase',marginBottom:4}}>
+                  Unexpected Major Expense — Stress Scenario Active
+                </div>
+                <div style={{fontSize:13,color:'#DDD6C4',lineHeight:1.6}}>
+                  A <strong style={{color:'#C8A96E'}}>${(inputs.expenseShockAmount/1000).toFixed(0)}K</strong> expense shock modeled every <strong style={{color:'#C8A96E'}}>{inputs.expenseShockFrequency} years</strong> (inflation-adjusted). Chart shows evenly-spaced shock years. Monte Carlo randomizes timing across trials — guaranteed income absorbs what it can; remainder hits the portfolio directly.
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Status Quo Banner */}
           {!inputs.architectureEnabled && (
             <div style={{
@@ -3699,6 +3818,14 @@ function App() {
               </div>
               <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:10}}>
                 <ConfidenceRing score={confidence}/>
+                {/* Dynamic label showing what risks are included in this MC score */}
+                <div style={{fontSize:11,color:'#5A7A8A',textAlign:'right',lineHeight:1.6,maxWidth:160}}>
+                  {[
+                    'Market variance',
+                    inputs.expenseShockEnabled ? `$${Math.round(inputs.expenseShockAmount/1000)}K expense shocks` : null,
+                    hasLtcForMC ? 'Healthcare event' : null,
+                  ].filter(Boolean).join(' · ')}
+                </div>
                 {fixedStreams && fixedStreams.some(s => s.yearOffset > 0) && (
                   <div style={{background:'rgba(74,155,122,.06)',border:'1px solid rgba(74,155,122,.18)',borderRadius:8,padding:'8px 12px',minWidth:170,maxWidth:210}}>
                     <div style={{fontSize:13,fontWeight:700,color:'#4A9B7A',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:6}}>
