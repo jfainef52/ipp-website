@@ -509,6 +509,8 @@ function projectArc(inputs) {
     spouseLtcNetAmount = 0, spouseLtcFundingAge = 0,
     portfolioReturn = 0.065,
     inflation = 0.028,
+    currentHouseholdIncome = 0,  // pre-retirement W-2/business income — sets marginal rate base for architecture events
+    ltcCareInflationRate = null,  // care cost inflation (null = use general inflation rate)
     sorrEnabled = false,
     expenseShockEnabled = false, expenseShockAmount = 0, expenseShockFrequency = 8,
     annualTradContribution = 0,
@@ -585,15 +587,23 @@ function projectArc(inputs) {
       if (archRothConversionAmount > 0 && rothConversionAge > 0 && a === rothConversionAge) {
         trad = Math.max(0, trad - archRothConversionAmount);
       }
-      // LTC policy funding draw — reduce trad balance (pre-retirement, approximate gross-up at 24% + penalty)
+      // LTC policy funding draw — reduce trad balance (pre-retirement)
+      // Derive marginal rate from currentHouseholdIncome to accurately reflect the tax bracket
+      // the event stacks into (vs. the old flat 24% approximation).
       if (archLtcNetAmount > 0 && ltcFundingAge > 0 && a === ltcFundingAge) {
         const preRetPenalty = ltcFundingAge < 59.5 ? 0.10 : 0;
-        const approxGross = archLtcNetAmount / Math.max(0.01, 1 - 0.24 - preRetPenalty);
+        const preRetBrackets = (filingStatus === 'mfj' ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025);
+        const preRetIncome = currentHouseholdIncome || 0;
+        const preRetMarginal = preRetBrackets.reduce((rate, b) => preRetIncome <= b.limit ? rate : b.rate, 0.10);
+        const approxGross = archLtcNetAmount / Math.max(0.01, 1 - preRetMarginal - preRetPenalty);
         trad = Math.max(0, trad - approxGross - (approxGross * preRetPenalty));
       }
       if (archSpouseLtcNetAmount > 0 && spouseLtcFundingAge > 0 && a === spouseLtcFundingAge) {
         const preRetPenaltySp = spouseLtcFundingAge < 59.5 ? 0.10 : 0;
-        const approxGrossSp = archSpouseLtcNetAmount / Math.max(0.01, 1 - 0.24 - preRetPenaltySp);
+        const preRetBracketsSp = (filingStatus === 'mfj' ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025);
+        const preRetIncomeSp = currentHouseholdIncome || 0;
+        const preRetMarginalSp = preRetBracketsSp.reduce((rate, b) => preRetIncomeSp <= b.limit ? rate : b.rate, 0.10);
+        const approxGrossSp = archSpouseLtcNetAmount / Math.max(0.01, 1 - preRetMarginalSp - preRetPenaltySp);
         trad = Math.max(0, trad - approxGrossSp - (approxGrossSp * preRetPenaltySp));
       }
       // Grow existing balance then add contribution (end-of-year)
@@ -612,8 +622,10 @@ function projectArc(inputs) {
   // Pre-seed magiHistory for ages before retirement so the first two retirement years
   // don't fall back to current MAGI. Pre-retirement MAGI estimate: SS not yet started
   // (if claiming at/after retireAge), pension may have started, no RMDs, part-time may be active.
-  // Conservative: use pension + part-time income as a floor for pre-retirement MAGI.
-  const preRetireMagi = (pensionMonthly > 0 ? pensionMonthly * 12 : 0)
+  // Include currentHouseholdIncome when provided — gives accurate IRMAA lookback for
+  // the final two pre-retirement years and correct marginal rate base for architecture events.
+  const preRetireMagi = (currentHouseholdIncome || 0)
+    + (pensionMonthly > 0 ? pensionMonthly * 12 : 0)
     + (partTimeMonthly > 0 ? partTimeMonthly * 12 : 0);
   magiHistory[retireAge - 2] = preRetireMagi;
   magiHistory[retireAge - 1] = preRetireMagi;
@@ -670,10 +682,13 @@ function projectArc(inputs) {
       // Build stressed ordinary brackets at this point in the loop
       const ordBracketsLtc = (effectiveStatus === 'mfj' ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025)
         .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
-      const currentAGI = (row.sources.ss||0)*0.85 + (row.sources.pension||0) + (row.sources.rmd||0) + (row.sources.parttime||0) + (row.sources.annuity||0);
+      // Pre-retirement: use household income as AGI base (architecture events stack on top of earned income)
+      const eventAGIBase = age < retireAge
+        ? (currentHouseholdIncome || 0) + (row.sources.pension||0) + (row.sources.parttime||0)
+        : (row.sources.ss||0)*0.85 + (row.sources.pension||0) + (row.sources.rmd||0) + (row.sources.parttime||0) + (row.sources.annuity||0);
       const earlyPenaltyRate = age < 59.5 ? 0.10 : 0;
       // Gross up: net needed / (1 - marginalRate - penaltyRate) approximation, refined iteratively
-      const { grossDraw: ltcGross, taxOnDraw: ltcTax } = grossUpIterative(archLtcNetAmount, ordBracketsLtc, currentAGI);
+      const { grossDraw: ltcGross, taxOnDraw: ltcTax } = grossUpIterative(archLtcNetAmount, ordBracketsLtc, eventAGIBase);
       const ltcFund = Math.min(ltcGross, trad);
       const earlyPenalty = ltcFund * earlyPenaltyRate;
       trad = Math.max(0, trad - ltcFund - earlyPenalty);
@@ -690,9 +705,11 @@ function projectArc(inputs) {
     if (archSpouseLtcNetAmount > 0 && spouseLtcFundingAge > 0 && age === spouseLtcFundingAge) {
       const ordBracketsSpLtc = (effectiveStatus === 'mfj' ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025)
         .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
-      const currentAGISp = (row.sources.ss||0)*0.85 + (row.sources.pension||0) + (row.sources.rmd||0) + (row.sources.parttime||0) + (row.sources.annuity||0);
+      const eventAGIBaseSp = age < retireAge
+        ? (currentHouseholdIncome || 0) + (row.sources.pension||0) + (row.sources.parttime||0)
+        : (row.sources.ss||0)*0.85 + (row.sources.pension||0) + (row.sources.rmd||0) + (row.sources.parttime||0) + (row.sources.annuity||0);
       const earlyPenaltyRateSp = age < 59.5 ? 0.10 : 0;
-      const { grossDraw: spLtcGross, taxOnDraw: spLtcTax } = grossUpIterative(archSpouseLtcNetAmount, ordBracketsSpLtc, currentAGISp);
+      const { grossDraw: spLtcGross, taxOnDraw: spLtcTax } = grossUpIterative(archSpouseLtcNetAmount, ordBracketsSpLtc, eventAGIBaseSp);
       const spLtcFund = Math.min(spLtcGross, trad);
       const spEarlyPenalty = spLtcFund * earlyPenaltyRateSp;
       trad = Math.max(0, trad - spLtcFund - spEarlyPenalty);
@@ -887,8 +904,12 @@ function projectArc(inputs) {
     let expenses = (fixedExpenses + lifestyleExpenses) * 12 * inflFactor;
 
     // LTC event — net cost after any Layer 2 benefit coverage
+    // Care costs inflated from today's dollars to the event age using ltcCareInflationRate
+    // (defaults to general inflation; medical costs often run higher).
     if (ltcEventAge > 0 && age >= ltcEventAge && age < ltcEventAge + ltcDuration) {
-      const ltcAnnualCost = ltcMonthlyCost * 12;
+      const careInflRate = ltcCareInflationRate !== null && ltcCareInflationRate !== undefined ? ltcCareInflationRate : inflation;
+      const careInflFactor = Math.pow(1 + careInflRate, ltcEventAge - retireAge); // inflate to event start age
+      const ltcAnnualCost = ltcMonthlyCost * 12 * careInflFactor;
       const benefitCoverage = ltcInsured ? ltcAnnualCost : 0;
       const uncoveredLtcCost = ltcAnnualCost - benefitCoverage;
       expenses += uncoveredLtcCost;
@@ -900,7 +921,9 @@ function projectArc(inputs) {
 
     // Spouse LTC event — same mechanics, independent age/cost/duration
     if (spouseLtcEventAge > 0 && age >= spouseLtcEventAge && age < spouseLtcEventAge + spouseLtcDuration) {
-      const spLtcAnnualCost = spouseLtcMonthlyCost * 12;
+      const spCareInflRate = ltcCareInflationRate !== null && ltcCareInflationRate !== undefined ? ltcCareInflationRate : inflation;
+      const spCareInflFactor = Math.pow(1 + spCareInflRate, spouseLtcEventAge - retireAge);
+      const spLtcAnnualCost = spouseLtcMonthlyCost * 12 * spCareInflFactor;
       const spBenefitCoverage = spouseLtcInsured ? spLtcAnnualCost : 0;
       const spUncoveredLtcCost = spLtcAnnualCost - spBenefitCoverage;
       expenses += spUncoveredLtcCost;
@@ -2002,6 +2025,7 @@ function App() {
   const [inputs, setInputs] = useState({
     filingStatus: 'single',
     currentAge: 60, retireAge: 65, planToAge: 98, fra: 67,
+    currentHouseholdIncome: 0,
     ssMonthly: 2800, ssClaimAge: 67,
     spouseSsMonthly: 0, spouseSsClaimAge: 67, spouseFra: 67, spouseDobOffset: 0, spouseCurrentAge: null,
     pensionMonthly: 0, pensionStartAge: 65, pensionType: 'single', pensionSurvivorPct: 50,
@@ -2020,7 +2044,7 @@ function App() {
     partTimeMonthly: 0, partTimeEndAge: 68,
     fixedExpenses: 15000, lifestyleExpenses: 8500,
     ltcEventEnabled: false,
-    ltcEventAge: 0, ltcMonthlyCost: 7500, ltcDuration: 3, ltcShowComparison: false, ltcMonthlyBenefit: 7500, ltcBenefitDuration: 3,
+    ltcEventAge: 0, ltcMonthlyCost: 7500, ltcDuration: 3, ltcShowComparison: false, ltcMonthlyBenefit: 7500, ltcBenefitDuration: 3, ltcCareInflationRate: 4,
     spouseLtcEventAge: 0, spouseLtcMonthlyCost: 7500, spouseLtcDuration: 3, spouseLtcMonthlyBenefit: 7500, spouseLtcBenefitDuration: 3, spouseLtcInsured: false,
     stateCode: 'IL', customStateRate: '', taxRateStressAdder: 0,
     annualTradDrawdown: 0, tradDrawdownStartAge: 0, tradDrawdownEndAge: 0,
@@ -2041,6 +2065,7 @@ function App() {
     portfolioReturn: inputs.portfolioReturn / 100,
     inflation: inputs.inflation / 100,
     etaColaRate: (inputs.etaColaRate || 0) / 100,
+    ltcCareInflationRate: (inputs.ltcCareInflationRate != null ? inputs.ltcCareInflationRate : 4) / 100,
   };
   // Primary projection — overall MC score reflects exactly what is toggled ON.
   // Healthcare OFF → ltcEventAge:0 (no care shock in MC)
@@ -2530,6 +2555,11 @@ function App() {
               )}
               <Field label="Retirement Age"><NumInput value={inputs.retireAge} onChange={v=>set('retireAge',v)} suffix="yrs"/></Field>
               <Field label="Plan Through Age (Primary)"><NumInput value={inputs.planToAge} onChange={v=>set('planToAge',v)} suffix="yrs"/></Field>
+              {inputs.currentAge < inputs.retireAge && (
+                <Field label="Current Gross Household Income" hint="Pre-retirement W-2 or business income — sets the marginal rate base for architecture events that occur before retirement (Roth conversion, ETA funding, LTC premium draw)">
+                  <NumInput value={inputs.currentHouseholdIncome} onChange={v=>set('currentHouseholdIncome',v)} prefix="$" suffix="/yr"/>
+                </Field>
+              )}
             </Section>
 
             <Section title="Tax &amp; State" collapsed={sections.tax} onToggle={()=>toggleSection('tax')}>
@@ -3397,9 +3427,24 @@ function App() {
                 <NumInput value={inputs.ltcEventAge} onChange={v=>set('ltcEventAge',v)} suffix="yrs"/>
               </Field>
               {inputs.ltcEventAge > 0 && <>
-                <Field label="Monthly Care Cost" hint="National median: $7,500–$10,000/mo for facility care">
+                <Field label="Monthly Care Cost" hint="National median: $7,500–$10,000/mo for facility care · Enter today's dollars — model inflates to event age">
                   <NumInput value={inputs.ltcMonthlyCost} onChange={v=>set('ltcMonthlyCost',v)} prefix="$" suffix="/mo"/>
                 </Field>
+                <Field label="Care Cost Inflation" hint="Medical/care inflation typically runs 1–2% above general CPI · Default 4%">
+                  <NumInput value={inputs.ltcCareInflationRate != null ? inputs.ltcCareInflationRate : 4} onChange={v=>set('ltcCareInflationRate',v)} suffix="%/yr"/>
+                </Field>
+                {inputs.ltcEventAge > inputs.retireAge && inputs.ltcMonthlyCost > 0 && (() => {
+                  const yrsToEvent = inputs.ltcEventAge - inputs.retireAge;
+                  const careInfl = (inputs.ltcCareInflationRate != null ? inputs.ltcCareInflationRate : 4) / 100;
+                  const projectedMonthly = Math.round(inputs.ltcMonthlyCost * Math.pow(1 + careInfl, yrsToEvent));
+                  return (
+                    <div style={{padding:'7px 12px',background:'rgba(90,143,168,.05)',border:'1px solid rgba(90,143,168,.15)',borderRadius:6,marginTop:-4,marginBottom:4}}>
+                      <span style={{fontSize:12,color:'#8DAFC8'}}>At age {inputs.ltcEventAge} ({yrsToEvent} yrs) → </span>
+                      <span style={{fontSize:13,fontWeight:700,color:'#5B8FA8',fontFamily:"'Cormorant Garamond',serif"}}>${projectedMonthly.toLocaleString()}/mo</span>
+                      <span style={{fontSize:11,color:'#6B8FA8'}}> in today's dollars, inflated at {inputs.ltcCareInflationRate ?? 4}%</span>
+                    </div>
+                  );
+                })()}
                 <Field label="Duration">
                   <NumInput value={inputs.ltcDuration} onChange={v=>set('ltcDuration',v)} suffix="yrs"/>
                 </Field>
@@ -3492,9 +3537,21 @@ function App() {
                   <NumInput value={inputs.spouseLtcEventAge} onChange={v=>set('spouseLtcEventAge',v)} suffix="yrs (primary age)"/>
                 </Field>
                 {inputs.spouseLtcEventAge > 0 && <>
-                  <Field label="Monthly Care Cost" hint="National median: $7,500–$10,000/mo for facility care">
+                  <Field label="Monthly Care Cost" hint="National median: $7,500–$10,000/mo for facility care · Enter today's dollars — model inflates to event age">
                     <NumInput value={inputs.spouseLtcMonthlyCost} onChange={v=>set('spouseLtcMonthlyCost',v)} prefix="$" suffix="/mo"/>
                   </Field>
+                  {inputs.spouseLtcEventAge > inputs.retireAge && inputs.spouseLtcMonthlyCost > 0 && (() => {
+                    const yrsToSpEvent = inputs.spouseLtcEventAge - inputs.retireAge;
+                    const spCareInfl = (inputs.ltcCareInflationRate != null ? inputs.ltcCareInflationRate : 4) / 100;
+                    const spProjectedMonthly = Math.round(inputs.spouseLtcMonthlyCost * Math.pow(1 + spCareInfl, yrsToSpEvent));
+                    return (
+                      <div style={{padding:'7px 12px',background:'rgba(90,143,168,.05)',border:'1px solid rgba(90,143,168,.15)',borderRadius:6,marginTop:-4,marginBottom:4}}>
+                        <span style={{fontSize:12,color:'#8DAFC8'}}>At age {inputs.spouseLtcEventAge} ({yrsToSpEvent} yrs) → </span>
+                        <span style={{fontSize:13,fontWeight:700,color:'#5B8FA8',fontFamily:"'Cormorant Garamond',serif"}}>${spProjectedMonthly.toLocaleString()}/mo</span>
+                        <span style={{fontSize:11,color:'#6B8FA8'}}> inflated at {inputs.ltcCareInflationRate ?? 4}%</span>
+                      </div>
+                    );
+                  })()}
                   <Field label="Duration">
                     <NumInput value={inputs.spouseLtcDuration} onChange={v=>set('spouseLtcDuration',v)} suffix="yrs"/>
                   </Field>
