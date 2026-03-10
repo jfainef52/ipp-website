@@ -2155,8 +2155,6 @@ function App() {
                   const clientLabel = clientInfo.primaryName || 'Client';
                   const spouseLabel = inputs.filingStatus==='mfj'&&clientInfo.spouseName ? ` & ${clientInfo.spouseName}` : '';
                   const fullName = clientLabel + spouseLabel;
-                  const stateInfo2 = STATE_TAX_DATA[inputs.stateCode];
-                  const yr1 = years[0];
 // ── Status Quo parallel projection (for before/after comparison) ──
                   const sqInputs = {
                     ...baseProjectionInputs,
@@ -2408,29 +2406,29 @@ function App() {
       const hasLtcRpt = inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
       if (!hasLtcRpt) return '';
 
-      const ltcAge = inputs.ltcEventAge;
+      const ltcAge_r = inputs.ltcEventAge;
       const ltcDur = inputs.ltcDuration || 3;
-      const ltcEnd = ltcAge + ltcDur;
-      const totalLtcCost = inputs.ltcMonthlyCost * 12 * ltcDur;
+      const ltcEnd_r = ltcAge_r + ltcDur;
+      const totalLtcCost_r = inputs.ltcMonthlyCost * 12 * ltcDur;
       const annualLtcCost = inputs.ltcMonthlyCost * 12;
       const hasInsuranceData = yearsInsured && yearsUninsured;
 
       // Gross-up tax from uninsured projection
-      const grossUpTaxTotal = hasInsuranceData
-        ? yearsUninsured.filter(r => r.age >= ltcAge && r.age < ltcEnd).reduce((sum,r) => sum + (r.ltcGrossUpTax||0), 0)
+      const grossUpTaxTotal_r = hasInsuranceData
+        ? yearsUninsured.filter(r => r.age >= ltcAge_r && r.age < ltcEnd_r).reduce((sum,r) => sum + (r.ltcGrossUpTax||0), 0)
         : 0;
-      const trueTotalCost = totalLtcCost + grossUpTaxTotal;
+      const trueTotalCost_r = totalLtcCost_r + grossUpTaxTotal_r;
 
       // Portfolio difference at end of plan
-      const uninsuredFinal = hasInsuranceData ? yearsUninsured[yearsUninsured.length-1] : null;
-      const insuredFinal   = hasInsuranceData ? yearsInsured[yearsInsured.length-1]   : null;
-      const portfolioDiff  = (insuredFinal && uninsuredFinal) ? (insuredFinal.totalPortfolio - uninsuredFinal.totalPortfolio) : 0;
-      const compoundingLoss = Math.max(0, portfolioDiff - trueTotalCost);
+      const uninsuredFinal_r = hasInsuranceData ? yearsUninsured[yearsUninsured.length-1] : null;
+      const insuredFinal_r   = hasInsuranceData ? yearsInsured[yearsInsured.length-1]   : null;
+      const portfolioDiff_r  = (insuredFinal_r && uninsuredFinal_r) ? (insuredFinal_r.totalPortfolio - uninsuredFinal_r.totalPortfolio) : 0;
+      const compoundingLoss_r = Math.max(0, portfolioDiff_r - trueTotalCost_r);
 
       // Layer 2 benefit sizing
-      const annualBenefit = (inputs.ltcMonthlyBenefit || inputs.ltcMonthlyCost) * 12;
-      const totalBenefit  = annualBenefit * (inputs.ltcBenefitDuration || ltcDur);
-      const benefitGap    = Math.max(0, totalLtcCost - totalBenefit);
+      const annualBenefit_r = (inputs.ltcMonthlyBenefit || inputs.ltcMonthlyCost) * 12;
+      const totalBenefit_r  = annualBenefit_r * (inputs.ltcBenefitDuration || ltcDur);
+      const benefitGap_r    = Math.max(0, totalLtcCost_r - totalBenefit_r);
 
       // Confidence delta
       const confDeltaLtc = hasInsuranceData && confidenceInsured !== null && confidenceUninsured !== null
@@ -2457,7 +2455,7 @@ function App() {
         <div style="font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:${P.textSoft};margin-bottom:10px;">Modeled Care Event — ${clientLabel2}</div>
         <div style="display:flex;flex-wrap:wrap;gap:10px;">
           <div style="flex:1;min-width:100px;text-align:center;padding:10px;background:#fff;border:1px solid ${P.border};border-radius:5px;">
-            <div style="font-size:16px;font-weight:700;color:${P.navy};">Age ${ltcAge}</div>
+            <div style="font-size:16px;font-weight:700;color:${P.navy};">Age ${ltcAge_r}</div>
             <div style="font-size:10px;color:${P.textSoft};margin-top:1px;">Event begins</div>
           </div>
           <div style="flex:1;min-width:100px;text-align:center;padding:10px;background:#fff;border:1px solid ${P.border};border-radius:5px;">
@@ -2469,7 +2467,7 @@ function App() {
             <div style="font-size:10px;color:${P.textSoft};margin-top:1px;">Care cost</div>
           </div>
           <div style="flex:1;min-width:100px;text-align:center;padding:10px;background:#fff;border:1px solid ${P.border};border-radius:5px;">
-            <div style="font-size:16px;font-weight:700;color:${P.red};">${f2(totalLtcCost)}</div>
+            <div style="font-size:16px;font-weight:700;color:${P.red};">${f2(totalLtcCost_r)}</div>
             <div style="font-size:10px;color:${P.textSoft};margin-top:1px;">Total care cost</div>
           </div>
         </div>
@@ -2486,10 +2484,10 @@ function App() {
           </div>
           <div style="padding:12px 14px;background:#fff;">
             ${[
-              ['Direct Care Cost', f2(totalLtcCost), P.red],
-              ['Gross-Up Tax (extra withdrawal needed)', grossUpTaxTotal > 0 ? f2(grossUpTaxTotal) : 'Minimal', P.amber],
-              ['True Total Cost to Portfolio', f2(trueTotalCost), P.red],
-              ['Lost Compounding (event → plan end)', compoundingLoss > 0 ? f2(compoundingLoss) : '—', P.red],
+              ['Direct Care Cost', f2(totalLtcCost_r), P.red],
+              ['Gross-Up Tax (extra withdrawal needed)', grossUpTaxTotal_r > 0 ? f2(grossUpTaxTotal_r) : 'Minimal', P.amber],
+              ['True Total Cost to Portfolio', f2(trueTotalCost_r), P.red],
+              ['Lost Compounding (event → plan end)', compoundingLoss_r > 0 ? f2(compoundingLoss_r) : '—', P.red],
               ...(uninsuredAge90 ? [['Portfolio at Age 90', f2(uninsuredAge90.totalPortfolio), P.textMid]] : []),
               ...(confDeltaLtc !== null ? [['Plan Survival Confidence', (confidenceUninsured||'—')+'%', (confidenceUninsured||0) < 70 ? P.red : P.amber]] : []),
             ].map(([l,v,c]) => `
@@ -2508,8 +2506,8 @@ function App() {
           </div>
           <div style="padding:12px 14px;background:#fff;">
             ${[
-              ['Policy Benefit Covers', benefitGap === 0 ? 'Full care cost' : f2(totalBenefit)+' (partial)', P.teal],
-              ['Remaining Gap', benefitGap > 0 ? f2(benefitGap) : 'None', benefitGap > 0 ? P.amber : P.teal],
+              ['Policy Benefit Covers', benefitGap_r === 0 ? 'Full care cost' : f2(totalBenefit_r)+' (partial)', P.teal],
+              ['Remaining Gap', benefitGap_r > 0 ? f2(benefitGap_r) : 'None', benefitGap_r > 0 ? P.amber : P.teal],
               ['Gross-Up Tax', 'Eliminated', P.teal],
               ['Portfolio Impact', 'Untouched', P.teal],
               ...(insuredAge90 ? [['Portfolio at Age 90', f2(insuredAge90.totalPortfolio), P.teal]] : []),
@@ -2524,9 +2522,9 @@ function App() {
       </div>
 
       <!-- Portfolio difference callout -->
-      ${portfolioDiff > 0 ? `<div style="padding:11px 15px;background:${P.tealLt};border:1px solid #A8D8C4;border-radius:6px;margin-bottom:12px;">
-        <div style="font-size:12px;font-weight:700;color:${P.teal};margin-bottom:3px;">Portfolio Preserved by Layer 2: ${f2(portfolioDiff)}</div>
-        <div style="font-size:11px;color:${P.textMid};line-height:1.6;">This is the projected difference in final portfolio value between the insured and uninsured paths. It includes the direct care cost, the gross-up tax on forced withdrawals, and the compounding growth the depleted portfolio never earned.${compoundingLoss > 0 ? ` The compounding loss alone — the permanent drag on a smaller portfolio from event age to plan end — accounts for approximately ${f2(compoundingLoss)}.` : ''}</div>
+      ${portfolioDiff_r > 0 ? `<div style="padding:11px 15px;background:${P.tealLt};border:1px solid #A8D8C4;border-radius:6px;margin-bottom:12px;">
+        <div style="font-size:12px;font-weight:700;color:${P.teal};margin-bottom:3px;">Portfolio Preserved by Layer 2: ${f2(portfolioDiff_r)}</div>
+        <div style="font-size:11px;color:${P.textMid};line-height:1.6;">This is the projected difference in final portfolio value between the insured and uninsured paths. It includes the direct care cost, the gross-up tax on forced withdrawals, and the compounding growth the depleted portfolio never earned.${compoundingLoss_r > 0 ? ` The compounding loss alone — the permanent drag on a smaller portfolio from event age to plan end — accounts for approximately ${f2(compoundingLoss_r)}.` : ''}</div>
       </div>` : ''}
 
       ${confDeltaLtc !== null && Math.abs(confDeltaLtc) >= 1 ? `<div style="padding:11px 15px;background:${confDeltaLtc > 0 ? P.tealLt : P.amberLt};border:1px solid ${confDeltaLtc > 0 ? '#A8D8C4' : '#E8C890'};border-radius:6px;margin-bottom:12px;">
