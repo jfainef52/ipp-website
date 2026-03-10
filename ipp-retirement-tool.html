@@ -203,7 +203,7 @@ function seededRandom(seed) {
   };
 }
 
-function runMonteCarlo(startBalance, annualWithdraw, years, trials=500, mean=0.065, inflation=0.028, ssIncome=0, fixedStreams=[], totalExpensesY1=0, ltcShockYear=-1, ltcShockAnnual=0, ltcShockDuration=0) {
+function runMonteCarlo(startBalance, annualWithdraw, years, trials=1000, mean=0.065, inflation=0.028, ssIncome=0, fixedStreams=[], totalExpensesY1=0, ltcShockYear=-1, ltcShockAnnual=0, ltcShockDuration=0, expShockAnnual=0, expShockFreq=0) {
   let successes = 0;
   const stddev = 0.12;
   const streams = Array.isArray(fixedStreams)
@@ -220,6 +220,8 @@ function runMonteCarlo(startBalance, annualWithdraw, years, trials=500, mean=0.0
     + (totalExpensesY1 * 0.007)
     + (ltcShockAnnual * 0.0013)
     + (ltcShockYear * 333)
+    + (expShockAnnual * 0.0019)
+    + (expShockFreq * 57)
     + streams.reduce((a, s) => a + s.annual * 0.003 + s.yearOffset * 17, 0)
   ) ^ 0xDEADBEEF;
   const rand = seededRandom(seedVal);
@@ -227,6 +229,15 @@ function runMonteCarlo(startBalance, annualWithdraw, years, trials=500, mean=0.0
   for (let t = 0; t < trials; t++) {
     let bal = startBalance;
     let failed = false;
+    // Randomized shock timing: jitter each shock around its expected interval per trial
+    const shockYearsThisTrial = new Set();
+    if (expShockAnnual > 0 && expShockFreq > 0) {
+      for (let y = expShockFreq; y < years; y += expShockFreq) {
+        const jitter = Math.floor(rand() * expShockFreq) - Math.floor(expShockFreq / 2);
+        const shockY = Math.max(1, Math.min(years - 1, Math.round(y + jitter)));
+        shockYearsThisTrial.add(shockY);
+      }
+    }
     for (let y = 0; y < years; y++) {
       const r = mean + stddev * (Math.sqrt(-2*Math.log(rand())) * Math.cos(2*Math.PI*rand()));
       const inflFactor = Math.pow(1 + inflation, y);
@@ -234,10 +245,14 @@ function runMonteCarlo(startBalance, annualWithdraw, years, trials=500, mean=0.0
       const ssThisYear = ssIncome * inflFactor;
       const fixedThisYear = streams.reduce((sum, s) => sum + (y >= s.yearOffset ? s.annual : 0), 0);
       const netDraw = Math.max(0, expensesThisYear - ssThisYear - fixedThisYear);
-      // Apply care cost shock: grossed-up portfolio draw during uninsured care years
+      // LTC shock: grossed-up portfolio draw during uninsured care years
       const ltcShock = (ltcShockYear >= 0 && y >= ltcShockYear && y < ltcShockYear + ltcShockDuration)
         ? ltcShockAnnual : 0;
-      bal = bal * (1 + r) - netDraw - ltcShock;
+      // Expense shock: guaranteed income surplus absorbs first; remainder hits portfolio
+      const rawShock = shockYearsThisTrial.has(y) ? expShockAnnual * inflFactor : 0;
+      const guaranteedSurplus = Math.max(0, ssThisYear + fixedThisYear - expensesThisYear);
+      const expShock = Math.max(0, rawShock - guaranteedSurplus);
+      bal = bal * (1 + r) - netDraw - ltcShock - expShock;
       if (bal <= 0) { failed = true; break; }
     }
     if (!failed) successes++;
@@ -493,6 +508,7 @@ function projectArc(inputs) {
     portfolioReturn = 0.065,
     inflation = 0.028,
     sorrEnabled = false,
+    expenseShockEnabled = false, expenseShockAmount = 0, expenseShockFrequency = 8,
     annualTradContribution = 0,
     tradContributionEndAge = 0,
     annualTaxableContribution = 0,
@@ -509,7 +525,17 @@ function projectArc(inputs) {
     ? [-0.18, 0.04, -0.14, 0.05, -0.10]
     : null;
 
-  const years = [];
+  // ── Expense Shock Schedule (deterministic, evenly spaced for chart display) ──
+  const SHOCK_YEARS = (expenseShockEnabled && expenseShockAmount > 0 && expenseShockFrequency > 0)
+    ? (() => {
+        const set = new Set();
+        const totalYrs = planToAge - retireAge + 1;
+        for (let y = expenseShockFrequency; y < totalYrs; y += expenseShockFrequency) set.add(Math.round(y));
+        return set;
+      })()
+    : null;
+
+
 
   // ── Architecture toggle — when disabled, zero out all IncomeArc™ layers ──
   const archRothAnnuityMonthly   = architectureEnabled ? rothAnnuityMonthly   : 0;
@@ -868,6 +894,15 @@ function projectArc(inputs) {
     }
 
     row.totalExpense = expenses;
+
+    // ── Expense Shock Event (deterministic — evenly spaced shock years) ──
+    if (SHOCK_YEARS && SHOCK_YEARS.has(yr)) {
+      const shockAmt = expenseShockAmount * inflFactor;
+      expenses += shockAmt;
+      row.expenseShockEvent = true;
+      row.expenseShockAmount = shockAmt;
+      row.totalExpense = expenses;
+    }
     // Gap uses only spendable income — purpose-driven events (ETA funding, Roth conversion,
     // LTC policy premium draw) are non-spendable IRA distributions that go directly to
     // the policy/conversion, not into the client's pocket to pay living expenses.
@@ -1335,7 +1370,7 @@ function projectArc(inputs) {
     mcStartBalance,
     0,
     mcYears,
-    500,
+    1000,
     portfolioReturn,
     inflation,
     ssAtMcStart,
@@ -1343,7 +1378,9 @@ function projectArc(inputs) {
     expensesAtMcStart,
     ltcShockYear,
     ltcShockAnnual,
-    ltcDuration
+    ltcDuration,
+    expenseShockEnabled ? expenseShockAmount : 0,
+    expenseShockEnabled ? expenseShockFrequency : 0
   );
 
   return { years, confidence, fixedStreams, mcStartAge };
@@ -1548,6 +1585,20 @@ function ArcChart({ data, view, insuredData, sorrEnabled }) {
                 <text x={xScale(i)+4} y={PAD.t+38} textAnchor="start"
                   fill="#9B7EC8" fontSize="9" fontFamily="DM Sans" fontWeight="700">
                   ♥ LTC
+                </text>
+              </g>
+            )}
+            {/* Expense Shock marker — amber spike */}
+            {d.expenseShockEvent && (
+              <g>
+                <line x1={xScale(i)} x2={xScale(i)} y1={PAD.t} y2={PAD.t+chartH}
+                  stroke="rgba(196,148,58,.6)" strokeWidth="2" strokeDasharray="5,3"/>
+                <polygon
+                  points={`${xScale(i)},${PAD.t+4} ${xScale(i)-6},${PAD.t+16} ${xScale(i)+6},${PAD.t+16}`}
+                  fill="rgba(196,148,58,.8)"/>
+                <text x={xScale(i)+4} y={PAD.t+26} textAnchor="start"
+                  fill="#C4943A" fontSize="9" fontFamily="DM Sans" fontWeight="700">
+                  ⚡ Expense
                 </text>
               </g>
             )}
@@ -1951,6 +2002,7 @@ function App() {
     annualTaxableDrawdown: 0, taxableDrawdownStartAge: 0, taxableDrawdownEndAge: 0,
     annualRothDrawdown: 0, rothDrawdownStartAge: 0, rothDrawdownEndAge: 0,
     portfolioReturn: 6.5, inflation: 2.8, sorrEnabled: false,
+    expenseShockEnabled: false, expenseShockAmount: 50000, expenseShockFrequency: 8,
     annualTradContribution: 0, tradContributionEndAge: 0,
     annualTaxableContribution: 0, taxableContributionEndAge: 0,
     annualSpouseTradContribution: 0, spouseTradContributionEndAge: 0,
@@ -2967,6 +3019,53 @@ function App() {
               <Field label="Lifestyle Monthly Expenses" hint="Travel, dining, family, discretionary">
                 <NumInput value={inputs.lifestyleExpenses} onChange={v=>set('lifestyleExpenses',v)} prefix="$" suffix="/mo"/>
               </Field>
+
+              {/* ── Expense Shock Stress toggle ── */}
+              <div style={{marginTop:14,paddingTop:14,borderTop:'1px solid rgba(255,255,255,.06)'}}>
+                <div style={{fontSize:12,fontWeight:700,color:'#C4943A',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:6}}>
+                  Unexpected Major Expense
+                </div>
+                <div style={{fontSize:12,color:'#8DAFC8',lineHeight:1.6,marginBottom:10}}>
+                  Models recurring large expenses (home repair, medical episode, family support) that hit the portfolio mid-retirement. Guaranteed income from the Roth Annuity absorbs what it can — the gap shows what the portfolio must cover.
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:12,marginBottom: inputs.expenseShockEnabled ? 12 : 0}}>
+                  <div
+                    onClick={()=>set('expenseShockEnabled', !inputs.expenseShockEnabled)}
+                    style={{
+                      width:44, height:24, borderRadius:12, cursor:'pointer',
+                      background: inputs.expenseShockEnabled ? '#C4943A' : 'rgba(255,255,255,.1)',
+                      position:'relative', transition:'background .2s', flexShrink:0,
+                      border: inputs.expenseShockEnabled ? '1px solid #C4943A' : '1px solid rgba(255,255,255,.15)',
+                    }}>
+                    <div style={{
+                      position:'absolute', top:3, left: inputs.expenseShockEnabled ? 22 : 3,
+                      width:16, height:16, borderRadius:8,
+                      background:'#F5F2EC', transition:'left .2s',
+                      boxShadow:'0 1px 3px rgba(0,0,0,.3)',
+                    }}/>
+                  </div>
+                  <span style={{fontSize:13,color: inputs.expenseShockEnabled ? '#C4943A' : '#8DAFC8', fontWeight: inputs.expenseShockEnabled ? 700 : 400}}>
+                    {inputs.expenseShockEnabled ? 'Expense Shock Active' : 'Off'}
+                  </span>
+                </div>
+
+                {inputs.expenseShockEnabled && (
+                  <div style={{background:'rgba(196,148,58,.06)',border:'1px solid rgba(196,148,58,.2)',borderRadius:8,padding:'10px 12px'}}>
+                    <Field label="Shock Amount" hint="Size of each unexpected expense event (today's dollars)">
+                      <NumInput value={inputs.expenseShockAmount} onChange={v=>set('expenseShockAmount',v)} prefix="$"/>
+                    </Field>
+                    <Field label="Average Frequency" hint="How often a shock event occurs (Monte Carlo randomizes exact timing)">
+                      <div style={{display:'flex',alignItems:'center',gap:8}}>
+                        <span style={{fontSize:13,color:'#8DAFC8'}}>Every</span>
+                        <NumInput value={inputs.expenseShockFrequency} onChange={v=>set('expenseShockFrequency',Math.max(1,v))} suffix=" yrs" style={{width:80}}/>
+                      </div>
+                    </Field>
+                    <div style={{fontSize:11,color:'rgba(196,148,58,.7)',lineHeight:1.55,marginTop:4}}>
+                      Chart shows evenly-spaced shock markers. Monte Carlo randomizes exact timing across 1,000 trials for a statistically honest confidence score.
+                    </div>
+                  </div>
+                )}
+              </div>
             </Section>
 
 
@@ -3823,6 +3922,26 @@ function App() {
               </div>
             </div>
           )}
+
+          {/* Expense Shock active banner */}
+          {inputs.expenseShockEnabled && (() => {
+            const shockCount = Math.floor((inputs.planToAge - inputs.retireAge) / (inputs.expenseShockFrequency || 8));
+            const totalShock = shockCount * (inputs.expenseShockAmount || 0);
+            const fmt = v => v >= 1000000 ? '$'+(v/1000000).toFixed(1)+'M' : '$'+Math.round(v/1000)+'K';
+            return (
+              <div style={{padding:'12px 16px',background:'rgba(196,148,58,.07)',border:'1px solid rgba(196,148,58,.25)',borderRadius:8,marginBottom:14,display:'flex',alignItems:'flex-start',gap:12}}>
+                <div style={{fontSize:20,lineHeight:1,marginTop:1}}>⚡</div>
+                <div>
+                  <div style={{fontSize:13,fontWeight:700,color:'#C4943A',letterSpacing:'.07em',textTransform:'uppercase',marginBottom:4}}>
+                    Unexpected Major Expense — Stress Active
+                  </div>
+                  <div style={{fontSize:13,color:'#DDD6C4',lineHeight:1.6}}>
+                    Modeling <strong style={{color:'#C4943A'}}>{fmt(inputs.expenseShockAmount)}</strong> expense events every ~<strong style={{color:'#C4943A'}}>{inputs.expenseShockFrequency} years</strong> (~{shockCount} events, ~{fmt(totalShock)} total exposure). Chart shows deterministic spacing. Monte Carlo randomizes exact timing across 1,000 trials — guaranteed income absorbs what it can; the remainder hits the portfolio. Amber markers ⚡ on the chart show shock years.
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Status Quo Banner */}
           {!inputs.architectureEnabled && (
