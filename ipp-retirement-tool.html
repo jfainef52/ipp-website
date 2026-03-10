@@ -830,25 +830,24 @@ function projectArc(inputs) {
     }
 
     // RMD — Primary
+    // Deduct-only here. Growth applied once below in the gap/surplus block.
     if (age >= 73 && trad > 0) {
       const rmdAmt = trad / getRMDFactor(age);
       row.sources.rmd = rmdAmt;
       row.totalIncome += rmdAmt;
-      trad = Math.max(0, (trad - rmdAmt) * (1 + yearReturn));
-    } else {
-      trad = trad * (1 + yearReturn);
+      trad = Math.max(0, trad - rmdAmt);
     }
+    // (no else-growth — gap/surplus block handles it)
 
     // RMD — Spouse (separate account, separate schedule based on spouse's age)
+    // Deduct-only here. spouseTrad grows via the surplus/gap block at end of year.
     if (filingStatus === 'mfj' && spouseTrad > 0) {
       const spouseAge = age - spouseDobOffset;
       if (spouseAge >= 73) {
         const spouseRmdAmt = spouseTrad / getRMDFactor(spouseAge);
         row.sources.rmd = (row.sources.rmd || 0) + spouseRmdAmt;
         row.totalIncome += spouseRmdAmt;
-        spouseTrad = Math.max(0, (spouseTrad - spouseRmdAmt) * (1 + yearReturn));
-      } else {
-        spouseTrad = spouseTrad * (1 + yearReturn);
+        spouseTrad = Math.max(0, spouseTrad - spouseRmdAmt);
       }
     }
 
@@ -1056,6 +1055,7 @@ function projectArc(inputs) {
       }
 
       row.gap = 0;
+      spouseTrad = spouseTrad * (1 + yearReturn); // grow spouseTrad once (no draw from it in gap path)
     } else if (row.ltcEvent && row.ltcUncovered > 0 && !ltcInsured) {
       // ── Dedicated LTC gross-up draw (surplus year with care costs) ──
       // When regular income covers living expenses but NOT care costs, row.gap may be >= 0
@@ -1114,6 +1114,7 @@ function projectArc(inputs) {
       taxable = taxable * (1 + yearReturn);
       roth = roth * (1 + yearReturn);
       trad = trad * (1 + yearReturn);
+      spouseTrad = spouseTrad * (1 + yearReturn);
     } else if (row.spouseLtcEvent && row.spouseLtcUncovered > 0 && !spouseLtcInsured) {
       // ── Dedicated Spouse LTC gross-up draw (surplus year with spouse care costs) ──
       const ltcNeeded = row.spouseLtcUncovered;
@@ -1167,11 +1168,13 @@ function projectArc(inputs) {
       taxable = taxable * (1 + yearReturn);
       roth = roth * (1 + yearReturn);
       trad = trad * (1 + yearReturn);
+      spouseTrad = spouseTrad * (1 + yearReturn);
     } else {
       // Surplus — invest surplus in taxable, grow all three buckets
       taxable = taxable * (1 + yearReturn);
       roth = roth * (1 + yearReturn);
       trad = trad * (1 + yearReturn);
+      spouseTrad = spouseTrad * (1 + yearReturn);
     }
 
     // Portfolio snapshot
@@ -1211,12 +1214,13 @@ function projectArc(inputs) {
       row.totalExpense += row.irmaa;
       row.irmaaExpense = row.irmaa;
       // Fill IRMAA gap — draw from Roth first (no gross-up), then traditional (gross-up)
+      // Growth already applied in the gap/surplus block above — these are deduct-only draws.
       let irmaaRemaining = row.irmaa;
       if (roth > 0 && irmaaRemaining > 0) {
         const draw = Math.min(roth, irmaaRemaining);
         row.sources.roth = (row.sources.roth || 0) + draw;
         row.totalIncome += draw;
-        roth = Math.max(0, (roth - draw) * (1 + yearReturn));
+        roth = Math.max(0, roth - draw);
         irmaaRemaining -= draw;
       }
       if (trad > 0 && irmaaRemaining > 0) {
@@ -1228,7 +1232,7 @@ function projectArc(inputs) {
         const actualGross = Math.min(trad, grossDraw);
         row.sources.rmd = (row.sources.rmd || 0) + actualGross;
         row.totalIncome += actualGross;
-        trad = Math.max(0, (trad - actualGross) * (1 + yearReturn));
+        trad = Math.max(0, trad - actualGross); // deduct only — growth already applied above
       }
     }
 
