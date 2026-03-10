@@ -646,6 +646,7 @@ function projectArc(inputs) {
       : portfolioReturn;
     const row = { age, sources: {}, totalIncome: 0, totalExpense: 0, gap: 0 };
     row.yearReturn = yearReturn; // stored for chart annotation
+    const portfolioStartOfYear = trad + roth + taxable + spouseTrad; // capture before any draws/growth
 
     // ── ETA Lump-Sum Funding Event ──
     // Tax AND any early withdrawal penalty are financed externally (bank loan / policy financing).
@@ -1245,6 +1246,7 @@ function projectArc(inputs) {
     // Portfolio snapshot
     row.totalPortfolio = trad + roth + taxable + spouseTrad;
     row.trad = trad; row.roth = roth; row.taxable = taxable; row.spouseTrad = spouseTrad;
+    row.portfolioYield = portfolioStartOfYear * yearReturn; // dollar return earned this year
 
     // IRMAA MAGI — only taxable sources count. Tax-free sources (Roth, ETA policy loans,
     // LTC benefit proceeds, Roth annuity) are explicitly excluded — they do not appear
@@ -1323,8 +1325,8 @@ function projectArc(inputs) {
     row.stateTaxRate = stateEffRate;
     row.ordinaryTax = taxResult.ordinaryTax;
     row.ltcgTax = taxResult.ltcgTax;
-    row.ltcGrossUpTaxNote = row.ltcEvent && row.ltcGrossUpTax > 0
-      ? `LTC draws grossed up — $${Math.round((row.ltcGrossUpTax||0)/1000)}K additional tax this year`
+    row.ltcGrossUpTaxNote = (row.ltcEvent || row.spouseLtcEvent) && row.ltcGrossUpTax > 0
+      ? `${row.ltcEvent && row.spouseLtcEvent ? 'Primary + Spouse' : row.spouseLtcEvent ? 'Spouse' : 'Primary'} LTC draws grossed up — $${Math.round((row.ltcGrossUpTax||0)/1000)}K additional tax this year`
       : null;
 
     // ── Roth Conversion Overage Gross-Up (resolved post-tax with actual marginal rate) ──
@@ -1862,8 +1864,8 @@ function DataTable({ data }) {
       <table style={{width:'100%',borderCollapse:'collapse',fontSize:13,fontFamily:'DM Sans'}}>
         <thead>
           <tr>
-            {['Age','Soc Sec','Pension','Roth Ann.','NQ Ann.','ETA (L3)','RMD/Trad','Roth IRA','Taxable','Part-Time','Gross In','Fed Tax','State Tax','Eff. Rate','MAGI','Net Income','Expenses','IRMAA','Portfolio'].map(h=>(
-              <th key={h} style={{padding:'6px 8px',textAlign:'right',color: h==='Net Income'?'#C8A96E': h==='Fed Tax'||h==='State Tax'||h==='Eff. Rate'?'#C47A7A': h==='MAGI'?'#9B7EC8':'#9EB8CC',fontWeight:500,letterSpacing:'.04em',fontSize:14,borderBottom:'1px solid rgba(255,255,255,.06)',whiteSpace:'nowrap'}}>
+            {['Age','Soc Sec','Pension','Roth Ann.','NQ Ann.','ETA (L3)','RMD/Trad','Roth IRA','Taxable','Part-Time','Gross In','Fed Tax','State Tax','Eff. Rate','MAGI','Net Income','Expenses','IRMAA','Yield','Portfolio'].map(h=>(
+              <th key={h} style={{padding:'6px 8px',textAlign:'right',color: h==='Net Income'?'#C8A96E': h==='Fed Tax'||h==='State Tax'||h==='Eff. Rate'?'#C47A7A': h==='MAGI'?'#9B7EC8': h==='Yield'?'#4A9B7A':'#9EB8CC',fontWeight:500,letterSpacing:'.04em',fontSize:14,borderBottom:'1px solid rgba(255,255,255,.06)',whiteSpace:'nowrap'}}>
                 {h}
               </th>
             ))}
@@ -1890,11 +1892,12 @@ function DataTable({ data }) {
               <td style={{padding:'5px 8px',textAlign:'right',color:'#8DAFC8'}}>{fmt$(d.grossIncome||d.totalIncome)}</td>
               <td style={{padding:'5px 8px',textAlign:'right',color:'#C47A7A'}}>{d.federalTax>0?fmt$(d.federalTax):'—'}</td>
               <td style={{padding:'5px 8px',textAlign:'right',color:'#C8A030'}}>{d.stateTax>0?fmt$(d.stateTax):'—'}</td>
-              <td style={{padding:'5px 8px',textAlign:'right',color: d.ltcEvent&&d.ltcGrossUpTax>0?'#C47A7A':'#9EB8CC',fontWeight:d.ltcEvent&&d.ltcGrossUpTax>0?600:400}} title={d.ltcGrossUpTaxNote||''}>{fmtPct(d.effectiveTaxRate)}{d.ltcEvent&&d.ltcGrossUpTax>0?' ⬆':''}</td>
+              <td style={{padding:'5px 8px',textAlign:'right',color: (d.ltcEvent||d.spouseLtcEvent)&&d.ltcGrossUpTax>0?'#C47A7A':'#9EB8CC',fontWeight:(d.ltcEvent||d.spouseLtcEvent)&&d.ltcGrossUpTax>0?600:400}} title={d.ltcGrossUpTaxNote||''}>{fmtPct(d.effectiveTaxRate)}{(d.ltcEvent||d.spouseLtcEvent)&&d.ltcGrossUpTax>0?' ⬆':''}</td>
               <td style={{padding:'5px 8px',textAlign:'right',color:'#9B7EC8'}}>{d.magi>0?fmt$(d.magi):'—'}</td>
               <td style={{padding:'5px 8px',textAlign:'right',color:'#F5F2EC',fontWeight:600}}>{fmt$(d.totalIncome)}</td>
               <td style={{padding:'5px 8px',textAlign:'right',color:'#C47A7A'}}>{fmt$(d.totalExpense)}</td>
               <td title={d.irmaa>0?`IRMAA based on age ${d.irmaaMagiYear} MAGI ($${Math.round((d.irmaaMagi||0)/1000)}K) — 2-yr lookback`:'No IRMAA'} style={{padding:'5px 8px',textAlign:'right',color: d.irmaa>0?'#E8943A':'#2A4060',cursor:d.irmaa>0?'help':'default'}}>{d.irmaa>0?'$'+d.irmaa.toLocaleString():'-'}</td>
+              <td title={`${((d.yearReturn||0)*100).toFixed(1)}% return on $${Math.round((d.totalPortfolio-(d.portfolioYield||0))/1000)}K start-of-year balance`} style={{padding:'5px 8px',textAlign:'right',color:(d.portfolioYield||0)>=0?'#4A9B7A':'#C47A7A',cursor:'help'}}>{fmt$((d.portfolioYield||0))}</td>
               <td style={{padding:'5px 8px',textAlign:'right',color:'#9EB8CC'}}>{fmtM(d.totalPortfolio)}</td>
             </tr>
           ))}
@@ -3601,11 +3604,18 @@ function App() {
               </>}
               </div>
 
-              {/* ── Spouse Health Event — MFJ only, visible only when toggle is ON ── */}
-              {inputs.filingStatus === 'mfj' && inputs.ltcEventEnabled && <>
-                <div style={{transition:'opacity .3s'}}>
-                <div style={{marginTop:14,paddingTop:12,borderTop:'1px solid rgba(255,255,255,.06)',fontSize:13,fontWeight:700,color:'#9EB8CC',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8}}>
-                  Spouse
+              {/* ── Spouse Health Event — MFJ only · Always visible so advisor can pre-fill for reveal ── */}
+              {inputs.filingStatus === 'mfj' && <>
+                <div style={{opacity: inputs.ltcEventEnabled ? 1 : 0.5, transition:'opacity .3s', pointerEvents: inputs.ltcEventEnabled ? 'auto' : 'auto'}}>
+                <div style={{marginTop:14,paddingTop:12,borderTop:'1px solid rgba(255,255,255,.06)',display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+                  <div style={{fontSize:13,fontWeight:700,color:'#9EB8CC',letterSpacing:'.06em',textTransform:'uppercase'}}>
+                    Spouse
+                  </div>
+                  {!inputs.ltcEventEnabled && (
+                    <div style={{fontSize:10,color:'#5B8FA8',fontStyle:'italic',letterSpacing:'.04em'}}>
+                      staged — activates with toggle
+                    </div>
+                  )}
                 </div>
                 <Field label="Model Spouse Care Event at Age" hint="Enter 0 to exclude · Uses primary's age as the projection axis">
                   <NumInput value={inputs.spouseLtcEventAge} onChange={v=>set('spouseLtcEventAge',v)} suffix="yrs (primary age)"/>
