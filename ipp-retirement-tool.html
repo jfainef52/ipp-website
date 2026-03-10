@@ -1439,7 +1439,30 @@ function projectArc(inputs) {
   // a short tail (e.g. 8 years) where even a depleted portfolio usually survives,
   // making insured vs uninsured look nearly identical — which is wrong.
   const mcStartAge = retireAge;
-  const mcStartBalance = portfolioAtRetirementForMC;
+
+  // Post-retirement architecture events (ETA, L1 Roth conversion, and any L2/SpouseL2 draws
+  // with funding ages >= retireAge) happen INSIDE the year loop — AFTER portfolioAtRetirementForMC
+  // is captured. The MC starting balance must be reduced by these draws so the simulation
+  // doesn't start from an artificially high portfolio. Pre-retirement draws already reduced
+  // trad/roth/taxable before portfolioAtRetirementForMC was captured, so those are fine.
+  // For post-retirement draws we use the gross amounts from the deterministic row data
+  // (already computed above in the year loop).
+  const postRetirementPremiumDraws = years.reduce((sum, r) => {
+    // ETA L3: always post-retirement by design (funded at retireAge or later)
+    if (r.etaFundingEvent)        sum += (r.etaFundingAmount  || 0);
+    // L1 Roth conversion: post-retirement if rothConversionAge >= retireAge
+    if (r.rothConversionEvent && rothConversionAge >= retireAge)
+                                  sum += (r.rothConversionAmount || 0) + (r.rothConversionOverage || 0);
+    // L2 primary LTC: only if funding age is at or after retirement
+    if (r.ltcFundingEvent && ltcFundingAge >= retireAge)
+                                  sum += (r.ltcFundingAmount || 0);
+    // Spouse L2 LTC: only if funding age is at or after retirement
+    if (r.spouseLtcFundingEvent && spouseLtcFundingAge >= retireAge)
+                                  sum += (r.spouseLtcFundingAmount || 0);
+    return sum;
+  }, 0);
+
+  const mcStartBalance = Math.max(0, portfolioAtRetirementForMC - postRetirementPremiumDraws);
   const mcYears = planToAge - retireAge;
   const ssAtMcStart = ssIncomeY1; // MC starts at retirement — no inflation offset needed
   const expensesAtMcStart = totalExpensesY1;
