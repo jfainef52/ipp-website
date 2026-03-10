@@ -2592,9 +2592,112 @@ function App() {
         <div style="font-size:11px;color:${P.textMid};line-height:1.65;">Most care costs are paid from a traditional IRA or 401(k). Every dollar that comes out is ordinary income — taxable in the year of withdrawal. To net $7,500/month for care, the account must distribute more than $7,500 — enough extra to cover the tax on the withdrawal itself. This <strong style="color:${P.navy};">gross-up</strong> is forced additional income that compounds the tax burden, can trigger IRMAA surcharges, and increases Social Security taxation — all while permanently reducing the portfolio's compounding base.</div>
       </div>
 
-      ${hasSpouseLtc ? `<div style="padding:9px 13px;background:${P.steelLt};border:1px solid #B8CCE0;border-radius:5px;font-size:11px;color:${P.textMid};line-height:1.55;">
-        📋 <strong style="color:${P.steel};">Spouse Care Event Also Modeled:</strong> ${clientInfo.spouseName || 'Spouse'} — Age ${inputs.spouseLtcEventAge}, $${inputs.spouseLtcMonthlyCost.toLocaleString()}/mo for ${inputs.spouseLtcDuration||3} years. This creates a second draw on the same portfolio, often at a time when the primary earner's income may have also changed. Layer 2 coverage for both spouses insulates the portfolio from both events independently.
-      </div>` : ''}
+      ${hasSpouseLtc ? (() => {
+        const spAge = inputs.spouseLtcEventAge;
+        const spDur = inputs.spouseLtcDuration || 3;
+        const spEnd = spAge + spDur;
+        const sTotalCareCost = inputs.spouseLtcMonthlyCost * 12 * spDur;
+        const sGrossUpTax = (yearsSpouseUninsured||[])
+          .filter(r => r.age >= spAge && r.age < spEnd)
+          .reduce((s,r) => s + (r.ltcGrossUpTax||0), 0);
+        const sPortfolioDiff = (yearsSpouseInsured && yearsSpouseUninsured)
+          ? ((yearsSpouseInsured[yearsSpouseInsured.length-1]||{}).totalPortfolio||0)
+            - ((yearsSpouseUninsured[yearsSpouseUninsured.length-1]||{}).totalPortfolio||0)
+          : 0;
+        const sForced = (yearsSpouseUninsured||[])
+          .filter(r => r.age >= spAge && r.age < spEnd)
+          .reduce((s,r) => s + (r.ltcPortfolioDraw||0), 0);
+        const cForced = (yearsUninsured||[])
+          .filter(r => r.age >= ltcAge_r && r.age < ltcEnd_r)
+          .reduce((s,r) => s + (r.ltcPortfolioDraw||0), 0);
+
+        const hTotalCareCost   = totalLtcCost_r + sTotalCareCost;
+        const hTotalGrossUpTax = grossUpTaxTotal_r + sGrossUpTax;
+        const hTotalPreserved  = portfolioDiff_r + sPortfolioDiff;
+        const hTotalCompounding = Math.max(0, hTotalPreserved - hTotalCareCost - hTotalGrossUpTax);
+        const hForcedDraws     = cForced + sForced;
+
+        const hhConfU = (confidenceUninsured !== null && confidenceSpouseUninsured !== null)
+          ? Math.round((confidenceUninsured + confidenceSpouseUninsured) / 2) : null;
+        const hhConfI = (confidenceInsured !== null && confidenceSpouseInsured !== null)
+          ? Math.round((confidenceInsured + confidenceSpouseInsured) / 2) : null;
+        const hhConfDelta = hhConfI !== null && hhConfU !== null ? hhConfI - hhConfU : null;
+        const spLabel = clientInfo.spouseName || 'Spouse';
+
+        return `
+        <div style="margin-top:14px;background:${P.bgAlt};border:2px solid #C8B8E8;border-radius:8px;overflow:hidden;">
+          <div style="background:#5B3E8A;padding:10px 16px;display:flex;align-items:center;gap:12px;">
+            <div style="font-size:10px;font-weight:700;color:#fff;letter-spacing:.08em;text-transform:uppercase;">Combined Household — Total Layer 2 Economic Benefit</div>
+            <div style="font-size:10px;color:rgba(255,255,255,.65);">${clientLabel2} + ${spLabel}</div>
+          </div>
+          <div style="padding:14px 16px;">
+            <div style="font-size:11px;color:${P.textMid};line-height:1.65;margin-bottom:12px;">
+              Both care events draw from the same shared retirement portfolio. The combined figures below represent the full household exposure and the total economic benefit of insuring both spouses under Layer 2.
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px;">
+              ${[
+                ['Combined Care Cost', f2(hTotalCareCost), clientLabel2+' '+f2(totalLtcCost_r)+' + '+spLabel+' '+f2(sTotalCareCost), P.red],
+                ['Total Forced Draws', hForcedDraws > 0 ? f2(hForcedDraws) : '—', 'Gross IRA/taxable drawn if both uninsured', hForcedDraws > 0 ? P.red : P.teal],
+                ['Total Gross-Up Tax', hTotalGrossUpTax > 0 ? f2(hTotalGrossUpTax) : '—', 'Extra tax on all forced IRA draws', hTotalGrossUpTax > 0 ? P.red : P.teal],
+                ['Compounding Loss', f2(hTotalCompounding), 'Growth never earned from depleted base', P.red],
+                ['Total Portfolio Preserved', f2(hTotalPreserved), 'Both events — full Layer 2 benefit', '#5B3E8A'],
+              ].map(([l,v,sub,c]) => `
+              <div style="background:#fff;border:1px solid ${P.border};border-radius:5px;padding:9px 10px;text-align:center;">
+                <div style="font-size:9px;color:${P.textSoft};text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">${l}</div>
+                <div style="font-size:14px;font-weight:700;color:${c};font-family:'Cormorant Garamond',serif;">${v}</div>
+                <div style="font-size:9px;color:${P.textSoft};margin-top:2px;line-height:1.4;">${sub}</div>
+              </div>`).join('')}
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+              ${[
+                { name: clientLabel2, careCost: totalLtcCost_r, grossUp: grossUpTaxTotal_r, preserved: portfolioDiff_r },
+                { name: spLabel, careCost: sTotalCareCost, grossUp: sGrossUpTax, preserved: sPortfolioDiff },
+              ].map(sp => `
+              <div style="background:#fff;border:1px solid ${P.border};border-radius:5px;padding:10px 12px;">
+                <div style="font-size:9.5px;font-weight:700;color:#5B3E8A;text-transform:uppercase;letter-spacing:.07em;margin-bottom:7px;">${sp.name}</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
+                  ${[
+                    ['Care Cost', f2(sp.careCost), P.red],
+                    ['Gross-Up Tax', sp.grossUp > 0 ? f2(sp.grossUp) : 'None', sp.grossUp > 0 ? P.amber : P.teal],
+                    ['Portfolio Preserved', f2(sp.preserved), '#5B3E8A'],
+                    ['Layer 2 Coverage', 'Full', P.teal],
+                  ].map(([l,v,c]) => `
+                  <div>
+                    <div style="font-size:9px;color:${P.textSoft};text-transform:uppercase;">${l}</div>
+                    <div style="font-size:11px;font-weight:700;color:${c};">${v}</div>
+                  </div>`).join('')}
+                </div>
+              </div>`).join('')}
+            </div>
+            ${hhConfDelta !== null ? `
+            <div style="background:${P.bgAlt};border:1px solid ${P.border};border-radius:6px;padding:10px 14px;margin-bottom:10px;">
+              <div style="font-size:9.5px;font-weight:700;color:#5B3E8A;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">Household Plan Survival — Average Monte Carlo Confidence</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px;">
+                <div>
+                  <div style="font-size:9px;color:${P.red};font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px;">Without Layer 2 — Both Uninsured</div>
+                  <div style="font-size:22px;font-weight:700;color:${P.red};font-family:'Cormorant Garamond',serif;">${hhConfU}%</div>
+                  <div style="height:5px;background:${P.border};border-radius:3px;overflow:hidden;margin-top:4px;"><div style="height:100%;width:${Math.max(4,hhConfU)}%;background:${P.red};border-radius:3px;"></div></div>
+                </div>
+                <div>
+                  <div style="font-size:9px;color:#5B3E8A;font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px;">With Layer 2 — Both Insured</div>
+                  <div style="font-size:22px;font-weight:700;color:#5B3E8A;font-family:'Cormorant Garamond',serif;">${hhConfI}%</div>
+                  <div style="height:5px;background:${P.border};border-radius:3px;overflow:hidden;margin-top:4px;"><div style="height:100%;width:${Math.max(4,hhConfI)}%;background:#5B3E8A;border-radius:3px;"></div></div>
+                </div>
+              </div>
+              <div style="text-align:center;font-size:10.5px;font-weight:700;color:${hhConfDelta > 0 ? '#5B3E8A' : P.red};padding-top:8px;border-top:1px solid ${P.border};">
+                ${hhConfDelta > 0
+                  ? 'Insuring both spouses improves household plan survival by +'+hhConfDelta+' percentage points'
+                  : hhConfDelta < 0
+                  ? 'Review benefit sizing — combined premium cost exceeds confidence benefit'
+                  : 'No confidence difference at the household level'}
+              </div>
+            </div>` : ''}
+            <div style="padding:9px 13px;background:#F0EBF8;border:1px solid #C8B8E8;border-radius:5px;font-size:11px;color:${P.textMid};line-height:1.55;">
+              Without Layer 2 on both spouses, a sequential or overlapping care scenario could permanently impair the shared portfolio by an estimated <strong style="color:#5B3E8A;">${f2(hTotalPreserved)}</strong> — including direct draws, tax friction, and compounding loss on the depleted base.
+            </div>
+          </div>
+        </div>`;
+      })() : ''}
       `;
     })()}
 
