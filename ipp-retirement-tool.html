@@ -1077,8 +1077,32 @@ function projectArc(inputs) {
         remaining -= actualNet;
       }
 
+      // --- Spouse Traditional IRA: draw if primary trad is exhausted and gap remains (MFJ only) ---
+      if (remaining > 0 && spouseTrad > 0 && filingStatus === 'mfj') {
+        const ordBracketsEff = (isMFJeff ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025)
+          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
+        const adjOrdAGI = baseOrdAGI + (row.sources.taxable || 0) * 0.15 + (row.sources.rmd || 0);
+        const netToDraw = Math.min(remaining, spouseTrad);
+        const { grossDraw, taxOnDraw } = grossUpIterative(netToDraw, ordBracketsEff, adjOrdAGI);
+        const actualGross = Math.min(spouseTrad, grossDraw);
+        const taxProportion = grossDraw > 0 ? taxOnDraw / grossDraw : 0;
+        const actualTax = actualGross * taxProportion;
+        const actualNet = actualGross - actualTax;
+        row.sources.rmd = (row.sources.rmd || 0) + actualGross;
+        row.totalIncome += actualGross;
+        if (isAnyLtcEvent && ltcRemaining > 0 && !ltcInsured) {
+          const ltcShare = Math.min(actualNet, ltcRemaining) / Math.max(actualNet, 0.01);
+          row.ltcGrossUpTax = (row.ltcGrossUpTax || 0) + actualTax * ltcShare;
+          row.ltcPortfolioDraw = (row.ltcPortfolioDraw || 0) + actualGross * ltcShare;
+          ltcRemaining -= Math.min(actualNet, ltcRemaining);
+        }
+        spouseTrad = Math.max(0, (spouseTrad - actualGross) * (1 + yearReturn));
+        remaining -= actualNet;
+      } else {
+        spouseTrad = spouseTrad * (1 + yearReturn); // grow spouseTrad if no draw needed
+      }
+
       row.gap = 0;
-      spouseTrad = spouseTrad * (1 + yearReturn); // grow spouseTrad once (no draw from it in gap path)
     } else if (row.ltcEvent && row.ltcUncovered > 0 && !ltcInsured) {
       // ── Dedicated LTC gross-up draw (surplus year with care costs) ──
       // When regular income covers living expenses but NOT care costs, row.gap may be >= 0
@@ -1129,8 +1153,26 @@ function projectArc(inputs) {
         row.sources.rmd = (row.sources.rmd || 0) + actualGross;
         row.totalIncome += actualGross;
         row.ltcGrossUpTax = (row.ltcGrossUpTax || 0) + actualTax;
-        row.ltcPortfolioDraw = (row.ltcPortfolioDraw || 0) + actualGross; // track gross portfolio draw for LTC
-        trad = Math.max(0, trad - actualGross); // remove draw; growth applied below in surplus
+        row.ltcPortfolioDraw = (row.ltcPortfolioDraw || 0) + actualGross;
+        trad = Math.max(0, trad - actualGross);
+        ltcRemaining -= (actualGross - actualTax);
+      }
+
+      // Draw from spouse traditional IRA if primary trad exhausted and gap remains (MFJ only)
+      if (spouseTrad > 0 && ltcRemaining > 0 && filingStatus === 'mfj') {
+        const ordBracketsEff = (isMFJeff ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025)
+          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
+        const adjOrdAGI = baseOrdAGI + (row.sources.taxable || 0) * 0.15 + (row.sources.rmd || 0);
+        const netToDraw = Math.min(ltcRemaining, spouseTrad);
+        const { grossDraw, taxOnDraw } = grossUpIterative(netToDraw, ordBracketsEff, adjOrdAGI);
+        const actualGross = Math.min(spouseTrad, grossDraw);
+        const taxProportion = grossDraw > 0 ? taxOnDraw / grossDraw : 0;
+        const actualTax = actualGross * taxProportion;
+        row.sources.rmd = (row.sources.rmd || 0) + actualGross;
+        row.totalIncome += actualGross;
+        row.ltcGrossUpTax = (row.ltcGrossUpTax || 0) + actualTax;
+        row.ltcPortfolioDraw = (row.ltcPortfolioDraw || 0) + actualGross;
+        spouseTrad = Math.max(0, spouseTrad - actualGross);
       }
 
       // Grow remaining balances (surplus path)
