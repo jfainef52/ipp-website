@@ -3372,7 +3372,13 @@ function App() {
               </div>
 
               {/* ── Primary Health Event ── */}
-              {inputs.ltcEventEnabled && <>
+              {/* Always rendered — advisor can pre-load inputs with toggle off for client reveal */}
+              <div style={{opacity: inputs.ltcEventEnabled ? 1 : 0.45, transition:'opacity .3s'}}>
+              {!inputs.ltcEventEnabled && (
+                <div style={{fontSize:11,color:'#5B8FA8',fontStyle:'italic',marginBottom:8,letterSpacing:'.04em'}}>
+                  Inputs staged — toggle on to activate
+                </div>
+              )}
               <div style={{fontSize:13,fontWeight:700,color:'#9EB8CC',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8}}>
                 {inputs.filingStatus === 'mfj' ? 'Primary' : 'Care Event'}
               </div>
@@ -3457,7 +3463,7 @@ function App() {
                     Care costs hit the portfolio directly.{inputs.architectureEnabled ? ' The dashed green line shows the same retirement with Layer 2 covering the event.' : ''}
                   </p>
                 </div>
-              </>}
+              </div>
 
               {/* ── Spouse Health Event — MFJ only ── */}
               {inputs.filingStatus === 'mfj' && <>
