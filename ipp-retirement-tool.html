@@ -1394,6 +1394,12 @@ function projectArc(inputs) {
     // Combined all-in tax (federal + state; IRMAA already in expenses)
     const totalAllInTax = taxResult.totalTax + stateTax;
 
+    // Snapshot gross (pre-tax) sources for chart bars — stored separately so the arc
+    // can plot gross income vs gross expense line (apples-to-apples comparison).
+    // row.sources will be reduced to after-tax net below (used for net income stats).
+    row.grossSources = { ...row.sources };
+    row.grossTotalIncome = row.totalIncome;
+
     // Reduce each source proportionally to show after-tax net on the arc
     const taxableSources = ['ss','pension','rmd','parttime','taxable','annuity'];
     const totalTaxableIncome = taxableSources.reduce((s, k) => s + (row.sources[k] || 0), 0);
@@ -1588,7 +1594,7 @@ function ArcChart({ data, view, insuredData, sorrEnabled }) {
 
   if (!data || data.length === 0) return null;
 
-  const maxVal = Math.max(...data.map(d => Math.max(d.totalIncome, d.totalExpense))) * 1.1;
+  const maxVal = Math.max(...data.map(d => Math.max(d.grossTotalIncome || d.totalIncome, d.totalExpense))) * 1.1;
   const barW = Math.max(4, Math.floor(chartW / data.length) - 2);
 
   const xScale = i => PAD.l + (i / (data.length - 1)) * chartW;
@@ -1648,7 +1654,7 @@ function ArcChart({ data, view, insuredData, sorrEnabled }) {
         return (
           <g key={i}>
             {sourceKeys.map(k => {
-              const v = d.sources[k] || 0;
+              const v = (d.grossSources && d.grossSources[k]) || d.sources[k] || 0;
               if (v <= 0) return null;
               const barH = (v / maxVal) * chartH;
               const y = yBottom - barH;
@@ -4017,7 +4023,7 @@ function App() {
                   Income Arc — Age {inputs.retireAge} to {inputs.planToAge}
                 </h2>
                 <p style={{fontSize:13,color:'#8DAFC8'}}>
-                  After-tax net income by source · expense line overlay · {inputs.ltcEventAge > 0 ? 'healthcare event marked' : 'no healthcare event modeled'}
+                  Gross income by source · gross expense line · {inputs.ltcEventAge > 0 ? 'healthcare event marked' : 'no healthcare event modeled'}
                 </p>
               </div>
               <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:10}}>
@@ -4102,9 +4108,10 @@ function App() {
               : 0;
 
             // Compounding loss = portfolioDiff minus the direct costs (care + gross-up tax)
-            // This is the pure growth the depleted portfolio never earned from event age → plan-to age
-            // portfolioDiff is the authoritative number — both projections ran full engine independently
-            const compoundingLoss = Math.max(0, portfolioDiff - trueTotalCost);
+            // Compounding effect = the additional benefit of NOT having drawn the portfolio down.
+            // Correct identity: forcedDraws + grossUpTax + compoundingEffect = portfolioPreserved
+            // So: compoundingEffect = portfolioDiff - extraGrossDraws - grossUpTaxTotal
+            // (must be computed AFTER extraGrossDraws is defined — moved below)
 
             // "Covered by Income" = how much of the care cost is absorbed by income surplus
             // AFTER fixed + lifestyle expenses are already paid.
@@ -4113,27 +4120,27 @@ function App() {
             //   - row.totalExpense includes living expenses + LTC cost
             //   - Income surplus after living expenses = spendableIncome - (totalExpense - ltcUncovered)
             //   - That surplus (if any) absorbs part of the LTC cost before portfolio is touched
+            // "Covered by Income" = organic income surplus (SS + pension + RMDs, excluding ETA loan)
+            // that absorbs LTC cost before portfolio is touched. ETA excluded — it is a structured
+            // policy draw, not regular income surplus, and including it overstates organic coverage.
+            const annualBenefit = (inputs.ltcMonthlyBenefit || inputs.ltcMonthlyCost) * 12;
+            const totalBenefit = annualBenefit * inputs.ltcDuration;
+            const benefitGap = Math.max(0, totalLtcCost - totalBenefit);
             const incomeOffset = yearsUninsured
               .filter(r => r.age >= ltcAge && r.age < ltcEnd)
               .reduce((sum, r) => {
                 const livingExpenses = (r.totalExpense || 0) - (r.ltcUncovered || 0);
-                const surplusAfterLiving = Math.max(0, (r.spendableIncome || 0) - livingExpenses);
+                const incomeExEta = (r.spendableIncome || 0) - (r.sources && r.sources.eta || 0);
+                const surplusAfterLiving = Math.max(0, incomeExEta - livingExpenses);
                 return sum + Math.min(surplusAfterLiving, r.ltcUncovered || 0);
               }, 0);
-
-            const annualBenefit = (inputs.ltcMonthlyBenefit || inputs.ltcMonthlyCost) * 12;
-            const totalBenefit = annualBenefit * inputs.ltcDuration;
-            const benefitGap = Math.max(0, totalLtcCost - totalBenefit);
-            // Forced portfolio draws = actual gross IRA/taxable drawn from portfolio during LTC years
-            // (tracked directly by the engine as ltcPortfolioDraw, which is 0 when income surplus
-            // fully absorbs the care cost and >0 only when the portfolio was actually tapped)
+            // Forced portfolio draws = gross IRA/taxable drawn during LTC years (uninsured scenario)
             const extraGrossDraws = yearsUninsured
               .filter(r => r.age >= ltcAge && r.age < ltcEnd)
               .reduce((sum, r) => sum + (r.ltcPortfolioDraw || 0), 0);
-            // "Covered by Income" only meaningful when there's a benefit gap or no insurance.
-            // When benefit fully covers care, this should be $0 — income doesn't need to absorb anything.
-            const showBenefitCard = totalBenefit > 0; // insured scenario
-            const incomeAbsorbed = showBenefitCard ? Math.max(0, benefitGap - extraGrossDraws) : incomeOffset;
+            const showBenefitCard = totalBenefit > 0;
+            // Identity: forcedDraws + grossUpTax + compounding = portfolioDiff
+            const compoundingLoss = Math.max(0, portfolioDiff - extraGrossDraws - grossUpTaxTotal);
 
             const fmtD = v => v >= 1000000 ? `$${(v/1000000).toFixed(2)}M` : `$${Math.round(v/1000)}K`;
             return (
@@ -4167,15 +4174,13 @@ function App() {
                 <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:12,flexWrap:'wrap',fontSize:12,color:'#8DAFC8',background:'rgba(255,255,255,.02)',borderRadius:6,padding:'7px 12px',border:'1px solid rgba(255,255,255,.05)'}}>
                   <span style={{color:'#C47A7A',fontWeight:600}}>{fmtD(extraGrossDraws)}</span>
                   <span>forced draws</span>
-                  {incomeOffset > 0 && <><span style={{color:'#8DAFC8',margin:'0 2px'}}>+</span>
-                  <span style={{color:'#8DAFC8',fontWeight:600}}>{fmtD(incomeOffset)}</span>
-                  <span>covered by income surplus</span></>}
                   <span style={{color:'#8DAFC8',margin:'0 2px'}}>+</span>
-                  <span style={{color:'#C47A7A',fontWeight:600}}>{grossUpTaxTotal > 0 ? fmtD(grossUpTaxTotal) : '$0'}</span>
+                  <span style={{color:'#C47A7A',fontWeight:600}}>{grossUpTaxTotal > 0 ? fmtD(grossUpTaxTotal) : '$0K'}</span>
                   <span>gross-up tax</span>
-                  <span style={{color:'#8DAFC8',margin:'0 2px'}}>+</span>
+                  {compoundingLoss > 0 && <><span style={{color:'#8DAFC8',margin:'0 2px'}}>+</span>
                   <span style={{color:'#C47A7A',fontWeight:600}}>{fmtD(compoundingLoss)}</span>
-                  <span>compounding loss (age {ltcEnd}→{inputs.planToAge})</span>
+                  <span>lost compounding (age {ltcEnd}→{inputs.planToAge})</span></>}
+                  {incomeOffset > 0 && <><span style={{color:'#8DAFC8',margin:'0 6px',fontSize:11,fontStyle:'italic'}}>(income surplus covered {fmtD(incomeOffset)} of gap)</span></>}
                   <span style={{color:'#8DAFC8',margin:'0 2px'}}>=</span>
                   <span style={{color:'#4A9B7A',fontWeight:700}}>{fmtD(portfolioDiff)}</span>
                   <span style={{color:'#4A9B7A'}}>Portfolio Preserved</span>
@@ -4271,13 +4276,11 @@ function App() {
               ? (insuredFinal.totalPortfolio - uninsuredFinal.totalPortfolio)
               : 0;
 
-            const trueTotalCost = totalLtcCost + grossUpTaxTotal;
-            const compoundingLoss = Math.max(0, portfolioDiff - trueTotalCost);
-
-            const uninsuredDraws = yearsSpouseUninsured
+            const extraGrossDraws = yearsSpouseUninsured
               .filter(r => r.age >= ltcAge && r.age < ltcEnd)
               .reduce((sum, r) => sum + (r.ltcPortfolioDraw || 0), 0);
-            const extraGrossDraws = uninsuredDraws;
+            // Identity: forcedDraws + grossUpTax + compounding = portfolioDiff
+            const compoundingLoss = Math.max(0, portfolioDiff - extraGrossDraws - grossUpTaxTotal);
 
             const fmtD = v => v >= 1000000 ? `$${(v/1000000).toFixed(2)}M` : `$${Math.round(v/1000)}K`;
             const spouseName = inputs.spouseName || 'Spouse';
@@ -4310,11 +4313,11 @@ function App() {
                   <span style={{color:'#C47A7A',fontWeight:600}}>{fmtD(extraGrossDraws)}</span>
                   <span>forced draws</span>
                   <span style={{color:'#8DAFC8',margin:'0 2px'}}>+</span>
-                  <span style={{color:'#C47A7A',fontWeight:600}}>{grossUpTaxTotal > 0 ? fmtD(grossUpTaxTotal) : '$0'}</span>
+                  <span style={{color:'#C47A7A',fontWeight:600}}>{grossUpTaxTotal > 0 ? fmtD(grossUpTaxTotal) : '$0K'}</span>
                   <span>gross-up tax</span>
-                  <span style={{color:'#8DAFC8',margin:'0 2px'}}>+</span>
+                  {compoundingLoss > 0 && <><span style={{color:'#8DAFC8',margin:'0 2px'}}>+</span>
                   <span style={{color:'#C47A7A',fontWeight:600}}>{fmtD(compoundingLoss)}</span>
-                  <span>compounding loss (primary age {ltcEnd}→{inputs.planToAge})</span>
+                  <span>lost compounding (primary age {ltcEnd}→{inputs.planToAge})</span></>}
                   <span style={{color:'#8DAFC8',margin:'0 2px'}}>=</span>
                   <span style={{color:'#4A9B7A',fontWeight:700}}>{fmtD(portfolioDiff)}</span>
                   <span style={{color:'#4A9B7A'}}>Portfolio Preserved</span>
