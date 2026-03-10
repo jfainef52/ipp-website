@@ -2076,23 +2076,34 @@ function App() {
   // Architecture layers are always included when architectureEnabled is true —
   // the overall ring shows the plan WITH architecture fighting all active risks.
   const hasLtcForMC = inputs.ltcEventEnabled && inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
+  const hasSpouseLtcForMC = inputs.ltcEventEnabled && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
   const { years, confidence, fixedStreams, mcStartAge } = projectArc({
     ...baseProjectionInputs,
     ltcInsured: false,
     ltcEventAge: hasLtcForMC ? inputs.ltcEventAge : 0,
+    spouseLtcEventAge: hasSpouseLtcForMC ? inputs.spouseLtcEventAge : 0,
   });
 
   // Primary display projection — includes LTC event only when the healthcare toggle is ON
-  // ltcEventEnabled is a separate toggle from architectureEnabled — lets advisor show/hide
-  // the care event impact independently without turning architecture on or off.
   const hasLtcEvent = inputs.ltcEventEnabled && inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
-  const { years: yearsWithLtc } = hasLtcEvent
-    ? projectArc({ ...baseProjectionInputs, ltcInsured: false })
+  const hasSpouseLtcEvent = inputs.ltcEventEnabled && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
+  const { years: yearsWithLtc } = (hasLtcEvent || hasSpouseLtcEvent)
+    ? projectArc({
+        ...baseProjectionInputs,
+        ltcInsured: false,
+        ltcEventAge: hasLtcEvent ? inputs.ltcEventAge : 0,
+        spouseLtcEventAge: hasSpouseLtcEvent ? inputs.spouseLtcEventAge : 0,
+      })
     : { years: years };
 
   // LTC comparison projections — only when architecture is enabled, healthcare toggle is ON,
   // and LTC inputs are set.
-  const ltcCompareBase = { ...baseProjectionInputs, ltcNetAmount: 0, spouseLtcNetAmount: 0 };
+  const ltcCompareBase = {
+    ...baseProjectionInputs,
+    ltcNetAmount: 0, spouseLtcNetAmount: 0,
+    ltcEventAge: hasLtcEvent ? inputs.ltcEventAge : 0,
+    spouseLtcEventAge: hasSpouseLtcEvent ? inputs.spouseLtcEventAge : 0,
+  };
   const isMarried = inputs.filingStatus === 'mfj';
   const showLtcComparison = inputs.ltcEventEnabled && inputs.architectureEnabled && inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
   const { years: yearsUninsured, confidence: confidenceUninsured } = showLtcComparison
@@ -3443,7 +3454,7 @@ function App() {
                 <Field label="Monthly Care Cost" hint="National median: $7,500–$10,000/mo for facility care · Enter today's dollars — model inflates to event age">
                   <NumInput value={inputs.ltcMonthlyCost} onChange={v=>set('ltcMonthlyCost',v)} prefix="$" suffix="/mo"/>
                 </Field>
-                <Field label="Care Cost Inflation" hint="Medical/care inflation typically runs 1–2% above general CPI · Default 4%">
+                <Field label="Care Cost Inflation" hint="Applies to both primary and spouse care costs · Medical/care inflation typically runs 1–2% above general CPI · Default 4%">
                   <NumInput value={inputs.ltcCareInflationRate != null ? inputs.ltcCareInflationRate : 4} onChange={v=>set('ltcCareInflationRate',v)} suffix="%/yr"/>
                 </Field>
                 {inputs.ltcEventAge > inputs.retireAge && inputs.ltcMonthlyCost > 0 && (() => {
