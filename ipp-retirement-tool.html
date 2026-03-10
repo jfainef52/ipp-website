@@ -1559,7 +1559,7 @@ function NumInput({ value, onChange, placeholder, prefix, suffix }) {
 function ArcChart({ data, view, insuredData, sorrEnabled }) {
   const svgRef = useRef(null);
   const W = 720;
-  const MAIN_H = 240, IRMAA_H = 48, IRMAA_GAP = 10, AGE_H = 20;
+  const MAIN_H = 240, IRMAA_H = 56, IRMAA_GAP = 10, AGE_H = 20;
   const H = MAIN_H + IRMAA_GAP + IRMAA_H + AGE_H;
   const PAD = { t:20, r:20, b:0, l:50 };
   const chartW = W - PAD.l - PAD.r;
@@ -1766,15 +1766,28 @@ function ArcChart({ data, view, insuredData, sorrEnabled }) {
                 </g>
               );
             })}
-            {data.filter((d,i) => d.irmaa > 0 && (!data[i-1] || data[i-1].irmaa !== d.irmaa)).map((d) => {
-              const i = data.indexOf(d);
-              return (
-                <text key={i} x={xScale(i)} y={irmaaTop - 3}
-                  textAnchor="middle" fill="#E8943A" fontSize="9" fontFamily="DM Sans" fontWeight="600">
-                  +${Math.round(d.irmaa/100)*100 === d.irmaa ? d.irmaa.toLocaleString() : d.irmaa.toLocaleString()}
-                </text>
-              );
-            })}
+            {(() => {
+              // Only label on tier changes; suppress if previous label was within 3 bars
+              const tierChanges = data.reduce((acc, d, i) => {
+                if (d.irmaa > 0 && (!data[i-1] || data[i-1].irmaa !== d.irmaa)) {
+                  acc.push({ d, i });
+                }
+                return acc;
+              }, []);
+              return tierChanges.map(({ d, i }, labelIdx) => {
+                const prevLabel = tierChanges[labelIdx - 1];
+                // Suppress if within 3 bars of previous label — too crowded
+                if (prevLabel && (i - prevLabel.i) < 3) return null;
+                // Stagger: even-indexed labels sit above the panel, odd sit inside top of panel
+                const yPos = labelIdx % 2 === 0 ? irmaaTop - 3 : irmaaTop + 10;
+                return (
+                  <text key={i} x={xScale(i)} y={yPos}
+                    textAnchor="middle" fill="#E8943A" fontSize="9" fontFamily="DM Sans" fontWeight="600">
+                    +${d.irmaa.toLocaleString()}
+                  </text>
+                );
+              });
+            })()}
             <line x1={PAD.l} x2={W-PAD.r} y1={irmaaBottom} y2={irmaaBottom}
               stroke="rgba(196,106,106,.15)" strokeWidth="1"/>
           </g>
