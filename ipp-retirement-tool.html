@@ -203,7 +203,7 @@ function seededRandom(seed) {
   };
 }
 
-function runMonteCarlo(startBalance, annualWithdraw, years, trials=500, mean=0.065, inflation=0.028, ssIncome=0, fixedStreams=[], totalExpensesY1=0, ltcShockYear=-1, ltcShockAnnual=0, ltcShockDuration=0) {
+function runMonteCarlo(startBalance, annualWithdraw, years, trials=1000, mean=0.065, inflation=0.028, ssIncome=0, fixedStreams=[], totalExpensesY1=0, ltcShockYear=-1, ltcShockAnnual=0, ltcShockDuration=0) {
   let successes = 0;
   const stddev = 0.12;
   const streams = Array.isArray(fixedStreams)
@@ -4169,7 +4169,7 @@ function App() {
               IncomeArc™ and the retirement income architecture methodology contained herein are the <strong style={{color:'#DDD6C4'}}>exclusive proprietary property of Integrated Planning Partners and Jeffrey Faine, CLU, RICP®</strong>. This tool, its underlying logic, design, output, and methodology may not be copied, reproduced, distributed, reverse-engineered, or used in any form without the <strong style={{color:'#DDD6C4'}}>explicit written permission of Integrated Planning Partners and/or Jeffrey Faine</strong>. Unauthorized use constitutes misappropriation of proprietary intellectual property and may result in legal action. IncomeArc™ is a trademark of Integrated Planning Partners. © {new Date().getFullYear()} Integrated Planning Partners · Jeffrey Faine, CLU, RICP®. All rights reserved.
             </p>
             <p style={{fontSize:12,color:'#6E8299',lineHeight:1.7}}>
-              Projections are illustrative only and do not constitute financial, tax, or legal advice. Actual results will vary. RMD calculations use IRS Uniform Lifetime Table. IRMAA thresholds reflect 2025 Medicare brackets. Monte Carlo uses 500 trials with user-defined mean return and 12% standard deviation; expenses inflation-adjusted annually; SS income receives full inflation COLA each year; pension and annuity are fixed with no COLA.
+              Projections are illustrative only and do not constitute financial, tax, or legal advice. Actual results will vary. RMD calculations use IRS Uniform Lifetime Table. IRMAA thresholds reflect 2025 Medicare brackets. Monte Carlo uses 1,000 trials with user-defined mean return and 12% standard deviation; expenses inflation-adjusted annually; SS income receives full inflation COLA each year; pension and annuity are fixed with no COLA.
             </p>
           </div>
         </div>
