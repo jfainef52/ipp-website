@@ -3064,11 +3064,24 @@ function App() {
                 {inputs.rothConversionAmount > 0 && inputs.rothConversionAge > 0 && (()=>{
                   const amt = inputs.rothConversionAmount;
                   const financed = inputs.rothConversionFinanced || 0;
-                  // Use peak marginal rate from projection if available, else fallback to 30%
-                  const peakRate = peakMarginalRow ? (peakMarginalRow.allInMarginalRate || 0.30) : 0.30;
-                  const convTax = amt * peakRate;                          // tax on conversion at marginal rate
+                  // If conversion is pre-retirement, use household income as the AGI base for marginal rate.
+                  // If at/after retirement, use peak marginal rate from projection.
+                  let convRate;
+                  if (inputs.rothConversionAge < inputs.retireAge && inputs.currentHouseholdIncome > 0) {
+                    const brackets = inputs.filingStatus === 'mfj' ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025;
+                    const baseIncome = inputs.currentHouseholdIncome;
+                    // Find marginal bracket after stacking conversion on top of household income
+                    const totalIncome = baseIncome + amt;
+                    convRate = brackets.reduce((rate, b) => totalIncome > b.limit ? b.rate : rate, 0.10);
+                    // Add state rate
+                    const stateRate = STATE_TAX_DATA[inputs.stateCode]?.rate || 0;
+                    convRate = Math.min(convRate + stateRate, 0.99);
+                  } else {
+                    convRate = peakMarginalRow ? (peakMarginalRow.allInMarginalRate || 0.30) : 0.30;
+                  }
+                  const convTax = amt * convRate;                          // tax on conversion at marginal rate
                   const overageTax = Math.max(0, convTax - financed);     // unfinanced portion
-                  const grossOverage = overageTax > 0 ? overageTax / (1 - peakRate) : 0;
+                  const grossOverage = overageTax > 0 ? overageTax / (1 - convRate) : 0;
                   const totalIraReduction = amt + grossOverage;
                   return (
                     <div style={{background:'rgba(123,175,132,.05)',border:'1px solid rgba(123,175,132,.2)',borderRadius:7,padding:'10px 12px',marginBottom:6}}>
@@ -3079,7 +3092,7 @@ function App() {
                         <div>
                           <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:4}}>Overage Tax (est.)</div>
                           <div style={{fontSize:15,fontWeight:600,color:overageTax>0?'#C47A7A':'#4A9B7A',fontFamily:"'Cormorant Garamond',serif"}}>{overageTax>0?'$'+Math.round(grossOverage/1000)+'K gross-up':'None'}</div>
-                          <div style={{fontSize:11,color:'#8DAFC8',marginTop:2}}>{overageTax>0?`$${Math.round(overageTax/1000)}K tax ÷ (1 − ${Math.round(peakRate*100)}%) rate`:'Bank loan covers full tax liability'}</div>
+                          <div style={{fontSize:11,color:'#8DAFC8',marginTop:2}}>{overageTax>0?`$${Math.round(overageTax/1000)}K tax ÷ (1 − ${Math.round(convRate*100)}%) rate`:'Bank loan covers full tax liability'}</div>
                         </div>
                       </div>
                       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,paddingTop:8,borderTop:'1px solid rgba(123,175,132,.15)'}}>
@@ -3958,8 +3971,10 @@ function App() {
             const uninsuredFinal = yearsUninsured[yearsUninsured.length-1];
             const insuredFinal = yearsInsured[yearsInsured.length-1];
 
-            // Raw care cost (net expense, before tax friction)
-            const totalLtcCost = inputs.ltcMonthlyCost * 12 * inputs.ltcDuration;
+            // Care cost inflated to event age (matches what the simulation actually models)
+            const careInflRate = (inputs.ltcCareInflationRate != null ? inputs.ltcCareInflationRate : 4) / 100;
+            const careInflFactor = Math.pow(1 + careInflRate, inputs.ltcEventAge - inputs.retireAge);
+            const totalLtcCost = inputs.ltcMonthlyCost * 12 * careInflFactor * inputs.ltcDuration;
             const coveredAmt = totalLtcCost; // policy fully covers care cost (hardwired)
 
             // Gross-up tax actually incurred in the uninsured projection during LTC years
@@ -4130,7 +4145,10 @@ function App() {
           {showSpouseLtcComparison && yearsSpouseInsured && yearsSpouseUninsured && (() => {
             const ltcAge = inputs.spouseLtcEventAge;
             const ltcEnd = ltcAge + inputs.spouseLtcDuration;
-            const totalLtcCost = inputs.spouseLtcMonthlyCost * 12 * inputs.spouseLtcDuration;
+            // Care cost inflated to event age (matches what the simulation actually models)
+            const spCareInflRate = (inputs.ltcCareInflationRate != null ? inputs.ltcCareInflationRate : 4) / 100;
+            const spCareInflFactor = Math.pow(1 + spCareInflRate, inputs.spouseLtcEventAge - inputs.retireAge);
+            const totalLtcCost = inputs.spouseLtcMonthlyCost * 12 * spCareInflFactor * inputs.spouseLtcDuration;
 
             const uninsuredFinal = yearsSpouseUninsured[yearsSpouseUninsured.length-1];
             const insuredFinal   = yearsSpouseInsured[yearsSpouseInsured.length-1];
