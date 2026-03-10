@@ -2036,6 +2036,7 @@ function App() {
     nonQualAnnuityMonthly: 0, nonQualAnnuityStartAge: 65, nonQualAnnuityBasis: 0, nonQualAnnuityTotalValue: 0,
     partTimeMonthly: 0, partTimeEndAge: 68,
     fixedExpenses: 15000, lifestyleExpenses: 8500,
+    ltcEventEnabled: false,
     ltcEventAge: 0, ltcMonthlyCost: 7500, ltcDuration: 3, ltcShowComparison: false, ltcMonthlyBenefit: 7500, ltcBenefitDuration: 3,
     spouseLtcEventAge: 0, spouseLtcMonthlyCost: 7500, spouseLtcDuration: 3, spouseLtcMonthlyBenefit: 7500, spouseLtcBenefitDuration: 3, spouseLtcInsured: false,
     stateCode: 'IL', customStateRate: '', taxRateStressAdder: 0,
@@ -2067,8 +2068,10 @@ function App() {
   // When architecture is ON and the client has a policy, ltcInsured is used below in the
   // comparison projections. The main display always shows the uninsured reality so the
   // cost of NOT having coverage is visible in Status Quo mode.
-  const hasLtcEvent = inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
-  const hasSpouseLtcEvent = inputs.filingStatus === 'mfj' && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
+  // ltcEventEnabled gates ALL care event modeling. Inputs stay visible for pre-fill,
+  // but nothing hits the MC or projection until the advisor flips the toggle ON.
+  const hasLtcEvent = inputs.ltcEventEnabled && inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
+  const hasSpouseLtcEvent = inputs.ltcEventEnabled && inputs.filingStatus === 'mfj' && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
   const hasAnyLtcEvent = hasLtcEvent || hasSpouseLtcEvent;
   const { years, confidence, fixedStreams: _fs2, mcStartAge: _mc2 } = hasAnyLtcEvent
     ? projectArc({ ...baseProjectionInputs, ltcInsured: false, spouseLtcInsured: false })
@@ -3882,6 +3885,43 @@ function App() {
             </Section>
 
             <Section title="Healthcare Event" collapsed={sections.ltc} onToggle={()=>toggleSection('ltc')}>
+
+              {/* ── Healthcare Event Modeling Toggle ── */}
+              <div style={{
+                padding:'12px 14px', marginBottom:14,
+                background: inputs.ltcEventEnabled ? 'rgba(90,143,168,.10)' : 'rgba(255,255,255,.04)',
+                border: `1px solid ${inputs.ltcEventEnabled ? 'rgba(90,143,168,.45)' : 'rgba(255,255,255,.12)'}`,
+                borderRadius:8, transition:'all .2s',
+              }}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:700,color: inputs.ltcEventEnabled ? '#5B8FA8' : '#8DAFC8',letterSpacing:'.05em',textTransform:'uppercase',marginBottom:3}}>
+                      Model Healthcare Events
+                    </div>
+                    <div style={{fontSize:12,color:'#8DAFC8',lineHeight:1.5}}>
+                      {inputs.ltcEventEnabled
+                        ? 'Care events are active — chart, MC confidence, and comparison panels reflect the impact.'
+                        : 'Off — inputs can be pre-filled without affecting MC confidence or chart. Toggle on to show the client.'}
+                    </div>
+                  </div>
+                  <div
+                    onClick={()=>set('ltcEventEnabled', !inputs.ltcEventEnabled)}
+                    style={{
+                      width:44, height:24, borderRadius:12, cursor:'pointer', flexShrink:0,
+                      background: inputs.ltcEventEnabled ? '#5B8FA8' : 'rgba(255,255,255,.1)',
+                      position:'relative', transition:'background .2s',
+                      border: inputs.ltcEventEnabled ? '1px solid #5B8FA8' : '1px solid rgba(255,255,255,.15)',
+                    }}>
+                    <div style={{
+                      position:'absolute', top:3, left: inputs.ltcEventEnabled ? 22 : 3,
+                      width:16, height:16, borderRadius:8,
+                      background:'#F5F2EC', transition:'left .2s',
+                      boxShadow:'0 1px 3px rgba(0,0,0,.3)',
+                    }}/>
+                  </div>
+                </div>
+              </div>
+
               <div style={{padding:'10px 12px',background:'rgba(90,143,168,.06)',border:'1px solid rgba(90,143,168,.18)',borderRadius:7,marginBottom:12}}>
                 <div style={{fontSize:14,fontWeight:700,color:'#5B8FA8',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:5}}>Layer 2 — Healthcare Insulation</div>
                 <p style={{fontSize:13,color:'#DDD6C4',lineHeight:1.65}}>
@@ -4337,7 +4377,7 @@ function App() {
                   Income Arc — Age {inputs.retireAge} to {inputs.planToAge}
                 </h2>
                 <p style={{fontSize:13,color:'#8DAFC8'}}>
-                  After-tax net income by source · expense line overlay · {inputs.ltcEventAge > 0 ? 'healthcare event marked' : 'no healthcare event modeled'}
+                  After-tax net income by source · expense line overlay · {inputs.ltcEventEnabled && inputs.ltcEventAge > 0 ? 'healthcare event marked' : 'no healthcare event modeled'}
                 </p>
               </div>
               <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:10}}>
