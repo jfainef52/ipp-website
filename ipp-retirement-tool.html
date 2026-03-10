@@ -1954,6 +1954,7 @@ function App() {
     nonQualAnnuityMonthly: 0, nonQualAnnuityStartAge: 65, nonQualAnnuityBasis: 0, nonQualAnnuityTotalValue: 0,
     partTimeMonthly: 0, partTimeEndAge: 68,
     fixedExpenses: 15000, lifestyleExpenses: 8500,
+    ltcEventEnabled: false,
     ltcEventAge: 0, ltcMonthlyCost: 7500, ltcDuration: 3, ltcShowComparison: false, ltcMonthlyBenefit: 7500, ltcBenefitDuration: 3,
     spouseLtcEventAge: 0, spouseLtcMonthlyCost: 7500, spouseLtcDuration: 3, spouseLtcMonthlyBenefit: 7500, spouseLtcBenefitDuration: 3, spouseLtcInsured: false,
     stateCode: 'IL', customStateRate: '', taxRateStressAdder: 0,
@@ -1980,26 +1981,19 @@ function App() {
   // plan's fundamental strength (income, portfolio, architecture) without a care shock.
   const { years, confidence, fixedStreams, mcStartAge } = projectArc({ ...baseProjectionInputs, ltcInsured: false, ltcEventAge: 0 });
 
-  // Primary display projection — includes LTC event if entered (uninsured view)
-  // This is what the chart and number table show when architecture is OFF or no LTC comparison
-  const hasLtcEvent = inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
+  // Primary display projection — includes LTC event only when the healthcare toggle is ON
+  // ltcEventEnabled is a separate toggle from architectureEnabled — lets advisor show/hide
+  // the care event impact independently without turning architecture on or off.
+  const hasLtcEvent = inputs.ltcEventEnabled && inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
   const { years: yearsWithLtc } = hasLtcEvent
     ? projectArc({ ...baseProjectionInputs, ltcInsured: false })
     : { years: years };
 
-  // LTC comparison projections — only when architecture is enabled and LTC inputs are set.
-  // IMPORTANT: both projections zero out ltcNetAmount/spouseLtcNetAmount so the funding draw
-  // does not distort the comparison. We are isolating the care event shock impact only.
-  // confidenceUninsured = plan survival WITH care event, NO Layer 2, and NO Layers 1/3
-  //   → stripArchLayersFromMC:true removes Roth annuity and ETA from the uninsured MC
-  //     so the score represents the honest naked plan: SS + pension + portfolio only.
-  //     Without this, Layer 1/3 income offsets the care shock and produces a paradox
-  //     where the uninsured panel shows HIGHER confidence than the overall score.
-  // confidenceInsured = plan survival WITH care event and all IncomeArc layers active
-  //   → stripArchLayersFromMC:false (default) — full architecture included
+  // LTC comparison projections — only when architecture is enabled, healthcare toggle is ON,
+  // and LTC inputs are set.
   const ltcCompareBase = { ...baseProjectionInputs, ltcNetAmount: 0, spouseLtcNetAmount: 0 };
   const isMarried = inputs.filingStatus === 'mfj';
-  const showLtcComparison = inputs.architectureEnabled && inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
+  const showLtcComparison = inputs.ltcEventEnabled && inputs.architectureEnabled && inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
   const { years: yearsUninsured, confidence: confidenceUninsured } = showLtcComparison
     ? projectArc({ ...ltcCompareBase, ltcInsured: false, stripArchLayersFromMC: true })
     : { years: null, confidence: null };
@@ -2007,8 +2001,8 @@ function App() {
     ? projectArc({ ...ltcCompareBase, ltcInsured: true })
     : { years: null, confidence: null };
 
-  // Spouse LTC comparison — only when MFJ and spouse LTC entered
-  const showSpouseLtcComparison = inputs.architectureEnabled && isMarried && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
+  // Spouse LTC comparison — only when MFJ, healthcare toggle ON, and spouse LTC entered
+  const showSpouseLtcComparison = inputs.ltcEventEnabled && inputs.architectureEnabled && isMarried && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
   const { years: yearsSpouseUninsured, confidence: confidenceSpouseUninsured } = showSpouseLtcComparison
     ? projectArc({ ...ltcCompareBase, spouseLtcInsured: false, stripArchLayersFromMC: true })
     : { years: null, confidence: null };
@@ -3249,6 +3243,20 @@ function App() {
             </Section>
 
             <Section title="Healthcare Event" collapsed={sections.ltc} onToggle={()=>toggleSection('ltc')}>
+              {/* ── Healthcare Events Master Toggle ── */}
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 12px',background: inputs.ltcEventEnabled ? 'rgba(90,143,168,.1)' : 'rgba(255,255,255,.03)',border:`1px solid ${inputs.ltcEventEnabled ? 'rgba(90,143,168,.35)' : 'rgba(255,255,255,.08)'}`,borderRadius:8,marginBottom:12,cursor:'pointer'}} onClick={()=>set('ltcEventEnabled',!inputs.ltcEventEnabled)}>
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,letterSpacing:'.1em',textTransform:'uppercase',color: inputs.ltcEventEnabled ? '#5B8FA8' : '#6B8FA8',marginBottom:3}}>MODEL HEALTHCARE EVENTS</div>
+                  <div style={{fontSize:12,color: inputs.ltcEventEnabled ? '#DDD6C4' : '#5A7A8A',lineHeight:1.4}}>
+                    {inputs.ltcEventEnabled
+                      ? 'Care events are active — chart, MC confidence, and comparison panels reflect the impact'
+                      : 'Toggle on to model care event impact on the projection'}
+                  </div>
+                </div>
+                <div style={{flexShrink:0,marginLeft:12,width:38,height:22,borderRadius:11,background: inputs.ltcEventEnabled ? '#5B8FA8' : 'rgba(255,255,255,.1)',border:`1px solid ${inputs.ltcEventEnabled ? '#5B8FA8' : 'rgba(255,255,255,.15)'}`,position:'relative',transition:'background .2s'}}>
+                  <div style={{position:'absolute',top:2,left: inputs.ltcEventEnabled ? 17 : 2,width:16,height:16,borderRadius:'50%',background:'#fff',transition:'left .2s',boxShadow:'0 1px 3px rgba(0,0,0,.3)'}}/>
+                </div>
+              </div>
               <div style={{padding:'10px 12px',background:'rgba(90,143,168,.06)',border:'1px solid rgba(90,143,168,.18)',borderRadius:7,marginBottom:12}}>
                 <div style={{fontSize:14,fontWeight:700,color:'#5B8FA8',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:5}}>Layer 2 — Healthcare Insulation</div>
                 <p style={{fontSize:13,color:'#DDD6C4',lineHeight:1.65}}>
@@ -3260,6 +3268,7 @@ function App() {
               </div>
 
               {/* ── Primary Health Event ── */}
+              {inputs.ltcEventEnabled && <>
               <div style={{fontSize:13,fontWeight:700,color:'#9EB8CC',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8}}>
                 {inputs.filingStatus === 'mfj' ? 'Primary' : 'Care Event'}
               </div>
@@ -3430,6 +3439,7 @@ function App() {
                     </p>
                   </div>
                 </>}
+              </>}
               </>}
             </Section>
 
