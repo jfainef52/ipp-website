@@ -123,6 +123,7 @@ const COLORS = {
   parttime:  { fill: '#6E9BC8', label: 'Part-Time Income',    tax: 'ordinary'   },
   eta:       { fill: '#A8C5D8', label: 'ETA Policy Loan (Layer 3)', tax: 'free'  },
   fedtax:    { fill: '#7A4A4A', label: 'Federal Tax',         tax: null         },
+  statetax:  { fill: '#8A5A3A', label: 'State Tax',           tax: null         },
   expense:   { fill: 'rgba(196,106,106,.25)', label: 'Expenses', tax: null      },
 };
 
@@ -963,6 +964,12 @@ function projectArc(inputs) {
 
     row.totalExpense = expenses;
 
+    // totalExpenseGross = full expense burden including insurance-covered care costs.
+    // Used for the chart expense line so care event years display true cost visually.
+    // The portfolio math still uses totalExpense (only uncovered amounts drive draws).
+    const grossCareAdded = (row.ltcCoverage || 0) + (row.spouseLtcCoverage || 0);
+    row.totalExpenseGross = expenses + grossCareAdded;
+
     // Gap uses only spendable income — purpose-driven events (ETA funding, Roth conversion,
     // LTC policy premium draw) are non-spendable IRA distributions that go directly to
     // the policy/conversion, not into the client's pocket to pay living expenses.
@@ -1644,8 +1651,8 @@ function ArcChart({ data, view, insuredData, uninsuredData, sorrEnabled }) {
   if (!data || data.length === 0) return null;
 
   const maxVal = Math.max(...data.map(d => Math.max(
-    (d.grossTotalIncome || d.totalIncome) + (d.federalTax || 0),
-    d.totalExpense
+    (d.grossTotalIncome || d.totalIncome) + (d.federalTax || 0) + (d.stateTax || 0),
+    d.totalExpenseGross ?? d.totalExpense
   ))) * 1.1;
   const barW = Math.max(4, Math.floor(chartW / data.length) - 2);
 
@@ -1654,11 +1661,11 @@ function ArcChart({ data, view, insuredData, uninsuredData, sorrEnabled }) {
 
   // Build expense line path
   const expensePath = data.map((d, i) =>
-    `${i === 0 ? 'M' : 'L'} ${xScale(i).toFixed(1)} ${yScale(d.totalExpense).toFixed(1)}`
+    `${i === 0 ? 'M' : 'L'} ${xScale(i).toFixed(1)} ${yScale(d.totalExpenseGross ?? d.totalExpense).toFixed(1)}`
   ).join(' ');
 
-  // Source keys in stack order — fedtax on top so gross income bars reach expense line
-  const sourceKeys = ['ss','pension','annuity','parttime','roth','eta','taxable','rmd','fedtax'];
+  // Source keys in stack order — fedtax + statetax on top so gross income bars reach expense line
+  const sourceKeys = ['ss','pension','annuity','parttime','roth','eta','taxable','rmd','fedtax','statetax'];
 
   const fmt = v => v >= 1000000 ? `$${(v/1000000).toFixed(1)}M` : v >= 1000 ? `$${Math.round(v/1000)}K` : `$${Math.round(v)}`;
 
@@ -1701,9 +1708,11 @@ function ArcChart({ data, view, insuredData, uninsuredData, sorrEnabled }) {
         return (
           <g key={i}>
             {sourceKeys.map(k => {
-              // fedtax pulls from federalTax field, not sources
+              // tax segments pull from dedicated fields, not sources
               const v = k === 'fedtax'
                 ? (d.federalTax || 0)
+                : k === 'statetax'
+                ? (d.stateTax || 0)
                 : (d.grossSources && d.grossSources[k]) || d.sources[k] || 0;
               if (v <= 0) return null;
               const barH = (v / maxVal) * chartH;
@@ -2195,6 +2204,12 @@ function Legend({ insuredData }) {
         <div style={{width:14,height:10,borderRadius:2,background:'#7A4A4A',opacity:.85,flexShrink:0}}/>
         <span style={{fontSize:13,color:'#9EB8CC'}}>Federal Tax</span>
       </div>
+      {insuredData && insuredData.some(d => (d.stateTax||0) > 0) && (
+        <div style={{display:'flex',alignItems:'center',gap:5}}>
+          <div style={{width:14,height:10,borderRadius:2,background:'#8A5A3A',opacity:.85,flexShrink:0}}/>
+          <span style={{fontSize:13,color:'#9EB8CC'}}>State Tax</span>
+        </div>
+      )}
       <div style={{display:'flex',alignItems:'center',gap:5}}>
         <div style={{width:10,height:10,borderRadius:2,background:'#E8943A',opacity:.7,flexShrink:0}}/>
         <span style={{fontSize:13,color:'#9EB8CC'}}>IRMAA Surcharge</span>
@@ -4379,26 +4394,11 @@ function App() {
             //   - row.totalExpense includes living expenses + LTC cost
             //   - Income surplus after living expenses = spendableIncome - (totalExpense - ltcUncovered)
             //   - That surplus (if any) absorbs part of the LTC cost before portfolio is touched
-            // "Covered by Income" = organic income surplus (SS + pension + RMDs, excluding ETA loan)
-            // that absorbs LTC cost before portfolio is touched. ETA excluded — it is a structured
-            // policy draw, not regular income surplus, and including it overstates organic coverage.
-            const annualBenefit = (inputs.ltcMonthlyBenefit || inputs.ltcMonthlyCost) * 12;
-            const totalBenefit = annualBenefit * inputs.ltcDuration;
-            const benefitGap = Math.max(0, totalLtcCost - totalBenefit);
-            const incomeOffset = yearsUninsured
-              .filter(r => r.age >= ltcAge && r.age < ltcEnd)
-              .reduce((sum, r) => {
-                const livingExpenses = (r.totalExpense || 0) - (r.ltcUncovered || 0);
-                const incomeExEta = (r.spendableIncome || 0) - (r.sources && r.sources.eta || 0);
-                const surplusAfterLiving = Math.max(0, incomeExEta - livingExpenses);
-                return sum + Math.min(surplusAfterLiving, r.ltcUncovered || 0);
-              }, 0);
-            // Forced portfolio draws = gross IRA/taxable drawn during LTC years (uninsured scenario)
+            // Layer 2 (Living Benefits IUL) accelerates the death benefit to cover actual care cost —
+            // not a fixed daily benefit. Policy fully covers the inflated care cost.
             const extraGrossDraws = yearsUninsured
               .filter(r => r.age >= ltcAge && r.age < ltcEnd)
               .reduce((sum, r) => sum + (r.ltcPortfolioDraw || 0), 0);
-            const showBenefitCard = totalBenefit > 0;
-            // Identity: forcedDraws + grossUpTax + compounding = portfolioDiff
             const compoundingLoss = Math.max(0, portfolioDiff - extraGrossDraws - grossUpTaxTotal);
 
             const fmtD = v => v >= 1000000 ? `$${(v/1000000).toFixed(2)}M` : `$${Math.round(v/1000)}K`;
@@ -4415,10 +4415,8 @@ function App() {
                 <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:10,marginBottom:14}}>
                   {[
                     { label:'Total Care Cost', value: fmtD(totalLtcCost), sub:'Full cost if uninsured', color:'#C47A7A' },
-                    showBenefitCard
-                      ? { label:'Layer 2 Benefit', value: fmtD(totalBenefit), sub: benefitGap > 0 ? `$${Math.round(benefitGap/1000)}K gap remains` : 'Fully covers care cost', color:'#4A9B7A' }
-                      : { label:'Covered by Income', value: incomeOffset > 0 ? fmtD(incomeOffset) : '—', sub:'Income surplus after living expenses (e.g. RMDs exceeding bills)', color:'#8DAFC8' },
-                    { label:'Forced Portfolio Draws', value: extraGrossDraws > 0 ? fmtD(extraGrossDraws) : '—', sub: showBenefitCard && benefitGap === 0 ? 'None — policy absorbs all' : 'Gross IRA/taxable drawn above income', color: extraGrossDraws > 0 ? '#C47A7A' : '#4A9B7A' },
+                    { label:'Layer 2 Benefit', value: fmtD(totalLtcCost), sub:'Fully covers care cost', color:'#4A9B7A' },
+                    { label:'Forced Portfolio Draws', value: extraGrossDraws > 0 ? fmtD(extraGrossDraws) : '—', sub: extraGrossDraws === 0 ? 'None — policy absorbs all' : 'Gross IRA/taxable drawn above income', color: extraGrossDraws > 0 ? '#C47A7A' : '#4A9B7A' },
                     { label:'Gross-Up Tax Cost', value: grossUpTaxTotal > 0 ? fmtD(grossUpTaxTotal) : '—', sub: grossUpTaxTotal > 0 ? 'Extra tax on forced IRA draws' : 'None — no forced IRA draws', color: grossUpTaxTotal > 0 ? '#C47A7A' : '#4A9B7A' },
                     { label:'Portfolio Preserved', value: fmtD(portfolioDiff), sub:`Net care cost compounded to plan age — legacy capital protected`, color: portfolioDiff > 0 ? '#4A9B7A' : '#C47A7A' },
                   ].map(s => (
@@ -4621,6 +4619,75 @@ function App() {
                     </div>
                   );
                 })()}
+              </div>
+            );
+          })()}
+
+          {/* Combined Portfolio Preserved Summary — only when both events active */}
+          {yearsWithLtc && inputs.ltcEventAge > 0 && inputs.spouseLtcEventAge > 0 && showSpouseLtcComparison && (() => {
+            const portReturn = (inputs.portfolioReturn != null ? inputs.portfolioReturn : 6.5) / 100;
+            const fmt2 = v => v >= 1000000 ? `$${(v/1000000).toFixed(2)}M` : `$${Math.round(v/1000)}K`;
+
+            // Primary preserved
+            const pInfl = Math.pow(1 + (inputs.ltcCareInflationRate||4)/100, inputs.ltcEventAge - inputs.retireAge);
+            const pAnnual = inputs.ltcMonthlyCost * 12 * pInfl;
+            const primaryPreserved = Array.from({length: inputs.ltcDuration}, (_, i) => {
+              return pAnnual * Math.pow(1 + portReturn, inputs.planToAge - (inputs.ltcEventAge + i));
+            }).reduce((s,v) => s+v, 0);
+
+            // Spouse preserved
+            const sInfl = Math.pow(1 + (inputs.ltcCareInflationRate||4)/100, inputs.spouseLtcEventAge - inputs.retireAge);
+            const sAnnual = inputs.spouseLtcMonthlyCost * 12 * sInfl;
+            const spousePreserved = Array.from({length: inputs.spouseLtcDuration}, (_, i) => {
+              return sAnnual * Math.pow(1 + portReturn, inputs.planToAge - (inputs.spouseLtcEventAge + i));
+            }).reduce((s,v) => s+v, 0);
+
+            const totalPreserved = primaryPreserved + spousePreserved;
+            const primaryName = inputs.clientName || 'Primary';
+            const spouseName = inputs.spouseName || 'Spouse';
+
+            // Estimate total premium investment (both policies)
+            const primaryNet = inputs.ltcNetAmount || 0;
+            const spouseNet  = inputs.spouseLtcNetAmount || 0;
+            const totalInvestment = primaryNet + spouseNet;
+
+            return (
+              <div style={{background:'linear-gradient(135deg,rgba(74,155,122,.08),rgba(74,155,122,.03))',border:'2px solid rgba(74,155,122,.35)',borderRadius:14,padding:'22px 24px',marginBottom:16}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:18}}>
+                  <div>
+                    <div style={{fontSize:11,fontWeight:700,letterSpacing:'.18em',textTransform:'uppercase',color:'#4A9B7A',marginBottom:4}}>
+                      Combined Layer 2 Impact — Both Healthcare Events
+                    </div>
+                    <div style={{fontSize:13,color:'#8DAFC8'}}>
+                      {primaryName} (age {inputs.ltcEventAge}, {inputs.ltcDuration} yr) + {spouseName} (age {inputs.spouseLtcEventAge}, {inputs.spouseLtcDuration} yr) · compounded to age {inputs.planToAge} @ {inputs.portfolioReturn ?? 6.5}%
+                    </div>
+                  </div>
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:14,marginBottom:18}}>
+                  {[
+                    { label:`${primaryName} Preserved`, value: fmt2(primaryPreserved), sub:`${inputs.ltcDuration} yr event · age ${inputs.ltcEventAge}`, color:'#4A9B7A' },
+                    { label:`${spouseName} Preserved`,  value: fmt2(spousePreserved),  sub:`${inputs.spouseLtcDuration} yr event · age ${inputs.spouseLtcEventAge}`, color:'#4A9B7A' },
+                    { label:'Total Portfolio Preserved', value: fmt2(totalPreserved), sub:'Legacy capital protected for heirs', color:'#7BAF84' },
+                    totalInvestment > 0
+                      ? { label:'Total Policy Investment', value: fmt2(totalInvestment), sub:'Not use-it-or-lose-it — builds cash value', color:'#C8A030' }
+                      : { label:'Policy Type', value: 'Living Benefits IUL', sub:'Not use-it-or-lose-it — builds cash value', color:'#C8A030' },
+                  ].map(s => (
+                    <div key={s.label} style={{background:'rgba(255,255,255,.04)',borderRadius:10,padding:'14px 16px',border:'1px solid rgba(255,255,255,.08)'}}>
+                      <div style={{fontSize:11,color:'#8DAFC8',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:6}}>{s.label}</div>
+                      <div style={{fontSize:22,fontWeight:700,color:s.color,fontFamily:"'Cormorant Garamond',serif",marginBottom:4}}>{s.value}</div>
+                      <div style={{fontSize:12,color:'#8DAFC8'}}>{s.sub}</div>
+                    </div>
+                  ))}
+                </div>
+                {totalInvestment > 0 && (
+                  <div style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:'#DDD6C4',background:'rgba(74,155,122,.06)',borderRadius:8,padding:'10px 14px',border:'1px solid rgba(74,155,122,.15)'}}>
+                    <span style={{color:'#4A9B7A',fontSize:16}}>◆</span>
+                    <span>
+                      A <strong style={{color:'#C8A030'}}>{fmt2(totalInvestment)}</strong> investment in two Living Benefits IUL policies protects <strong style={{color:'#4A9B7A'}}>{fmt2(totalPreserved)}</strong> in legacy capital — 
+                      and unlike traditional LTC insurance, if care is never needed, the policy delivers tax-free retirement income and a tax-free death benefit.
+                    </span>
+                  </div>
+                )}
               </div>
             );
           })()}
