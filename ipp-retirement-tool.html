@@ -1245,7 +1245,10 @@ function projectArc(inputs) {
     // Portfolio snapshot
     row.totalPortfolio = trad + roth + taxable + spouseTrad;
     row.trad = trad; row.roth = roth; row.taxable = taxable; row.spouseTrad = spouseTrad;
-    row.portfolioYield = portfolioStartOfYear * yearReturn; // dollar return earned this year
+    // Actual dollar return = end portfolio - start portfolio + net withdrawals taken this year
+    // This correctly reflects growth on post-draw balances, not the inflated pre-draw base.
+    const netWithdrawals = (row.sources.rmd || 0) + (row.sources.roth || 0) + (row.sources.taxable || 0);
+    row.portfolioYield = row.totalPortfolio - portfolioStartOfYear + netWithdrawals;
 
     // IRMAA MAGI — only taxable sources count. Tax-free sources (Roth, ETA policy loans,
     // LTC benefit proceeds, Roth annuity) are explicitly excluded — they do not appear
@@ -1448,15 +1451,15 @@ function projectArc(inputs) {
     fixedStreams.push({ yearOffset: offset, annual: archEtaAnnualIncome });
   }
 
-  // LTC shock for Monte Carlo: the actual gross portfolio draws made during care years
-  // (tracked as ltcPortfolioDraw in each row) plus the gross-up tax friction.
-  // Using ltcPortfolioDraw is correct because it captures what was truly pulled from the
-  // portfolio — it's zero when income surplus fully absorbed the care cost, and reflects
-  // the actual IRA/taxable gross draws when a portfolio withdrawal was required.
+  // LTC shock for Monte Carlo — use the projected annual care cost (inflated to event age)
+  // rather than the actual portfolio draw from the deterministic rows. The portfolio draw
+  // varies with SORR (depleted portfolio → larger forced draws) which would bleed SORR
+  // into the MC score. The care cost itself is SORR-independent.
   const ltcShockYear = (ltcEventAge > 0 && !ltcInsured) ? ltcEventAge - retireAge : -1;
-  const ltcShockAnnual = (ltcShockYear >= 0 && ltcDuration > 0)
-    ? years.filter(r => r.age >= ltcEventAge && r.age < ltcEventAge + ltcDuration)
-           .reduce((sum, r) => sum + (r.ltcPortfolioDraw || 0) + (r.ltcGrossUpTax || 0), 0) / ltcDuration
+  const careInflRateForMC = ltcCareInflationRate != null ? ltcCareInflationRate : inflation;
+  const careInflFactorForMC = Math.pow(1 + careInflRateForMC, ltcEventAge - retireAge);
+  const ltcShockAnnual = ltcShockYear >= 0
+    ? ltcMonthlyCost * 12 * careInflFactorForMC
     : 0;
 
   const confidence = runMonteCarlo(
@@ -2194,6 +2197,11 @@ function App() {
   const avgEffectiveRate = years.length > 0
     ? years.reduce((sum, y) => sum + (y.effectiveTaxRate||0), 0) / years.length
     : 0;
+
+  // Portfolio exhaustion — find first year portfolio hits zero (or effectively zero < $1K)
+  const exhaustionYear = yearsWithLtc.find(y => y.totalPortfolio < 1000);
+  const portfolioExhausted = !!exhaustionYear;
+  const exhaustionAge = exhaustionYear ? exhaustionYear.age : null;
 
   // Lifetime income summaries (retirement years only)
   const retirementYears = years.filter(y => y.age >= inputs.retireAge);
@@ -3767,12 +3775,27 @@ function App() {
           )}
 
           {/* Key stats row */}
+          {/* ── Portfolio Exhaustion Warning ── */}
+          {portfolioExhausted && (
+            <div style={{marginBottom:16,padding:'14px 18px',background:'rgba(196,106,106,.12)',border:'2px solid rgba(196,106,106,.5)',borderRadius:10,display:'flex',alignItems:'center',gap:14}}>
+              <div style={{fontSize:22}}>⚠️</div>
+              <div>
+                <div style={{fontSize:13,fontWeight:700,color:'#E87A7A',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:3}}>
+                  Portfolio Depleted Before Plan End
+                </div>
+                <div style={{fontSize:13,color:'#DDD6C4',lineHeight:1.5}}>
+                  Under these assumptions, the portfolio runs to <strong style={{color:'#E87A7A'}}>$0 at age {exhaustionAge}</strong> — {inputs.planToAge - exhaustionAge} year{inputs.planToAge - exhaustionAge !== 1 ? 's' : ''} short of the plan-to age of {inputs.planToAge}. The confidence score reflects this shortfall. Consider reducing expenses, increasing guaranteed income, or adding architecture layers.
+                </div>
+              </div>
+            </div>
+          )}
+
           <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:20}}>
             {[
               { label:'Portfolio at Retirement', value: fmtM(totalPortfolioAtRetire), sub:'Starting balance', color:'#C8A96E' },
               { label:'Guaranteed Income', value: guaranteedPct+'%', sub: `SS · pension · annuity (age ${inputs.retireAge}–${inputs.planToAge})`, color: guaranteedPct>=50?'#4A9B7A':'#C8A030' },
               { label:'Total IRMAA Exposure', value: totalIrmaa>0?'$'+Math.round(totalIrmaa/1000)+'K':'None', sub: isMarried ? 'Est. surcharges (MFJ brackets)' : 'Est. Medicare surcharges', color: totalIrmaa>0?'#E8943A':'#4A9B7A' },
-              { label:'Portfolio at Age 90', value: age90Data?fmtM(age90Data.totalPortfolio):'—', sub:'Est. remaining balance', color: age90Data&&age90Data.totalPortfolio>0?'#7BAF84':'#C47A7A' },
+              { label:'Portfolio at Age 90', value: age90Data?fmtM(age90Data.totalPortfolio):'—', sub: portfolioExhausted && exhaustionAge <= 90 ? `⚠ Depleted at age ${exhaustionAge}` : portfolioExhausted ? `⚠ Depletes at age ${exhaustionAge}` : 'Est. remaining balance', color: (portfolioExhausted && exhaustionAge <= 90) ? '#C47A7A' : age90Data&&age90Data.totalPortfolio>0?'#7BAF84':'#C47A7A' },
               { label:'Est. Lifetime Tax', value: totalEstTax>0?(totalEstTax>=1000000?'$'+(totalEstTax/1000000).toFixed(1)+'M':'$'+Math.round(totalEstTax/1000)+'K'):'—', sub:'Fed '+(totalFedTax>=1000000?'$'+(totalFedTax/1000000).toFixed(1)+'M':'$'+Math.round(totalFedTax/1000)+'K')+' · State '+(totalStateTax>=1000000?'$'+(totalStateTax/1000000).toFixed(1)+'M':'$'+Math.round(totalStateTax/1000)+'K')+(inputs.taxRateStressAdder>0?' · ⚠ stress +'+inputs.taxRateStressAdder+'%':''), color:'#C47A7A' },
               { label:'Total Gross Income', value: totalGrossIncome>=1000000?'$'+(totalGrossIncome/1000000).toFixed(1)+'M':'$'+Math.round(totalGrossIncome/1000)+'K', sub:`All sources · age ${inputs.retireAge}–${inputs.planToAge}`, color:'#C8A96E' },
               { label:'Total Net Income', value: totalNetIncome>=1000000?'$'+(totalNetIncome/1000000).toFixed(1)+'M':'$'+Math.round(totalNetIncome/1000)+'K', sub:'After fed · state · IRMAA', color:'#7BAF84' },
