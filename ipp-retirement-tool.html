@@ -203,7 +203,7 @@ function seededRandom(seed) {
   };
 }
 
-function runMonteCarlo(startBalance, annualWithdraw, years, trials=500, mean=0.065, inflation=0.028, ssIncome=0, fixedStreams=[], totalExpensesY1=0, ltcShockYear=-1, ltcShockAnnual=0, ltcShockDuration=0, expShockAnnual=0, expShockFreq=0) {
+function runMonteCarlo(startBalance, annualWithdraw, years, trials=500, mean=0.065, inflation=0.028, ssIncome=0, fixedStreams=[], totalExpensesY1=0, ltcShockYear=-1, ltcShockAnnual=0, ltcShockDuration=0, expShockAnnual=0, expShockFreq=0, spouseLtcShockYear=-1, spouseLtcShockAnnual=0, spouseLtcShockDuration=0) {
   let successes = 0;
   const stddev = 0.12;
   const streams = Array.isArray(fixedStreams)
@@ -219,6 +219,8 @@ function runMonteCarlo(startBalance, annualWithdraw, years, trials=500, mean=0.0
     + (totalExpensesY1 * 0.007)
     + (ltcShockAnnual * 0.0013)
     + (ltcShockYear * 333)
+    + (spouseLtcShockAnnual * 0.0011)
+    + (spouseLtcShockYear * 317)
     + streams.reduce((a, s) => a + s.annual * 0.003 + s.yearOffset * 17, 0)
   ) ^ 0xDEADBEEF;
   const rand = seededRandom(seedVal);
@@ -249,11 +251,14 @@ function runMonteCarlo(startBalance, annualWithdraw, years, trials=500, mean=0.0
       // LTC shock: grossed-up portfolio draw during uninsured care years
       const ltcShock = (ltcShockYear >= 0 && y >= ltcShockYear && y < ltcShockYear + ltcShockDuration)
         ? ltcShockAnnual : 0;
+      // Spouse LTC shock: independent care event at a different age
+      const spouseLtcShock = (spouseLtcShockYear >= 0 && y >= spouseLtcShockYear && y < spouseLtcShockYear + spouseLtcShockDuration)
+        ? spouseLtcShockAnnual : 0;
       // Expense shock: guaranteed income surplus absorbs what it can; remainder hits portfolio
       const rawShock = shockYearsThisTrial.has(y) ? expShockAnnual * inflFactor : 0;
       const guaranteedSurplus = Math.max(0, ssThisYear + fixedThisYear - expensesThisYear);
       const expShock = Math.max(0, rawShock - guaranteedSurplus);
-      bal = bal * (1 + r) - netDraw - ltcShock - expShock;
+      bal = bal * (1 + r) - netDraw - ltcShock - spouseLtcShock - expShock;
       if (bal <= 0) { failed = true; break; }
     }
     if (!failed) successes++;
@@ -1479,16 +1484,28 @@ function projectArc(inputs) {
     fixedStreams.push({ yearOffset: offset, annual: archEtaAnnualIncome });
   }
 
-  // LTC shock for Monte Carlo — use the projected annual care cost (inflated to event age)
+  // LTC shocks for Monte Carlo — use the projected annual care cost (inflated to event age)
   // rather than the actual portfolio draw from the deterministic rows. The portfolio draw
   // varies with SORR (depleted portfolio → larger forced draws) which would bleed SORR
   // into the MC score. The care cost itself is SORR-independent.
-  const ltcShockYear = (ltcEventAge > 0 && !ltcInsured) ? ltcEventAge - retireAge : -1;
+  // When insured (Architecture ON), the insurance pool absorbs the cost — no portfolio shock.
   const careInflRateForMC = ltcCareInflationRate != null ? ltcCareInflationRate : inflation;
-  const careInflFactorForMC = Math.pow(1 + careInflRateForMC, ltcEventAge - retireAge);
+
+  // Primary LTC shock
+  const ltcShockYear = (ltcEventAge > 0 && !ltcInsured) ? ltcEventAge - retireAge : -1;
+  const careInflFactorForMC = Math.pow(1 + careInflRateForMC, ltcEventAge > 0 ? ltcEventAge - retireAge : 0);
   const ltcShockAnnual = ltcShockYear >= 0
     ? ltcMonthlyCost * 12 * careInflFactorForMC
     : 0;
+
+  // Spouse LTC shock — independent event, separate age and duration
+  const spouseLtcShockYear = (spouseLtcEventAge > 0 && !spouseLtcInsured) ? spouseLtcEventAge - retireAge : -1;
+  const spCareInflFactorForMC = Math.pow(1 + careInflRateForMC, spouseLtcEventAge > 0 ? spouseLtcEventAge - retireAge : 0);
+  const spouseLtcMonthlyCostMC = spouseLtcMonthlyCost || 0;
+  const spouseLtcShockAnnual = spouseLtcShockYear >= 0
+    ? spouseLtcMonthlyCostMC * 12 * spCareInflFactorForMC
+    : 0;
+  const spouseLtcShockDuration = spouseLtcDuration || 0;
 
   const confidence = runMonteCarlo(
     mcStartBalance,
@@ -1504,7 +1521,10 @@ function projectArc(inputs) {
     ltcShockAnnual,
     ltcDuration,
     expenseShockEnabled ? expenseShockAmount : 0,
-    expenseShockEnabled ? expenseShockFrequency : 0
+    expenseShockEnabled ? expenseShockFrequency : 0,
+    spouseLtcShockYear,
+    spouseLtcShockAnnual,
+    spouseLtcShockDuration
   );
 
   return { years, confidence, fixedStreams, mcStartAge };
