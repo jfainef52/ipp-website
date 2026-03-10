@@ -117,7 +117,7 @@ const COLORS = {
   ss:        { fill: '#4A9B7A', label: 'Social Security',     tax: 'partial'    },
   pension:   { fill: '#5B8FA8', label: 'Pension',             tax: 'ordinary'   },
   rmd:       { fill: '#C47A7A', label: 'Traditional QP (incl. RMD)', tax: 'ordinary' },
-  roth:      { fill: '#D48B3A', label: 'Roth / Tax-Free (L1 + IRA)',  tax: 'free'       },
+  roth:      { fill: '#7BAF84', label: 'Roth / Tax-Free (L1 + IRA)',  tax: 'free'       },
   taxable:   { fill: '#C8A030', label: 'Taxable Portfolio',   tax: 'favorable'  },
   annuity:   { fill: '#9B7EC8', label: 'Non-Qual Annuity (Gain)', tax: 'partial' },
   parttime:  { fill: '#6E9BC8', label: 'Part-Time Income',    tax: 'ordinary'   },
@@ -203,7 +203,7 @@ function seededRandom(seed) {
   };
 }
 
-function runMonteCarlo(startBalance, annualWithdraw, years, trials=1000, mean=0.065, inflation=0.028, ssIncome=0, fixedStreams=[], totalExpensesY1=0, ltcShockYear=-1, ltcShockAnnual=0, ltcShockDuration=0, expShockAnnual=0, expShockFreq=0, spLtcShockYear=-1, spLtcShockAnnual=0, spLtcShockDuration=0) {
+function runMonteCarlo(startBalance, annualWithdraw, years, trials=500, mean=0.065, inflation=0.028, ssIncome=0, fixedStreams=[], totalExpensesY1=0, ltcShockYear=-1, ltcShockAnnual=0, ltcShockDuration=0) {
   let successes = 0;
   const stddev = 0.12;
   const streams = Array.isArray(fixedStreams)
@@ -220,10 +220,6 @@ function runMonteCarlo(startBalance, annualWithdraw, years, trials=1000, mean=0.
     + (totalExpensesY1 * 0.007)
     + (ltcShockAnnual * 0.0013)
     + (ltcShockYear * 333)
-    + (expShockAnnual * 0.0019)
-    + (expShockFreq * 57)
-    + (spLtcShockAnnual * 0.0017)
-    + (spLtcShockYear * 251)
     + streams.reduce((a, s) => a + s.annual * 0.003 + s.yearOffset * 17, 0)
   ) ^ 0xDEADBEEF;
   const rand = seededRandom(seedVal);
@@ -231,15 +227,6 @@ function runMonteCarlo(startBalance, annualWithdraw, years, trials=1000, mean=0.
   for (let t = 0; t < trials; t++) {
     let bal = startBalance;
     let failed = false;
-    // Randomized shock timing: jitter each shock around its expected interval per trial
-    const shockYearsThisTrial = new Set();
-    if (expShockAnnual > 0 && expShockFreq > 0) {
-      for (let y = expShockFreq; y < years; y += expShockFreq) {
-        const jitter = Math.floor(rand() * expShockFreq) - Math.floor(expShockFreq / 2);
-        const shockY = Math.max(1, Math.min(years - 1, Math.round(y + jitter)));
-        shockYearsThisTrial.add(shockY);
-      }
-    }
     for (let y = 0; y < years; y++) {
       const r = mean + stddev * (Math.sqrt(-2*Math.log(rand())) * Math.cos(2*Math.PI*rand()));
       const inflFactor = Math.pow(1 + inflation, y);
@@ -247,17 +234,10 @@ function runMonteCarlo(startBalance, annualWithdraw, years, trials=1000, mean=0.
       const ssThisYear = ssIncome * inflFactor;
       const fixedThisYear = streams.reduce((sum, s) => sum + (y >= s.yearOffset ? s.annual : 0), 0);
       const netDraw = Math.max(0, expensesThisYear - ssThisYear - fixedThisYear);
-      // LTC shock: grossed-up portfolio draw during uninsured care years
+      // Apply care cost shock: grossed-up portfolio draw during uninsured care years
       const ltcShock = (ltcShockYear >= 0 && y >= ltcShockYear && y < ltcShockYear + ltcShockDuration)
         ? ltcShockAnnual : 0;
-      // Spouse LTC shock: independent care event for spouse
-      const spLtcShock = (spLtcShockYear >= 0 && y >= spLtcShockYear && y < spLtcShockYear + spLtcShockDuration)
-        ? spLtcShockAnnual : 0;
-      // Expense shock: guaranteed income surplus absorbs first; remainder hits portfolio
-      const rawShock = shockYearsThisTrial.has(y) ? expShockAnnual * inflFactor : 0;
-      const guaranteedSurplus = Math.max(0, ssThisYear + fixedThisYear - expensesThisYear);
-      const expShock = Math.max(0, rawShock - guaranteedSurplus);
-      bal = bal * (1 + r) - netDraw - ltcShock - spLtcShock - expShock;
+      bal = bal * (1 + r) - netDraw - ltcShock;
       if (bal <= 0) { failed = true; break; }
     }
     if (!failed) successes++;
@@ -513,13 +493,18 @@ function projectArc(inputs) {
     portfolioReturn = 0.065,
     inflation = 0.028,
     sorrEnabled = false,
-    expenseShockEnabled = false, expenseShockAmount = 0, expenseShockFrequency = 8,
     annualTradContribution = 0,
     tradContributionEndAge = 0,
     annualTaxableContribution = 0,
     taxableContributionEndAge = 0,
     annualSpouseTradContribution = 0,
     spouseTradContributionEndAge = 0,
+    // When true, strips Layer 1 (Roth annuity) and Layer 3 (ETA) from MC fixed streams.
+    // Used for "without Layer 2" care event comparisons so the uninsured score reflects
+    // the plan with NO IncomeArc™ income layers — just SS, pension, and portfolio draws.
+    // This prevents the paradox where care event panels show higher confidence than the
+    // overall score because Layer 1/3 income more than offsets the LTC shock.
+    stripArchLayersFromMC = false,
   } = inputs;
 
   // Sequence of Returns Risk overrides — years 0-4 of retirement (index = age - retireAge)
@@ -529,18 +514,6 @@ function projectArc(inputs) {
   const SORR_SCHEDULE = sorrEnabled
     ? [-0.18, 0.04, -0.14, 0.05, -0.10]
     : null;
-
-  // ── Expense Shock Schedule (deterministic, evenly spaced for chart display) ──
-  const SHOCK_YEARS = (expenseShockEnabled && expenseShockAmount > 0 && expenseShockFrequency > 0)
-    ? (() => {
-        const set = new Set();
-        const totalYrs = planToAge - retireAge + 1;
-        for (let y = expenseShockFrequency; y < totalYrs; y += expenseShockFrequency) set.add(Math.round(y));
-        return set;
-      })()
-    : null;
-
-
 
   const years = [];
 
@@ -612,10 +585,6 @@ function projectArc(inputs) {
     + (partTimeMonthly > 0 ? partTimeMonthly * 12 : 0);
   magiHistory[retireAge - 2] = preRetireMagi;
   magiHistory[retireAge - 1] = preRetireMagi;
-
-  // Capture the true starting portfolio at retirement — BEFORE any year-1 draws or growth.
-  // trad/roth/taxable/spouseTrad are already grown through pre-retirement at this point.
-  const startingPortfolioAtRetire = trad + roth + taxable + spouseTrad;
 
   for (let age = retireAge; age <= planToAge; age++) {
     const yr = age - retireAge;
@@ -905,15 +874,6 @@ function projectArc(inputs) {
     }
 
     row.totalExpense = expenses;
-
-    // ── Expense Shock Event (deterministic — evenly spaced shock years) ──
-    if (SHOCK_YEARS && SHOCK_YEARS.has(yr)) {
-      const shockAmt = expenseShockAmount * inflFactor;
-      expenses += shockAmt;
-      row.expenseShockEvent = true;
-      row.expenseShockAmount = shockAmt;
-      row.totalExpense = expenses;
-    }
     // Gap uses only spendable income — purpose-driven events (ETA funding, Roth conversion,
     // LTC policy premium draw) are non-spendable IRA distributions that go directly to
     // the policy/conversion, not into the client's pocket to pay living expenses.
@@ -1134,8 +1094,6 @@ function projectArc(inputs) {
         row.totalIncome += actualGross;
         row.ltcGrossUpTax = (row.ltcGrossUpTax || 0) + actualTax;
         row.ltcPortfolioDraw = (row.ltcPortfolioDraw || 0) + actualGross;
-        row.spouseLtcGrossUpTax = (row.spouseLtcGrossUpTax || 0) + actualTax;   // spouse-only tracking
-        row.spouseLtcPortfolioDraw = (row.spouseLtcPortfolioDraw || 0) + actualGross; // spouse-only tracking
         taxable = Math.max(0, taxable - actualGross);
         ltcRemaining -= actualNet;
       }
@@ -1154,8 +1112,6 @@ function projectArc(inputs) {
         row.totalIncome += actualGross;
         row.ltcGrossUpTax = (row.ltcGrossUpTax || 0) + actualTax;
         row.ltcPortfolioDraw = (row.ltcPortfolioDraw || 0) + actualGross;
-        row.spouseLtcGrossUpTax = (row.spouseLtcGrossUpTax || 0) + actualTax;   // spouse-only tracking
-        row.spouseLtcPortfolioDraw = (row.spouseLtcPortfolioDraw || 0) + actualGross; // spouse-only tracking
         trad = Math.max(0, trad - actualGross);
       }
 
@@ -1352,46 +1308,44 @@ function projectArc(inputs) {
   }
 
   // Roth annuity — only when architecture is enabled (Layer 1 product)
-  if (archRothAnnuityMonthly > 0) {
+  // Excluded when stripArchLayersFromMC is true (uninsured care event comparison —
+  // we want to show the plan WITHOUT any IncomeArc layers to give an honest baseline)
+  if (archRothAnnuityMonthly > 0 && !stripArchLayersFromMC) {
     const offset = Math.max(0, rothAnnuityStartAge - mcStartAge);
     fixedStreams.push({ yearOffset: offset, annual: archRothAnnuityMonthly * 12 });
   }
 
   // Non-qualified annuity — only when architecture is enabled
-  if (archNonQualAnnuityMonthly > 0) {
+  // Also excluded when stripping arch layers
+  if (archNonQualAnnuityMonthly > 0 && !stripArchLayersFromMC) {
     const offset = Math.max(0, nonQualAnnuityStartAge - mcStartAge);
     fixedStreams.push({ yearOffset: offset, annual: archNonQualAnnuityMonthly * 12 });
   }
 
   // ETA policy loan income — only when architecture is enabled (Layer 3 product)
-  // MC uses Year 1 amount as a conservative floor — COLA growth is reflected in the main projection arc
-  if (archEtaAnnualIncome > 0) {
+  // MC uses Year 1 amount as a conservative floor — COLA growth reflected in main arc
+  // Excluded when stripArchLayersFromMC is true (uninsured care event comparison)
+  if (archEtaAnnualIncome > 0 && !stripArchLayersFromMC) {
     const offset = Math.max(0, etaStartAge - mcStartAge);
     fixedStreams.push({ yearOffset: offset, annual: archEtaAnnualIncome });
   }
 
   // LTC shock for Monte Carlo: the actual gross portfolio draws made during care years
   // (tracked as ltcPortfolioDraw in each row) plus the gross-up tax friction.
+  // Using ltcPortfolioDraw is correct because it captures what was truly pulled from the
+  // portfolio — it's zero when income surplus fully absorbed the care cost, and reflects
+  // the actual IRA/taxable gross draws when a portfolio withdrawal was required.
   const ltcShockYear = (ltcEventAge > 0 && !ltcInsured) ? ltcEventAge - retireAge : -1;
   const ltcShockAnnual = (ltcShockYear >= 0 && ltcDuration > 0)
     ? years.filter(r => r.age >= ltcEventAge && r.age < ltcEventAge + ltcDuration)
            .reduce((sum, r) => sum + (r.ltcPortfolioDraw || 0) + (r.ltcGrossUpTax || 0), 0) / ltcDuration
     : 0;
 
-  // Spouse LTC shock for Monte Carlo — uses dedicated spouseLtcPortfolioDraw/spouseLtcGrossUpTax
-  // fields which are written ONLY during spouse care draws, so they are always correct
-  // regardless of whether client's event overlaps in the same year.
-  const spLtcShockYear = (spouseLtcEventAge > 0 && !spouseLtcInsured) ? spouseLtcEventAge - retireAge : -1;
-  const spLtcShockAnnual = (spLtcShockYear >= 0 && spouseLtcDuration > 0)
-    ? years.filter(r => r.age >= spouseLtcEventAge && r.age < spouseLtcEventAge + spouseLtcDuration)
-           .reduce((sum, r) => sum + (r.spouseLtcPortfolioDraw || 0) + (r.spouseLtcGrossUpTax || 0), 0) / spouseLtcDuration
-    : 0;
-
   const confidence = runMonteCarlo(
     mcStartBalance,
     0,
     mcYears,
-    1000,
+    500,
     portfolioReturn,
     inflation,
     ssAtMcStart,
@@ -1399,15 +1353,10 @@ function projectArc(inputs) {
     expensesAtMcStart,
     ltcShockYear,
     ltcShockAnnual,
-    ltcDuration,
-    expenseShockEnabled ? expenseShockAmount : 0,
-    expenseShockEnabled ? expenseShockFrequency : 0,
-    spLtcShockYear,
-    spLtcShockAnnual,
-    spouseLtcDuration
+    ltcDuration
   );
 
-  return { years, confidence, fixedStreams, mcStartAge, startingPortfolioAtRetire };
+  return { years, confidence, fixedStreams, mcStartAge };
 }
 
 // ── Input field component ──
@@ -1601,49 +1550,14 @@ function ArcChart({ data, view, insuredData, sorrEnabled }) {
                 </text>
               </g>
             )}
-            {/* Client LTC care event — subtle red band, no cluttering text */}
-            {d.ltcEvent && (
-              <rect x={xScale(i)-barW/2} y={PAD.t} width={barW} height={chartH}
-                fill="rgba(196,106,106,.10)" rx="1"/>
-            )}
-            {/* Spouse LTC care event — teal/steel dashed band, visually distinct */}
-            {d.spouseLtcEvent && (
-              <rect x={xScale(i)-barW/2} y={PAD.t} width={barW} height={chartH}
-                fill="rgba(74,155,155,.08)" rx="1"/>
-            )}
-            {/* LTC Funding Event marker — client */}
+            {/* LTC Funding Event marker */}
             {d.ltcFundingEvent && (
               <g>
                 <line x1={xScale(i)} x2={xScale(i)} y1={PAD.t} y2={PAD.t+chartH}
-                  stroke="rgba(155,126,200,.6)" strokeWidth="2" strokeDasharray="4,3"/>
+                  stroke="rgba(155,126,200,.5)" strokeWidth="2" strokeDasharray="4,3"/>
                 <text x={xScale(i)+4} y={PAD.t+38} textAnchor="start"
                   fill="#9B7EC8" fontSize="9" fontFamily="DM Sans" fontWeight="700">
                   ♥ LTC
-                </text>
-              </g>
-            )}
-            {/* Spouse LTC Funding Event marker — dashed teal line */}
-            {d.spouseLtcFundingEvent && (
-              <g>
-                <line x1={xScale(i)} x2={xScale(i)} y1={PAD.t} y2={PAD.t+chartH}
-                  stroke="rgba(74,155,155,.6)" strokeWidth="2" strokeDasharray="3,4"/>
-                <text x={xScale(i)+4} y={PAD.t+52} textAnchor="start"
-                  fill="#4A9B9B" fontSize="9" fontFamily="DM Sans" fontWeight="700">
-                  ♥ Sp
-                </text>
-              </g>
-            )}
-            {/* Expense Shock marker — amber spike */}
-            {d.expenseShockEvent && (
-              <g>
-                <line x1={xScale(i)} x2={xScale(i)} y1={PAD.t} y2={PAD.t+chartH}
-                  stroke="rgba(196,148,58,.6)" strokeWidth="2" strokeDasharray="5,3"/>
-                <polygon
-                  points={`${xScale(i)},${PAD.t+4} ${xScale(i)-6},${PAD.t+16} ${xScale(i)+6},${PAD.t+16}`}
-                  fill="rgba(196,148,58,.8)"/>
-                <text x={xScale(i)+4} y={PAD.t+26} textAnchor="start"
-                  fill="#C4943A" fontSize="9" fontFamily="DM Sans" fontWeight="700">
-                  ⚡ Expense
                 </text>
               </g>
             )}
@@ -2040,7 +1954,6 @@ function App() {
     nonQualAnnuityMonthly: 0, nonQualAnnuityStartAge: 65, nonQualAnnuityBasis: 0, nonQualAnnuityTotalValue: 0,
     partTimeMonthly: 0, partTimeEndAge: 68,
     fixedExpenses: 15000, lifestyleExpenses: 8500,
-    ltcEventEnabled: false,
     ltcEventAge: 0, ltcMonthlyCost: 7500, ltcDuration: 3, ltcShowComparison: false, ltcMonthlyBenefit: 7500, ltcBenefitDuration: 3,
     spouseLtcEventAge: 0, spouseLtcMonthlyCost: 7500, spouseLtcDuration: 3, spouseLtcMonthlyBenefit: 7500, spouseLtcBenefitDuration: 3, spouseLtcInsured: false,
     stateCode: 'IL', customStateRate: '', taxRateStressAdder: 0,
@@ -2048,7 +1961,6 @@ function App() {
     annualTaxableDrawdown: 0, taxableDrawdownStartAge: 0, taxableDrawdownEndAge: 0,
     annualRothDrawdown: 0, rothDrawdownStartAge: 0, rothDrawdownEndAge: 0,
     portfolioReturn: 6.5, inflation: 2.8, sorrEnabled: false,
-    expenseShockEnabled: false, expenseShockAmount: 50000, expenseShockFrequency: 8,
     annualTradContribution: 0, tradContributionEndAge: 0,
     annualTaxableContribution: 0, taxableContributionEndAge: 0,
     annualSpouseTradContribution: 0, spouseTradContributionEndAge: 0,
@@ -2063,67 +1975,48 @@ function App() {
     inflation: inputs.inflation / 100,
     etaColaRate: (inputs.etaColaRate || 0) / 100,
   };
-  // Primary projection — clean baseline WITHOUT any LTC event.
-  // Used only for the clean confidence score and pre-retirement accumulation phase.
-  const { years: yearsClean, confidence: confidenceClean, fixedStreams, mcStartAge, startingPortfolioAtRetire } = projectArc({ ...baseProjectionInputs, ltcInsured: false, ltcEventAge: 0, spouseLtcEventAge: 0 });
+  // Primary projection — NO LTC shock. This is the clean baseline plan survival score
+  // regardless of any healthcare event inputs. The main confidence score reflects the
+  // plan's fundamental strength (income, portfolio, architecture) without a care shock.
+  const { years, confidence, fixedStreams, mcStartAge } = projectArc({ ...baseProjectionInputs, ltcInsured: false, ltcEventAge: 0 });
 
-  // Primary display projection — ALWAYS includes LTC events if entered, uninsured.
-  // This is what the chart, number table, and main confidence score show.
-  // When architecture is ON and the client has a policy, ltcInsured is used below in the
-  // comparison projections. The main display always shows the uninsured reality so the
-  // cost of NOT having coverage is visible in Status Quo mode.
-  // ltcEventEnabled gates ALL care event modeling. Inputs stay visible for pre-fill,
-  // but nothing hits the MC or projection until the advisor flips the toggle ON.
-  const hasLtcEvent = inputs.ltcEventEnabled && inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
-  const hasSpouseLtcEvent = inputs.ltcEventEnabled && inputs.filingStatus === 'mfj' && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
-  const hasAnyLtcEvent = hasLtcEvent || hasSpouseLtcEvent;
-  const { years, confidence, fixedStreams: _fs2, mcStartAge: _mc2 } = hasAnyLtcEvent
-    ? projectArc({ ...baseProjectionInputs, ltcInsured: false, spouseLtcInsured: false })
-    : { years: yearsClean, confidence: confidenceClean };
-  // yearsWithLtc is an alias kept for chart rendering compatibility
-  const yearsWithLtc = years;
+  // Primary display projection — includes LTC event if entered (uninsured view)
+  // This is what the chart and number table show when architecture is OFF or no LTC comparison
+  const hasLtcEvent = inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
+  const { years: yearsWithLtc } = hasLtcEvent
+    ? projectArc({ ...baseProjectionInputs, ltcInsured: false })
+    : { years: years };
 
-  // LTC comparison projections — shown whenever LTC inputs are entered (not gated on architectureEnabled).
-  // Both zero out ltcNetAmount so the funding draw doesn't distort the pure care-event comparison.
-  // confidenceUninsured = plan survival WITH care event and NO policy (shock applied)
-  // confidenceInsured   = plan survival WITH care event and Layer 2 policy (shock absorbed)
+  // LTC comparison projections — only when architecture is enabled and LTC inputs are set.
+  // IMPORTANT: both projections zero out ltcNetAmount/spouseLtcNetAmount so the funding draw
+  // does not distort the comparison. We are isolating the care event shock impact only.
+  // confidenceUninsured = plan survival WITH care event, NO Layer 2, and NO Layers 1/3
+  //   → stripArchLayersFromMC:true removes Roth annuity and ETA from the uninsured MC
+  //     so the score represents the honest naked plan: SS + pension + portfolio only.
+  //     Without this, Layer 1/3 income offsets the care shock and produces a paradox
+  //     where the uninsured panel shows HIGHER confidence than the overall score.
+  // confidenceInsured = plan survival WITH care event and all IncomeArc layers active
+  //   → stripArchLayersFromMC:false (default) — full architecture included
   const ltcCompareBase = { ...baseProjectionInputs, ltcNetAmount: 0, spouseLtcNetAmount: 0 };
   const isMarried = inputs.filingStatus === 'mfj';
-  const showLtcComparison = hasLtcEvent;
-  // CLIENT isolation: set spouseLtcInsured:true so spouse event is neutralized.
-  // This ensures the client panel shows ONLY the impact of the client's own care event.
+  const showLtcComparison = inputs.architectureEnabled && inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
   const { years: yearsUninsured, confidence: confidenceUninsured } = showLtcComparison
-    ? projectArc({ ...ltcCompareBase, ltcInsured: false, spouseLtcInsured: true })
+    ? projectArc({ ...ltcCompareBase, ltcInsured: false, stripArchLayersFromMC: true })
     : { years: null, confidence: null };
   const { years: yearsInsured, confidence: confidenceInsured } = showLtcComparison
-    ? projectArc({ ...ltcCompareBase, ltcInsured: true, spouseLtcInsured: true })
+    ? projectArc({ ...ltcCompareBase, ltcInsured: true })
     : { years: null, confidence: null };
 
-  // Spouse LTC comparison — whenever MFJ and spouse LTC entered (not gated on architectureEnabled)
-  // IMPORTANT: zero out the CLIENT's ltcEventAge so we isolate the spouse event shock only.
-  // Otherwise the client's shock drowns out the spouse difference.
-  const showSpouseLtcComparison = inputs.ltcEventEnabled && isMarried && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
-  const spouseCompareBase = { ...ltcCompareBase, ltcEventAge: 0, ltcInsured: false };
+  // Spouse LTC comparison — only when MFJ and spouse LTC entered
+  const showSpouseLtcComparison = inputs.architectureEnabled && isMarried && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
   const { years: yearsSpouseUninsured, confidence: confidenceSpouseUninsured } = showSpouseLtcComparison
-    ? projectArc({ ...spouseCompareBase, spouseLtcInsured: false })
+    ? projectArc({ ...ltcCompareBase, spouseLtcInsured: false, stripArchLayersFromMC: true })
     : { years: null, confidence: null };
   const { years: yearsSpouseInsured, confidence: confidenceSpouseInsured } = showSpouseLtcComparison
-    ? projectArc({ ...spouseCompareBase, spouseLtcInsured: true })
+    ? projectArc({ ...ltcCompareBase, spouseLtcInsured: true })
     : { years: null, confidence: null };
 
-  // Combined household projections — both LTC events active at the same time on the same portfolio.
-  // This is the CORRECT way to get household confidence: one simulation with both shocks.
-  // Averaging individual scores would understate the combined risk since both draws hit the same portfolio.
-  const showCombinedLtcComparison = hasLtcEvent && showSpouseLtcComparison;
-  const combinedCompareBase = { ...ltcCompareBase };
-  const { confidence: confidenceBothUninsured } = showCombinedLtcComparison
-    ? projectArc({ ...combinedCompareBase, ltcInsured: false, spouseLtcInsured: false })
-    : { confidence: null };
-  const { confidence: confidenceBothInsured } = showCombinedLtcComparison
-    ? projectArc({ ...combinedCompareBase, ltcInsured: true, spouseLtcInsured: true })
-    : { confidence: null };
-
-  const totalPortfolioAtRetire = startingPortfolioAtRetire || (inputs.traditionalBalance + inputs.rothBalance + inputs.taxableBalance);
+  const totalPortfolioAtRetire = years[0] ? years[0].totalPortfolio : (inputs.traditionalBalance + inputs.rothBalance + inputs.taxableBalance);
   const fmt$ = v => '$' + Math.round(v||0).toLocaleString();
   const fmtM = v => v >= 1000000 ? '$'+(v/1000000).toFixed(1)+'M' : '$'+Math.round(v/1000)+'K';
 
@@ -2277,569 +2170,83 @@ function App() {
                   const clientLabel = clientInfo.primaryName || 'Client';
                   const spouseLabel = inputs.filingStatus==='mfj'&&clientInfo.spouseName ? ` & ${clientInfo.spouseName}` : '';
                   const fullName = clientLabel + spouseLabel;
-// ── Status Quo parallel projection (for before/after comparison) ──
-                  const sqInputs = {
-                    ...baseProjectionInputs,
-                    architectureEnabled: false,
-                    rothConversionAmount: 0, rothConversionAge: 0, rothConversionFinanced: 0,
-                    etaAnnualIncome: 0, etaStartAge: 70, etaFundingAmount: 0, etaFundingAge: 0,
-                    rothAnnuityMonthly: 0, rothAnnuityStartAge: 0,
-                    ltcNetAmount: 0, ltcFundingAge: 0, spouseLtcNetAmount: 0, spouseLtcFundingAge: 0,
-                    ltcInsured: false, ltcEventAge: 0, spouseLtcInsured: false,
-                  };
-                  const { years: sqYears, confidence: sqConfidence, startingPortfolioAtRetire: sqStartingPortfolio } = projectArc(sqInputs);
-                  const sqPortfolioAtRetire = sqStartingPortfolio || totalPortfolioAtRetire;
-                  const sqAge90 = sqYears.find(y => y.age === 90);
-                  const sqTotalTax = sqYears.reduce((sum, y) => sum + (y.estimatedTax||0), 0);
-                  const sqRetirementYears = sqYears.filter(y => y.age >= inputs.retireAge);
-                  const sqGuaranteedPct = (() => {
-                    if (!sqRetirementYears.length) return 0;
-                    const tG = sqRetirementYears.reduce((s,y)=>s+(y.grossGuaranteedIncome||0),0);
-                    const tA = sqRetirementYears.reduce((s,y)=>s+Math.max(1,y.grossIncome||0),0);
-                    return Math.round(tG/tA*100);
-                  })();
-                  const sqTotalIrmaa = sqYears.reduce((sum,y)=>sum+(y.irmaa||0),0);
-
-                  // ── Derived values ──
-                  const clientLabel2 = clientInfo.primaryName || 'Client';
-                  const spouseLabel2 = inputs.filingStatus==='mfj'&&clientInfo.spouseName ? ` & ${clientInfo.spouseName}` : '';
-                  const fullName2 = clientLabel2 + spouseLabel2;
                   const stateInfo2 = STATE_TAX_DATA[inputs.stateCode];
-                  const isMarriedRpt = inputs.filingStatus === 'mfj';
-                  const taxSavings = sqTotalTax - totalEstTax;
                   const yr1 = years[0];
-                  const sqYr1 = sqYears[0];
-                  const hasL1 = (inputs.rothAnnuityMonthly > 0 || inputs.rothConversionAmount > 0);
-                  const hasL2 = (inputs.ltcNetAmount > 0 || inputs.spouseLtcNetAmount > 0);
-                  const hasL3 = (inputs.etaAnnualIncome > 0 || inputs.etaFundingAmount > 0);
-                  const l1FundAmt = inputs.rothConversionAmount || 0;
-                  const l2FundAmt = (inputs.ltcNetAmount||0) + (inputs.spouseLtcNetAmount||0);
-                  const l3FundAmt = inputs.etaFundingAmount || 0;
-                  const totalQualBal = inputs.traditionalBalance + (isMarriedRpt ? (inputs.spouseTraditionalBalance||0) : 0);
-                  const residualPortfolio = Math.max(0, totalQualBal - l1FundAmt - l2FundAmt - l3FundAmt);
-                  const totalFunding = l1FundAmt + l2FundAmt + l3FundAmt;
-                  const fmtM2 = v => v >= 1000000 ? '$'+(v/1000000).toFixed(1)+'M' : '$'+Math.round(v/1000)+'K';
-
-                  // ── Light print-optimized color tokens ──
-                  const P = {
-                    bg:'#FFFFFF', bgAlt:'#F7F8FA', bgCard:'#F0F2F6',
-                    navy:'#0B1928', navyMid:'#1A2F45',
-                    gold:'#9A7430', goldLt:'#C8A96E',
-                    teal:'#1F6B55', tealLt:'#EAF4EF',
-                    steel:'#2D5B7A', steelLt:'#E8F0F6',
-                    purple:'#5B3E8A', purpleLt:'#EEE9F6',
-                    red:'#8B2A2A', redLt:'#FAF0F0',
-                    amber:'#7A4A0A', amberLt:'#FDF3E7',
-                    text:'#1A2030', textMid:'#3A4A5C', textSoft:'#6B7A8A',
-                    border:'#DDE2EA', borderMid:'#C8D0DA',
-                  };
-
-                  // ── HTML snippet helpers ──
-                  const pH = (l, sub='') =>
-                    `<div style="margin-bottom:14px;">
-                      <div style="font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:${P.gold};font-weight:700;margin-bottom:2px;">${l}</div>
-                      ${sub ? `<div style="font-size:10.5px;color:${P.textSoft};margin-top:1px;">${sub}</div>` : ''}
-                      <div style="height:2px;background:linear-gradient(90deg,${P.goldLt},transparent);margin-top:6px;border-radius:1px;"></div>
-                    </div>`;
-
-                  const pHr = () => `<div style="height:1px;background:${P.border};margin:20px 0;"></div>`;
-
-                  const pSb = (v,l,c,bg,s='') =>
-                    `<div style="flex:1;min-width:100px;background:${bg};border:1px solid ${P.border};border-top:3px solid ${c};border-radius:6px;padding:12px 10px;text-align:center;">
-                      <div style="font-size:20px;font-family:Georgia,serif;font-weight:600;color:${c};margin-bottom:3px;">${v}</div>
-                      <div style="font-size:10px;color:${P.textMid};line-height:1.4;font-weight:500;">${l}</div>
-                      ${s?`<div style="font-size:9px;color:${P.textSoft};margin-top:2px;">${s}</div>`:''}
-                    </div>`;
-
-                  const pCr = (l, sq, ar, b='higher') => {
-                    const n1 = parseFloat(String(ar).replace(/[^0-9.-]/g,'')),
-                          n2 = parseFloat(String(sq).replace(/[^0-9.-]/g,''));
-                    const ok = b==='higher' ? n1>=n2 : n1<=n2;
-                    return `<tr style="border-bottom:1px solid ${P.border};">
-                      <td style="padding:8px 10px;font-size:11.5px;color:${P.textMid};">${l}</td>
-                      <td style="padding:8px 10px;font-size:12px;color:${P.red};font-weight:600;text-align:right;background:${P.redLt};">${sq}</td>
-                      <td style="padding:8px 10px;font-size:12px;color:${ok?P.teal:P.amber};font-weight:700;text-align:right;background:${ok?P.tealLt:P.amberLt};">${ar}</td>
-                    </tr>`;
-                  };
-
-                  const pBb = (l, a, t, c, bgc, ic) => {
-                    const w = t>0 ? Math.min(100,Math.round(a/t*100)) : 0;
-                    const f = v => v>=1e6?'$'+(v/1e6).toFixed(1)+'M':'$'+Math.round(v/1000)+'K';
-                    return `<div style="margin-bottom:10px;">
-                      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                        <span style="font-size:11px;color:${P.textMid};font-weight:500;">${ic} ${l}</span>
-                        <span style="font-size:11.5px;font-weight:700;color:${c};">${f(a)} <span style="font-size:10px;font-weight:400;color:${P.textSoft};">(${w}%)</span></span>
-                      </div>
-                      <div style="height:10px;background:${P.bgCard};border-radius:5px;overflow:hidden;border:1px solid ${P.border};">
-                        <div style="width:${w}%;height:100%;background:${c};border-radius:4px;opacity:0.85;"></div>
-                      </div>
-                    </div>`;
-                  };
-
-                  const pRisk = (ic, title, body, c, bg) =>
-                    `<div style="display:flex;gap:12px;margin-bottom:10px;padding:12px 14px;background:${bg};border-left:3px solid ${c};border-radius:0 6px 6px 0;border:1px solid ${P.border};border-left-width:3px;">
-                      <div style="font-size:18px;flex-shrink:0;line-height:1.4;">${ic}</div>
-                      <div>
-                        <div style="font-size:12px;font-weight:700;color:${P.navy};margin-bottom:3px;">${title}</div>
-                        <div style="font-size:11px;color:${P.textMid};line-height:1.6;">${body}</div>
-                      </div>
-                    </div>`;
-
-                  const pLayer = (num, title, sub, body, tags, c, bg) =>
-                    `<div style="border:1px solid ${P.border};border-radius:7px;overflow:hidden;margin-bottom:10px;">
-                      <div style="background:${bg};padding:10px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid ${P.border};">
-                        <div style="width:24px;height:24px;border-radius:50%;background:${c};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;flex-shrink:0;">${num}</div>
-                        <div>
-                          <div style="font-size:12.5px;font-weight:700;color:${P.navy};">${title}</div>
-                          <div style="font-size:10px;color:${P.textSoft};">${sub}</div>
-                        </div>
-                      </div>
-                      <div style="padding:12px 14px;background:#fff;">
-                        <div style="font-size:11px;color:${P.textMid};line-height:1.65;margin-bottom:9px;">${body}</div>
-                        <div style="display:flex;gap:6px;flex-wrap:wrap;">${tags.map(([t,hi])=>`<div style="padding:4px 9px;background:${hi?bg:P.bgAlt};border:1px solid ${hi?c:P.border};border-radius:4px;font-size:10.5px;color:${hi?c:P.textMid};font-weight:${hi?700:400};">${t}</div>`).join('')}</div>
-                      </div>
-                    </div>`;
-
-                  // ── Build risk narrative based on actual inputs ──
-                  const riskCards = [];
-                  riskCards.push(pRisk('⚡','Sequence of Returns Risk',
-                    'A market downturn in the first 3–5 years of retirement can permanently impair a portfolio with no guaranteed income floor. When living expenses force asset sales during a downturn, early losses compound — even if markets later recover. Without an income floor, this risk is always active.',
-                    P.red, P.redLt));
-                  if (inputs.ltcEventAge > 0) {
-                    riskCards.push(pRisk('🏥',`Long-Term Care Exposure — Age ${inputs.ltcEventAge}`,
-                      `A care event modeled at age ${inputs.ltcEventAge} costing $${(inputs.ltcMonthlyCost||7500).toLocaleString()}/month for ${inputs.ltcDuration||3} years. Without Layer 2, this draws directly from the portfolio: triggering gross-up withdrawals, additional taxes, and a permanent compounding loss. Layer 2 isolates this cost entirely from the income architecture.`,
-                      P.amber, P.amberLt));
-                  } else {
-                    riskCards.push(pRisk('🏥','Long-Term Care Exposure (Not Yet Modeled)',
-                      '70% of Americans over 65 will need some form of long-term care. The average care event costs $90K–$180K and lasts 2–4 years. Without a dedicated coverage layer, that cost draws directly from the retirement portfolio — at the worst possible time.',
-                      P.amber, P.amberLt));
-                  }
-                  if (totalQualBal > 200000) {
-                    riskCards.push(pRisk('📋','RMD & Tax Acceleration',
-                      `With ${fmtM2(totalQualBal)} in qualified accounts, Required Minimum Distributions beginning at age 73 will force taxable income regardless of need — pushing into higher IRMAA brackets and increasing Social Security taxation. The ETA strategy (Layer 3) repositions a portion of this into a permanent tax-free environment.`,
-                      P.purple, P.purpleLt));
-                  }
-                  riskCards.push(pRisk('⏳','Longevity Risk',
-                    `A plan projecting to age ${inputs.planToAge} with a ${sqConfidence}% confidence score without the IncomeArc™ Architecture means a meaningful probability of portfolio depletion. The Roth FIA with GLWB (Layer 1) provides contractual income that cannot be outlived — regardless of market performance or longevity.`,
-                    P.steel, P.steelLt));
-
-                  // ── Build layer cards ──
-                  const layerCards = [];
-                  layerCards.push(pLayer(1,
-                    'Layer 1 — Roth Fixed Indexed Annuity with GLWB Rider',
-                    'Guaranteed Lifetime Income Floor · Tax-Free · Market-Protected',
-                    `${l1FundAmt>0?`A ${fmtM2(l1FundAmt)} Roth conversion${inputs.rothConversionAge>0?` at age ${inputs.rothConversionAge}`:''}  funds`:'A single-premium Roth conversion funds'} a Fixed Indexed Annuity with GLWB rider. The result: a contractual income floor that pays${inputs.rothAnnuityMonthly>0?` <strong>$${Math.round(inputs.rothAnnuityMonthly).toLocaleString()}/month tax-free for life</strong>`:', guaranteed lifetime income tax-free,'}, regardless of market conditions or longevity. This is the bedrock of the architecture — the income that cannot be disrupted.`,
-                    [[inputs.rothAnnuityMonthly>0?`$${Math.round(inputs.rothAnnuityMonthly).toLocaleString()}/mo guaranteed`:'Guaranteed income',true],['Cannot be outlived',false],['Zero MAGI impact',false],['No RMD requirement',false]],
-                    '#6B44AA', P.purpleLt));
-                  layerCards.push(pLayer(2,
-                    'Layer 2 — Living Benefits IUL · Long-Term Care Protection',
-                    'Portfolio Shield · Chronic Care Rider · Tax-Free Death Benefit',
-                    `A Living Benefits IUL policy with chronic care acceleration rider.${inputs.ltcEventAge>0?` A care event at age ${inputs.ltcEventAge} draws from the policy benefit pool —`:'  A care event draws from the policy benefit pool —'} <strong>the portfolio is never touched</strong>. Care never needed? The policy builds cash value and passes a tax-free death benefit. No premium is wasted either way.`,
-                    [[l2FundAmt>0?`Net Premium: ${fmtM2(l2FundAmt)}`:'Dedicated care pool',true],['Portfolio untouched',false],['Tax-free care benefit',false],['Surviving spouse protected',false]],
-                    '#9A5A0A', P.amberLt));
-                  layerCards.push(pLayer(3,
-                    'Layer 3 — Enhanced Tax Accumulation (ETA)',
-                    'Bank-Financed IUL · Tax-Free Growth · Zero RMD · Zero IRMAA',
-                    `A bank non-recourse loan pays the IRA distribution tax — so the full${l3FundAmt>0?` ${fmtM2(l3FundAmt)}`:''} gross proceeds enter the IUL policy rather than the after-tax net. The tax that would have left permanently instead compounds tax-free, delivering${inputs.etaAnnualIncome>0?` <strong>$${Math.round(inputs.etaAnnualIncome).toLocaleString()}/year in tax-free policy loan income</strong>`:' lifetime tax-free policy loan income'} (IRC §7702)${inputs.etaStartAge>0?` beginning at age ${inputs.etaStartAge}`:''}. No personal guarantee. No credit impact.`,
-                    [[inputs.etaAnnualIncome>0?`$${Math.round(inputs.etaAnnualIncome).toLocaleString()}/yr income`:'Tax-free income',true],['Bank pays the tax',false],['Reduces future RMDs',false],['No IRMAA impact',false]],
-                    '#1F6B55', P.tealLt));
-                  layerCards.push(pLayer(4,
-                    'Layer 4 — Portfolio Reserve',
-                    'Discretionary Reserve · Growth · Legacy · No Daily Income Pressure',
-                    `The remaining ${fmtM2(residualPortfolio)} no longer bears the burden of funding daily retirement income. Layers 1–3 absorb the income floor, LTC exposure, and tax drag — so Layer 4 becomes a strategic reserve for growth, discretionary spending, and legacy. <strong>Market volatility no longer threatens the retirement lifestyle.</strong>`,
-                    [['Strategic reserve',false],['Discretionary spending',false],['Legacy & heirs',false]],
-                    '#2D5B7A', P.steelLt));
-
                   const htmlContent = `
-<div style="font-family:Arial,Helvetica,sans-serif;max-width:720px;margin:0 auto;background:#fff;color:${P.text};">
-
-  <!-- HEADER -->
-  <div style="background:${P.navy};padding:28px 36px 24px;">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;">
-      <div>
-        <div style="font-size:9px;letter-spacing:.3em;text-transform:uppercase;color:${P.goldLt};margin-bottom:10px;">Integrated Planning Partners</div>
-        <div style="font-size:26px;font-family:Georgia,serif;font-weight:600;color:#fff;line-height:1.2;margin-bottom:4px;">IncomeArc™</div>
-        <div style="font-size:11px;color:rgba(200,169,110,.65);">Retirement Income Architecture · Conceptual Illustration</div>
-      </div>
-      <div style="text-align:right;">
-        <div style="font-size:9px;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px;">Prepared For</div>
-        <div style="font-size:17px;font-family:Georgia,serif;color:${P.goldLt};">${fullName2}</div>
-        <div style="font-size:10px;color:rgba(255,255,255,.5);margin-top:3px;">${isMarriedRpt?'Married Filing Jointly':'Single'} · Age ${inputs.currentAge}${inputs.retireAge>inputs.currentAge?' · Retires '+inputs.retireAge:' · Retired'} · ${stateInfo2?stateInfo2.name:inputs.stateCode}</div>
-        <div style="font-size:10px;color:rgba(200,169,110,.45);margin-top:2px;">Plan Through Age ${inputs.planToAge} · Generated ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</div>
-      </div>
+<div style="font-family:'DM Sans',Arial,sans-serif;max-width:620px;margin:0 auto;background:#07101A;color:#F5F2EC;border-radius:12px;overflow:hidden;border:1px solid rgba(200,169,110,.2);">
+  <div style="background:#0B1928;padding:24px 28px;border-bottom:1px solid rgba(200,169,110,.18);">
+    <div style="font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#C8A96E;margin-bottom:6px;">Integrated Planning Partners</div>
+    <div style="font-size:26px;font-family:Georgia,serif;font-weight:400;color:#F5F2EC;margin-bottom:4px;">IncomeArc™ Projection Report</div>
+    <div style="font-size:13px;color:#8DAFC8;">Retirement Income Architecture · Conceptual Illustration</div>
+  </div>
+  <div style="padding:24px 28px;">
+    <div style="margin-bottom:20px;">
+      <div style="font-size:13px;color:#8DAFC8;margin-bottom:2px;">Prepared for</div>
+      <div style="font-size:20px;font-family:Georgia,serif;color:#C8A96E;">${fullName}</div>
+      <div style="font-size:12px;color:#8DAFC8;margin-top:4px;">${inputs.filingStatus==='mfj'?'Married Filing Jointly':'Single'} · Age ${inputs.currentAge} · ${stateInfo2?stateInfo2.name:inputs.stateCode} · Retire Age ${inputs.retireAge}</div>
+    </div>
+    <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:18px;margin-bottom:20px;">
+      <div style="font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:#C8A96E;margin-bottom:14px;">Key Projections</div>
+      <table style="width:100%;border-collapse:collapse;">
+        ${[
+          ['Monte Carlo Confidence','#4A9B7A',confidence+'%'],
+          ['Portfolio at Retirement','#C8A96E',fmtM(totalPortfolioAtRetire)],
+          ['Portfolio at Age 90','#7BAF84',age90Data?fmtM(age90Data.totalPortfolio):'—'],
+          ['Guaranteed Income (Lifetime Avg)','#7BAF84',guaranteedPct+'%'],
+          ['Est. Lifetime Federal Tax','#C47A7A',totalFedTax>=1000000?'$'+(totalFedTax/1000000).toFixed(1)+'M':'$'+Math.round(totalFedTax/1000)+'K'],
+          ['Est. Lifetime State Tax','#C47A7A',totalStateTax>=1000000?'$'+(totalStateTax/1000000).toFixed(1)+'M':'$'+Math.round(totalStateTax/1000)+'K'],
+          ['Est. Lifetime Total Tax','#C47A7A',totalEstTax>=1000000?'$'+(totalEstTax/1000000).toFixed(1)+'M':'$'+Math.round(totalEstTax/1000)+'K'],
+          ...(totalIrmaa>0?[['Total IRMAA Exposure','#E8943A','$'+Math.round(totalIrmaa/1000)+'K']]:[] ),
+          ['Year 1 All-In Marginal Rate','#9B7EC8',Math.round(allInMarginalRate*100)+'%'],
+          ['Year 1 All-In Effective Rate','#9B7EC8',Math.round(allInEffectiveRate*100)+'%'],
+        ].map(([label,color,val])=>`
+        <tr style="border-bottom:1px solid rgba(255,255,255,.05);">
+          <td style="padding:8px 0;font-size:13px;color:#8DAFC8;">${label}</td>
+          <td style="padding:8px 0;font-size:15px;font-weight:600;color:${color};text-align:right;">${val}</td>
+        </tr>`).join('')}
+      </table>
+    </div>
+    <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:18px;margin-bottom:20px;">
+      <div style="font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:#C8A96E;margin-bottom:14px;">Income Architecture (Year 1 of Retirement)</div>
+      <table style="width:100%;border-collapse:collapse;">
+        ${yr1 ? Object.entries(COLORS).filter(([k])=>k!=='expense'&&yr1.sources&&yr1.sources[k]>0).map(([k,c])=>`
+        <tr style="border-bottom:1px solid rgba(255,255,255,.05);">
+          <td style="padding:7px 0;font-size:13px;color:#8DAFC8;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${c.fill};margin-right:8px;vertical-align:middle;"></span>${c.label}</td>
+          <td style="padding:7px 0;font-size:13px;color:#F5F2EC;text-align:right;">$${Math.round((yr1.sources[k]||0)/12/1000*10)/10}K/mo</td>
+        </tr>`).join('') : '' }
+      </table>
+    </div>
+    <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:18px;margin-bottom:20px;">
+      <div style="font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:#C8A96E;margin-bottom:14px;">Assumptions</div>
+      <table style="width:100%;border-collapse:collapse;">
+        ${[
+          ['Portfolio Return',inputs.portfolioReturn+'%'],
+          ['Inflation Rate',inputs.inflation+'%'],
+          ['Fixed Monthly Expenses','$'+inputs.fixedExpenses.toLocaleString()],
+          ['Lifestyle Monthly Expenses','$'+inputs.lifestyleExpenses.toLocaleString()],
+          ['Traditional Balance (Today)',fmtM(inputs.traditionalBalance)],
+          ['Roth Balance (Today)',fmtM(inputs.rothBalance)],
+          ['Taxable Balance (Today)',fmtM(inputs.taxableBalance)],
+          ...(inputs.filingStatus==='mfj' && inputs.spouseTraditionalBalance > 0 ? [['Spouse Traditional (Today)', fmtM(inputs.spouseTraditionalBalance)]] : []),
+          ...(inputs.filingStatus==='mfj' && inputs.annualSpouseTradContribution > 0 ? [['Spouse Annual Contribution', fmtM(inputs.annualSpouseTradContribution)+'/yr']] : []),
+          ['Portfolio at Retirement (Projected)',fmtM(totalPortfolioAtRetire)],
+          ...(inputs.sorrEnabled?[['SORR Stress Scenario','Active — First 5 Yrs']]:[] ),
+          ...(inputs.taxRateStressAdder>0?[['Tax Rate Stress Adder','+'+inputs.taxRateStressAdder+'%']]:[] ),
+        ].map(([l,v])=>`
+        <tr style="border-bottom:1px solid rgba(255,255,255,.05);">
+          <td style="padding:7px 0;font-size:13px;color:#8DAFC8;">${l}</td>
+          <td style="padding:7px 0;font-size:13px;color:#F5F2EC;text-align:right;">${v}</td>
+        </tr>`).join('')}
+      </table>
+    </div>
+    <div style="padding:14px 16px;background:rgba(196,106,106,.06);border:1px solid rgba(196,106,106,.2);border-radius:8px;font-size:11px;color:#8DAFC8;line-height:1.7;">
+      <strong style="color:#C47A7A;">Important Disclosure:</strong> These projections are hypothetical illustrations for conceptual and educational purposes only. They are not a guarantee, prediction, or promise of future performance, results, or returns. Actual results will vary based on market conditions, tax law changes, and individual circumstances. This report is intended for use by licensed financial professionals in conjunction with a comprehensive financial planning engagement.
     </div>
   </div>
-  <div style="height:4px;background:linear-gradient(90deg,${P.gold},${P.goldLt},${P.gold});"></div>
-
-  <!-- BODY -->
-  <div style="padding:24px 36px;">
-
-    ${pH('The Bottom Line — What the Architecture Changes')}
-    <div style="font-size:11.5px;color:${P.textMid};line-height:1.7;margin-bottom:12px;">Two versions of ${isMarriedRpt && clientInfo.spouseName ? clientLabel2 + ' and ' + clientInfo.spouseName : clientLabel2}${String.fromCharCode(39)}s retirement — identical assets, identical income needs, identical assumptions. The only difference is <strong style="color:${P.navy};">structure</strong>.</div>
-    <table style="width:100%;border-collapse:collapse;border:1px solid ${P.border};overflow:hidden;margin-bottom:10px;">
-      <thead>
-        <tr style="background:${P.navy};">
-          <th style="padding:9px 10px;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.65);text-align:left;font-weight:600;">Metric</th>
-          <th style="padding:9px 10px;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#F4A0A0;text-align:right;font-weight:600;">Status Quo</th>
-          <th style="padding:9px 10px;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#7DD4B0;text-align:right;font-weight:600;">IncomeArc™</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${pCr('Plan Survival Confidence (Monte Carlo)', sqConfidence+'%', confidence+'%', 'higher')}
-        ${pCr('Guaranteed Income — Lifetime Avg', sqGuaranteedPct+'%', guaranteedPct+'%', 'higher')}
-        ${sqPortfolioAtRetire !== totalPortfolioAtRetire ? pCr('Portfolio at Retirement', fmtM2(sqPortfolioAtRetire), fmtM2(totalPortfolioAtRetire), 'higher') : ''}
-        ${sqAge90 && age90Data ? pCr('Portfolio at Age 90', fmtM2(sqAge90.totalPortfolio), fmtM2(age90Data.totalPortfolio), 'higher') : ''}
-        ${pCr('Est. Lifetime Tax Burden', sqTotalTax>=1000000?'$'+(sqTotalTax/1000000).toFixed(1)+'M':'$'+Math.round(sqTotalTax/1000)+'K', totalEstTax>=1000000?'$'+(totalEstTax/1000000).toFixed(1)+'M':'$'+Math.round(totalEstTax/1000)+'K', 'lower')}
-        ${sqTotalIrmaa > 0 || totalIrmaa > 0 ? pCr('Total IRMAA Exposure (Medicare Surcharge)', '$'+Math.round(sqTotalIrmaa/1000)+'K', '$'+Math.round(totalIrmaa/1000)+'K', 'lower') : ''}
-        ${pCr('Year 1 Monthly Income', sqYr1?'$'+Math.round((sqYr1.grossIncome||0)/12).toLocaleString()+'/mo':'—', yr1?'$'+Math.round((yr1.grossIncome||0)/12).toLocaleString()+'/mo':'—', 'higher')}
-      </tbody>
-    </table>
-    ${taxSavings > 5000 ? `<div style="padding:9px 13px;background:${P.tealLt};border:1px solid #A8D8C4;border-radius:5px;font-size:11px;color:${P.textMid};line-height:1.5;margin-bottom:4px;">
-      💡 <strong style="color:${P.teal};">Estimated lifetime tax reduction: ${fmtM2(taxSavings)}</strong> — The result of repositioning income into tax-free vehicles and strategically reducing the future RMD base.
-    </div>` : ''}
-
-    ${pHr()}
-    ${pH('The Gaps We Are Addressing', 'Each risk below is present in the current plan — and each is solved by a specific IncomeArc™ layer')}
-    ${riskCards.join('')}
-
-    ${pHr()}
-    ${pH('From One Bucket to Four — Restructuring ' + fmtM2(totalQualBal))}
-    ${totalFunding > 0 ? `<div style="background:${P.bgAlt};border:1px solid ${P.border};border-radius:8px;padding:16px 18px;margin-bottom:16px;">
-      <div style="font-size:11.5px;color:${P.textMid};line-height:1.65;margin-bottom:12px;">Today, <strong style="color:${P.navy};">${fmtM2(totalQualBal)}</strong> sits in a single undifferentiated pool — fully taxable, exposed to market risk, forced RMDs, and zero LTC protection. IncomeArc™ repositions a portion into four purpose-built layers, each solving a specific retirement risk.</div>
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding:10px 14px;background:#fff;border:1px solid ${P.border};border-radius:5px;">
-        <div style="font-size:20px;">🪣</div>
-        <div><div style="font-size:13px;font-weight:700;color:${P.navy};">Total Qualified Balance: ${fmtM2(totalQualBal)}</div><div style="font-size:10px;color:${P.textSoft};margin-top:1px;">One pool — taxable, RMD-exposed, unprotected</div></div>
-      </div>
-      <div style="font-size:9px;color:${P.textSoft};margin-bottom:10px;letter-spacing:.1em;text-transform:uppercase;">Repositioned Into Four Layers:</div>
-      ${hasL1 && l1FundAmt > 0 ? pBb('Layer 1 — Roth Annuity Conversion (GLWB Income Floor)', l1FundAmt, totalQualBal, '#6B44AA', P.purpleLt, '🛡️') : ''}
-      ${hasL2 && l2FundAmt > 0 ? pBb('Layer 2 — LTC Protection (Living Benefits IUL)', l2FundAmt, totalQualBal, '#9A5A0A', P.amberLt, '🏥') : ''}
-      ${hasL3 && l3FundAmt > 0 ? pBb('Layer 3 — ETA Tax-Free Accumulation (IUL Policy)', l3FundAmt, totalQualBal, '#1F6B55', P.tealLt, '📈') : ''}
-      ${pBb('Layer 4 — Remaining Portfolio Reserve', residualPortfolio, totalQualBal, '#2D5B7A', P.steelLt, '💼')}
-      <div style="margin-top:12px;padding:9px 12px;background:#fff;border:1px solid #A8D8C4;border-radius:5px;font-size:11px;color:${P.textMid};line-height:1.55;"><strong style="color:${P.teal};">What changes:</strong> The portfolio reserve (Layer 4) is no longer a daily income machine. Each repositioned layer has a dedicated purpose — so Layer 4 becomes a strategic reserve for growth, discretionary spending, and legacy.</div>
-    </div>` : `<div style="font-size:11.5px;color:${P.textMid};line-height:1.65;margin-bottom:16px;">Enable the IncomeArc™ Architecture and enter Layer commitments to see the bucket restructuring illustration.</div>`}
-
-    ${pH('The Four Layers — What Each One Does', 'A coordinated system — not a single product')}
-    ${layerCards.join('')}
-
-    ${pHr()}
-
-    ${(() => {
-      // ── LTC Impact Section — only render when LTC event is modeled ──
-      const hasLtcRpt = inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
-      if (!hasLtcRpt) return '';
-
-      const ltcAge_r = inputs.ltcEventAge;
-      const ltcDur = inputs.ltcDuration || 3;
-      const ltcEnd_r = ltcAge_r + ltcDur;
-      const totalLtcCost_r = inputs.ltcMonthlyCost * 12 * ltcDur;
-      const annualLtcCost = inputs.ltcMonthlyCost * 12;
-      const hasInsuranceData = yearsInsured && yearsUninsured;
-
-      // Gross-up tax from uninsured projection
-      const grossUpTaxTotal_r = hasInsuranceData
-        ? yearsUninsured.filter(r => r.age >= ltcAge_r && r.age < ltcEnd_r).reduce((sum,r) => sum + (r.ltcGrossUpTax||0), 0)
-        : 0;
-      const trueTotalCost_r = totalLtcCost_r + grossUpTaxTotal_r;
-
-      // Portfolio difference at end of plan
-      const uninsuredFinal_r = hasInsuranceData ? yearsUninsured[yearsUninsured.length-1] : null;
-      const insuredFinal_r   = hasInsuranceData ? yearsInsured[yearsInsured.length-1]   : null;
-      const portfolioDiff_r  = (insuredFinal_r && uninsuredFinal_r) ? (insuredFinal_r.totalPortfolio - uninsuredFinal_r.totalPortfolio) : 0;
-      const compoundingLoss_r = Math.max(0, portfolioDiff_r - trueTotalCost_r);
-
-      // Layer 2 benefit sizing
-      const annualBenefit_r = (inputs.ltcMonthlyBenefit || inputs.ltcMonthlyCost) * 12;
-      const totalBenefit_r  = annualBenefit_r * (inputs.ltcBenefitDuration || ltcDur);
-      const benefitGap_r    = Math.max(0, totalLtcCost_r - totalBenefit_r);
-
-      // Confidence delta
-      const confDeltaLtc = hasInsuranceData && confidenceInsured !== null && confidenceUninsured !== null
-        ? confidenceInsured - confidenceUninsured : null;
-
-      // Portfolio at plan-end for each scenario
-      const uninsuredAge90 = hasInsuranceData ? yearsUninsured.find(y => y.age === 90) : null;
-      const insuredAge90   = hasInsuranceData ? yearsInsured.find(y => y.age === 90)   : null;
-
-      const f2 = v => v >= 1000000 ? '$'+(v/1000000).toFixed(1)+'M' : '$'+Math.round(v/1000)+'K';
-
-      // Spouse LTC
-      const hasSpouseLtc = isMarriedRpt && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
-
-      return `
-      ${pH('Long-Term Care — The Hidden Portfolio Risk', 'Side-by-side impact of an uninsured vs. insured care event')}
-
-      <div style="font-size:11.5px;color:${P.textMid};line-height:1.7;margin-bottom:14px;">
-        A long-term care event is one of the most financially devastating risks in retirement — not just because of the direct cost, but because of what it does to the portfolio. A forced withdrawal during an LTC event requires a <strong style="color:${P.navy};">gross-up draw</strong> from a tax-deferred account — meaning more must come out to net the care cost after tax. That enlarged withdrawal reduces the compounding base permanently, and the portfolio never fully recovers.
-      </div>
-
-      <!-- Event Summary Bar -->
-      <div style="background:${P.bgAlt};border:1px solid ${P.border};border-radius:7px;padding:14px 18px;margin-bottom:14px;">
-        <div style="font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:${P.textSoft};margin-bottom:10px;">Modeled Care Event — ${clientLabel2}</div>
-        <div style="display:flex;flex-wrap:wrap;gap:10px;">
-          <div style="flex:1;min-width:100px;text-align:center;padding:10px;background:#fff;border:1px solid ${P.border};border-radius:5px;">
-            <div style="font-size:16px;font-weight:700;color:${P.navy};">Age ${ltcAge_r}</div>
-            <div style="font-size:10px;color:${P.textSoft};margin-top:1px;">Event begins</div>
-          </div>
-          <div style="flex:1;min-width:100px;text-align:center;padding:10px;background:#fff;border:1px solid ${P.border};border-radius:5px;">
-            <div style="font-size:16px;font-weight:700;color:${P.navy};">${ltcDur} Years</div>
-            <div style="font-size:10px;color:${P.textSoft};margin-top:1px;">Duration</div>
-          </div>
-          <div style="flex:1;min-width:100px;text-align:center;padding:10px;background:#fff;border:1px solid ${P.border};border-radius:5px;">
-            <div style="font-size:16px;font-weight:700;color:${P.amber};">$${inputs.ltcMonthlyCost.toLocaleString()}/mo</div>
-            <div style="font-size:10px;color:${P.textSoft};margin-top:1px;">Care cost</div>
-          </div>
-          <div style="flex:1;min-width:100px;text-align:center;padding:10px;background:#fff;border:1px solid ${P.border};border-radius:5px;">
-            <div style="font-size:16px;font-weight:700;color:${P.red};">${f2(totalLtcCost_r)}</div>
-            <div style="font-size:10px;color:${P.textSoft};margin-top:1px;">Total care cost</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Two-column comparison: Uninsured vs Insured -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
-
-        <!-- WITHOUT Layer 2 -->
-        <div style="border:2px solid #E8C0C0;border-radius:7px;overflow:hidden;">
-          <div style="background:${P.red};padding:10px 14px;">
-            <div style="font-size:10px;font-weight:700;color:#fff;letter-spacing:.06em;text-transform:uppercase;">Without Layer 2</div>
-            <div style="font-size:10px;color:rgba(255,255,255,.65);margin-top:1px;">Uninsured — portfolio absorbs all costs</div>
-          </div>
-          <div style="padding:12px 14px;background:#fff;">
-            ${[
-              ['Direct Care Cost', f2(totalLtcCost_r), P.red],
-              ['Gross-Up Tax (extra withdrawal needed)', grossUpTaxTotal_r > 0 ? f2(grossUpTaxTotal_r) : 'Minimal', P.amber],
-              ['True Total Cost to Portfolio', f2(trueTotalCost_r), P.red],
-              ['Lost Compounding (event → plan end)', compoundingLoss_r > 0 ? f2(compoundingLoss_r) : '—', P.red],
-              ...(uninsuredAge90 ? [['Portfolio at Age 90', f2(uninsuredAge90.totalPortfolio), P.textMid]] : []),
-              ...(confDeltaLtc !== null ? [['Plan Survival Confidence', (confidenceUninsured||'—')+'%', (confidenceUninsured||0) < 70 ? P.red : P.amber]] : []),
-            ].map(([l,v,c]) => `
-            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid ${P.border};">
-              <span style="font-size:10.5px;color:${P.textSoft};">${l}</span>
-              <span style="font-size:11px;font-weight:700;color:${c};">${v}</span>
-            </div>`).join('')}
-          </div>
-        </div>
-
-        <!-- WITH Layer 2 -->
-        <div style="border:2px solid #A8D8C4;border-radius:7px;overflow:hidden;">
-          <div style="background:${P.teal};padding:10px 14px;">
-            <div style="font-size:10px;font-weight:700;color:#fff;letter-spacing:.06em;text-transform:uppercase;">With Layer 2</div>
-            <div style="font-size:10px;color:rgba(255,255,255,.65);margin-top:1px;">Insured — benefit pool absorbs care cost</div>
-          </div>
-          <div style="padding:12px 14px;background:#fff;">
-            ${[
-              ['Policy Benefit Covers', benefitGap_r === 0 ? 'Full care cost' : f2(totalBenefit_r)+' (partial)', P.teal],
-              ['Remaining Gap', benefitGap_r > 0 ? f2(benefitGap_r) : 'None', benefitGap_r > 0 ? P.amber : P.teal],
-              ['Gross-Up Tax', 'Eliminated', P.teal],
-              ['Portfolio Impact', 'Untouched', P.teal],
-              ...(insuredAge90 ? [['Portfolio at Age 90', f2(insuredAge90.totalPortfolio), P.teal]] : []),
-              ...(confDeltaLtc !== null ? [['Plan Survival Confidence', (confidenceInsured||'—')+'%', P.teal]] : []),
-            ].map(([l,v,c]) => `
-            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid ${P.border};">
-              <span style="font-size:10.5px;color:${P.textSoft};">${l}</span>
-              <span style="font-size:11px;font-weight:700;color:${c};">${v}</span>
-            </div>`).join('')}
-          </div>
-        </div>
-      </div>
-
-      <!-- Portfolio difference callout -->
-      ${portfolioDiff_r > 0 ? `<div style="padding:11px 15px;background:${P.tealLt};border:1px solid #A8D8C4;border-radius:6px;margin-bottom:12px;">
-        <div style="font-size:12px;font-weight:700;color:${P.teal};margin-bottom:3px;">Portfolio Preserved by Layer 2: ${f2(portfolioDiff_r)}</div>
-        <div style="font-size:11px;color:${P.textMid};line-height:1.6;">This is the projected difference in final portfolio value between the insured and uninsured paths. It includes the direct care cost, the gross-up tax on forced withdrawals, and the compounding growth the depleted portfolio never earned.${compoundingLoss_r > 0 ? ` The compounding loss alone — the permanent drag on a smaller portfolio from event age to plan end — accounts for approximately ${f2(compoundingLoss_r)}.` : ''}</div>
-      </div>` : ''}
-
-      ${confDeltaLtc !== null && Math.abs(confDeltaLtc) >= 1 ? `<div style="padding:11px 15px;background:${confDeltaLtc > 0 ? P.tealLt : P.amberLt};border:1px solid ${confDeltaLtc > 0 ? '#A8D8C4' : '#E8C890'};border-radius:6px;margin-bottom:12px;">
-        <div style="font-size:12px;font-weight:700;color:${confDeltaLtc > 0 ? P.teal : P.amber};margin-bottom:3px;">Plan Survival Confidence: ${confDeltaLtc > 0 ? '+' : ''}${confDeltaLtc} percentage points with Layer 2</div>
-        <div style="font-size:11px;color:${P.textMid};line-height:1.6;">Without Layer 2: <strong>${confidenceUninsured}%</strong> plan survival confidence. With Layer 2: <strong>${confidenceInsured}%</strong>. The difference reflects the portfolio's ability to sustain distributions through age ${inputs.planToAge} when the care event does not drain the compounding base.</div>
-      </div>` : ''}
-
-      <!-- The gross-up explained -->
-      <div style="background:${P.amberLt};border:1px solid #E8C890;border-radius:6px;padding:11px 15px;margin-bottom:12px;">
-        <div style="font-size:11px;font-weight:700;color:${P.amber};margin-bottom:4px;">Why Does the Uninsured Path Cost More Than the Care Bill?</div>
-        <div style="font-size:11px;color:${P.textMid};line-height:1.65;">Most care costs are paid from a traditional IRA or 401(k). Every dollar that comes out is ordinary income — taxable in the year of withdrawal. To net $7,500/month for care, the account must distribute more than $7,500 — enough extra to cover the tax on the withdrawal itself. This <strong style="color:${P.navy};">gross-up</strong> is forced additional income that compounds the tax burden, can trigger IRMAA surcharges, and increases Social Security taxation — all while permanently reducing the portfolio's compounding base.</div>
-      </div>
-
-      ${hasSpouseLtc ? (() => {
-        const spAge = inputs.spouseLtcEventAge;
-        const spDur = inputs.spouseLtcDuration || 3;
-        const spEnd = spAge + spDur;
-        const sTotalCareCost = inputs.spouseLtcMonthlyCost * 12 * spDur;
-        const sGrossUpTax = (yearsSpouseUninsured||[])
-          .filter(r => r.age >= spAge && r.age < spEnd)
-          .reduce((s,r) => s + (r.ltcGrossUpTax||0), 0);
-        const sPortfolioDiff = (yearsSpouseInsured && yearsSpouseUninsured)
-          ? ((yearsSpouseInsured[yearsSpouseInsured.length-1]||{}).totalPortfolio||0)
-            - ((yearsSpouseUninsured[yearsSpouseUninsured.length-1]||{}).totalPortfolio||0)
-          : 0;
-        const sForced = (yearsSpouseUninsured||[])
-          .filter(r => r.age >= spAge && r.age < spEnd)
-          .reduce((s,r) => s + (r.ltcPortfolioDraw||0), 0);
-        const cForced = (yearsUninsured||[])
-          .filter(r => r.age >= ltcAge_r && r.age < ltcEnd_r)
-          .reduce((s,r) => s + (r.ltcPortfolioDraw||0), 0);
-
-        const hTotalCareCost   = totalLtcCost_r + sTotalCareCost;
-        const hTotalGrossUpTax = grossUpTaxTotal_r + sGrossUpTax;
-        const hTotalPreserved  = portfolioDiff_r + sPortfolioDiff;
-        const hTotalCompounding = Math.max(0, hTotalPreserved - hTotalCareCost - hTotalGrossUpTax);
-        const hForcedDraws     = cForced + sForced;
-
-        const hhConfU = confidenceBothUninsured !== null ? confidenceBothUninsured : null;
-        const hhConfI = confidenceBothInsured !== null ? confidenceBothInsured : null;
-        const hhConfDelta = hhConfI !== null && hhConfU !== null ? hhConfI - hhConfU : null;
-        const spLabel = clientInfo.spouseName || 'Spouse';
-
-        return `
-        <div style="margin-top:14px;background:${P.bgAlt};border:2px solid #C8B8E8;border-radius:8px;overflow:hidden;">
-          <div style="background:#5B3E8A;padding:10px 16px;display:flex;align-items:center;gap:12px;">
-            <div style="font-size:10px;font-weight:700;color:#fff;letter-spacing:.08em;text-transform:uppercase;">Combined Household — Total Layer 2 Economic Benefit</div>
-            <div style="font-size:10px;color:rgba(255,255,255,.65);">${clientLabel2} + ${spLabel}</div>
-          </div>
-          <div style="padding:14px 16px;">
-            <div style="font-size:11px;color:${P.textMid};line-height:1.65;margin-bottom:12px;">
-              Both care events draw from the same shared retirement portfolio. The combined figures below represent the full household exposure and the total economic benefit of insuring both spouses under Layer 2.
-            </div>
-            <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px;">
-              ${[
-                ['Combined Care Cost', f2(hTotalCareCost), clientLabel2+' '+f2(totalLtcCost_r)+' + '+spLabel+' '+f2(sTotalCareCost), P.red],
-                ['Total Forced Draws', hForcedDraws > 0 ? f2(hForcedDraws) : '—', 'Gross IRA/taxable drawn if both uninsured', hForcedDraws > 0 ? P.red : P.teal],
-                ['Total Gross-Up Tax', hTotalGrossUpTax > 0 ? f2(hTotalGrossUpTax) : '—', 'Extra tax on all forced IRA draws', hTotalGrossUpTax > 0 ? P.red : P.teal],
-                ['Compounding Loss', f2(hTotalCompounding), 'Growth never earned from depleted base', P.red],
-                ['Total Portfolio Preserved', f2(hTotalPreserved), 'Both events — full Layer 2 benefit', '#5B3E8A'],
-              ].map(([l,v,sub,c]) => `
-              <div style="background:#fff;border:1px solid ${P.border};border-radius:5px;padding:9px 10px;text-align:center;">
-                <div style="font-size:9px;color:${P.textSoft};text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">${l}</div>
-                <div style="font-size:14px;font-weight:700;color:${c};font-family:'Cormorant Garamond',serif;">${v}</div>
-                <div style="font-size:9px;color:${P.textSoft};margin-top:2px;line-height:1.4;">${sub}</div>
-              </div>`).join('')}
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
-              ${[
-                { name: clientLabel2, careCost: totalLtcCost_r, grossUp: grossUpTaxTotal_r, preserved: portfolioDiff_r },
-                { name: spLabel, careCost: sTotalCareCost, grossUp: sGrossUpTax, preserved: sPortfolioDiff },
-              ].map(sp => `
-              <div style="background:#fff;border:1px solid ${P.border};border-radius:5px;padding:10px 12px;">
-                <div style="font-size:9.5px;font-weight:700;color:#5B3E8A;text-transform:uppercase;letter-spacing:.07em;margin-bottom:7px;">${sp.name}</div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
-                  ${[
-                    ['Care Cost', f2(sp.careCost), P.red],
-                    ['Gross-Up Tax', sp.grossUp > 0 ? f2(sp.grossUp) : 'None', sp.grossUp > 0 ? P.amber : P.teal],
-                    ['Portfolio Preserved', f2(sp.preserved), '#5B3E8A'],
-                    ['Layer 2 Coverage', 'Full', P.teal],
-                  ].map(([l,v,c]) => `
-                  <div>
-                    <div style="font-size:9px;color:${P.textSoft};text-transform:uppercase;">${l}</div>
-                    <div style="font-size:11px;font-weight:700;color:${c};">${v}</div>
-                  </div>`).join('')}
-                </div>
-              </div>`).join('')}
-            </div>
-            ${hhConfDelta !== null ? `
-            <div style="background:${P.bgAlt};border:1px solid ${P.border};border-radius:6px;padding:10px 14px;margin-bottom:10px;">
-              <div style="font-size:9.5px;font-weight:700;color:#5B3E8A;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">Household Plan Survival — Combined Monte Carlo Confidence</div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px;">
-                <div>
-                  <div style="font-size:9px;color:${P.red};font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px;">Without Layer 2 — Both Uninsured</div>
-                  <div style="font-size:22px;font-weight:700;color:${P.red};font-family:'Cormorant Garamond',serif;">${hhConfU}%</div>
-                  <div style="height:5px;background:${P.border};border-radius:3px;overflow:hidden;margin-top:4px;"><div style="height:100%;width:${Math.max(4,hhConfU)}%;background:${P.red};border-radius:3px;"></div></div>
-                </div>
-                <div>
-                  <div style="font-size:9px;color:#5B3E8A;font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px;">With Layer 2 — Both Insured</div>
-                  <div style="font-size:22px;font-weight:700;color:#5B3E8A;font-family:'Cormorant Garamond',serif;">${hhConfI}%</div>
-                  <div style="height:5px;background:${P.border};border-radius:3px;overflow:hidden;margin-top:4px;"><div style="height:100%;width:${Math.max(4,hhConfI)}%;background:#5B3E8A;border-radius:3px;"></div></div>
-                </div>
-              </div>
-              <div style="text-align:center;font-size:10.5px;font-weight:700;color:${hhConfDelta > 0 ? '#5B3E8A' : P.red};padding-top:8px;border-top:1px solid ${P.border};">
-                ${hhConfDelta > 0
-                  ? 'Insuring both spouses improves household plan survival by +'+hhConfDelta+' percentage points'
-                  : hhConfDelta < 0
-                  ? 'Review benefit sizing — combined premium cost exceeds confidence benefit'
-                  : 'No confidence difference at the household level'}
-              </div>
-            </div>` : ''}
-            <div style="padding:9px 13px;background:#F0EBF8;border:1px solid #C8B8E8;border-radius:5px;font-size:11px;color:${P.textMid};line-height:1.55;">
-              Without Layer 2 on both spouses, a sequential or overlapping care scenario could permanently impair the shared portfolio by an estimated <strong style="color:#5B3E8A;">${f2(hTotalPreserved)}</strong> — including direct draws, tax friction, and compounding loss on the depleted base.
-            </div>
-          </div>
-        </div>`;
-      })() : ''}
-      `;
-    })()}
-
-    ${pHr()}
-    ${pH('Income Architecture — Year 1 of Retirement (Age ' + inputs.retireAge + ')')}
-    <div style="font-size:11.5px;color:${P.textMid};margin-bottom:12px;">Projected first-year gross income: <strong style="color:${P.navy};">${yr1?'$'+Math.round((yr1.grossIncome||0)/12).toLocaleString()+'/month':'—'}</strong></div>
-    <table style="width:100%;border-collapse:collapse;border:1px solid ${P.border};overflow:hidden;margin-bottom:14px;">
-      <thead>
-        <tr style="background:${P.bgCard};">
-          <th style="padding:8px 10px;font-size:9.5px;color:${P.textSoft};text-align:left;border-bottom:1px solid ${P.border};font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Source</th>
-          <th style="padding:8px 10px;font-size:9.5px;color:${P.textSoft};text-align:right;border-bottom:1px solid ${P.border};font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Annual</th>
-          <th style="padding:8px 10px;font-size:9.5px;color:${P.textSoft};text-align:right;border-bottom:1px solid ${P.border};font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Monthly</th>
-          <th style="padding:8px 10px;font-size:9.5px;color:${P.textSoft};text-align:right;border-bottom:1px solid ${P.border};font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Tax</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${yr1 ? Object.entries(COLORS).filter(([k])=>k!=='expense'&&yr1.sources&&(yr1.sources[k]||0)>0).map(([k,c],i)=>`
-        <tr style="border-bottom:1px solid ${P.border};background:${i%2===0?'#fff':P.bgAlt};">
-          <td style="padding:8px 10px;font-size:11.5px;color:${P.textMid};"><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${c.fill};margin-right:8px;vertical-align:middle;opacity:0.8;"></span>${c.label}</td>
-          <td style="padding:8px 10px;font-size:11.5px;color:${P.text};text-align:right;font-weight:500;">$${Math.round((yr1.sources[k]||0)/1000*10)/10}K</td>
-          <td style="padding:8px 10px;font-size:11.5px;color:${P.text};text-align:right;font-weight:500;">$${Math.round((yr1.sources[k]||0)/12).toLocaleString()}</td>
-          <td style="padding:8px 10px;font-size:11px;text-align:right;font-weight:600;color:${c.tax==='free'?P.teal:c.tax==='partial'?P.amber:P.red};">${c.tax==='free'?'Tax-Free':c.tax==='partial'?'Partial':'Taxable'}</td>
-        </tr>`).join('') : `<tr><td colspan="4" style="padding:12px;text-align:center;color:${P.textSoft};font-size:11px;">Enter retirement inputs to populate income detail</td></tr>`}
-      </tbody>
-    </table>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:4px;">
-      ${pSb(guaranteedPct+'%','Guaranteed<br>Income',P.teal,P.tealLt,'SS + pension + Roth annuity')}
-      ${pSb(confidence+'%','Plan Survival<br>Confidence',confidence>=80?P.teal:confidence>=65?P.amber:P.red,confidence>=80?P.tealLt:confidence>=65?P.amberLt:P.redLt,'1,000-trial Monte Carlo')}
-      ${age90Data?pSb(fmtM2(age90Data.totalPortfolio),'Portfolio<br>at Age 90',P.gold,'#FDF8EE','IncomeArc™ projection'):''}
-    </div>
-
-    ${pHr()}
-    ${pH('Key Assumptions')}
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid ${P.border};overflow:hidden;margin-bottom:22px;">
-      ${[
-        ['Portfolio Return', inputs.portfolioReturn+'%'],
-        ['Inflation Rate', inputs.inflation+'%'],
-        ['Filing Status', isMarriedRpt?'Married Filing Jointly':'Single'],
-        ['State', stateInfo2?stateInfo2.name:inputs.stateCode],
-        ['Fixed Monthly Expenses', '$'+inputs.fixedExpenses.toLocaleString()],
-        ['Lifestyle Monthly Expenses', '$'+inputs.lifestyleExpenses.toLocaleString()],
-        ['Traditional IRA / 401(k)', fmtM2(totalQualBal)],
-        ['Roth Accounts', fmtM2(inputs.rothBalance)],
-        ...(inputs.taxableBalance>0?[['Taxable / Non-Qualified', fmtM2(inputs.taxableBalance)]]:[] ),
-        ...(inputs.sorrEnabled?[['SORR Stress', 'Active — First 5 Years']]:[] ),
-        ...(inputs.taxRateStressAdder>0?[['Tax Rate Stress Adder', '+'+inputs.taxRateStressAdder+'%']]:[] ),
-        ['Monte Carlo Trials','1,000'],
-      ].map(([l,v],i)=>`<div style="padding:7px 12px;border-bottom:1px solid ${P.border};${i%2===0?'border-right:1px solid '+P.border+';':''}background:${i%2===0?'#fff':P.bgAlt};"><span style="font-size:10.5px;color:${P.textSoft};">${l}</span><span style="font-size:11px;color:${P.text};font-weight:600;float:right;">${v}</span></div>`).join('')}
-    </div>
-
-    <div style="background:${P.navy};border-radius:7px;padding:20px 26px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;">
-      <div>
-        <div style="font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:${P.goldLt};margin-bottom:6px;">Your Next Step</div>
-        <div style="font-size:17px;font-family:Georgia,serif;color:#fff;margin-bottom:6px;">Review this together.</div>
-        <div style="font-size:11px;color:rgba(255,255,255,.58);line-height:1.6;max-width:360px;">This illustration is a starting point — not a finished plan. The next step is a working session to confirm product assumptions, underwriting, and the specific sequence of implementation.</div>
-      </div>
-      <div style="text-align:right;flex-shrink:0;">
-        <div style="font-size:12.5px;font-weight:700;color:${P.goldLt};">Jeffrey Faine, CLU, RICP</div>
-        <div style="font-size:10px;color:rgba(200,169,110,.55);margin-top:3px;">Integrated Planning Partners</div>
-        <div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:2px;">integratedplanningpartners.com</div>
-      </div>
-    </div>
-
+  <div style="padding:16px 28px;background:#0B1928;border-top:1px solid rgba(255,255,255,.06);font-size:11px;color:#8DAFC8;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+    <span>Integrated Planning Partners · support@integratedplanningpartners.com</span>
+    <span>Generated ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</span>
   </div>
-
-  <!-- FOOTER -->
-  <div style="padding:14px 36px;background:${P.bgCard};border-top:1px solid ${P.border};">
-    <div style="font-size:9.5px;color:${P.textSoft};line-height:1.65;margin-bottom:6px;">
-      <strong style="color:${P.red};">Important Disclosure:</strong> All projections are hypothetical illustrations for conceptual and educational purposes only and do not constitute financial, legal, tax, or investment advice. Figures are based on user-entered assumptions and will vary with actual market conditions, tax law changes, product terms, and individual circumstances. Monte Carlo uses 1,000 trials with user-defined mean return and 12% standard deviation. RMD calculations use IRS Uniform Lifetime Table. IRMAA thresholds reflect current Medicare brackets. Insurance product benefits subject to underwriting and contractual terms. Intended for use by licensed financial professionals in conjunction with a comprehensive financial planning engagement. © 2026 Integrated Planning Partners. All rights reserved.
-    </div>
-    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;font-size:9px;color:${P.textSoft};">
-      <span>IncomeArc™ is a proprietary system of Integrated Planning Partners &amp; Jeffrey Faine, CLU, RICP®</span>
-      <span>Generated ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</span>
-    </div>
-  </div>
-
 </div>`;
                   try {
                     const res = await fetch('https://api.emailjs.com/api/v1.0/email/send',{
@@ -3190,53 +2597,6 @@ function App() {
               <Field label="Lifestyle Monthly Expenses" hint="Travel, dining, family, discretionary">
                 <NumInput value={inputs.lifestyleExpenses} onChange={v=>set('lifestyleExpenses',v)} prefix="$" suffix="/mo"/>
               </Field>
-
-              {/* ── Expense Shock Stress toggle ── */}
-              <div style={{marginTop:14,paddingTop:14,borderTop:'1px solid rgba(255,255,255,.06)'}}>
-                <div style={{fontSize:12,fontWeight:700,color:'#C4943A',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:6}}>
-                  Unexpected Major Expense
-                </div>
-                <div style={{fontSize:12,color:'#8DAFC8',lineHeight:1.6,marginBottom:10}}>
-                  Models recurring large expenses (home repair, medical episode, family support) that hit the portfolio mid-retirement. Guaranteed income from the Roth Annuity absorbs what it can — the gap shows what the portfolio must cover.
-                </div>
-                <div style={{display:'flex',alignItems:'center',gap:12,marginBottom: inputs.expenseShockEnabled ? 12 : 0}}>
-                  <div
-                    onClick={()=>set('expenseShockEnabled', !inputs.expenseShockEnabled)}
-                    style={{
-                      width:44, height:24, borderRadius:12, cursor:'pointer',
-                      background: inputs.expenseShockEnabled ? '#C4943A' : 'rgba(255,255,255,.1)',
-                      position:'relative', transition:'background .2s', flexShrink:0,
-                      border: inputs.expenseShockEnabled ? '1px solid #C4943A' : '1px solid rgba(255,255,255,.15)',
-                    }}>
-                    <div style={{
-                      position:'absolute', top:3, left: inputs.expenseShockEnabled ? 22 : 3,
-                      width:16, height:16, borderRadius:8,
-                      background:'#F5F2EC', transition:'left .2s',
-                      boxShadow:'0 1px 3px rgba(0,0,0,.3)',
-                    }}/>
-                  </div>
-                  <span style={{fontSize:13,color: inputs.expenseShockEnabled ? '#C4943A' : '#8DAFC8', fontWeight: inputs.expenseShockEnabled ? 700 : 400}}>
-                    {inputs.expenseShockEnabled ? 'Expense Shock Active' : 'Off'}
-                  </span>
-                </div>
-
-                {inputs.expenseShockEnabled && (
-                  <div style={{background:'rgba(196,148,58,.06)',border:'1px solid rgba(196,148,58,.2)',borderRadius:8,padding:'10px 12px'}}>
-                    <Field label="Shock Amount" hint="Size of each unexpected expense event (today's dollars)">
-                      <NumInput value={inputs.expenseShockAmount} onChange={v=>set('expenseShockAmount',v)} prefix="$"/>
-                    </Field>
-                    <Field label="Average Frequency" hint="How often a shock event occurs (Monte Carlo randomizes exact timing)">
-                      <div style={{display:'flex',alignItems:'center',gap:8}}>
-                        <span style={{fontSize:13,color:'#8DAFC8'}}>Every</span>
-                        <NumInput value={inputs.expenseShockFrequency} onChange={v=>set('expenseShockFrequency',Math.max(1,v))} suffix=" yrs" style={{width:80}}/>
-                      </div>
-                    </Field>
-                    <div style={{fontSize:11,color:'rgba(196,148,58,.7)',lineHeight:1.55,marginTop:4}}>
-                      Chart shows evenly-spaced shock markers. Monte Carlo randomizes exact timing across 1,000 trials for a statistically honest confidence score.
-                    </div>
-                  </div>
-                )}
-              </div>
             </Section>
 
 
@@ -3889,43 +3249,6 @@ function App() {
             </Section>
 
             <Section title="Healthcare Event" collapsed={sections.ltc} onToggle={()=>toggleSection('ltc')}>
-
-              {/* ── Healthcare Event Modeling Toggle ── */}
-              <div style={{
-                padding:'12px 14px', marginBottom:14,
-                background: inputs.ltcEventEnabled ? 'rgba(90,143,168,.10)' : 'rgba(255,255,255,.04)',
-                border: `1px solid ${inputs.ltcEventEnabled ? 'rgba(90,143,168,.45)' : 'rgba(255,255,255,.12)'}`,
-                borderRadius:8, transition:'all .2s',
-              }}>
-                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}>
-                  <div>
-                    <div style={{fontSize:13,fontWeight:700,color: inputs.ltcEventEnabled ? '#5B8FA8' : '#8DAFC8',letterSpacing:'.05em',textTransform:'uppercase',marginBottom:3}}>
-                      Model Healthcare Events
-                    </div>
-                    <div style={{fontSize:12,color:'#8DAFC8',lineHeight:1.5}}>
-                      {inputs.ltcEventEnabled
-                        ? 'Care events are active — chart, MC confidence, and comparison panels reflect the impact.'
-                        : 'Off — inputs can be pre-filled without affecting MC confidence or chart. Toggle on to show the client.'}
-                    </div>
-                  </div>
-                  <div
-                    onClick={()=>set('ltcEventEnabled', !inputs.ltcEventEnabled)}
-                    style={{
-                      width:44, height:24, borderRadius:12, cursor:'pointer', flexShrink:0,
-                      background: inputs.ltcEventEnabled ? '#5B8FA8' : 'rgba(255,255,255,.1)',
-                      position:'relative', transition:'background .2s',
-                      border: inputs.ltcEventEnabled ? '1px solid #5B8FA8' : '1px solid rgba(255,255,255,.15)',
-                    }}>
-                    <div style={{
-                      position:'absolute', top:3, left: inputs.ltcEventEnabled ? 22 : 3,
-                      width:16, height:16, borderRadius:8,
-                      background:'#F5F2EC', transition:'left .2s',
-                      boxShadow:'0 1px 3px rgba(0,0,0,.3)',
-                    }}/>
-                  </div>
-                </div>
-              </div>
-
               <div style={{padding:'10px 12px',background:'rgba(90,143,168,.06)',border:'1px solid rgba(90,143,168,.18)',borderRadius:7,marginBottom:12}}>
                 <div style={{fontSize:14,fontWeight:700,color:'#5B8FA8',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:5}}>Layer 2 — Healthcare Insulation</div>
                 <p style={{fontSize:13,color:'#DDD6C4',lineHeight:1.65}}>
@@ -4131,26 +3454,6 @@ function App() {
             </div>
           )}
 
-          {/* Expense Shock active banner */}
-          {inputs.expenseShockEnabled && (() => {
-            const shockCount = Math.floor((inputs.planToAge - inputs.retireAge) / (inputs.expenseShockFrequency || 8));
-            const totalShock = shockCount * (inputs.expenseShockAmount || 0);
-            const fmt = v => v >= 1000000 ? '$'+(v/1000000).toFixed(1)+'M' : '$'+Math.round(v/1000)+'K';
-            return (
-              <div style={{padding:'12px 16px',background:'rgba(196,148,58,.07)',border:'1px solid rgba(196,148,58,.25)',borderRadius:8,marginBottom:14,display:'flex',alignItems:'flex-start',gap:12}}>
-                <div style={{fontSize:20,lineHeight:1,marginTop:1}}>⚡</div>
-                <div>
-                  <div style={{fontSize:13,fontWeight:700,color:'#C4943A',letterSpacing:'.07em',textTransform:'uppercase',marginBottom:4}}>
-                    Unexpected Major Expense — Stress Active
-                  </div>
-                  <div style={{fontSize:13,color:'#DDD6C4',lineHeight:1.6}}>
-                    Modeling <strong style={{color:'#C4943A'}}>{fmt(inputs.expenseShockAmount)}</strong> expense events every ~<strong style={{color:'#C4943A'}}>{inputs.expenseShockFrequency} years</strong> (~{shockCount} events, ~{fmt(totalShock)} total exposure). Chart shows deterministic spacing. Monte Carlo randomizes exact timing across 1,000 trials — guaranteed income absorbs what it can; the remainder hits the portfolio. Amber markers ⚡ on the chart show shock years.
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-
           {/* Status Quo Banner */}
           {!inputs.architectureEnabled && (
             <div style={{
@@ -4174,7 +3477,7 @@ function App() {
           <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:20}}>
             {[
               { label:'Portfolio at Retirement', value: fmtM(totalPortfolioAtRetire), sub:'Starting balance', color:'#C8A96E' },
-              { label:'Guaranteed Income', value: guaranteedPct+'%', sub: `SS · pension · Roth annuity (age ${inputs.retireAge}–${inputs.planToAge})`, color: guaranteedPct>=50?'#4A9B7A':'#C8A030' },
+              { label:'Guaranteed Income', value: guaranteedPct+'%', sub: `SS · pension · annuity (age ${inputs.retireAge}–${inputs.planToAge})`, color: guaranteedPct>=50?'#4A9B7A':'#C8A030' },
               { label:'Total IRMAA Exposure', value: totalIrmaa>0?'$'+Math.round(totalIrmaa/1000)+'K':'None', sub: isMarried ? 'Est. surcharges (MFJ brackets)' : 'Est. Medicare surcharges', color: totalIrmaa>0?'#E8943A':'#4A9B7A' },
               { label:'Portfolio at Age 90', value: age90Data?fmtM(age90Data.totalPortfolio):'—', sub:'Est. remaining balance', color: age90Data&&age90Data.totalPortfolio>0?'#7BAF84':'#C47A7A' },
               { label:'Est. Lifetime Tax', value: totalEstTax>0?(totalEstTax>=1000000?'$'+(totalEstTax/1000000).toFixed(1)+'M':'$'+Math.round(totalEstTax/1000)+'K'):'—', sub:'Fed '+(totalFedTax>=1000000?'$'+(totalFedTax/1000000).toFixed(1)+'M':'$'+Math.round(totalFedTax/1000)+'K')+' · State '+(totalStateTax>=1000000?'$'+(totalStateTax/1000000).toFixed(1)+'M':'$'+Math.round(totalStateTax/1000)+'K')+(inputs.taxRateStressAdder>0?' · ⚠ stress +'+inputs.taxRateStressAdder+'%':''), color:'#C47A7A' },
@@ -4381,7 +3684,7 @@ function App() {
                   Income Arc — Age {inputs.retireAge} to {inputs.planToAge}
                 </h2>
                 <p style={{fontSize:13,color:'#8DAFC8'}}>
-                  After-tax net income by source · expense line overlay · {inputs.ltcEventEnabled && inputs.ltcEventAge > 0 ? 'healthcare event marked' : 'no healthcare event modeled'}
+                  After-tax net income by source · expense line overlay · {inputs.ltcEventAge > 0 ? 'healthcare event marked' : 'no healthcare event modeled'}
                 </p>
               </div>
               <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:10}}>
@@ -4545,11 +3848,11 @@ function App() {
                         {/* Column headers aligned with data below */}
                         <div style={{fontSize:12,fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'#C47A7A'}}>
                           WITHOUT LAYER 2
-                          <span style={{fontWeight:400,marginLeft:6,color:'#5A7A8A',fontSize:11}}>· care event, no policy</span>
+                          <span style={{fontWeight:400,marginLeft:6,color:'#5A7A8A',fontSize:11}}>· care event, no IncomeArc™ layers</span>
                         </div>
                         <div style={{fontSize:12,fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'#4A9B7A'}}>
                           WITH LAYER 2
-                          <span style={{fontWeight:400,marginLeft:6,color:'#5A7A8A',fontSize:11}}>· care cost shock absorbed</span>
+                          <span style={{fontWeight:400,marginLeft:6,color:'#5A7A8A',fontSize:11}}>· full IncomeArc™ architecture</span>
                         </div>
                       </div>
                       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:10}}>
@@ -4678,10 +3981,10 @@ function App() {
                     <div style={{background:'rgba(255,255,255,.02)',border:'1px solid rgba(255,255,255,.07)',borderRadius:10,padding:'14px 16px',marginBottom:14}}>
                       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:10}}>
                         <div style={{fontSize:12,fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'#C47A7A'}}>
-                          WITHOUT LAYER 2<span style={{fontWeight:400,marginLeft:6,color:'#5A7A8A',fontSize:11}}>· care event, no policy</span>
+                          WITHOUT LAYER 2<span style={{fontWeight:400,marginLeft:6,color:'#5A7A8A',fontSize:11}}>· care event, no IncomeArc™ layers</span>
                         </div>
                         <div style={{fontSize:12,fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'#4A9B7A'}}>
-                          WITH LAYER 2<span style={{fontWeight:400,marginLeft:6,color:'#5A7A8A',fontSize:11}}>· care cost shock absorbed</span>
+                          WITH LAYER 2<span style={{fontWeight:400,marginLeft:6,color:'#5A7A8A',fontSize:11}}>· full IncomeArc™ architecture</span>
                         </div>
                       </div>
                       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:10}}>
@@ -4718,144 +4021,6 @@ function App() {
             );
           })()}
 
-          {/* ── Combined Household Layer 2 Summary — shown when both spouses have LTC panels ── */}
-          {showLtcComparison && showSpouseLtcComparison &&
-           yearsInsured && yearsUninsured &&
-           yearsSpouseInsured && yearsSpouseUninsured && (() => {
-
-            const fmtD = v => v >= 1000000 ? `$${(v/1000000).toFixed(2)}M` : `$${Math.round(v/1000)}K`;
-            const clientLabel = inputs.clientName || 'Client';
-            const spouseLabel = inputs.spouseName || 'Spouse';
-
-            // Client metrics
-            const cUninsuredFinal = yearsUninsured[yearsUninsured.length-1];
-            const cInsuredFinal   = yearsInsured[yearsInsured.length-1];
-            const cPortfolioDiff  = cInsuredFinal && cUninsuredFinal
-              ? cInsuredFinal.totalPortfolio - cUninsuredFinal.totalPortfolio : 0;
-            const cTotalCareCost  = inputs.ltcMonthlyCost * 12 * inputs.ltcDuration;
-            const cGrossUpTax     = yearsUninsured
-              .filter(r => r.age >= inputs.ltcEventAge && r.age < inputs.ltcEventAge + inputs.ltcDuration)
-              .reduce((s, r) => s + (r.ltcGrossUpTax || 0), 0);
-            const cForced = yearsUninsured
-              .filter(r => r.age >= inputs.ltcEventAge && r.age < inputs.ltcEventAge + inputs.ltcDuration)
-              .reduce((s, r) => s + (r.ltcPortfolioDraw || 0), 0);
-
-            // Spouse metrics
-            const sUninsuredFinal = yearsSpouseUninsured[yearsSpouseUninsured.length-1];
-            const sInsuredFinal   = yearsSpouseInsured[yearsSpouseInsured.length-1];
-            const sPortfolioDiff  = sInsuredFinal && sUninsuredFinal
-              ? sInsuredFinal.totalPortfolio - sUninsuredFinal.totalPortfolio : 0;
-            const sTotalCareCost  = inputs.spouseLtcMonthlyCost * 12 * inputs.spouseLtcDuration;
-            const sGrossUpTax     = yearsSpouseUninsured
-              .filter(r => r.age >= inputs.spouseLtcEventAge && r.age < inputs.spouseLtcEventAge + inputs.spouseLtcDuration)
-              .reduce((s, r) => s + (r.ltcGrossUpTax || 0), 0);
-            const sForced = yearsSpouseUninsured
-              .filter(r => r.age >= inputs.spouseLtcEventAge && r.age < inputs.spouseLtcEventAge + inputs.spouseLtcDuration)
-              .reduce((s, r) => s + (r.ltcPortfolioDraw || 0), 0);
-
-            // Combined totals
-            const totalCareCost    = cTotalCareCost + sTotalCareCost;
-            const totalGrossUpTax  = cGrossUpTax + sGrossUpTax;
-            const totalForcedDraws = cForced + sForced;
-            const totalPreserved   = cPortfolioDiff + sPortfolioDiff;
-            const totalCompounding = Math.max(0, totalPreserved - totalCareCost - totalGrossUpTax);
-
-            // Combined confidence — use the real simultaneous projections, not an average
-            const bothInsuredConf   = confidenceBothInsured !== null ? confidenceBothInsured : null;
-            const bothUninsuredConf = confidenceBothUninsured !== null ? confidenceBothUninsured : null;
-            const confDelta = bothInsuredConf !== null && bothUninsuredConf !== null
-              ? bothInsuredConf - bothUninsuredConf : null;
-
-            return (
-              <div style={{background:'rgba(155,126,200,.06)',border:'2px solid rgba(155,126,200,.3)',borderRadius:12,padding:'18px 20px',marginBottom:16}}>
-                <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:6}}>
-                  <div style={{fontSize:13,fontWeight:700,letterSpacing:'.14em',textTransform:'uppercase',color:'#9B7EC8'}}>
-                    Combined Household — Total Layer 2 Economic Benefit
-                  </div>
-                  <div style={{fontSize:12,color:'#8DAFC8',background:'rgba(155,126,200,.1)',padding:'2px 8px',borderRadius:4,border:'1px solid rgba(155,126,200,.2)'}}>
-                    {clientLabel} + {spouseLabel}
-                  </div>
-                </div>
-                <div style={{fontSize:13,color:'#8DAFC8',marginBottom:14,lineHeight:1.5}}>
-                  Both care events draw from the same shared retirement portfolio. The totals below represent the combined household exposure and full economic benefit of insuring both spouses.
-                </div>
-
-                <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:10,marginBottom:14}}>
-                  {[
-                    { label:'Combined Care Cost', value: fmtD(totalCareCost), sub:`${clientLabel} ${fmtD(cTotalCareCost)} + ${spouseLabel} ${fmtD(sTotalCareCost)}`, color:'#C47A7A' },
-                    { label:'Total Forced Draws', value: totalForcedDraws > 0 ? fmtD(totalForcedDraws) : '—', sub:'Gross portfolio draws if both uninsured', color: totalForcedDraws > 0 ? '#C47A7A' : '#4A9B7A' },
-                    { label:'Total Gross-Up Tax', value: totalGrossUpTax > 0 ? fmtD(totalGrossUpTax) : '—', sub:'Extra tax friction on forced IRA draws', color: totalGrossUpTax > 0 ? '#C47A7A' : '#4A9B7A' },
-                    { label:'Compounding Loss', value: fmtD(totalCompounding), sub:'Growth never earned from depleted base', color:'#C47A7A' },
-                    { label:'Total Portfolio Preserved', value: fmtD(totalPreserved), sub:'Both events — full Layer 2 benefit', color:'#9B7EC8' },
-                  ].map(s => (
-                    <div key={s.label} style={{background:'rgba(255,255,255,.03)',borderRadius:8,padding:'10px 12px',border:'1px solid rgba(155,126,200,.12)'}}>
-                      <div style={{fontSize:12,color:'#8DAFC8',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:4}}>{s.label}</div>
-                      <div style={{fontSize:18,fontWeight:700,color:s.color,fontFamily:"'Cormorant Garamond',serif"}}>{s.value}</div>
-                      <div style={{fontSize:12,color:'#8DAFC8',marginTop:3}}>{s.sub}</div>
-                    </div>
-                  ))}
-                </div>
-
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
-                  {[
-                    { name: clientLabel, careCost: cTotalCareCost, forced: cForced, tax: cGrossUpTax, preserved: cPortfolioDiff },
-                    { name: spouseLabel, careCost: sTotalCareCost, forced: sForced, tax: sGrossUpTax, preserved: sPortfolioDiff },
-                  ].map(sp => (
-                    <div key={sp.name} style={{background:'rgba(255,255,255,.02)',border:'1px solid rgba(255,255,255,.07)',borderRadius:8,padding:'12px 14px'}}>
-                      <div style={{fontSize:12,fontWeight:700,color:'#9B7EC8',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:8}}>{sp.name}</div>
-                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
-                        {[
-                          { label:'Care Cost', value: fmtD(sp.careCost), color:'#C47A7A' },
-                          { label:'Forced Draws', value: sp.forced > 0 ? fmtD(sp.forced) : '—', color: sp.forced > 0 ? '#C47A7A' : '#4A9B7A' },
-                          { label:'Gross-Up Tax', value: sp.tax > 0 ? fmtD(sp.tax) : '—', color: sp.tax > 0 ? '#C47A7A' : '#4A9B7A' },
-                          { label:'Portfolio Preserved', value: fmtD(sp.preserved), color:'#9B7EC8' },
-                        ].map(m => (
-                          <div key={m.label}>
-                            <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.05em'}}>{m.label}</div>
-                            <div style={{fontSize:15,fontWeight:700,color:m.color,fontFamily:"'Cormorant Garamond',serif"}}>{m.value}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {confDelta !== null && (
-                  <div style={{background:'rgba(255,255,255,.02)',border:'1px solid rgba(255,255,255,.07)',borderRadius:10,padding:'14px 16px',marginBottom:14}}>
-                    <div style={{fontSize:12,fontWeight:700,color:'#9B7EC8',letterSpacing:'.1em',textTransform:'uppercase',marginBottom:10}}>Household Plan Survival — Combined Monte Carlo Confidence</div>
-                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:10}}>
-                      <div>
-                        <div style={{fontSize:12,color:'#C47A7A',fontWeight:700,letterSpacing:'.1em',textTransform:'uppercase',marginBottom:6}}>Without Layer 2 — Both Uninsured</div>
-                        <div style={{fontSize:28,fontWeight:700,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif",marginBottom:6}}>{bothUninsuredConf}%</div>
-                        <div style={{height:8,background:'rgba(255,255,255,.06)',borderRadius:4,overflow:'hidden'}}>
-                          <div style={{height:'100%',width:`${Math.max(4,bothUninsuredConf)}%`,background:'#C47A7A',borderRadius:4}}/>
-                        </div>
-                      </div>
-                      <div>
-                        <div style={{fontSize:12,color:'#9B7EC8',fontWeight:700,letterSpacing:'.1em',textTransform:'uppercase',marginBottom:6}}>With Layer 2 — Both Insured</div>
-                        <div style={{fontSize:28,fontWeight:700,color:'#9B7EC8',fontFamily:"'Cormorant Garamond',serif",marginBottom:6}}>{bothInsuredConf}%</div>
-                        <div style={{height:8,background:'rgba(255,255,255,.06)',borderRadius:4,overflow:'hidden'}}>
-                          <div style={{height:'100%',width:`${Math.max(4,bothInsuredConf)}%`,background:'#9B7EC8',borderRadius:4}}/>
-                        </div>
-                      </div>
-                    </div>
-                    <div style={{textAlign:'center',fontSize:13,fontWeight:700,color: confDelta > 0 ? '#9B7EC8' : '#C47A7A',borderTop:'1px solid rgba(255,255,255,.06)',paddingTop:10}}>
-                      {confDelta > 0
-                        ? `Insuring both spouses improves household plan survival confidence by +${confDelta} percentage points`
-                        : confDelta < 0
-                        ? `Review benefit sizing — combined premium cost exceeds confidence benefit`
-                        : 'No confidence difference at the household level'}
-                    </div>
-                  </div>
-                )}
-
-                <div style={{fontSize:13,color:'#DDD6C4',lineHeight:1.65,padding:'10px 14px',background:'rgba(155,126,200,.04)',borderRadius:8,border:'1px solid rgba(155,126,200,.12)'}}>
-                  Without Layer 2 coverage on both spouses, a sequential or overlapping care scenario could permanently impair the shared retirement portfolio by an estimated <strong style={{color:'#9B7EC8'}}>{fmtD(totalPreserved)}</strong> — including direct draws, tax gross-up friction, and compounding loss on the depleted base.
-                </div>
-              </div>
-            );
-          })()}
-
           {/* Sequence of returns stress test callout */}
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:16}}>
             <div style={{background:'rgba(196,106,106,.05)',border:'1px solid rgba(196,106,106,.15)',borderRadius:10,padding:'14px 16px'}}>
@@ -4867,7 +4032,7 @@ function App() {
             <div style={{background:'rgba(74,155,122,.05)',border:'1px solid rgba(74,155,122,.15)',borderRadius:10,padding:'14px 16px'}}>
               <div style={{fontSize:13,fontWeight:700,letterSpacing:'.14em',textTransform:'uppercase',color:'#4A9B7A',marginBottom:8}}>Guaranteed Income Floor</div>
               <p style={{fontSize:14,lineHeight:1.65,color:'#DDD6C4'}}>
-                <strong style={{color:'#4A9B7A'}}>{guaranteedPct}%</strong> of total projected retirement income (age {inputs.retireAge}–{inputs.planToAge}) comes from guaranteed sources (Social Security{inputs.pensionMonthly > 0 ? ', pension' : ''}{inputs.rothAnnuityMonthly > 0 ? ', Roth annuity' : ''}{inputs.nonQualAnnuityMonthly > 0 ? ', annuity' : ''}). {guaranteedPct < 50 ? 'Increasing this floor through a Roth Fixed Indexed Annuity with GLWB rider (Layer 1) reduces sequence risk and future IRMAA exposure. The ETA structure (Layer 3) can fund the conversion by eliminating the distribution tax via bank non-recourse loan.' : 'A strong floor provides stability against market volatility. Every dollar repositioned into the Roth Annuity (Layer 1) or ETA IUL policy (Layer 3) permanently reduces the future RMD base — lowering mandatory income and IRMAA exposure year after year.'}
+                <strong style={{color:'#4A9B7A'}}>{guaranteedPct}%</strong> of total projected retirement income (age {inputs.retireAge}–{inputs.planToAge}) comes from guaranteed sources (Social Security{inputs.pensionMonthly > 0 ? ', pension' : ''}{inputs.annuityMonthly > 0 ? ', annuity' : ''}). {guaranteedPct < 50 ? 'Increasing this floor through a Roth Fixed Indexed Annuity with GLWB rider (Layer 1) reduces sequence risk and future IRMAA exposure. The ETA structure (Layer 3) can fund the conversion by eliminating the distribution tax via bank non-recourse loan.' : 'A strong floor provides stability against market volatility. Every dollar repositioned into the Roth Annuity (Layer 1) or ETA IUL policy (Layer 3) permanently reduces the future RMD base — lowering mandatory income and IRMAA exposure year after year.'}
               </p>
             </div>
           </div>
