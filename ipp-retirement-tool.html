@@ -1130,6 +1130,8 @@ function projectArc(inputs) {
         row.totalIncome += actualGross;
         row.ltcGrossUpTax = (row.ltcGrossUpTax || 0) + actualTax;
         row.ltcPortfolioDraw = (row.ltcPortfolioDraw || 0) + actualGross;
+        row.spouseLtcGrossUpTax = (row.spouseLtcGrossUpTax || 0) + actualTax;   // spouse-only tracking
+        row.spouseLtcPortfolioDraw = (row.spouseLtcPortfolioDraw || 0) + actualGross; // spouse-only tracking
         taxable = Math.max(0, taxable - actualGross);
         ltcRemaining -= actualNet;
       }
@@ -1148,6 +1150,8 @@ function projectArc(inputs) {
         row.totalIncome += actualGross;
         row.ltcGrossUpTax = (row.ltcGrossUpTax || 0) + actualTax;
         row.ltcPortfolioDraw = (row.ltcPortfolioDraw || 0) + actualGross;
+        row.spouseLtcGrossUpTax = (row.spouseLtcGrossUpTax || 0) + actualTax;   // spouse-only tracking
+        row.spouseLtcPortfolioDraw = (row.spouseLtcPortfolioDraw || 0) + actualGross; // spouse-only tracking
         trad = Math.max(0, trad - actualGross);
       }
 
@@ -1370,13 +1374,13 @@ function projectArc(inputs) {
            .reduce((sum, r) => sum + (r.ltcPortfolioDraw || 0) + (r.ltcGrossUpTax || 0), 0) / ltcDuration
     : 0;
 
-  // Spouse LTC shock for Monte Carlo — uses same fields (ltcPortfolioDraw/ltcGrossUpTax)
-  // because in the spouse-only comparison projection, client ltcEventAge=0, so those
-  // fields will only contain spouse draws.
+  // Spouse LTC shock for Monte Carlo — uses dedicated spouseLtcPortfolioDraw/spouseLtcGrossUpTax
+  // fields which are written ONLY during spouse care draws, so they are always correct
+  // regardless of whether client's event overlaps in the same year.
   const spLtcShockYear = (spouseLtcEventAge > 0 && !spouseLtcInsured) ? spouseLtcEventAge - retireAge : -1;
   const spLtcShockAnnual = (spLtcShockYear >= 0 && spouseLtcDuration > 0)
     ? years.filter(r => r.age >= spouseLtcEventAge && r.age < spouseLtcEventAge + spouseLtcDuration)
-           .reduce((sum, r) => sum + (r.ltcPortfolioDraw || 0) + (r.ltcGrossUpTax || 0), 0) / spouseLtcDuration
+           .reduce((sum, r) => sum + (r.spouseLtcPortfolioDraw || 0) + (r.spouseLtcGrossUpTax || 0), 0) / spouseLtcDuration
     : 0;
 
   const confidence = runMonteCarlo(
@@ -2079,11 +2083,13 @@ function App() {
   const ltcCompareBase = { ...baseProjectionInputs, ltcNetAmount: 0, spouseLtcNetAmount: 0 };
   const isMarried = inputs.filingStatus === 'mfj';
   const showLtcComparison = hasLtcEvent;
+  // CLIENT isolation: set spouseLtcInsured:true so spouse event is neutralized.
+  // This ensures the client panel shows ONLY the impact of the client's own care event.
   const { years: yearsUninsured, confidence: confidenceUninsured } = showLtcComparison
-    ? projectArc({ ...ltcCompareBase, ltcInsured: false })
+    ? projectArc({ ...ltcCompareBase, ltcInsured: false, spouseLtcInsured: true })
     : { years: null, confidence: null };
   const { years: yearsInsured, confidence: confidenceInsured } = showLtcComparison
-    ? projectArc({ ...ltcCompareBase, ltcInsured: true })
+    ? projectArc({ ...ltcCompareBase, ltcInsured: true, spouseLtcInsured: true })
     : { years: null, confidence: null };
 
   // Spouse LTC comparison — whenever MFJ and spouse LTC entered (not gated on architectureEnabled)
