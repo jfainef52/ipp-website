@@ -1053,9 +1053,9 @@ function projectArc(inputs) {
         }
         taxable = Math.max(0, (taxable - actualGross) * (1 + yearReturn));
         remaining -= actualNet;
+      } else {
+        taxable = taxable * (1 + yearReturn); // grow taxable when not drawn from this gap year
       }
-
-      // --- Roth / tax-free: no gross-up needed ---
       if (remaining > 0 && roth > 0) {
         const draw = Math.min(roth, remaining);
         row.sources.roth = (row.sources.roth || 0) + draw;
@@ -1063,6 +1063,8 @@ function projectArc(inputs) {
         if (isAnyLtcEvent && ltcRemaining > 0) ltcRemaining -= Math.min(draw, ltcRemaining);
         roth = Math.max(0, (roth - draw) * (1 + yearReturn));
         remaining -= draw;
+      } else {
+        roth = roth * (1 + yearReturn); // grow Roth when not drawn from this gap year
       }
 
       // --- Traditional / IRA: ordinary income gross-up ---
@@ -1088,6 +1090,8 @@ function projectArc(inputs) {
         }
         trad = Math.max(0, (trad - actualGross) * (1 + yearReturn));
         remaining -= actualNet;
+      } else {
+        trad = trad * (1 + yearReturn); // grow trad when not drawn from this gap year
       }
 
       // --- Spouse Traditional IRA: draw if primary trad is exhausted and gap remains (MFJ only) ---
