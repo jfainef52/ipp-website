@@ -1579,7 +1579,7 @@ function ArcChart({ data, view, insuredData, sorrEnabled }) {
                 </text>
               </g>
             )}
-            {/* LTC Funding Event marker */}
+            {/* LTC Funding Event marker — client */}
             {d.ltcFundingEvent && (
               <g>
                 <line x1={xScale(i)} x2={xScale(i)} y1={PAD.t} y2={PAD.t+chartH}
@@ -1587,6 +1587,39 @@ function ArcChart({ data, view, insuredData, sorrEnabled }) {
                 <text x={xScale(i)+4} y={PAD.t+38} textAnchor="start"
                   fill="#9B7EC8" fontSize="9" fontFamily="DM Sans" fontWeight="700">
                   ♥ LTC
+                </text>
+              </g>
+            )}
+            {/* Spouse LTC Funding Event marker */}
+            {d.spouseLtcFundingEvent && (
+              <g>
+                <line x1={xScale(i)} x2={xScale(i)} y1={PAD.t} y2={PAD.t+chartH}
+                  stroke="rgba(155,126,200,.4)" strokeWidth="2" strokeDasharray="3,4"/>
+                <text x={xScale(i)+4} y={PAD.t+52} textAnchor="start"
+                  fill="#9B7EC8" fontSize="9" fontFamily="DM Sans" fontWeight="700">
+                  ♥ Sp LTC
+                </text>
+              </g>
+            )}
+            {/* Client LTC care event — amber band across care years */}
+            {d.ltcEvent && (
+              <g>
+                <rect x={xScale(i)-barW/2} y={PAD.t} width={barW} height={chartH}
+                  fill="rgba(196,106,106,.08)" rx="1"/>
+                <text x={xScale(i)} y={PAD.t+chartH-6} textAnchor="middle"
+                  fill="#C47A7A" fontSize="8" fontFamily="DM Sans" fontWeight="700">
+                  care
+                </text>
+              </g>
+            )}
+            {/* Spouse LTC care event — lighter band */}
+            {d.spouseLtcEvent && (
+              <g>
+                <rect x={xScale(i)-barW/2} y={PAD.t} width={barW} height={chartH}
+                  fill="rgba(196,106,106,.05)" rx="1"/>
+                <text x={xScale(i)} y={PAD.t+chartH-16} textAnchor="middle"
+                  fill="#C47A7A" fontSize="8" fontFamily="DM Sans" fontWeight="700">
+                  sp care
                 </text>
               </g>
             )}
@@ -2019,26 +2052,31 @@ function App() {
     inflation: inputs.inflation / 100,
     etaColaRate: (inputs.etaColaRate || 0) / 100,
   };
-  // Primary projection — NO LTC shock. This is the clean baseline plan survival score
-  // regardless of any healthcare event inputs. The main confidence score reflects the
-  // plan's fundamental strength (income, portfolio, architecture) without a care shock.
-  const { years, confidence, fixedStreams, mcStartAge } = projectArc({ ...baseProjectionInputs, ltcInsured: false, ltcEventAge: 0 });
+  // Primary projection — clean baseline WITHOUT any LTC event.
+  // Used only for the clean confidence score and pre-retirement accumulation phase.
+  const { years: yearsClean, confidence: confidenceClean, fixedStreams, mcStartAge } = projectArc({ ...baseProjectionInputs, ltcInsured: false, ltcEventAge: 0, spouseLtcEventAge: 0 });
 
-  // Primary display projection — includes LTC event if entered (uninsured view)
-  // This is what the chart and number table show when architecture is OFF or no LTC comparison
+  // Primary display projection — ALWAYS includes LTC events if entered, uninsured.
+  // This is what the chart, number table, and main confidence score show.
+  // When architecture is ON and the client has a policy, ltcInsured is used below in the
+  // comparison projections. The main display always shows the uninsured reality so the
+  // cost of NOT having coverage is visible in Status Quo mode.
   const hasLtcEvent = inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
-  const { years: yearsWithLtc } = hasLtcEvent
-    ? projectArc({ ...baseProjectionInputs, ltcInsured: false })
-    : { years: years };
+  const hasSpouseLtcEvent = inputs.filingStatus === 'mfj' && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
+  const hasAnyLtcEvent = hasLtcEvent || hasSpouseLtcEvent;
+  const { years, confidence, fixedStreams: _fs2, mcStartAge: _mc2 } = hasAnyLtcEvent
+    ? projectArc({ ...baseProjectionInputs, ltcInsured: false, spouseLtcInsured: false })
+    : { years: yearsClean, confidence: confidenceClean };
+  // yearsWithLtc is an alias kept for chart rendering compatibility
+  const yearsWithLtc = years;
 
-  // LTC comparison projections — only when architecture is enabled and LTC inputs are set.
-  // IMPORTANT: both projections zero out ltcNetAmount/spouseLtcNetAmount so the funding draw
-  // does not distort the comparison. We are isolating the care event shock impact only.
+  // LTC comparison projections — shown whenever LTC inputs are entered (not gated on architectureEnabled).
+  // Both zero out ltcNetAmount so the funding draw doesn't distort the pure care-event comparison.
   // confidenceUninsured = plan survival WITH care event and NO policy (shock applied)
   // confidenceInsured   = plan survival WITH care event and Layer 2 policy (shock absorbed)
   const ltcCompareBase = { ...baseProjectionInputs, ltcNetAmount: 0, spouseLtcNetAmount: 0 };
   const isMarried = inputs.filingStatus === 'mfj';
-  const showLtcComparison = inputs.architectureEnabled && inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
+  const showLtcComparison = hasLtcEvent;
   const { years: yearsUninsured, confidence: confidenceUninsured } = showLtcComparison
     ? projectArc({ ...ltcCompareBase, ltcInsured: false })
     : { years: null, confidence: null };
@@ -2046,8 +2084,8 @@ function App() {
     ? projectArc({ ...ltcCompareBase, ltcInsured: true })
     : { years: null, confidence: null };
 
-  // Spouse LTC comparison — only when MFJ and spouse LTC entered
-  const showSpouseLtcComparison = inputs.architectureEnabled && isMarried && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
+  // Spouse LTC comparison — whenever MFJ and spouse LTC entered (not gated on architectureEnabled)
+  const showSpouseLtcComparison = isMarried && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
   const { years: yearsSpouseUninsured, confidence: confidenceSpouseUninsured } = showSpouseLtcComparison
     ? projectArc({ ...ltcCompareBase, spouseLtcInsured: false })
     : { years: null, confidence: null };
