@@ -647,9 +647,37 @@ function projectArc(inputs) {
     row.yearReturn = yearReturn; // stored for chart annotation
     const portfolioStartOfYear = trad + roth + taxable + spouseTrad; // capture before any draws/growth
 
-    // ── ETA Lump-Sum Funding Event ──
-    // Tax AND any early withdrawal penalty are financed externally (bank loan / policy financing).
-    // IRA is reduced by the gross funding amount only. No penalty hits the portfolio here.
+    // ── Effective filing status — must be established FIRST, before any architecture events ──
+    // All gross-up bracket lookups depend on this. Primary death triggers surviving-spouse brackets.
+    const spouseAlive = filingStatus === 'mfj' && (primaryDeathAge === 0 || age <= primaryDeathAge);
+    const effectiveStatus = spouseAlive ? 'mfj' : 'single';
+    row.spouseAlive = spouseAlive;
+    row.primaryDiedThisYear = (filingStatus === 'mfj' && primaryDeathAge > 0 && age === primaryDeathAge);
+
+    // ── Architecture Event Stacking — Running AGI Accumulator ──
+    // When multiple architecture events fire in the same year, each event's gross-up must
+    // start its bracket walk at the AGI already committed by all prior events that year.
+    // The accumulator begins at the base non-architecture income for this year:
+    //   Pre-retirement : W-2/self-employment household income + any pension/part-time already sourced
+    //   Post-retirement: SS (85% taxable) + pension + existing RMDs + part-time + annuity
+    // Each event appends its gross distribution to archAGI before the next event fires.
+    // L3 (ETA) fires first — largest distribution, tax externally financed, no cash flow impact.
+    // L2 (LTC) fires second — gross-up now correctly stacks on top of ETA AGI.
+    // L1 (Roth) fires third — conversion stacks on ETA + LTC AGI.
+    // Spouse LTC fires last — stacks on all prior events.
+    let archAGI = age < retireAge
+      ? (currentHouseholdIncome || 0) + (row.sources.pension||0) + (row.sources.parttime||0)
+      : (row.sources.ss||0)*0.85 + (row.sources.pension||0) + (row.sources.rmd||0)
+          + (row.sources.parttime||0) + (row.sources.annuity||0);
+
+    // Shared bracket array (inflation-adjusted + stress) — same for all events this year
+    const archBrackets = (effectiveStatus === 'mfj' ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025)
+      .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
+
+    // ── L3: ETA Lump-Sum Funding Event ──
+    // Tax AND early withdrawal penalty are financed externally (bank non-recourse loan).
+    // No tax cash flow hits the portfolio. The gross distribution DOES count as AGI for
+    // purposes of bracket stacking for any other architecture event firing the same year.
     if (archEtaFundingAmount > 0 && etaFundingAge > 0 && age === etaFundingAge) {
       const fundAmt = Math.min(archEtaFundingAmount, trad);
       trad = Math.max(0, trad - fundAmt);
@@ -657,38 +685,15 @@ function projectArc(inputs) {
       row.etaFundingAmount = fundAmt;
       row.sources.rmd = (row.sources.rmd || 0) + fundAmt;
       row.totalIncome += fundAmt;
+      archAGI += fundAmt;  // ETA gross distribution elevates bracket position for subsequent events
     }
 
-    // ── Roth Annuity Conversion Event (Layer 1) ──
-    // Full conversion amount is ordinary income. Tax is partially or fully financed (rothConversionFinanced).
-    // Unfinanced tax overage is grossed up from IRA after calcAnnualTax runs (see below).
-    // Early withdrawal penalty is NOT modeled here — 72(t) SEPP or other structuring handles it.
-    if (archRothConversionAmount > 0 && rothConversionAge > 0 && age === rothConversionAge) {
-      const convAmt = Math.min(archRothConversionAmount, trad);
-      trad = Math.max(0, trad - convAmt);
-      row.rothConversionEvent = true;
-      row.rothConversionAmount = convAmt;
-      // Entire conversion is a taxable IRA distribution — elevates marginal rate this year.
-      row.sources.rmd = (row.sources.rmd || 0) + convAmt;
-      row.totalIncome += convAmt;
-      // Flag for post-tax overage gross-up. financed covers as much of the tax as specified.
-      row._conversionOveragePending = { convAmt, financed: Math.min(rothConversionFinanced || 0, convAmt) };
-    }
-
-    // ── Primary LTC Policy Funding Draw ──
-    // User enters NET amount needed (policy premium after tax). We gross up from IRA to net that amount.
-    // Tax is NOT financed. Early withdrawal penalty (age < 59½) applied as additional IRA deduction.
+    // ── L2: Primary LTC Policy Funding Draw ──
+    // User enters NET premium needed (after tax). Grossed up from IRA using running archAGI
+    // so the bracket walk correctly starts above any ETA distribution in the same year.
     if (archLtcNetAmount > 0 && ltcFundingAge > 0 && age === ltcFundingAge) {
-      // Build stressed ordinary brackets at this point in the loop
-      const ordBracketsLtc = (effectiveStatus === 'mfj' ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025)
-        .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
-      // Pre-retirement: use household income as AGI base (architecture events stack on top of earned income)
-      const eventAGIBase = age < retireAge
-        ? (currentHouseholdIncome || 0) + (row.sources.pension||0) + (row.sources.parttime||0)
-        : (row.sources.ss||0)*0.85 + (row.sources.pension||0) + (row.sources.rmd||0) + (row.sources.parttime||0) + (row.sources.annuity||0);
       const earlyPenaltyRate = age < 59.5 ? 0.10 : 0;
-      // Gross up: net needed / (1 - marginalRate - penaltyRate) approximation, refined iteratively
-      const { grossDraw: ltcGross, taxOnDraw: ltcTax } = grossUpIterative(archLtcNetAmount, ordBracketsLtc, eventAGIBase);
+      const { grossDraw: ltcGross, taxOnDraw: ltcTax } = grossUpIterative(archLtcNetAmount, archBrackets, archAGI);
       const ltcFund = Math.min(ltcGross, trad);
       const earlyPenalty = ltcFund * earlyPenaltyRate;
       trad = Math.max(0, trad - ltcFund - earlyPenalty);
@@ -699,17 +704,30 @@ function projectArc(inputs) {
       row.ltcEarlyPenalty = earlyPenalty;
       row.sources.rmd = (row.sources.rmd || 0) + ltcFund;
       row.totalIncome += ltcFund;
+      archAGI += ltcFund;  // LTC gross draw elevates bracket position for subsequent events
+    }
+
+    // ── L1: Roth Annuity Conversion Event ──
+    // Full conversion is ordinary income stacking on ETA + LTC AGI already committed.
+    // Tax is partially or fully financed (rothConversionFinanced). Unfinanced overage is
+    // grossed up post-calcAnnualTax using the actual marginal rate from the full income stack.
+    if (archRothConversionAmount > 0 && rothConversionAge > 0 && age === rothConversionAge) {
+      const convAmt = Math.min(archRothConversionAmount, trad);
+      trad = Math.max(0, trad - convAmt);
+      row.rothConversionEvent = true;
+      row.rothConversionAmount = convAmt;
+      row.sources.rmd = (row.sources.rmd || 0) + convAmt;
+      row.totalIncome += convAmt;
+      archAGI += convAmt;  // Roth conversion elevates bracket position for subsequent events
+      // Overage gross-up deferred until after calcAnnualTax so we use the real marginal rate
+      row._conversionOveragePending = { convAmt, financed: Math.min(rothConversionFinanced || 0, convAmt), archAGIBeforeOverage: archAGI };
     }
 
     // ── Spouse LTC Policy Funding Draw ──
+    // Stacks on all prior architecture events via archAGI accumulator.
     if (archSpouseLtcNetAmount > 0 && spouseLtcFundingAge > 0 && age === spouseLtcFundingAge) {
-      const ordBracketsSpLtc = (effectiveStatus === 'mfj' ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025)
-        .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
-      const eventAGIBaseSp = age < retireAge
-        ? (currentHouseholdIncome || 0) + (row.sources.pension||0) + (row.sources.parttime||0)
-        : (row.sources.ss||0)*0.85 + (row.sources.pension||0) + (row.sources.rmd||0) + (row.sources.parttime||0) + (row.sources.annuity||0);
       const earlyPenaltyRateSp = age < 59.5 ? 0.10 : 0;
-      const { grossDraw: spLtcGross, taxOnDraw: spLtcTax } = grossUpIterative(archSpouseLtcNetAmount, ordBracketsSpLtc, eventAGIBaseSp);
+      const { grossDraw: spLtcGross, taxOnDraw: spLtcTax } = grossUpIterative(archSpouseLtcNetAmount, archBrackets, archAGI);
       const spLtcFund = Math.min(spLtcGross, trad);
       const spEarlyPenalty = spLtcFund * earlyPenaltyRateSp;
       trad = Math.max(0, trad - spLtcFund - spEarlyPenalty);
@@ -720,13 +738,8 @@ function projectArc(inputs) {
       row.spouseLtcEarlyPenalty = spEarlyPenalty;
       row.sources.rmd = (row.sources.rmd || 0) + spLtcFund;
       row.totalIncome += spLtcFund;
+      archAGI += spLtcFund;
     }
-
-    // Determine effective filing status this year (primary death triggers surviving spouse scenario)
-    const spouseAlive = filingStatus === 'mfj' && (primaryDeathAge === 0 || age <= primaryDeathAge);
-    const effectiveStatus = spouseAlive ? 'mfj' : 'single';
-    row.spouseAlive = spouseAlive;
-    row.primaryDiedThisYear = (filingStatus === 'mfj' && primaryDeathAge > 0 && age === primaryDeathAge);
 
     // Social Security — primary
     let primarySS = 0, spouseSS = 0;
@@ -1339,16 +1352,20 @@ function projectArc(inputs) {
     //   3. Gross up the overage: grossUp = overage / (1 − marginalRate)
     // This is the additional IRA withdrawal needed to net exactly the overage tax after taxes.
     if (row._conversionOveragePending) {
-      const { convAmt, financed } = row._conversionOveragePending;
+      const { convAmt, financed, archAGIBeforeOverage } = row._conversionOveragePending;
       const allInRate = row.allInMarginalRate || taxResult.marginalRate;
-      const convTax = convAmt * allInRate;                              // actual tax on conversion
+      const convTax = convAmt * allInRate;                              // actual tax on conversion at real marginal rate
       const overageTax = Math.max(0, convTax - financed);              // unfinanced portion — must come from IRA
       if (overageTax > 0 && trad > 0) {
-        const grossUp = Math.min(trad, overageTax / (1 - allInRate));  // gross-up so net covers the overage
-        trad = Math.max(0, trad - grossUp);
-        row.sources.rmd = (row.sources.rmd || 0) + grossUp;
-        row.totalIncome += grossUp;
-        row.rothConversionOverage = grossUp;
+        // Use grossUpIterative so the gross-up draw itself is bracketed correctly.
+        // AGI base = archAGIBeforeOverage (already includes ETA + LTC + conversion itself).
+        // We need enough gross to net exactly overageTax after taxes on the gross-up draw.
+        const { grossDraw: grossUp } = grossUpIterative(overageTax, archBrackets, archAGIBeforeOverage);
+        const clampedGrossUp = Math.min(trad, grossUp);
+        trad = Math.max(0, trad - clampedGrossUp);
+        row.sources.rmd = (row.sources.rmd || 0) + clampedGrossUp;
+        row.totalIncome += clampedGrossUp;
+        row.rothConversionOverage = clampedGrossUp;
         row.rothConversionOverageTax = overageTax;
         row.rothConversionMarginalRate = allInRate;
       }
