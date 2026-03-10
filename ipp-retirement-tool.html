@@ -2098,7 +2098,7 @@ function App() {
   // Spouse LTC comparison — whenever MFJ and spouse LTC entered (not gated on architectureEnabled)
   // IMPORTANT: zero out the CLIENT's ltcEventAge so we isolate the spouse event shock only.
   // Otherwise the client's shock drowns out the spouse difference.
-  const showSpouseLtcComparison = isMarried && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
+  const showSpouseLtcComparison = inputs.ltcEventEnabled && isMarried && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
   const spouseCompareBase = { ...ltcCompareBase, ltcEventAge: 0, ltcInsured: false };
   const { years: yearsSpouseUninsured, confidence: confidenceSpouseUninsured } = showSpouseLtcComparison
     ? projectArc({ ...spouseCompareBase, spouseLtcInsured: false })
