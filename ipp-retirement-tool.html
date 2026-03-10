@@ -117,7 +117,7 @@ const COLORS = {
   ss:        { fill: '#4A9B7A', label: 'Social Security',     tax: 'partial'    },
   pension:   { fill: '#5B8FA8', label: 'Pension',             tax: 'ordinary'   },
   rmd:       { fill: '#C47A7A', label: 'Traditional QP (incl. RMD)', tax: 'ordinary' },
-  roth:      { fill: '#7BAF84', label: 'Roth / Tax-Free (L1 + IRA)',  tax: 'free'       },
+  roth:      { fill: '#D48B3A', label: 'Roth / Tax-Free (L1 + IRA)',  tax: 'free'       },
   taxable:   { fill: '#C8A030', label: 'Taxable Portfolio',   tax: 'favorable'  },
   annuity:   { fill: '#9B7EC8', label: 'Non-Qual Annuity (Gain)', tax: 'partial' },
   parttime:  { fill: '#6E9BC8', label: 'Part-Time Income',    tax: 'ordinary'   },
@@ -203,7 +203,7 @@ function seededRandom(seed) {
   };
 }
 
-function runMonteCarlo(startBalance, annualWithdraw, years, trials=1000, mean=0.065, inflation=0.028, ssIncome=0, fixedStreams=[], totalExpensesY1=0, ltcShockYear=-1, ltcShockAnnual=0, ltcShockDuration=0, expShockAnnual=0, expShockFreq=0) {
+function runMonteCarlo(startBalance, annualWithdraw, years, trials=1000, mean=0.065, inflation=0.028, ssIncome=0, fixedStreams=[], totalExpensesY1=0, ltcShockYear=-1, ltcShockAnnual=0, ltcShockDuration=0, expShockAnnual=0, expShockFreq=0, spLtcShockYear=-1, spLtcShockAnnual=0, spLtcShockDuration=0) {
   let successes = 0;
   const stddev = 0.12;
   const streams = Array.isArray(fixedStreams)
@@ -222,6 +222,8 @@ function runMonteCarlo(startBalance, annualWithdraw, years, trials=1000, mean=0.
     + (ltcShockYear * 333)
     + (expShockAnnual * 0.0019)
     + (expShockFreq * 57)
+    + (spLtcShockAnnual * 0.0017)
+    + (spLtcShockYear * 251)
     + streams.reduce((a, s) => a + s.annual * 0.003 + s.yearOffset * 17, 0)
   ) ^ 0xDEADBEEF;
   const rand = seededRandom(seedVal);
@@ -248,11 +250,14 @@ function runMonteCarlo(startBalance, annualWithdraw, years, trials=1000, mean=0.
       // LTC shock: grossed-up portfolio draw during uninsured care years
       const ltcShock = (ltcShockYear >= 0 && y >= ltcShockYear && y < ltcShockYear + ltcShockDuration)
         ? ltcShockAnnual : 0;
+      // Spouse LTC shock: independent care event for spouse
+      const spLtcShock = (spLtcShockYear >= 0 && y >= spLtcShockYear && y < spLtcShockYear + spLtcShockDuration)
+        ? spLtcShockAnnual : 0;
       // Expense shock: guaranteed income surplus absorbs first; remainder hits portfolio
       const rawShock = shockYearsThisTrial.has(y) ? expShockAnnual * inflFactor : 0;
       const guaranteedSurplus = Math.max(0, ssThisYear + fixedThisYear - expensesThisYear);
       const expShock = Math.max(0, rawShock - guaranteedSurplus);
-      bal = bal * (1 + r) - netDraw - ltcShock - expShock;
+      bal = bal * (1 + r) - netDraw - ltcShock - spLtcShock - expShock;
       if (bal <= 0) { failed = true; break; }
     }
     if (!failed) successes++;
@@ -1359,13 +1364,19 @@ function projectArc(inputs) {
 
   // LTC shock for Monte Carlo: the actual gross portfolio draws made during care years
   // (tracked as ltcPortfolioDraw in each row) plus the gross-up tax friction.
-  // Using ltcPortfolioDraw is correct because it captures what was truly pulled from the
-  // portfolio — it's zero when income surplus fully absorbed the care cost, and reflects
-  // the actual IRA/taxable gross draws when a portfolio withdrawal was required.
   const ltcShockYear = (ltcEventAge > 0 && !ltcInsured) ? ltcEventAge - retireAge : -1;
   const ltcShockAnnual = (ltcShockYear >= 0 && ltcDuration > 0)
     ? years.filter(r => r.age >= ltcEventAge && r.age < ltcEventAge + ltcDuration)
            .reduce((sum, r) => sum + (r.ltcPortfolioDraw || 0) + (r.ltcGrossUpTax || 0), 0) / ltcDuration
+    : 0;
+
+  // Spouse LTC shock for Monte Carlo — uses same fields (ltcPortfolioDraw/ltcGrossUpTax)
+  // because in the spouse-only comparison projection, client ltcEventAge=0, so those
+  // fields will only contain spouse draws.
+  const spLtcShockYear = (spouseLtcEventAge > 0 && !spouseLtcInsured) ? spouseLtcEventAge - retireAge : -1;
+  const spLtcShockAnnual = (spLtcShockYear >= 0 && spouseLtcDuration > 0)
+    ? years.filter(r => r.age >= spouseLtcEventAge && r.age < spouseLtcEventAge + spouseLtcDuration)
+           .reduce((sum, r) => sum + (r.ltcPortfolioDraw || 0) + (r.ltcGrossUpTax || 0), 0) / spouseLtcDuration
     : 0;
 
   const confidence = runMonteCarlo(
@@ -1382,7 +1393,10 @@ function projectArc(inputs) {
     ltcShockAnnual,
     ltcDuration,
     expenseShockEnabled ? expenseShockAmount : 0,
-    expenseShockEnabled ? expenseShockFrequency : 0
+    expenseShockEnabled ? expenseShockFrequency : 0,
+    spLtcShockYear,
+    spLtcShockAnnual,
+    spouseLtcDuration
   );
 
   return { years, confidence, fixedStreams, mcStartAge };
@@ -1579,47 +1593,35 @@ function ArcChart({ data, view, insuredData, sorrEnabled }) {
                 </text>
               </g>
             )}
+            {/* Client LTC care event — subtle red band, no cluttering text */}
+            {d.ltcEvent && (
+              <rect x={xScale(i)-barW/2} y={PAD.t} width={barW} height={chartH}
+                fill="rgba(196,106,106,.10)" rx="1"/>
+            )}
+            {/* Spouse LTC care event — teal/steel dashed band, visually distinct */}
+            {d.spouseLtcEvent && (
+              <rect x={xScale(i)-barW/2} y={PAD.t} width={barW} height={chartH}
+                fill="rgba(74,155,155,.08)" rx="1"/>
+            )}
             {/* LTC Funding Event marker — client */}
             {d.ltcFundingEvent && (
               <g>
                 <line x1={xScale(i)} x2={xScale(i)} y1={PAD.t} y2={PAD.t+chartH}
-                  stroke="rgba(155,126,200,.5)" strokeWidth="2" strokeDasharray="4,3"/>
+                  stroke="rgba(155,126,200,.6)" strokeWidth="2" strokeDasharray="4,3"/>
                 <text x={xScale(i)+4} y={PAD.t+38} textAnchor="start"
                   fill="#9B7EC8" fontSize="9" fontFamily="DM Sans" fontWeight="700">
                   ♥ LTC
                 </text>
               </g>
             )}
-            {/* Spouse LTC Funding Event marker */}
+            {/* Spouse LTC Funding Event marker — dashed teal line */}
             {d.spouseLtcFundingEvent && (
               <g>
                 <line x1={xScale(i)} x2={xScale(i)} y1={PAD.t} y2={PAD.t+chartH}
-                  stroke="rgba(155,126,200,.4)" strokeWidth="2" strokeDasharray="3,4"/>
+                  stroke="rgba(74,155,155,.6)" strokeWidth="2" strokeDasharray="3,4"/>
                 <text x={xScale(i)+4} y={PAD.t+52} textAnchor="start"
-                  fill="#9B7EC8" fontSize="9" fontFamily="DM Sans" fontWeight="700">
-                  ♥ Sp LTC
-                </text>
-              </g>
-            )}
-            {/* Client LTC care event — amber band across care years */}
-            {d.ltcEvent && (
-              <g>
-                <rect x={xScale(i)-barW/2} y={PAD.t} width={barW} height={chartH}
-                  fill="rgba(196,106,106,.08)" rx="1"/>
-                <text x={xScale(i)} y={PAD.t+chartH-6} textAnchor="middle"
-                  fill="#C47A7A" fontSize="8" fontFamily="DM Sans" fontWeight="700">
-                  care
-                </text>
-              </g>
-            )}
-            {/* Spouse LTC care event — lighter band */}
-            {d.spouseLtcEvent && (
-              <g>
-                <rect x={xScale(i)-barW/2} y={PAD.t} width={barW} height={chartH}
-                  fill="rgba(196,106,106,.05)" rx="1"/>
-                <text x={xScale(i)} y={PAD.t+chartH-16} textAnchor="middle"
-                  fill="#C47A7A" fontSize="8" fontFamily="DM Sans" fontWeight="700">
-                  sp care
+                  fill="#4A9B9B" fontSize="9" fontFamily="DM Sans" fontWeight="700">
+                  ♥ Sp
                 </text>
               </g>
             )}
@@ -2085,13 +2087,28 @@ function App() {
     : { years: null, confidence: null };
 
   // Spouse LTC comparison — whenever MFJ and spouse LTC entered (not gated on architectureEnabled)
+  // IMPORTANT: zero out the CLIENT's ltcEventAge so we isolate the spouse event shock only.
+  // Otherwise the client's shock drowns out the spouse difference.
   const showSpouseLtcComparison = isMarried && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
+  const spouseCompareBase = { ...ltcCompareBase, ltcEventAge: 0, ltcInsured: false };
   const { years: yearsSpouseUninsured, confidence: confidenceSpouseUninsured } = showSpouseLtcComparison
-    ? projectArc({ ...ltcCompareBase, spouseLtcInsured: false })
+    ? projectArc({ ...spouseCompareBase, spouseLtcInsured: false })
     : { years: null, confidence: null };
   const { years: yearsSpouseInsured, confidence: confidenceSpouseInsured } = showSpouseLtcComparison
-    ? projectArc({ ...ltcCompareBase, spouseLtcInsured: true })
+    ? projectArc({ ...spouseCompareBase, spouseLtcInsured: true })
     : { years: null, confidence: null };
+
+  // Combined household projections — both LTC events active at the same time on the same portfolio.
+  // This is the CORRECT way to get household confidence: one simulation with both shocks.
+  // Averaging individual scores would understate the combined risk since both draws hit the same portfolio.
+  const showCombinedLtcComparison = hasLtcEvent && showSpouseLtcComparison;
+  const combinedCompareBase = { ...ltcCompareBase };
+  const { confidence: confidenceBothUninsured } = showCombinedLtcComparison
+    ? projectArc({ ...combinedCompareBase, ltcInsured: false, spouseLtcInsured: false })
+    : { confidence: null };
+  const { confidence: confidenceBothInsured } = showCombinedLtcComparison
+    ? projectArc({ ...combinedCompareBase, ltcInsured: true, spouseLtcInsured: true })
+    : { confidence: null };
 
   const totalPortfolioAtRetire = years[0] ? years[0].totalPortfolio : (inputs.traditionalBalance + inputs.rothBalance + inputs.taxableBalance);
   const fmt$ = v => '$' + Math.round(v||0).toLocaleString();
@@ -2655,10 +2672,8 @@ function App() {
         const hTotalCompounding = Math.max(0, hTotalPreserved - hTotalCareCost - hTotalGrossUpTax);
         const hForcedDraws     = cForced + sForced;
 
-        const hhConfU = (confidenceUninsured !== null && confidenceSpouseUninsured !== null)
-          ? Math.round((confidenceUninsured + confidenceSpouseUninsured) / 2) : null;
-        const hhConfI = (confidenceInsured !== null && confidenceSpouseInsured !== null)
-          ? Math.round((confidenceInsured + confidenceSpouseInsured) / 2) : null;
+        const hhConfU = confidenceBothUninsured !== null ? confidenceBothUninsured : null;
+        const hhConfI = confidenceBothInsured !== null ? confidenceBothInsured : null;
         const hhConfDelta = hhConfI !== null && hhConfU !== null ? hhConfI - hhConfU : null;
         const spLabel = clientInfo.spouseName || 'Spouse';
 
@@ -2709,7 +2724,7 @@ function App() {
             </div>
             ${hhConfDelta !== null ? `
             <div style="background:${P.bgAlt};border:1px solid ${P.border};border-radius:6px;padding:10px 14px;margin-bottom:10px;">
-              <div style="font-size:9.5px;font-weight:700;color:#5B3E8A;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">Household Plan Survival — Average Monte Carlo Confidence</div>
+              <div style="font-size:9.5px;font-weight:700;color:#5B3E8A;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">Household Plan Survival — Combined Monte Carlo Confidence</div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px;">
                 <div>
                   <div style="font-size:9px;color:${P.red};font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px;">Without Layer 2 — Both Uninsured</div>
@@ -4695,11 +4710,9 @@ function App() {
             const totalPreserved   = cPortfolioDiff + sPortfolioDiff;
             const totalCompounding = Math.max(0, totalPreserved - totalCareCost - totalGrossUpTax);
 
-            // Average confidence across both spouses
-            const bothInsuredConf   = confidenceInsured !== null && confidenceSpouseInsured !== null
-              ? Math.round((confidenceInsured + confidenceSpouseInsured) / 2) : null;
-            const bothUninsuredConf = confidenceUninsured !== null && confidenceSpouseUninsured !== null
-              ? Math.round((confidenceUninsured + confidenceSpouseUninsured) / 2) : null;
+            // Combined confidence — use the real simultaneous projections, not an average
+            const bothInsuredConf   = confidenceBothInsured !== null ? confidenceBothInsured : null;
+            const bothUninsuredConf = confidenceBothUninsured !== null ? confidenceBothUninsured : null;
             const confDelta = bothInsuredConf !== null && bothUninsuredConf !== null
               ? bothInsuredConf - bothUninsuredConf : null;
 
@@ -4759,7 +4772,7 @@ function App() {
 
                 {confDelta !== null && (
                   <div style={{background:'rgba(255,255,255,.02)',border:'1px solid rgba(255,255,255,.07)',borderRadius:10,padding:'14px 16px',marginBottom:14}}>
-                    <div style={{fontSize:12,fontWeight:700,color:'#9B7EC8',letterSpacing:'.1em',textTransform:'uppercase',marginBottom:10}}>Household Plan Survival — Average Monte Carlo Confidence</div>
+                    <div style={{fontSize:12,fontWeight:700,color:'#9B7EC8',letterSpacing:'.1em',textTransform:'uppercase',marginBottom:10}}>Household Plan Survival — Combined Monte Carlo Confidence</div>
                     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:10}}>
                       <div>
                         <div style={{fontSize:12,color:'#C47A7A',fontWeight:700,letterSpacing:'.1em',textTransform:'uppercase',marginBottom:6}}>Without Layer 2 — Both Uninsured</div>
