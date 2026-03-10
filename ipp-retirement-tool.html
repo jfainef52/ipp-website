@@ -968,6 +968,13 @@ function projectArc(inputs) {
     row.spendableIncome = row.totalIncome - nonSpendableEvents;
     row.gap = row.spendableIncome - expenses;
 
+    // Snapshot gross (pre-tax, pre-gap-fill) sources for chart bars.
+    // Captured HERE — before any gap-fill IRA draws or LTC gross-up draws are added —
+    // so the chart shows structured income sources vs the expense line.
+    // LTC care cost draws are excluded: they are expense-covering draws, not income.
+    row.grossSources = { ...row.sources };
+    row.grossTotalIncome = row.totalIncome;
+
     // ── Shared gross-up utilities — hoisted outside gap block so IRMAA fill can also use them ──
     const isMFJeff = effectiveStatus === 'mfj';
     const stdDed = (isMFJeff ? STD_DEDUCTION_MFJ : STD_DEDUCTION_SINGLE) * inflFactor;
@@ -1397,12 +1404,6 @@ function projectArc(inputs) {
 
     // Combined all-in tax (federal + state; IRMAA already in expenses)
     const totalAllInTax = taxResult.totalTax + stateTax;
-
-    // Snapshot gross (pre-tax) sources for chart bars — stored separately so the arc
-    // can plot gross income vs gross expense line (apples-to-apples comparison).
-    // row.sources will be reduced to after-tax net below (used for net income stats).
-    row.grossSources = { ...row.sources };
-    row.grossTotalIncome = row.totalIncome;
 
     // Reduce each source proportionally to show after-tax net on the arc
     const taxableSources = ['ss','pension','rmd','parttime','taxable','annuity'];
@@ -2164,11 +2165,15 @@ function App() {
   // the overall ring shows the plan WITH architecture fighting all active risks.
   const hasLtcForMC = inputs.ltcEventEnabled && inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
   const hasSpouseLtcForMC = inputs.ltcEventEnabled && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
+  // When architecture is ON, the main projection should model the insured scenario —
+  // care costs draw from the dedicated insurance pool, not the portfolio.
+  const ltcIsInsured = inputs.architectureEnabled && inputs.ltcEventEnabled;
   const { years, confidence, fixedStreams, mcStartAge } = projectArc({
     ...baseProjectionInputs,
-    ltcInsured: false,
+    ltcInsured: ltcIsInsured,
     ltcEventAge: hasLtcForMC ? inputs.ltcEventAge : 0,
     spouseLtcEventAge: hasSpouseLtcForMC ? inputs.spouseLtcEventAge : 0,
+    spouseLtcInsured: ltcIsInsured,
   });
 
   // Primary display projection — includes LTC event only when the healthcare toggle is ON
@@ -2177,9 +2182,10 @@ function App() {
   const { years: yearsWithLtc } = (hasLtcEvent || hasSpouseLtcEvent)
     ? projectArc({
         ...baseProjectionInputs,
-        ltcInsured: false,
+        ltcInsured: ltcIsInsured,
         ltcEventAge: hasLtcEvent ? inputs.ltcEventAge : 0,
         spouseLtcEventAge: hasSpouseLtcEvent ? inputs.spouseLtcEventAge : 0,
+        spouseLtcInsured: ltcIsInsured,
       })
     : { years: years };
 
