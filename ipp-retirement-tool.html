@@ -1484,59 +1484,45 @@ function ArcChart({ data, view, insuredData, sorrEnabled }) {
 
   if (!data || data.length === 0) return null;
 
-  // Gross expense = net outlay + estimated tax — this is what must be earned gross to net the expense.
-  // Bars stack to gross income (net sources + fedtax + statetax segments), so both are on gross basis.
-  const grossExpense = d => (d.totalExpense || 0) + (d.estimatedTax || 0);
-
-  // Architecture mode: expense line stays flat at base living expenses + tax (no LTC spike).
-  // A separate care-line shows the healthcare delta above that.
+  // Architecture mode = insuredData present (Architecture ON with LTC comparison)
   const archMode = !!insuredData;
 
+  // Bar total per row = sum of all source segments (includes fedtax + statetax on top of net income)
+  const barTotal = d => Object.values(d.sources || {}).reduce((s, v) => s + (v || 0), 0);
+
+  // maxVal: scale to the tallest bar or highest expense value
   const maxVal = Math.max(
-    ...data.map(d => Math.max(
-      (d.totalIncome || 0) + (d.fedtax_seg || d.sources?.fedtax || 0) + (d.sources?.statetax || 0),
-      grossExpense(d)
-    ))
+    ...data.map(d => Math.max(barTotal(d), d.totalExpense || 0)),
+    ...(insuredData ? insuredData.map(d => d.totalExpense || 0) : [])
   ) * 1.1;
   const barW = Math.max(4, Math.floor(chartW / data.length) - 2);
 
   const xScale = i => PAD.l + (i / (data.length - 1)) * chartW;
   const yScale = v => PAD.t + chartH - (v / maxVal) * chartH;
 
-  // Status quo: expense line on gross basis (net outlay + tax = what bars must cover)
-  // Architecture mode: flat at base living expense + tax only (no LTC spike on this line)
+  // STATUS QUO mode: single expense line = totalExpense (net outlay including LTC spike)
+  // ARCHITECTURE mode: expense line = baseExpense only (flat lifestyle line, no LTC spike)
   const expensePath = data.map((d, i) => {
-    const val = archMode
-      ? (d.baseExpense || d.totalExpense || 0) + (d.estimatedTax || 0)
-      : grossExpense(d);
+    const val = archMode ? (d.baseExpense || d.totalExpense || 0) : (d.totalExpense || 0);
     return `${i === 0 ? 'M' : 'L'} ${xScale(i).toFixed(1)} ${yScale(val).toFixed(1)}`;
   }).join(' ');
 
-  // Architecture mode only: care event delta line (base+tax → full gross expense during LTC years)
-  // Drawn as a second colored line segment — only appears during health event years
+  // ARCHITECTURE mode only: care event line — shows healthcare cost delta above base expense line
+  // Only draws during actual LTC event years, in a distinct red/coral color
   const careEventPath = archMode ? (() => {
-    let path = '';
-    let inCare = false;
+    const pts = [];
     data.forEach((d, i) => {
-      const hasEvent = d.ltcEvent || d.spouseLtcEvent;
-      const baseVal = (d.baseExpense || d.totalExpense || 0) + (d.estimatedTax || 0);
-      const fullVal = grossExpense(d);
-      if (hasEvent && fullVal > baseVal) {
-        const cmd = !inCare ? 'M' : 'L';
-        path += `${cmd} ${xScale(i).toFixed(1)} ${yScale(fullVal).toFixed(1)} `;
-        inCare = true;
-      } else {
-        inCare = false;
+      if ((d.ltcEvent || d.spouseLtcEvent) && d.totalExpense > (d.baseExpense || 0)) {
+        pts.push(`${pts.length === 0 ? 'M' : 'L'} ${xScale(i).toFixed(1)} ${yScale(d.totalExpense).toFixed(1)}`);
       }
     });
-    return path.trim() || null;
+    return pts.length > 0 ? pts.join(' ') : null;
   })() : null;
 
-  // Insured expense path — architecture mode: flat base line (policy covers care, no spike)
-  const insuredExpensePath = insuredData ? insuredData.map((d, i) => {
-    const val = (d.baseExpense || d.totalExpense || 0) + (d.estimatedTax || 0);
-    return `${i === 0 ? 'M' : 'L'} ${xScale(i).toFixed(1)} ${yScale(val).toFixed(1)}`;
-  }).join(' ') : null;
+  // ARCHITECTURE mode: insured line = baseExpense (flat — policy absorbs care, no portfolio spike)
+  const insuredExpensePath = insuredData ? insuredData.map((d, i) =>
+    `${i === 0 ? 'M' : 'L'} ${xScale(i).toFixed(1)} ${yScale(d.baseExpense || d.totalExpense || 0).toFixed(1)}`
+  ).join(' ') : null;
 
   // Source keys in stack order
   const sourceKeys = ['ss','pension','annuity','qualAnnuity','parttime','roth','eta','taxable','rmd','fedtax','statetax'];
