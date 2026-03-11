@@ -204,6 +204,12 @@ function seededRandom(seed) {
 }
 
 function runMonteCarlo(startBalance, annualWithdraw, years, trials=500, mean=0.065, inflation=0.028, ssIncome=0, fixedStreams=[], totalExpensesY1=0, ltcShockYear=-1, ltcShockAnnual=0, ltcShockDuration=0, spouseLtcShockYear=-1, spouseLtcShockAnnual=0, spouseLtcShockDuration=0) {
+  // ltcShockAnnual and spouseLtcShockAnnual are passed as today's-dollar NET care costs.
+  // The MC grosses them up by 1/(1-0.28) to represent the pre-tax IRA draw required,
+  // and inflates them to the care-event year using the same inflFactor as expenses.
+  // netDraw is also grossed up at 28% — to withdraw $X net from an IRA requires ~$X/(1-0.28) gross.
+  // SS and fixed streams are already gross (SS is not taxed at 100% but this is conservative).
+  const MC_TAX_RATE = 0.28;
   let successes = 0;
   const stddev = 0.12;
   const streams = Array.isArray(fixedStreams)
@@ -235,14 +241,16 @@ function runMonteCarlo(startBalance, annualWithdraw, years, trials=500, mean=0.0
       const expensesThisYear = totalExpensesY1 * inflFactor;
       const ssThisYear = ssIncome * inflFactor;
       const fixedThisYear = streams.reduce((sum, s) => sum + (y >= s.yearOffset ? s.annual : 0), 0);
-      const netDraw = Math.max(0, expensesThisYear - ssThisYear - fixedThisYear);
-      // Apply primary care cost shock
+      // Gross up the net portfolio draw needed — requires more than $1 gross from IRA to net $1
+      const netShortfall = Math.max(0, expensesThisYear - ssThisYear - fixedThisYear);
+      const grossDraw = netShortfall / (1 - MC_TAX_RATE);
+      // Care cost shock: inflate to care-year dollars, then gross up for pre-tax IRA draw
       const ltcShock = (ltcShockYear >= 0 && y >= ltcShockYear && y < ltcShockYear + ltcShockDuration)
-        ? ltcShockAnnual : 0;
-      // Apply spouse care cost shock (independent event, different age)
+        ? (ltcShockAnnual * inflFactor) / (1 - MC_TAX_RATE) : 0;
+      // Spouse care cost shock: independent event at a different age
       const spouseLtcShock = (spouseLtcShockYear >= 0 && y >= spouseLtcShockYear && y < spouseLtcShockYear + spouseLtcShockDuration)
-        ? spouseLtcShockAnnual : 0;
-      bal = bal * (1 + r) - netDraw - ltcShock - spouseLtcShock;
+        ? (spouseLtcShockAnnual * inflFactor) / (1 - MC_TAX_RATE) : 0;
+      bal = bal * (1 + r) - grossDraw - ltcShock - spouseLtcShock;
       if (bal <= 0) { failed = true; break; }
     }
     if (!failed) successes++;
@@ -1327,25 +1335,14 @@ function projectArc(inputs) {
 
   // LTC shock for Monte Carlo: the actual gross portfolio draws made during care years
   // (tracked as ltcPortfolioDraw in each row) plus the gross-up tax friction.
-  // Using ltcPortfolioDraw is correct because it captures what was truly pulled from the
-  // portfolio — it's zero when income surplus fully absorbed the care cost, and reflects
-  // the actual IRA/taxable gross draws when a portfolio withdrawal was required.
-  // LTC shock for MC: use gross care cost directly, not ltcPortfolioDraw.
-  // ltcPortfolioDraw is zero when RMDs/income fully cover care costs in the deterministic run —
-  // which happens with large portfolios where age-79 RMDs exceed care costs. In that case
-  // ltcShockAnnual = 0 and MC never sees any care shock, producing an incorrect score.
-  // The correct approach: the care cost is a real cash burden in ALL MC scenarios regardless
-  // of whether the deterministic run needed a portfolio draw. Use the actual annual care cost
-  // grossed up at 28% (conservative ordinary income rate) to represent the true portfolio cost.
+  // LTC shock: pass today's-dollar net care cost to MC.
+  // MC now handles both inflation (inflates to care-year dollars) and gross-up (pre-tax IRA draw).
+  // Do NOT use ltcPortfolioDraw — it is zero when RMDs/income cover care costs in the
+  // deterministic run, which causes MC to see no shock at all on large portfolios.
   const ltcShockYear = (ltcEventAge > 0 && !ltcInsured) ? ltcEventAge - retireAge : -1;
+  const ltcShockAnnual = (ltcShockYear >= 0) ? ltcMonthlyCost * 12 : 0;
   const spouseLtcShockYear = (spouseLtcEventAge > 0 && !spouseLtcInsured) ? spouseLtcEventAge - retireAge : -1;
-  // Gross up at 28% to approximate the pre-tax draw needed to net the care cost
-  const ltcShockAnnual = (ltcShockYear >= 0 && ltcDuration > 0)
-    ? (ltcMonthlyCost * 12) / (1 - 0.28)
-    : 0;
-  const spouseLtcShockAnnual = (spouseLtcShockYear >= 0 && spouseLtcDuration > 0)
-    ? (spouseLtcMonthlyCost * 12) / (1 - 0.28)
-    : 0;
+  const spouseLtcShockAnnual = (spouseLtcShockYear >= 0) ? spouseLtcMonthlyCost * 12 : 0;
 
   const confidence = runMonteCarlo(
     mcStartBalance,
@@ -2001,24 +1998,7 @@ function App() {
   // does not distort the comparison. We are isolating the care event shock impact only.
   // confidenceUninsured = plan survival WITH care event and NO policy (shock applied)
   // confidenceInsured   = plan survival WITH care event and Layer 2 policy (shock absorbed)
-  // Pin compare runs to the SAME retirement-age balances as the main projection.
-  // Without this, compare runs recompute pre-retirement accumulation WITHOUT arch events
-  // (ETA funding, Roth conversion) — producing a larger starting portfolio than the main
-  // plan, which inflates the uninsured MC score above the overall plan score.
-  // Fix: set currentAge = retireAge and inject actual retirement balances directly,
-  // bypassing pre-retirement accumulation entirely. Architecture OFF so no layer income
-  // contaminates the care-event isolation.
-  const retireBalances = yearsWithLtc[0] || years[0];
-  const ltcCompareBase = {
-    ...baseProjectionInputs,
-    architectureEnabled: false,
-    ltcNetAmount: 0, spouseLtcNetAmount: 0,
-    currentAge: inputs.retireAge,
-    traditionalBalance:       retireBalances ? retireBalances.trad        : baseProjectionInputs.traditionalBalance,
-    rothBalance:              retireBalances ? retireBalances.roth         : baseProjectionInputs.rothBalance,
-    taxableBalance:           retireBalances ? retireBalances.taxable      : baseProjectionInputs.taxableBalance,
-    spouseTraditionalBalance: retireBalances ? (retireBalances.spouseTrad || 0) : (baseProjectionInputs.spouseTraditionalBalance || 0),
-  };
+  const ltcCompareBase = { ...baseProjectionInputs, ltcNetAmount: 0, spouseLtcNetAmount: 0 };
   const isMarried = inputs.filingStatus === 'mfj';
   const showLtcComparison = inputs.architectureEnabled && inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
   const { years: yearsUninsured, confidence: confidenceUninsured } = showLtcComparison
