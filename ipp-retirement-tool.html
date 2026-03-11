@@ -1275,11 +1275,6 @@ function projectArc(inputs) {
     row.stateTax   = stateTax + (row.rothConversionOverage || 0) * stateEffRate;
     row.estimatedTax = row.federalTax + row.stateTax;
 
-    // Add tax segments to sources so the chart bars show gross income (net + tax = full bar height)
-    // This makes total bar height equal to the gross draw, which matches the expense line basis
-    if (row.federalTax > 0) row.sources.fedtax = row.federalTax;
-    if (row.stateTax > 0)   row.sources.statetax = row.stateTax;
-
     // Capture gross income (pre-tax, excludes overage gross-up draw which is a tax-covering draw not spendable income)
     row.grossIncome = row.totalIncome - (row.rothConversionOverage || 0);
 
@@ -1487,13 +1482,10 @@ function ArcChart({ data, view, insuredData, sorrEnabled }) {
   // Architecture mode = insuredData present (Architecture ON with LTC comparison)
   const archMode = !!insuredData;
 
-  // Bar total per row = sum of all source segments (includes fedtax + statetax on top of net income)
-  const barTotal = d => Object.values(d.sources || {}).reduce((s, v) => s + (v || 0), 0);
-
-  // maxVal: scale to the tallest bar or highest expense value
+  // maxVal: both bars (totalIncome, net) and expense line (totalExpense, net) are on same basis
   const maxVal = Math.max(
-    ...data.map(d => Math.max(barTotal(d), d.totalExpense || 0)),
-    ...(insuredData ? insuredData.map(d => d.totalExpense || 0) : [])
+    ...data.map(d => Math.max(d.totalIncome || 0, d.totalExpense || 0)),
+    ...(insuredData ? insuredData.map(d => Math.max(d.totalIncome || 0, d.totalExpense || 0)) : [])
   ) * 1.1;
   const barW = Math.max(4, Math.floor(chartW / data.length) - 2);
 
@@ -1525,7 +1517,7 @@ function ArcChart({ data, view, insuredData, sorrEnabled }) {
   ).join(' ') : null;
 
   // Source keys in stack order
-  const sourceKeys = ['ss','pension','annuity','qualAnnuity','parttime','roth','eta','taxable','rmd','fedtax','statetax'];
+  const sourceKeys = ['ss','pension','annuity','qualAnnuity','parttime','roth','eta','taxable','rmd'];
 
   const fmt = v => v >= 1000000 ? `$${(v/1000000).toFixed(1)}M` : v >= 1000 ? `$${Math.round(v/1000)}K` : `$${Math.round(v)}`;
 
@@ -2346,25 +2338,44 @@ function App() {
   // Both uninsured and insured run with same architecture — only ltcInsured differs.
   // This produces a meaningful score gap: insured score is higher because the portfolio
   // isn't depleted by care costs, and all architecture income remains intact.
-  const ltcCompareBase = { ...baseProjectionInputs, ltcNetAmount: 0, spouseLtcNetAmount: 0 };
+  // Portfolio comparison base: arch=false so portfolio diff purely reflects care cost shock.
+  // With arch on, income layers interact with the gap-fill logic and can mask or invert the diff.
+  // Isolation on pure portfolio gives a clean, accurate Portfolio Preserved figure.
+  const ltcPortfolioBase = { ...baseProjectionInputs, architectureEnabled: false, ltcNetAmount: 0, spouseLtcNetAmount: 0 };
+
+  // MC score base: full architecture state so scores reflect the real plan strength.
+  const ltcScoreBase = { ...baseProjectionInputs, ltcNetAmount: 0, spouseLtcNetAmount: 0 };
 
   // Show HC comparison scores whenever health event is ON
   const showLtcComparison = inputs.ltcEventEnabled && inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
-  const { years: yearsUninsured, confidence: confidenceUninsured } = showLtcComparison
-    ? projectArc({ ...ltcCompareBase, ltcInsured: false })
-    : { years: null, confidence: null };
-  const { years: yearsInsured, confidence: confidenceInsured } = showLtcComparison
-    ? projectArc({ ...ltcCompareBase, ltcInsured: true })
-    : { years: null, confidence: null };
+  const { years: yearsUninsured } = showLtcComparison
+    ? projectArc({ ...ltcPortfolioBase, ltcInsured: false })
+    : { years: null };
+  const { years: yearsInsured } = showLtcComparison
+    ? projectArc({ ...ltcPortfolioBase, ltcInsured: true })
+    : { years: null };
+  // MC scores use full architecture for meaningful confidence comparison
+  const { confidence: confidenceUninsured } = showLtcComparison
+    ? projectArc({ ...ltcScoreBase, ltcInsured: false })
+    : { confidence: null };
+  const { confidence: confidenceInsured } = showLtcComparison
+    ? projectArc({ ...ltcScoreBase, ltcInsured: true })
+    : { confidence: null };
 
   // Spouse LTC comparison — MFJ and spouse event ON
   const showSpouseLtcComparison = isMarried && inputs.spouseLtcEventEnabled && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
-  const { years: yearsSpouseUninsured, confidence: confidenceSpouseUninsured } = showSpouseLtcComparison
-    ? projectArc({ ...ltcCompareBase, spouseLtcInsured: false })
-    : { years: null, confidence: null };
-  const { years: yearsSpouseInsured, confidence: confidenceSpouseInsured } = showSpouseLtcComparison
-    ? projectArc({ ...ltcCompareBase, spouseLtcInsured: true })
-    : { years: null, confidence: null };
+  const { years: yearsSpouseUninsured } = showSpouseLtcComparison
+    ? projectArc({ ...ltcPortfolioBase, spouseLtcInsured: false })
+    : { years: null };
+  const { years: yearsSpouseInsured } = showSpouseLtcComparison
+    ? projectArc({ ...ltcPortfolioBase, spouseLtcInsured: true })
+    : { years: null };
+  const { confidence: confidenceSpouseUninsured } = showSpouseLtcComparison
+    ? projectArc({ ...ltcScoreBase, spouseLtcInsured: false })
+    : { confidence: null };
+  const { confidence: confidenceSpouseInsured } = showSpouseLtcComparison
+    ? projectArc({ ...ltcScoreBase, spouseLtcInsured: true })
+    : { confidence: null };
 
   const totalPortfolioAtRetire = years[0] ? years[0].totalPortfolio : (inputs.traditionalBalance + inputs.rothBalance + inputs.taxableBalance);
   const fmt$ = v => '$' + Math.round(v||0).toLocaleString();
@@ -4621,57 +4632,29 @@ function App() {
               .filter(r => r.age >= ltcAge && r.age < ltcEnd)
               .reduce((sum, r) => sum + (r.ltcAnnualCost || 0), 0);
 
-            // Gross-up tax actually incurred in the uninsured projection during LTC years
+            // Gross-up tax on forced IRA/taxable draws during care years
             const grossUpTaxTotal = yearsUninsured
               .filter(r => r.age >= ltcAge && r.age < ltcEnd)
               .reduce((sum, r) => sum + (r.ltcGrossUpTax || 0), 0);
 
-            // True portfolio draw = inflated care cost + gross-up tax friction
-            const trueTotalCost = totalLtcCost + grossUpTaxTotal;
-
-            // Portfolio preserved = full ending balance difference — captures gross-up AND compounding loss
+            // Portfolio Preserved = authoritative ending balance difference (engine ran full compounding)
+            // insured: no care draw, portfolio compounds uninhibited through plan end
+            // uninsured: care draws reduce base, compounding diminished for remaining years
             const portfolioDiff = insuredFinal && uninsuredFinal
               ? (insuredFinal.totalPortfolio - uninsuredFinal.totalPortfolio)
               : 0;
 
-            // Compounding loss = what those drawn dollars would have grown to from event end → plan age
-            // portfolioDiff is authoritative — both projections ran full engine independently
-            const compoundingLoss = Math.max(0, portfolioDiff - trueTotalCost);
+            // Compounding loss = portfolioDiff minus direct costs (care + grossup) = pure lost growth
+            const directCosts = totalLtcCost + grossUpTaxTotal;
+            const compoundingLoss = Math.max(0, portfolioDiff - directCosts);
 
-            // Today's-dollar reference cost for display context
             const todayDollarCost = inputs.ltcMonthlyCost * 12 * inputs.ltcDuration;
             const careInflRate = inputs.ltcCareInflationRate || 4;
-            const yearsToEvent = Math.max(0, ltcAge - inputs.retireAge);
 
-            // "Covered by Income" = how much of the care cost is absorbed by income surplus
-            // AFTER fixed + lifestyle expenses are already paid.
-            // We look at each LTC year in the UNINSURED projection:
-            //   - row.spendableIncome = SS + pension + RMDs + annuity (excluding arch events)
-            //   - row.totalExpense includes living expenses + LTC cost
-            //   - Income surplus after living expenses = spendableIncome - (totalExpense - ltcUncovered)
-            //   - That surplus (if any) absorbs part of the LTC cost before portfolio is touched
-            const incomeOffset = yearsUninsured
-              .filter(r => r.age >= ltcAge && r.age < ltcEnd)
-              .reduce((sum, r) => {
-                const livingExpenses = (r.totalExpense || 0) - (r.ltcUncovered || 0);
-                const surplusAfterLiving = Math.max(0, (r.spendableIncome || 0) - livingExpenses);
-                return sum + Math.min(surplusAfterLiving, r.ltcUncovered || 0);
-              }, 0);
-
-            // Layer 2 benefit fully covers the inflated care cost — the IUL accelerates
-            // the death benefit tax-free to match whatever care costs are. No gap.
+            // Layer 2 fully covers inflated care cost — no gap
             const totalBenefit = totalLtcCost;
             const benefitGap = 0;
-            // Forced portfolio draws = actual gross IRA/taxable drawn from portfolio during LTC years
-            // (tracked directly by the engine as ltcPortfolioDraw, which is 0 when income surplus
-            // fully absorbs the care cost and >0 only when the portfolio was actually tapped)
-            const extraGrossDraws = yearsUninsured
-              .filter(r => r.age >= ltcAge && r.age < ltcEnd)
-              .reduce((sum, r) => sum + (r.ltcPortfolioDraw || 0), 0);
-            // "Covered by Income" only meaningful when there's a benefit gap or no insurance.
-            // When benefit fully covers care, this should be $0 — income doesn't need to absorb anything.
-            const showBenefitCard = totalBenefit > 0; // insured scenario
-            const incomeAbsorbed = showBenefitCard ? Math.max(0, benefitGap - extraGrossDraws) : incomeOffset;
+            const showBenefitCard = true;
 
             const fmtD = v => v >= 1000000 ? `$${(v/1000000).toFixed(2)}M` : `$${Math.round(v/1000)}K`;
             return (
@@ -4689,13 +4672,11 @@ function App() {
                 </div>
                 <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:10,marginBottom:14}}>
                   {[
-                    { label:'Total Care Cost', value: fmtD(totalLtcCost), sub:`Inflated at ${careInflRate}%/yr · today's dollars: ${fmtD(todayDollarCost)}`, color:'#C47A7A' },
-                    showBenefitCard
-                      ? { label:'Layer 2 Benefit', value: fmtD(totalBenefit), sub: benefitGap > 0 ? `$${Math.round(benefitGap/1000)}K gap remains` : 'Fully covers care cost', color:'#4A9B7A' }
-                      : { label:'Covered by Income', value: incomeOffset > 0 ? fmtD(incomeOffset) : '—', sub:'Income surplus after living expenses (e.g. RMDs exceeding bills)', color:'#8DAFC8' },
-                    { label:'Forced Portfolio Draws', value: extraGrossDraws > 0 ? fmtD(extraGrossDraws) : '—', sub: showBenefitCard && benefitGap === 0 ? 'None — policy absorbs all' : 'Gross IRA/taxable drawn above income', color: extraGrossDraws > 0 ? '#C47A7A' : '#4A9B7A' },
-                    { label:'Gross-Up Tax Cost', value: grossUpTaxTotal > 0 ? fmtD(grossUpTaxTotal) : '—', sub: grossUpTaxTotal > 0 ? 'Extra tax on forced IRA draws' : 'None — no forced IRA draws', color: grossUpTaxTotal > 0 ? '#C47A7A' : '#4A9B7A' },
-                    { label:'Portfolio Preserved', value: fmtD(portfolioDiff), sub:`Draws + tax + compounding — full Layer 2 benefit`, color: portfolioDiff > 0 ? '#4A9B7A' : '#C47A7A' },
+                    { label:'Total Care Cost', value: fmtD(totalLtcCost), sub:`Inflated ${careInflRate}%/yr · today: ${fmtD(todayDollarCost)}`, color:'#C47A7A' },
+                    { label:'Layer 2 Benefit', value: fmtD(totalBenefit), sub:'Fully covers inflated care cost', color:'#4A9B7A' },
+                    { label:'Gross-Up Tax Cost', value: grossUpTaxTotal > 0 ? fmtD(grossUpTaxTotal) : '—', sub: grossUpTaxTotal > 0 ? 'Tax on forced IRA draws if uninsured' : 'None — policy eliminates this', color: grossUpTaxTotal > 0 ? '#C47A7A' : '#4A9B7A' },
+                    { label:'Compounding Lost', value: compoundingLoss > 0 ? fmtD(compoundingLoss) : '—', sub:`Growth lost on depleted dollars age ${ltcEnd}→${inputs.planToAge}`, color: compoundingLoss > 0 ? '#C47A7A' : '#4A9B7A' },
+                    { label:'Portfolio Preserved', value: portfolioDiff > 0 ? fmtD(portfolioDiff) : fmtD(Math.abs(portfolioDiff)), sub:'Net wealth preservation — insured vs uninsured ending balance', color: portfolioDiff > 0 ? '#4A9B7A' : '#C47A7A' },
                   ].map(s => (
                     <div key={s.label} style={{background:'rgba(255,255,255,.03)',borderRadius:8,padding:'10px 12px',border:'1px solid rgba(255,255,255,.06)'}}>
                       <div style={{fontSize:12,color:'#8DAFC8',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:4}}>{s.label}</div>
@@ -4706,17 +4687,14 @@ function App() {
                 </div>
                 {/* Equation line explaining how Portfolio Preserved is composed */}
                 <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:12,flexWrap:'wrap',fontSize:12,color:'#8DAFC8',background:'rgba(255,255,255,.02)',borderRadius:6,padding:'7px 12px',border:'1px solid rgba(255,255,255,.05)'}}>
-                  <span style={{color:'#C47A7A',fontWeight:600}}>{fmtD(extraGrossDraws)}</span>
-                  <span>forced draws</span>
-                  {incomeOffset > 0 && <><span style={{color:'#8DAFC8',margin:'0 2px'}}>+</span>
-                  <span style={{color:'#8DAFC8',fontWeight:600}}>{fmtD(incomeOffset)}</span>
-                  <span>covered by income surplus</span></>}
+                  <span style={{color:'#C47A7A',fontWeight:600}}>{fmtD(totalLtcCost)}</span>
+                  <span>inflated care cost</span>
                   <span style={{color:'#8DAFC8',margin:'0 2px'}}>+</span>
                   <span style={{color:'#C47A7A',fontWeight:600}}>{grossUpTaxTotal > 0 ? fmtD(grossUpTaxTotal) : '$0'}</span>
                   <span>gross-up tax</span>
                   <span style={{color:'#8DAFC8',margin:'0 2px'}}>+</span>
                   <span style={{color:'#C47A7A',fontWeight:600}}>{fmtD(compoundingLoss)}</span>
-                  <span>compounding loss (age {ltcEnd}→{inputs.planToAge})</span>
+                  <span>compounding lost (age {ltcEnd}→{inputs.planToAge})</span>
                   <span style={{color:'#8DAFC8',margin:'0 2px'}}>=</span>
                   <span style={{color:'#4A9B7A',fontWeight:700}}>{fmtD(portfolioDiff)}</span>
                   <span style={{color:'#4A9B7A'}}>Portfolio Preserved</span>
@@ -4748,7 +4726,7 @@ function App() {
                           <div style={{height:8,background:'rgba(255,255,255,.06)',borderRadius:4,overflow:'hidden'}}>
                             <div style={{height:'100%',width:barW(confidenceUninsured),background:'#C47A7A',borderRadius:4,transition:'width .6s ease'}}/>
                           </div>
-                          <div style={{fontSize:11,color:'#8DAFC8',marginTop:4}}>Portfolio depleted by {fmtD(trueTotalCost)} in care years</div>
+                          <div style={{fontSize:11,color:'#8DAFC8',marginTop:4}}>Portfolio depleted by {fmtD(directCostsSp)} in care years</div>
                         </div>
                         {/* With Layer 2 — insured, no shock */}
                         <div>
@@ -4813,12 +4791,8 @@ function App() {
               ? (insuredFinal.totalPortfolio - uninsuredFinal.totalPortfolio)
               : 0;
 
-            const trueTotalCost = totalLtcCost + grossUpTaxTotal;
-            const compoundingLoss = Math.max(0, portfolioDiff - trueTotalCost);
-
-            const extraGrossDraws = yearsSpouseUninsured
-              .filter(r => r.age >= ltcAge && r.age < ltcEnd)
-              .reduce((sum, r) => sum + (r.ltcPortfolioDraw || 0), 0);
+            const directCostsSp = totalLtcCost + grossUpTaxTotal;
+            const compoundingLoss = Math.max(0, portfolioDiff - directCostsSp);
 
             const todayDollarCostSp = inputs.spouseLtcMonthlyCost * 12 * inputs.spouseLtcDuration;
             const careInflRateSp = inputs.ltcCareInflationRate || 4;
@@ -4839,11 +4813,11 @@ function App() {
                 </div>
                 <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:10,marginBottom:14}}>
                   {[
-                    { label:'Total Care Cost', value: fmtD(totalLtcCost), sub:`Inflated at ${careInflRateSp}%/yr · today's: ${fmtD(todayDollarCostSp)}`, color:'#C47A7A' },
+                    { label:'Total Care Cost', value: fmtD(totalLtcCost), sub:`Inflated ${careInflRateSp}%/yr · today: ${fmtD(todayDollarCostSp)}`, color:'#C47A7A' },
                     { label:'Layer 2 Benefit', value: fmtD(totalLtcCost), sub:'Fully covers inflated care cost', color:'#4A9B7A' },
-                    { label:'Forced Portfolio Draws', value: extraGrossDraws > 0 ? fmtD(extraGrossDraws) : '—', sub: extraGrossDraws === 0 ? 'None — policy absorbs all' : 'Gross IRA/taxable drawn above income', color: extraGrossDraws > 0 ? '#C47A7A' : '#4A9B7A' },
-                    { label:'Gross-Up Tax Cost', value: grossUpTaxTotal > 0 ? fmtD(grossUpTaxTotal) : '—', sub: grossUpTaxTotal > 0 ? 'Extra tax on forced IRA draws' : 'None — no forced IRA draws', color: grossUpTaxTotal > 0 ? '#C47A7A' : '#4A9B7A' },
-                    { label:'Portfolio Preserved', value: fmtD(portfolioDiff), sub:'Draws + tax + compounding — full Layer 2 benefit', color: portfolioDiff > 0 ? '#4A9B7A' : '#C47A7A' },
+                    { label:'Gross-Up Tax Cost', value: grossUpTaxTotal > 0 ? fmtD(grossUpTaxTotal) : '—', sub: grossUpTaxTotal > 0 ? 'Tax on forced IRA draws if uninsured' : 'None — policy eliminates this', color: grossUpTaxTotal > 0 ? '#C47A7A' : '#4A9B7A' },
+                    { label:'Compounding Lost', value: compoundingLoss > 0 ? fmtD(compoundingLoss) : '—', sub:`Growth lost on depleted dollars age ${ltcEnd}→${inputs.planToAge}`, color: compoundingLoss > 0 ? '#C47A7A' : '#4A9B7A' },
+                    { label:'Portfolio Preserved', value: portfolioDiff > 0 ? fmtD(portfolioDiff) : fmtD(Math.abs(portfolioDiff)), sub:'Net wealth preservation — insured vs uninsured ending balance', color: portfolioDiff > 0 ? '#4A9B7A' : '#C47A7A' },
                   ].map(s => (
                     <div key={s.label} style={{background:'rgba(255,255,255,.03)',borderRadius:8,padding:'10px 12px',border:'1px solid rgba(255,255,255,.06)'}}>
                       <div style={{fontSize:12,color:'#8DAFC8',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:4}}>{s.label}</div>
@@ -4853,14 +4827,14 @@ function App() {
                   ))}
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:12,flexWrap:'wrap',fontSize:12,color:'#8DAFC8',background:'rgba(255,255,255,.02)',borderRadius:6,padding:'7px 12px',border:'1px solid rgba(255,255,255,.05)'}}>
-                  <span style={{color:'#C47A7A',fontWeight:600}}>{fmtD(extraGrossDraws)}</span>
-                  <span>forced draws</span>
+                  <span style={{color:'#C47A7A',fontWeight:600}}>{fmtD(totalLtcCost)}</span>
+                  <span>inflated care cost</span>
                   <span style={{color:'#8DAFC8',margin:'0 2px'}}>+</span>
                   <span style={{color:'#C47A7A',fontWeight:600}}>{grossUpTaxTotal > 0 ? fmtD(grossUpTaxTotal) : '$0'}</span>
                   <span>gross-up tax</span>
                   <span style={{color:'#8DAFC8',margin:'0 2px'}}>+</span>
                   <span style={{color:'#C47A7A',fontWeight:600}}>{fmtD(compoundingLoss)}</span>
-                  <span>compounding loss (primary age {ltcEnd}→{inputs.planToAge})</span>
+                  <span>compounding lost (age {ltcEnd}→{inputs.planToAge})</span>
                   <span style={{color:'#8DAFC8',margin:'0 2px'}}>=</span>
                   <span style={{color:'#4A9B7A',fontWeight:700}}>{fmtD(portfolioDiff)}</span>
                   <span style={{color:'#4A9B7A'}}>Portfolio Preserved</span>
