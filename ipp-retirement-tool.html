@@ -2052,6 +2052,93 @@ function DataTable({ data }) {
 }
 
 // ── Debits Table ──
+function BalancesTable({ data, inputs, clientInfo }) {
+  if (!data || data.length === 0) return null;
+  const fmtM = v => {
+    if (!v || v < 1000) return '—';
+    return v >= 1000000 ? '$'+(v/1000000).toFixed(2)+'M' : '$'+Math.round(v/1000)+'K';
+  };
+  const muted = '#9EB8CC', faint = 'rgba(255,255,255,.06)', green = '#4A9B7A', amber = '#C8A96E';
+  const isMFJ = inputs?.filingStatus === 'mfj';
+  const primaryLabel = clientInfo?.primaryName || 'Primary';
+  const spouseLabel  = clientInfo?.spouseName  || 'Spouse';
+  const hStyle = (c=muted) => ({padding:'6px 8px',textAlign:'right',color:c,fontWeight:500,letterSpacing:'.04em',fontSize:13,borderBottom:'1px solid '+faint,whiteSpace:'nowrap'});
+  const cell = (v, color, bold) => ({padding:'5px 8px',textAlign:'right',color:color||muted,fontWeight:bold?600:400,fontSize:13});
+
+  // Find peak values for subtle heat coloring
+  const maxTrad      = Math.max(...data.map(d => d.trad      || 0));
+  const maxSpouseTrad= Math.max(...data.map(d => d.spouseTrad|| 0));
+  const maxRoth      = Math.max(...data.map(d => d.roth      || 0));
+  const maxTaxable   = Math.max(...data.map(d => d.taxable   || 0));
+  const maxTotal     = Math.max(...data.map(d => d.totalPortfolio || 0));
+
+  const heatColor = (v, max) => {
+    if (!v || !max) return muted;
+    const pct = v / max;
+    if (pct >= 0.9) return '#4A9B7A';
+    if (pct >= 0.6) return muted;
+    if (pct >= 0.3) return amber;
+    return '#C47A7A';
+  };
+
+  return (
+    <div style={{overflowX:'auto'}}>
+      <div style={{padding:'8px 12px 4px',fontSize:12,color:'#8DAFC8',letterSpacing:'.05em'}}>
+        BALANCES — End-of-year portfolio balances by account · values shown in future dollars
+      </div>
+      <table style={{width:'100%',borderCollapse:'collapse',fontSize:13,fontFamily:'DM Sans'}}>
+        <thead>
+          <tr>
+            <th style={{...hStyle(muted),textAlign:'left'}}>Age</th>
+            <th style={hStyle('#C47A7A')}>{primaryLabel} Pre-Tax (IRA/401k)</th>
+            {isMFJ && <th style={hStyle('#C47A7A')}>{spouseLabel} Pre-Tax (IRA/401k)</th>}
+            <th style={hStyle('#7BAF84')}>{primaryLabel} Roth IRA</th>
+            <th style={hStyle('#C8A030')}>Taxable / Investment</th>
+            <th style={hStyle(green)}>Total Portfolio</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((d, i) => {
+            const trad       = d.trad       || 0;
+            const spouseTrad = d.spouseTrad || 0;
+            const roth       = d.roth       || 0;
+            const taxable    = d.taxable    || 0;
+            const total      = d.totalPortfolio || 0;
+            const isLtcYear  = d.ltcEvent || d.spouseLtcEvent;
+            const rowBg = isLtcYear ? 'rgba(196,122,122,.07)' : i%2===0 ? 'transparent' : 'rgba(255,255,255,.015)';
+            // Flag years where total is declining
+            const prev = data[i-1];
+            const declining = prev && (d.totalPortfolio || 0) < (prev.totalPortfolio || 0);
+            return (
+              <tr key={d.age} style={{background:rowBg}}>
+                <td style={{padding:'5px 8px',fontWeight:600,color:isLtcYear?amber:muted,fontSize:13}}>{d.age}</td>
+                <td style={cell(trad,       heatColor(trad,       maxTrad),       false)}>{fmtM(trad)}</td>
+                {isMFJ && <td style={cell(spouseTrad, heatColor(spouseTrad, maxSpouseTrad), false)}>{fmtM(spouseTrad)}</td>}
+                <td style={cell(roth,       heatColor(roth,       maxRoth),       false)}>{fmtM(roth)}</td>
+                <td style={cell(taxable,    heatColor(taxable,    maxTaxable),    false)}>{fmtM(taxable)}</td>
+                <td style={{...cell(total, heatColor(total, maxTotal), true), borderLeft:'1px solid '+faint}}>
+                  {fmtM(total)}
+                  {declining && <span style={{color:'#C47A7A',marginLeft:4,fontSize:11}}>▼</span>}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+        <tfoot>
+          <tr style={{borderTop:'2px solid rgba(255,255,255,.1)'}}>
+            <td style={{padding:'6px 8px',color:muted,fontWeight:700,fontSize:13}}>Age {data[data.length-1]?.age}</td>
+            <td style={{padding:'6px 8px',textAlign:'right',color:'#C47A7A',fontWeight:700,fontSize:13}}>{fmtM(data[data.length-1]?.trad||0)}</td>
+            {isMFJ && <td style={{padding:'6px 8px',textAlign:'right',color:'#C47A7A',fontWeight:700,fontSize:13}}>{fmtM(data[data.length-1]?.spouseTrad||0)}</td>}
+            <td style={{padding:'6px 8px',textAlign:'right',color:'#7BAF84',fontWeight:700,fontSize:13}}>{fmtM(data[data.length-1]?.roth||0)}</td>
+            <td style={{padding:'6px 8px',textAlign:'right',color:'#C8A030',fontWeight:700,fontSize:13}}>{fmtM(data[data.length-1]?.taxable||0)}</td>
+            <td style={{padding:'6px 8px',textAlign:'right',color:green,fontWeight:700,fontSize:13,borderLeft:'1px solid '+faint}}>{fmtM(data[data.length-1]?.totalPortfolio||0)}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
+}
+
 function DebitsTable({ data }) {
   if (!data || data.length === 0) return null;
   const fmt$ = v => v >= 1000 ? '$'+Math.round(v/1000)+'K' : (v > 0 ? '$'+Math.round(v||0) : '—');
@@ -2865,6 +2952,7 @@ function App() {
           <div style={{display:'flex',gap:6,background:'rgba(255,255,255,.03)',borderRadius:8,padding:4,border:'1px solid rgba(255,255,255,.06)'}}>
             <button className={`tab-btn ${view==='visual'?'active':''}`} onClick={()=>setView('visual')}>Visual Arc</button>
             <button className={`tab-btn ${view==='numbers'?'active':''}`} onClick={()=>setView('numbers')}>Totals Table</button>
+            <button className={`tab-btn ${view==='balances'?'active':''}`} onClick={()=>setView('balances')}>Balances</button>
             <button className={`tab-btn ${view==='debits'?'active':''}`} onClick={()=>setView('debits')}>Debits</button>
             <button className={`tab-btn ${view==='credits'?'active':''}`} onClick={()=>setView('credits')}>Credits</button>
           </div>
@@ -4429,6 +4517,8 @@ function App() {
               </>
             ) : view === 'numbers' ? (
               <DataTable data={yearsWithLtc}/>
+            ) : view === 'balances' ? (
+              <BalancesTable data={yearsWithLtc} inputs={inputs} clientInfo={clientInfo}/>
             ) : view === 'debits' ? (
               <DebitsTable data={yearsWithLtc}/>
             ) : (
