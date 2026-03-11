@@ -124,6 +124,7 @@ const COLORS = {
   eta:       { fill: '#A8C5D8', label: 'ETA Policy Loan (Layer 3)', tax: 'free'  },
   fedtax:    { fill: '#7A4A4A', label: 'Federal Tax',         tax: null         },
   statetax:  { fill: '#8A5A3A', label: 'State Tax',           tax: null         },
+  ltcpool:   { fill: '#4A7A9B', label: 'Layer 2 Benefit Pool',tax: null         },
   expense:   { fill: 'rgba(196,106,106,.25)', label: 'Expenses', tax: null      },
 };
 
@@ -1669,8 +1670,8 @@ function ArcChart({ data, view, insuredData, uninsuredData, sorrEnabled }) {
     `${i === 0 ? 'M' : 'L'} ${xScale(i).toFixed(1)} ${yScale(d.totalExpenseGross ?? d.totalExpense).toFixed(1)}`
   ).join(' ');
 
-  // Source keys in stack order — fedtax + statetax on top so gross income bars reach expense line
-  const sourceKeys = ['ss','pension','annuity','parttime','roth','eta','taxable','rmd','fedtax','statetax'];
+  // Source keys in stack order — tax segments on top, ltcpool fills care event gap
+  const sourceKeys = ['ss','pension','annuity','parttime','roth','eta','taxable','rmd','ltcpool','fedtax','statetax'];
 
   const fmt = v => v >= 1000000 ? `$${(v/1000000).toFixed(1)}M` : v >= 1000 ? `$${Math.round(v/1000)}K` : `$${Math.round(v)}`;
 
@@ -1713,11 +1714,13 @@ function ArcChart({ data, view, insuredData, uninsuredData, sorrEnabled }) {
         return (
           <g key={i}>
             {sourceKeys.map(k => {
-              // tax segments pull from dedicated fields, not sources
+              // tax and pool segments pull from dedicated fields, not sources
               const v = k === 'fedtax'
                 ? (d.federalTax || 0)
                 : k === 'statetax'
                 ? (d.stateTax || 0)
+                : k === 'ltcpool'
+                ? ((d.ltcCoverage || 0) + (d.spouseLtcCoverage || 0))
                 : (d.grossSources && d.grossSources[k]) || d.sources[k] || 0;
               if (v <= 0) return null;
               const barH = (v / maxVal) * chartH;
@@ -2209,6 +2212,12 @@ function Legend({ insuredData }) {
         <div style={{width:14,height:10,borderRadius:2,background:'#7A4A4A',opacity:.85,flexShrink:0}}/>
         <span style={{fontSize:13,color:'#9EB8CC'}}>Federal Tax</span>
       </div>
+      {insuredData && insuredData.some(d => (d.ltcCoverage||0) + (d.spouseLtcCoverage||0) > 0) && (
+        <div style={{display:'flex',alignItems:'center',gap:5}}>
+          <div style={{width:14,height:10,borderRadius:2,background:'#4A7A9B',opacity:.85,flexShrink:0}}/>
+          <span style={{fontSize:13,color:'#9EB8CC'}}>Layer 2 Benefit Pool</span>
+        </div>
+      )}
       {insuredData && insuredData.some(d => (d.stateTax||0) > 0) && (
         <div style={{display:'flex',alignItems:'center',gap:5}}>
           <div style={{width:14,height:10,borderRadius:2,background:'#8A5A3A',opacity:.85,flexShrink:0}}/>
@@ -4710,7 +4719,7 @@ function App() {
             <div style={{background:'rgba(74,155,122,.05)',border:'1px solid rgba(74,155,122,.15)',borderRadius:10,padding:'14px 16px'}}>
               <div style={{fontSize:13,fontWeight:700,letterSpacing:'.14em',textTransform:'uppercase',color:'#4A9B7A',marginBottom:8}}>Guaranteed Income Floor</div>
               <p style={{fontSize:14,lineHeight:1.65,color:'#DDD6C4'}}>
-                <strong style={{color:'#4A9B7A'}}>{guaranteedPct}%</strong> of total projected retirement income (age {inputs.retireAge}–{inputs.planToAge}) comes from guaranteed sources (Social Security{inputs.pensionMonthly > 0 ? ', pension' : ''}{inputs.annuityMonthly > 0 ? ', annuity' : ''}). {guaranteedPct < 50 ? 'Increasing this floor through a Roth Fixed Indexed Annuity with GLWB rider (Layer 1) reduces sequence risk and future IRMAA exposure. The ETA structure (Layer 3) can fund the conversion by eliminating the distribution tax via bank non-recourse loan.' : 'A strong floor provides stability against market volatility. Every dollar repositioned into the Roth Annuity (Layer 1) or ETA IUL policy (Layer 3) permanently reduces the future RMD base — lowering mandatory income and IRMAA exposure year after year.'}
+                <strong style={{color:'#4A9B7A'}}>{guaranteedPct}%</strong> of total projected retirement income (age {inputs.retireAge}–{inputs.planToAge}) comes from guaranteed sources (Social Security{inputs.pensionMonthly > 0 ? ', pension' : ''}{inputs.annuityMonthly > 0 ? ', annuity' : ''}). {guaranteedPct < 50 ? 'Increasing this floor through a Roth Fixed Indexed Annuity with GLWB rider (Layer 1) reduces sequence risk and future IRMAA exposure. The ETA structure (Layer 3) can fund the conversion by eliminating most of the distribution tax from client\'s cash flow via bank non-recourse loan.' : 'A strong floor provides stability against market volatility. Every dollar repositioned into the Roth Annuity (Layer 1) or ETA IUL policy (Layer 3) permanently reduces the future RMD base — lowering mandatory income and IRMAA exposure year after year.'}
               </p>
             </div>
           </div>
