@@ -988,7 +988,14 @@ function projectArc(inputs) {
     // not income. Gap-fill draws run below; they show implicitly via the tax segments
     // (gross draw = net expenses + taxes, so bars meet the line once fedtax+statetax stack).
     row.grossSources = { ...row.sources };
-    row.grossTotalIncome = row.totalIncome;
+    // Architecture event draws (ETA funding, LTC funding, Roth conversion) were added to
+    // sources.rmd before this snapshot. Remove them — they are IRA repositioning draws,
+    // not spendable income. Only genuine income sources belong in the chart bars.
+    const archRmdAdded = (row.etaFundingAmount || 0) + (row.ltcFundingAmount || 0) + (row.rothConversionAmount || 0);
+    if (archRmdAdded > 0) {
+      row.grossSources.rmd = Math.max(0, (row.grossSources.rmd || 0) - archRmdAdded);
+    }
+    row.grossTotalIncome = Object.values(row.grossSources).reduce((s,v) => s + (v||0), 0);
 
     // ── Shared gross-up utilities — hoisted outside gap block so IRMAA fill can also use them ──
     const isMFJeff = effectiveStatus === 'mfj';
@@ -1692,7 +1699,7 @@ function ArcChart({ data, view, insuredData, uninsuredData, sorrEnabled }) {
   ).join(' ');
 
   // Source keys in stack order — tax segments on top, ltcpool fills care event gap
-  const sourceKeys = ['ss','pension','annuity','parttime','roth','eta','taxable','rmd','ltcpool','fedtax','statetax'];
+  const sourceKeys = ['ss','pension','annuity','parttime','roth','eta','taxable','rmd','fedtax','statetax'];
 
   const fmt = v => v >= 1000000 ? `$${(v/1000000).toFixed(1)}M` : v >= 1000 ? `$${Math.round(v/1000)}K` : `$${Math.round(v)}`;
 
@@ -2261,12 +2268,12 @@ function LegendSwatch({ k, box }) {
   );
 }
 
-function Legend({ insuredData }) {
-  if (!insuredData || insuredData.length === 0) return null;
-  const gsSum = k => insuredData.reduce((s,d) => s + ((d.grossSources||d.sources||{})[k]||0), 0);
-  const hasInsuredCare = insuredData.some(d => (d.ltcCoverage||0)+(d.spouseLtcCoverage||0) > 0);
-  const hasStateTax   = insuredData.some(d => (d.stateTax||0) > 0);
-  const hasIrmaa      = insuredData.some(d => (d.irmaa||0) > 0);
+function Legend({ data }) {
+  if (!data || data.length === 0) return null;
+  const gsSum = k => data.reduce((s,d) => s + ((d.grossSources||d.sources||{})[k]||0), 0);
+  const hasInsuredCare = data.some(d => (d.ltcCoverage||0)+(d.spouseLtcCoverage||0) > 0);
+  const hasStateTax   = data.some(d => (d.stateTax||0) > 0);
+  const hasIrmaa      = data.some(d => (d.irmaa||0) > 0);
   return (
     <div style={{display:'flex',flexWrap:'wrap',gap:'8px 16px',marginBottom:16}}>
       {gsSum('ss')       > 0 && <LegendSwatch k="ss"/>}
@@ -2279,7 +2286,6 @@ function Legend({ insuredData }) {
       {gsSum('rmd')      > 0 && <LegendSwatch k="rmd"/>}
       <LegendSwatch k="fedtax" box/>
       {hasStateTax   && <LegendSwatch k="statetax" box/>}
-      {hasInsuredCare && <LegendSwatch k="ltcpool" box/>}
       <div style={{display:'flex',alignItems:'center',gap:5}}>
         <div style={{width:18,height:2,background:'#E09040',borderRadius:1}}/>
         <span style={{fontSize:13,color:'#9EB8CC'}}>Expense Line</span>
@@ -4372,7 +4378,7 @@ function App() {
                 <p style={{fontSize:13,color:'#8DAFC8'}}>
                   Gross income by source · gross expense line · {inputs.ltcEventAge > 0 ? 'healthcare event marked' : 'no healthcare event modeled'}
                 </p>
-                {view === 'visual' && <Legend insuredData={yearsInsured}/>}
+                {view === 'visual' && <Legend data={yearsWithLtc}/>}
               </div>
               <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:10}}>
                 <ConfidenceRing score={confidence}/>
