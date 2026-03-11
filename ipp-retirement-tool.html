@@ -964,9 +964,9 @@ function projectArc(inputs) {
 
     row.totalExpense = expenses;
 
-    // totalExpenseGross = full expense burden including insurance-covered care costs.
-    // Used for the chart expense line so care event years display true cost visually.
-    // The portfolio math still uses totalExpense (only uncovered amounts drive draws).
+    // totalExpenseGross = full annual cost including insurance-covered care AND taxes.
+    // Used for the chart expense line — bars stack income+fedtax+statetax, so the
+    // expense line must include taxes to visually meet the bar tops in a balanced plan.
     const grossCareAdded = (row.ltcCoverage || 0) + (row.spouseLtcCoverage || 0);
     row.totalExpenseGross = expenses + grossCareAdded;
 
@@ -1403,6 +1403,11 @@ function projectArc(inputs) {
     row.federalTax = taxResult.totalTax + (row.rothConversionOverageTax || 0);
     row.stateTax   = stateTax + (row.rothConversionOverage || 0) * stateEffRate;
     row.estimatedTax = row.federalTax + row.stateTax;
+
+    // Now that taxes are finalized, update totalExpenseGross to include them.
+    // The chart expense line = living costs + care (insured or not) + IRMAA + fed tax + state tax.
+    // This makes it align with the stacked bars (income sources + fedtax + statetax).
+    row.totalExpenseGross = (row.totalExpenseGross || 0) + row.federalTax + row.stateTax;
 
     // Capture gross income (pre-tax, excludes overage gross-up draw which is a tax-covering draw not spendable income)
     row.grossIncome = row.totalIncome - (row.rothConversionOverage || 0);
@@ -2441,17 +2446,19 @@ function App() {
   // and LTC inputs are set.
   const ltcCompareBase = {
     ...baseProjectionInputs,
-    // Keep all Architecture layers active — the comparison should show:
-    //   insured:   full architecture + insurance covers care
-    //   uninsured: full architecture + care costs hit portfolio directly
-    // Stripping layers would compare apples-to-oranges (low-income baseline vs real plan)
+    // Strip ALL Architecture layers from the LTC isolation comparison.
+    // The healthcare panel MC answers ONE question: "does insurance protect the portfolio
+    // from a care event?" — L1 and L3 are not relevant to that question.
+    // The overall MC score (which DOES include L1+L2+L3) will legitimately be higher —
+    // that's the correct story: full architecture > insurance alone.
+    architectureEnabled: false,
     ltcEventAge: hasLtcEvent ? inputs.ltcEventAge : 0,
     spouseLtcEventAge: hasSpouseLtcEvent ? inputs.spouseLtcEventAge : 0,
   };
   const isMarried = inputs.filingStatus === 'mfj';
   const showLtcComparison = inputs.ltcEventEnabled && inputs.architectureEnabled && inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
   const { years: yearsUninsured, confidence: confidenceUninsured } = showLtcComparison
-    ? projectArc({ ...ltcCompareBase, ltcInsured: false, stripArchLayersFromMC: true })
+    ? projectArc({ ...ltcCompareBase, ltcInsured: false })
     : { years: null, confidence: null };
   const { years: yearsInsured, confidence: confidenceInsured } = showLtcComparison
     ? projectArc({ ...ltcCompareBase, ltcInsured: true })
@@ -2460,7 +2467,7 @@ function App() {
   // Spouse LTC comparison — only when MFJ, healthcare toggle ON, and spouse LTC entered
   const showSpouseLtcComparison = inputs.ltcEventEnabled && inputs.architectureEnabled && isMarried && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
   const { years: yearsSpouseUninsured, confidence: confidenceSpouseUninsured } = showSpouseLtcComparison
-    ? projectArc({ ...ltcCompareBase, spouseLtcInsured: false, stripArchLayersFromMC: true })
+    ? projectArc({ ...ltcCompareBase, spouseLtcInsured: false })
     : { years: null, confidence: null };
   const { years: yearsSpouseInsured, confidence: confidenceSpouseInsured } = showSpouseLtcComparison
     ? projectArc({ ...ltcCompareBase, spouseLtcInsured: true })
