@@ -1707,15 +1707,26 @@ function ArcChart({ data, view, insuredData, sorrEnabled }) {
                 </g>
               );
             })}
-            {data.filter((d,i) => d.irmaa > 0 && (!data[i-1] || data[i-1].irmaa !== d.irmaa)).map((d) => {
-              const i = data.indexOf(d);
-              return (
-                <text key={i} x={xScale(i)} y={irmaaTop - 3}
-                  textAnchor="middle" fill="#E8943A" fontSize="9" fontFamily="DM Sans" fontWeight="600">
-                  +${Math.round(d.irmaa/100)*100 === d.irmaa ? d.irmaa.toLocaleString() : d.irmaa.toLocaleString()}
-                </text>
-              );
-            })}
+            {(() => {
+              // Only label bracket CHANGES, and only if they're spaced far enough apart (>=4 bars)
+              let lastLabelIdx = -99;
+              return data
+                .map((d, i) => ({ d, i }))
+                .filter(({ d, i }) => {
+                  if (!d.irmaa) return false;
+                  const prev = data[i - 1];
+                  if (prev && prev.irmaa === d.irmaa) return false; // same tier, no label
+                  if (i - lastLabelIdx < 4) return false; // too close to last label
+                  lastLabelIdx = i;
+                  return true;
+                })
+                .map(({ d, i }) => (
+                  <text key={i} x={xScale(i)} y={irmaaTop - 3}
+                    textAnchor="middle" fill="#E8943A" fontSize="9" fontFamily="DM Sans" fontWeight="600">
+                    +${d.irmaa.toLocaleString()}
+                  </text>
+                ));
+            })()}
             <line x1={PAD.l} x2={W-PAD.r} y1={irmaaBottom} y2={irmaaBottom}
               stroke="rgba(196,106,106,.15)" strokeWidth="1"/>
           </g>
@@ -2298,23 +2309,29 @@ function App() {
     etaColaRate: (inputs.etaColaRate || 0) / 100,
     ltcCareInflationRate: (inputs.ltcCareInflationRate || 4) / 100,
   };
-  // Primary projection — NO LTC shock. This is the clean baseline plan survival score
-  // regardless of any healthcare event inputs. The main confidence score reflects the
-  // plan's fundamental strength (income, portfolio, architecture) without a care shock.
-  const { years, confidence, fixedStreams, mcStartAge } = projectArc({ ...baseProjectionInputs, ltcInsured: false, ltcEventAge: 0, spouseLtcEventAge: 0 });
+  // Clean baseline — no LTC events, used for main confidence when events are OFF
+  const { years: yearsClean, confidence: confidenceClean, fixedStreams, mcStartAge } = projectArc({ ...baseProjectionInputs, ltcInsured: false, ltcEventAge: 0, spouseLtcEventAge: 0 });
 
-  // Primary display projection — includes LTC event if entered (uninsured view)
-  // This is what the chart and number table show when architecture is OFF or no LTC comparison
   const hasLtcEvent = inputs.ltcEventEnabled && inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
   const hasSpouseLtcEvent = inputs.spouseLtcEventEnabled && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
-  const { years: yearsWithLtc } = (hasLtcEvent || hasSpouseLtcEvent)
+
+  // When health events are ON and architecture is OFF: yearsWithLtc drives the chart AND the main MC score
+  // This lets the advisor stack SORR + expense shock + healthcare to show the "perfect storm"
+  const { years: yearsWithLtc, confidence: confidenceWithLtc } = (hasLtcEvent || hasSpouseLtcEvent)
     ? projectArc({
         ...baseProjectionInputs,
         ltcInsured: false,
         ltcEventAge: hasLtcEvent ? inputs.ltcEventAge : 0,
         spouseLtcEventAge: hasSpouseLtcEvent ? inputs.spouseLtcEventAge : 0,
       })
-    : { years: years };
+    : { years: yearsClean, confidence: confidenceClean };
+
+  // Main confidence ring: when architecture OFF + health events ON, show uninsured MC score
+  // When architecture ON, show full architecture score (confidenceClean with arch layers)
+  const years = yearsWithLtc;
+  const confidence = (hasLtcEvent || hasSpouseLtcEvent) && !inputs.architectureEnabled
+    ? confidenceWithLtc
+    : confidenceClean;
 
   // LTC comparison projections — only when architecture is enabled and LTC inputs are set.
   // IMPORTANT: both projections zero out ltcNetAmount/spouseLtcNetAmount so the funding draw
@@ -2324,9 +2341,15 @@ function App() {
   // Option C: HC comparison scores use pure portfolio — no L1/L3 income in either score.
   // This isolates exactly what Layer 2 contributes vs. not having it, on a level playing field.
   // The main confidence ring still includes L1+L3 when architecture is on.
-  const ltcCompareBase = { ...baseProjectionInputs, architectureEnabled: false, ltcNetAmount: 0, spouseLtcNetAmount: 0 };
   const isMarried = inputs.filingStatus === 'mfj';
-  const showLtcComparison = inputs.architectureEnabled && inputs.ltcEventEnabled && inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
+  // HC comparison base: respect current architecture state so scores reflect real plan.
+  // Both uninsured and insured run with same architecture — only ltcInsured differs.
+  // This produces a meaningful score gap: insured score is higher because the portfolio
+  // isn't depleted by care costs, and all architecture income remains intact.
+  const ltcCompareBase = { ...baseProjectionInputs, ltcNetAmount: 0, spouseLtcNetAmount: 0 };
+
+  // Show HC comparison scores whenever health event is ON
+  const showLtcComparison = inputs.ltcEventEnabled && inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
   const { years: yearsUninsured, confidence: confidenceUninsured } = showLtcComparison
     ? projectArc({ ...ltcCompareBase, ltcInsured: false })
     : { years: null, confidence: null };
@@ -2334,8 +2357,8 @@ function App() {
     ? projectArc({ ...ltcCompareBase, ltcInsured: true })
     : { years: null, confidence: null };
 
-  // Spouse LTC comparison — only when MFJ and spouse LTC entered
-  const showSpouseLtcComparison = inputs.architectureEnabled && isMarried && inputs.spouseLtcEventEnabled && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
+  // Spouse LTC comparison — MFJ and spouse event ON
+  const showSpouseLtcComparison = isMarried && inputs.spouseLtcEventEnabled && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
   const { years: yearsSpouseUninsured, confidence: confidenceSpouseUninsured } = showSpouseLtcComparison
     ? projectArc({ ...ltcCompareBase, spouseLtcInsured: false })
     : { years: null, confidence: null };
@@ -3995,6 +4018,33 @@ function App() {
                 <NumInput value={inputs.ltcCareInflationRate} onChange={v=>set('ltcCareInflationRate',v)} suffix="% / yr"/>
               </Field>
 
+              {/* ── Single Master Toggle — controls both primary and spouse events ── */}
+              {(inputs.ltcEventAge > 0 || inputs.spouseLtcEventAge > 0) && (() => {
+                const anyEnabled = inputs.ltcEventEnabled || inputs.spouseLtcEventEnabled;
+                const toggleBoth = () => {
+                  const next = !anyEnabled;
+                  set('ltcEventEnabled', inputs.ltcEventAge > 0 ? next : false);
+                  set('spouseLtcEventEnabled', inputs.spouseLtcEventAge > 0 ? next : false);
+                };
+                return (
+                  <div style={{marginBottom:12,padding:'10px 14px',background: anyEnabled ? 'rgba(196,106,106,.08)' : 'rgba(255,255,255,.03)',border:`1px solid ${anyEnabled ? 'rgba(196,106,106,.35)' : 'rgba(255,255,255,.1)'}`,borderRadius:8}}>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                      <div>
+                        <div style={{fontSize:13,fontWeight:700,color: anyEnabled ? '#C47A7A' : '#8DAFC8',letterSpacing:'.06em',textTransform:'uppercase'}}>
+                          Health Events — Model Impact ON/OFF
+                        </div>
+                        <div style={{fontSize:12,color: anyEnabled ? '#C47A7A' : '#6B8FA8',marginTop:3,lineHeight:1.4}}>
+                          {anyEnabled ? 'Active — portfolio impact visible in chart and tables' : 'Data saved · toggle on to model portfolio impact'}
+                        </div>
+                      </div>
+                      <div onClick={toggleBoth} style={{width:44,height:24,borderRadius:12,cursor:'pointer',background: anyEnabled ? '#C47A7A' : 'rgba(255,255,255,.1)',position:'relative',transition:'background .2s',flexShrink:0,border: anyEnabled ? '1px solid #C47A7A' : '1px solid rgba(255,255,255,.15)'}}>
+                        <div style={{position:'absolute',top:3,left: anyEnabled ? 22 : 3,width:16,height:16,borderRadius:8,background:'#F5F2EC',transition:'left .2s',boxShadow:'0 1px 3px rgba(0,0,0,.3)'}}/>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* ── Primary Health Event ── */}
               <div style={{fontSize:13,fontWeight:700,color:'#9EB8CC',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8,marginTop:8}}>
                 {inputs.filingStatus === 'mfj' ? 'Primary' : 'Care Event'}
@@ -4003,46 +4053,14 @@ function App() {
                 <NumInput value={inputs.ltcEventAge} onChange={v=>set('ltcEventAge',v)} suffix="yrs"/>
               </Field>
               {inputs.ltcEventAge > 0 && <>
-                <Field label="Monthly Care Cost" hint="National median: $7,500–$10,000/mo for facility care">
+                <Field label="Monthly Care Cost" hint="Today's dollars — inflated to event-year dollars at the care inflation rate above">
                   <NumInput value={inputs.ltcMonthlyCost} onChange={v=>set('ltcMonthlyCost',v)} prefix="$" suffix="/mo"/>
                 </Field>
                 <Field label="Duration">
                   <NumInput value={inputs.ltcDuration} onChange={v=>set('ltcDuration',v)} suffix="yrs"/>
                 </Field>
 
-                {/* Health Event Impact Toggle */}
-                <div style={{marginTop:10,marginBottom:6,padding:'10px 12px',background: inputs.ltcEventEnabled ? 'rgba(196,106,106,.08)' : 'rgba(255,255,255,.03)',border:`1px solid ${inputs.ltcEventEnabled ? 'rgba(196,106,106,.35)' : 'rgba(255,255,255,.1)'}`,borderRadius:8}}>
-                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom: inputs.ltcEventEnabled ? 6 : 0}}>
-                    <div style={{fontSize:13,fontWeight:700,color: inputs.ltcEventEnabled ? '#C47A7A' : '#8DAFC8',letterSpacing:'.06em',textTransform:'uppercase'}}>
-                      Model Impact ON/OFF
-                    </div>
-                    <div
-                      onClick={()=>set('ltcEventEnabled', !inputs.ltcEventEnabled)}
-                      style={{
-                        width:44, height:24, borderRadius:12, cursor:'pointer',
-                        background: inputs.ltcEventEnabled ? '#C47A7A' : 'rgba(255,255,255,.1)',
-                        position:'relative', transition:'background .2s', flexShrink:0,
-                        border: inputs.ltcEventEnabled ? '1px solid #C47A7A' : '1px solid rgba(255,255,255,.15)',
-                      }}>
-                      <div style={{
-                        position:'absolute', top:3, left: inputs.ltcEventEnabled ? 22 : 3,
-                        width:16, height:16, borderRadius:8,
-                        background:'#F5F2EC', transition:'left .2s',
-                        boxShadow:'0 1px 3px rgba(0,0,0,.3)',
-                      }}/>
-                    </div>
-                  </div>
-                  {inputs.ltcEventEnabled && (
-                    <div style={{fontSize:12,color:'#C47A7A',lineHeight:1.5}}>
-                      Care event is active in projection — portfolio impact visible in chart and tables.
-                    </div>
-                  )}
-                  {!inputs.ltcEventEnabled && (
-                    <div style={{fontSize:12,color:'#6B8FA8',lineHeight:1.5,marginTop:4}}>
-                      Data saved · toggle on to apply impact to projection.
-                    </div>
-                  )}
-                </div>
+                {/* Health Event Impact Toggle — single toggle controls both primary and spouse */}
 
                 {/* Layer 2 Insurance Option — always visible for pre-fill; engine gates on architectureEnabled */}
                 <div style={{marginTop:10,padding:'10px 12px',background:'rgba(74,155,122,.05)',border:`1px solid ${inputs.architectureEnabled ? 'rgba(74,155,122,.35)' : 'rgba(74,155,122,.12)'}`,borderRadius:8,opacity: inputs.architectureEnabled ? 1 : 0.6}}>
@@ -4130,46 +4148,14 @@ function App() {
                   <NumInput value={inputs.spouseLtcEventAge} onChange={v=>set('spouseLtcEventAge',v)} suffix="yrs (primary age)"/>
                 </Field>
                 {inputs.spouseLtcEventAge > 0 && <>
-                  <Field label="Monthly Care Cost" hint="National median: $7,500–$10,000/mo for facility care">
+                  <Field label="Monthly Care Cost" hint="Today's dollars — inflated to event-year dollars at the care inflation rate above">
                     <NumInput value={inputs.spouseLtcMonthlyCost} onChange={v=>set('spouseLtcMonthlyCost',v)} prefix="$" suffix="/mo"/>
                   </Field>
                   <Field label="Duration">
                     <NumInput value={inputs.spouseLtcDuration} onChange={v=>set('spouseLtcDuration',v)} suffix="yrs"/>
                   </Field>
 
-                  {/* Spouse Health Event Impact Toggle */}
-                  <div style={{marginTop:10,marginBottom:6,padding:'10px 12px',background: inputs.spouseLtcEventEnabled ? 'rgba(196,106,106,.08)' : 'rgba(255,255,255,.03)',border:`1px solid ${inputs.spouseLtcEventEnabled ? 'rgba(196,106,106,.35)' : 'rgba(255,255,255,.1)'}`,borderRadius:8}}>
-                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom: inputs.spouseLtcEventEnabled ? 6 : 0}}>
-                      <div style={{fontSize:13,fontWeight:700,color: inputs.spouseLtcEventEnabled ? '#C47A7A' : '#8DAFC8',letterSpacing:'.06em',textTransform:'uppercase'}}>
-                        Spouse Impact ON/OFF
-                      </div>
-                      <div
-                        onClick={()=>set('spouseLtcEventEnabled', !inputs.spouseLtcEventEnabled)}
-                        style={{
-                          width:44, height:24, borderRadius:12, cursor:'pointer',
-                          background: inputs.spouseLtcEventEnabled ? '#C47A7A' : 'rgba(255,255,255,.1)',
-                          position:'relative', transition:'background .2s', flexShrink:0,
-                          border: inputs.spouseLtcEventEnabled ? '1px solid #C47A7A' : '1px solid rgba(255,255,255,.15)',
-                        }}>
-                        <div style={{
-                          position:'absolute', top:3, left: inputs.spouseLtcEventEnabled ? 22 : 3,
-                          width:16, height:16, borderRadius:8,
-                          background:'#F5F2EC', transition:'left .2s',
-                          boxShadow:'0 1px 3px rgba(0,0,0,.3)',
-                        }}/>
-                      </div>
-                    </div>
-                    {inputs.spouseLtcEventEnabled && (
-                      <div style={{fontSize:12,color:'#C47A7A',lineHeight:1.5}}>
-                        Spouse care event is active in projection.
-                      </div>
-                    )}
-                    {!inputs.spouseLtcEventEnabled && (
-                      <div style={{fontSize:12,color:'#6B8FA8',lineHeight:1.5,marginTop:4}}>
-                        Data saved · toggle on to apply impact to projection.
-                      </div>
-                    )}
-                  </div>
+                  {/* Spouse toggle removed — single master toggle above controls both */}
 
                   {/* Spouse Layer 2 Insurance — always visible for pre-fill; engine gates on architectureEnabled */}
                   <div style={{marginTop:10,padding:'10px 12px',background:'rgba(74,155,122,.05)',border:`1px solid ${inputs.architectureEnabled ? 'rgba(74,155,122,.35)' : 'rgba(74,155,122,.12)'}`,borderRadius:8,opacity: inputs.architectureEnabled ? 1 : 0.6}}>
@@ -4672,9 +4658,10 @@ function App() {
                 return sum + Math.min(surplusAfterLiving, r.ltcUncovered || 0);
               }, 0);
 
-            const annualBenefit = (inputs.ltcMonthlyBenefit || inputs.ltcMonthlyCost) * 12;
-            const totalBenefit = annualBenefit * inputs.ltcDuration;
-            const benefitGap = Math.max(0, totalLtcCost - totalBenefit);
+            // Layer 2 benefit fully covers the inflated care cost — the IUL accelerates
+            // the death benefit tax-free to match whatever care costs are. No gap.
+            const totalBenefit = totalLtcCost;
+            const benefitGap = 0;
             // Forced portfolio draws = actual gross IRA/taxable drawn from portfolio during LTC years
             // (tracked directly by the engine as ltcPortfolioDraw, which is 0 when income surplus
             // fully absorbs the care cost and >0 only when the portfolio was actually tapped)
