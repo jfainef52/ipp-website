@@ -548,6 +548,17 @@ function projectArc(inputs) {
   let taxable = taxableBalance;
   let spouseTrad = (filingStatus === 'mfj') ? (spouseTraditionalBalance || 0) : 0;
 
+  // Pre-retirement marginal rate — from householdIncome. Falls back to 0.24 if not set.
+  const preRetMarginalRate = (() => {
+    if (!householdIncome || householdIncome <= 0) return 0.24;
+    const mfj = filingStatus === 'mfj';
+    const br = mfj
+      ? [{l:23200,r:.10},{l:94300,r:.12},{l:201050,r:.22},{l:383900,r:.24},{l:487450,r:.32},{l:731200,r:.35},{l:Infinity,r:.37}]
+      : [{l:11600,r:.10},{l:47150,r:.12},{l:100525,r:.22},{l:191950,r:.24},{l:243725,r:.32},{l:609350,r:.35},{l:Infinity,r:.37}];
+    const taxable = Math.max(0, householdIncome - (mfj ? 29200 : 14600));
+    return (br.find(b => taxable <= b.l) || br[br.length-1]).r;
+  })();
+
   if (currentAge < retireAge) {
     const tradStopAge    = tradContributionEndAge    > 0 ? tradContributionEndAge    : retireAge;
     const taxableStopAge = taxableContributionEndAge > 0 ? taxableContributionEndAge : retireAge;
@@ -567,12 +578,12 @@ function projectArc(inputs) {
       // LTC policy funding draw — reduce trad balance (pre-retirement, approximate gross-up at 24% + penalty)
       if (archLtcNetAmount > 0 && ltcFundingAge > 0 && a === ltcFundingAge) {
         const preRetPenalty = ltcFundingAge < 59.5 ? 0.10 : 0;
-        const approxGross = archLtcNetAmount / Math.max(0.01, 1 - 0.24 - preRetPenalty);
+        const approxGross = archLtcNetAmount / Math.max(0.01, 1 - preRetMarginalRate - preRetPenalty);
         trad = Math.max(0, trad - approxGross - (approxGross * preRetPenalty));
       }
       if (archSpouseLtcNetAmount > 0 && spouseLtcFundingAge > 0 && a === spouseLtcFundingAge) {
         const preRetPenaltySp = spouseLtcFundingAge < 59.5 ? 0.10 : 0;
-        const approxGrossSp = archSpouseLtcNetAmount / Math.max(0.01, 1 - 0.24 - preRetPenaltySp);
+        const approxGrossSp = archSpouseLtcNetAmount / Math.max(0.01, 1 - preRetMarginalRate - preRetPenaltySp);
         trad = Math.max(0, trad - approxGrossSp - (approxGrossSp * preRetPenaltySp));
       }
       // Grow existing balance then add contribution (end-of-year)
@@ -2199,6 +2210,7 @@ function App() {
     nonQualAnnuityMonthly: 0, nonQualAnnuityStartAge: 65, nonQualAnnuityBasis: 0, nonQualAnnuityTotalValue: 0,
     partTimeMonthly: 0, partTimeEndAge: 68,
     fixedExpenses: 15000, lifestyleExpenses: 8500,
+    householdIncome: 0,
     ltcEventAge: 0, ltcMonthlyCost: 7500, ltcDuration: 3, ltcShowComparison: false, ltcMonthlyBenefit: 7500, ltcBenefitDuration: 3,
     spouseLtcEventAge: 0, spouseLtcMonthlyCost: 7500, spouseLtcDuration: 3, spouseLtcMonthlyBenefit: 7500, spouseLtcBenefitDuration: 3, spouseLtcInsured: false,
     stateCode: 'IL', customStateRate: '', taxRateStressAdder: 0,
@@ -2427,14 +2439,14 @@ function App() {
                   const portColor = v => v > 500000 ? '#1A6B45' : v > 0 ? '#8B6914' : '#8B1A1A';
 
                   // Run stress-test projections for all four narrative sections
-                  const sqBase = { ...baseProjectionInputs, architectureEnabled: false, sorrEnabled: false, expenseShockEnabled: false, ltcEventEnabled: false };
+                  const sqBase = { ...baseProjectionInputs, architectureEnabled: false, sorrEnabled: false, expenseShockEnabled: false, ltcEventAge: 0, spouseLtcEventAge: 0 };
                   const sqFull = { ...baseProjectionInputs, architectureEnabled: false };
                   const sorrOnly = { ...sqBase, sorrEnabled: true };
                   const shockOnly = { ...sqBase, expenseShockEnabled: inputs.expenseShockEnabled, expenseShockAmount: inputs.expenseShockAmount, expenseShockFrequency: inputs.expenseShockFrequency };
-                  const hcOnly = { ...sqBase, ltcEventEnabled: true, ltcEventAge: inputs.ltcEventAge, spouseLtcEventAge: inputs.spouseLtcEventAge, ltcMonthlyCost: inputs.ltcMonthlyCost, spouseLtcMonthlyCost: inputs.spouseLtcMonthlyCost, ltcDuration: inputs.ltcDuration, spouseLtcDuration: inputs.spouseLtcDuration, ltcInsured: false, spouseLtcInsured: false, ltcCareInflationRate: baseProjectionInputs.ltcCareInflationRate };
-                  const hcInsured = { ...sqBase, ltcEventEnabled: true, ltcEventAge: inputs.ltcEventAge, spouseLtcEventAge: inputs.spouseLtcEventAge, ltcMonthlyCost: inputs.ltcMonthlyCost, spouseLtcMonthlyCost: inputs.spouseLtcMonthlyCost, ltcDuration: inputs.ltcDuration, spouseLtcDuration: inputs.spouseLtcDuration, ltcInsured: true, spouseLtcInsured: true, ltcCareInflationRate: baseProjectionInputs.ltcCareInflationRate };
-                  const stormSQ = { ...sqBase, sorrEnabled: true, expenseShockEnabled: inputs.expenseShockEnabled||true, expenseShockAmount: inputs.expenseShockAmount||50000, expenseShockFrequency: inputs.expenseShockFrequency||8, ltcEventEnabled: true, ltcEventAge: inputs.ltcEventAge, spouseLtcEventAge: inputs.spouseLtcEventAge, ltcMonthlyCost: inputs.ltcMonthlyCost, spouseLtcMonthlyCost: inputs.spouseLtcMonthlyCost, ltcDuration: inputs.ltcDuration, spouseLtcDuration: inputs.spouseLtcDuration, ltcInsured: false, spouseLtcInsured: false, ltcCareInflationRate: baseProjectionInputs.ltcCareInflationRate };
-                  const stormArch = { ...baseProjectionInputs, sorrEnabled: true, expenseShockEnabled: inputs.expenseShockEnabled||true, expenseShockAmount: inputs.expenseShockAmount||50000, expenseShockFrequency: inputs.expenseShockFrequency||8, ltcEventEnabled: true, ltcInsured: true, spouseLtcInsured: true };
+                  const hcOnly = { ...sqBase, ltcEventAge: inputs.ltcEventAge, spouseLtcEventAge: inputs.spouseLtcEventAge, ltcMonthlyCost: inputs.ltcMonthlyCost, spouseLtcMonthlyCost: inputs.spouseLtcMonthlyCost, ltcDuration: inputs.ltcDuration, spouseLtcDuration: inputs.spouseLtcDuration, ltcInsured: false, spouseLtcInsured: false, ltcCareInflationRate: baseProjectionInputs.ltcCareInflationRate };
+                  const hcInsured = { ...sqBase, ltcEventAge: inputs.ltcEventAge, spouseLtcEventAge: inputs.spouseLtcEventAge, ltcMonthlyCost: inputs.ltcMonthlyCost, spouseLtcMonthlyCost: inputs.spouseLtcMonthlyCost, ltcDuration: inputs.ltcDuration, spouseLtcDuration: inputs.spouseLtcDuration, ltcInsured: true, spouseLtcInsured: true, ltcCareInflationRate: baseProjectionInputs.ltcCareInflationRate };
+                  const stormSQ = { ...sqBase, sorrEnabled: true, expenseShockEnabled: inputs.expenseShockEnabled||true, expenseShockAmount: inputs.expenseShockAmount||50000, expenseShockFrequency: inputs.expenseShockFrequency||8, ltcEventAge: inputs.ltcEventAge||0, spouseLtcEventAge: inputs.spouseLtcEventAge||0, ltcMonthlyCost: inputs.ltcMonthlyCost, spouseLtcMonthlyCost: inputs.spouseLtcMonthlyCost, ltcDuration: inputs.ltcDuration, spouseLtcDuration: inputs.spouseLtcDuration, ltcInsured: false, spouseLtcInsured: false, ltcCareInflationRate: baseProjectionInputs.ltcCareInflationRate };
+                  const stormArch = { ...baseProjectionInputs, sorrEnabled: true, expenseShockEnabled: inputs.expenseShockEnabled||true, expenseShockAmount: inputs.expenseShockAmount||50000, expenseShockFrequency: inputs.expenseShockFrequency||8, ltcInsured: true, spouseLtcInsured: true };
 
                   const { years: sqYears, confidence: sqConf } = projectArc(sqBase);
                   const { years: sqFullYears, confidence: sqFullConf } = projectArc(sqFull);
@@ -3001,6 +3013,20 @@ function App() {
               )}
               <Field label="Retirement Age"><NumInput value={inputs.retireAge} onChange={v=>set('retireAge',v)} suffix="yrs"/></Field>
               <Field label="Plan Through Age (Primary)"><NumInput value={inputs.planToAge} onChange={v=>set('planToAge',v)} suffix="yrs"/></Field>
+              <Field label="Pre-Retirement Household Income" hint="Combined gross income before retirement — sets marginal rate for Layer 1 &amp; 2 funding gross-up">
+                <NumInput value={inputs.householdIncome} onChange={v=>set('householdIncome',v)} prefix="$" suffix="/yr"/>
+              </Field>
+              {inputs.householdIncome > 0 && (() => {
+                const _mfj = inputs.filingStatus === 'mfj';
+                const _br = _mfj
+                  ? [{l:23200,r:.10},{l:94300,r:.12},{l:201050,r:.22},{l:383900,r:.24},{l:487450,r:.32},{l:731200,r:.35},{l:Infinity,r:.37}]
+                  : [{l:11600,r:.10},{l:47150,r:.12},{l:100525,r:.22},{l:191950,r:.24},{l:243725,r:.32},{l:609350,r:.35},{l:Infinity,r:.37}];
+                const _taxable = Math.max(0, inputs.householdIncome - (_mfj ? 29200 : 14600));
+                const _rate = (_br.find(b => _taxable <= b.l) || _br[_br.length-1]).r;
+                return <div style={{marginTop:4,padding:'6px 10px',background:'rgba(200,169,110,.07)',border:'1px solid rgba(200,169,110,.2)',borderRadius:6,fontSize:12,color:'#8DAFC8'}}>
+                  Est. marginal bracket: <span style={{color:'#C8A96E',fontWeight:700}}>{Math.round(_rate*100)}%</span> — used for Layer 1 &amp; 2 funding gross-up
+                </div>;
+              })()}
             </Section>
 
             <Section title="Tax &amp; State" collapsed={sections.tax} onToggle={()=>toggleSection('tax')}>
@@ -3899,9 +3925,14 @@ function App() {
                     </div>
                     {inputs.ltcNetAmount > 0 && inputs.ltcFundingAge > 0 && (() => {
                       // Preview gross-up using estimated marginal rate
-                      const estRate = inputs.taxRateStressAdder
-                        ? 0.24 + inputs.taxRateStressAdder / 100
-                        : 0.24;
+
+                      const _mfj = inputs.filingStatus === 'mfj';
+                      const _br = _mfj
+                        ? [{l:23200,r:.10},{l:94300,r:.12},{l:201050,r:.22},{l:383900,r:.24},{l:487450,r:.32},{l:731200,r:.35},{l:Infinity,r:.37}]
+                        : [{l:11600,r:.10},{l:47150,r:.12},{l:100525,r:.22},{l:191950,r:.24},{l:243725,r:.32},{l:609350,r:.35},{l:Infinity,r:.37}];
+                      const _taxable = inputs.householdIncome > 0 ? Math.max(0, inputs.householdIncome - (_mfj ? 29200 : 14600)) : null;
+                      const _baseRate = _taxable !== null ? (_br.find(b => _taxable <= b.l) || _br[_br.length-1]).r : 0.24;
+                      const estRate = _baseRate + (inputs.taxRateStressAdder ? inputs.taxRateStressAdder / 100 : 0);
                       const estPenalty = inputs.ltcFundingAge < 59.5 ? 0.10 : 0;
                       const estGross = inputs.ltcNetAmount / Math.max(0.01, 1 - estRate - estPenalty);
                       const estTax = estGross - inputs.ltcNetAmount - (estGross * estPenalty);
@@ -3986,7 +4017,14 @@ function App() {
                         </Field>
                       </div>
                       {inputs.spouseLtcNetAmount > 0 && inputs.spouseLtcFundingAge > 0 && (() => {
-                        const estRate = inputs.taxRateStressAdder ? 0.24 + inputs.taxRateStressAdder / 100 : 0.24;
+
+                        const _mfj = inputs.filingStatus === 'mfj';
+                        const _br = _mfj
+                          ? [{l:23200,r:.10},{l:94300,r:.12},{l:201050,r:.22},{l:383900,r:.24},{l:487450,r:.32},{l:731200,r:.35},{l:Infinity,r:.37}]
+                          : [{l:11600,r:.10},{l:47150,r:.12},{l:100525,r:.22},{l:191950,r:.24},{l:243725,r:.32},{l:609350,r:.35},{l:Infinity,r:.37}];
+                        const _taxable = inputs.householdIncome > 0 ? Math.max(0, inputs.householdIncome - (_mfj ? 29200 : 14600)) : null;
+                        const _baseRate = _taxable !== null ? (_br.find(b => _taxable <= b.l) || _br[_br.length-1]).r : 0.24;
+                        const estRate = _baseRate + (inputs.taxRateStressAdder ? inputs.taxRateStressAdder / 100 : 0);
                         const estPenalty = inputs.spouseLtcFundingAge < 59.5 ? 0.10 : 0;
                         const estGross = inputs.spouseLtcNetAmount / Math.max(0.01, 1 - estRate - estPenalty);
                         const estTax = estGross - inputs.spouseLtcNetAmount - (estGross * estPenalty);
