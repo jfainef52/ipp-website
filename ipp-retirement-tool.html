@@ -2030,7 +2030,7 @@ function DataTable({ data }) {
               <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.annuity.fill}}>{d.nonQualAnnuityIncome>0?fmt$(d.nonQualAnnuityIncome):'—'}</td>
               <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.eta.fill}}>{d.etaIncome>0?fmt$(d.etaIncome):'—'}</td>
               <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.rmd.fill}}>{fmt$(d.sources.rmd||0)}</td>
-              <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.roth.fill}}>{fmt$(d.sources.roth||0)}</td>
+              <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.roth.fill}}>{fmt$(Math.max(0,(d.sources.roth||0)-(d.rothAnnuityIncome||0)))}</td>
               <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.taxable.fill}}>{fmt$(d.sources.taxable||0)}</td>
               <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.parttime.fill}}>{fmt$(d.sources.parttime||0)}</td>
               <td style={{padding:'5px 8px',textAlign:'right',color:'#8DAFC8'}}>{fmt$(d.grossIncome||d.totalIncome)}</td>
@@ -2183,7 +2183,7 @@ function CreditsTable({ data }) {
             const nqAnn    = d.nonQualAnnuityIncome || 0;
             const eta      = gs.eta || d.etaIncome || 0;
             const rmd      = gs.rmd || 0;
-            const rothIra  = gs.roth || 0;
+            const rothIra  = Math.max(0, (gs.roth || 0) - (d.rothAnnuityIncome || 0));
             const taxable  = gs.taxable || 0;
             const partTime = gs.parttime || 0;
             const ltcCov   = d.ltcCoverage || 0;
@@ -2235,7 +2235,7 @@ function CreditsTable({ data }) {
             <td style={{padding:'6px 8px',textAlign:'right',color:green,fontWeight:700,fontSize:13}}>
               {fmtM(data.reduce((s,d)=>{
                 const gs=d.grossSources||d.sources||{};
-                return s+(gs.ss||0)+(gs.pension||0)+(d.rothAnnuityIncome||0)+(d.nonQualAnnuityIncome||0)+(gs.eta||d.etaIncome||0)+(gs.rmd||0)+(gs.roth||0)+(gs.taxable||0)+(gs.parttime||0)+(d.ltcCoverage||0)+(d.spouseLtcCoverage||0)+(d.portfolioYield||0);
+                return s+(gs.ss||0)+(gs.pension||0)+(d.rothAnnuityIncome||0)+(d.nonQualAnnuityIncome||0)+(gs.eta||d.etaIncome||0)+(gs.rmd||0)+Math.max(0,(gs.roth||0)-(d.rothAnnuityIncome||0))+(gs.taxable||0)+(gs.parttime||0)+(d.ltcCoverage||0)+(d.spouseLtcCoverage||0)+(d.portfolioYield||0);
               },0))}
             </td>
             <td style={{padding:'6px 8px',textAlign:'right',color:muted,fontWeight:500,fontSize:13}}>
