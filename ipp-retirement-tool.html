@@ -2628,19 +2628,19 @@ function App() {
   const isMarried = inputs.filingStatus === 'mfj';
   const showLtcComparison = inputs.ltcEventEnabled && inputs.architectureEnabled && inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
   const { years: yearsUninsured, confidence: confidenceUninsured } = showLtcComparison
-    ? projectArc({ ...ltcCompareBase, ltcInsured: false })
+    ? projectArc({ ...ltcCompareBase, ltcInsured: false, spouseLtcInsured: true })
     : { years: null, confidence: null };
   const { years: yearsInsured, confidence: confidenceInsured } = showLtcComparison
-    ? projectArc({ ...ltcCompareBase, ltcInsured: true })
+    ? projectArc({ ...ltcCompareBase, ltcInsured: true, spouseLtcInsured: true })
     : { years: null, confidence: null };
 
   // Spouse LTC comparison — only when MFJ, healthcare toggle ON, and spouse LTC entered
   const showSpouseLtcComparison = inputs.ltcEventEnabled && inputs.architectureEnabled && isMarried && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
   const { years: yearsSpouseUninsured, confidence: confidenceSpouseUninsured } = showSpouseLtcComparison
-    ? projectArc({ ...ltcCompareBase, spouseLtcInsured: false })
+    ? projectArc({ ...ltcCompareBase, ltcInsured: true, spouseLtcInsured: false })
     : { years: null, confidence: null };
   const { years: yearsSpouseInsured, confidence: confidenceSpouseInsured } = showSpouseLtcComparison
-    ? projectArc({ ...ltcCompareBase, spouseLtcInsured: true })
+    ? projectArc({ ...ltcCompareBase, ltcInsured: true, spouseLtcInsured: true })
     : { years: null, confidence: null };
 
   const totalPortfolioAtRetire = years[0] ? years[0].totalPortfolio : (inputs.traditionalBalance + inputs.rothBalance + inputs.taxableBalance);
