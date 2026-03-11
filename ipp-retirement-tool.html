@@ -983,9 +983,17 @@ function projectArc(inputs) {
     row.spendableIncome = row.totalIncome - nonSpendableEvents;
     row.gap = row.spendableIncome - expenses;
 
+    // portfolioDrawSegment = net expense shortfall that the portfolio must cover.
+    // Captured HERE at the net level — NOT as the gross IRA draw (which is larger due
+    // to tax gross-up). This keeps the bar segment proportional to actual expense need,
+    // not the inflated pre-tax IRA pull. Purely aesthetic — model math unchanged.
+    row.portfolioDrawSegment = Math.max(0, -row.gap);
+
     // Snapshot gross (pre-tax, pre-gap-fill) sources for chart bars.
-    // Captured HERE — before any gap-fill IRA draws or LTC gross-up draws are added —
-    // so the chart shows structured income sources vs the expense line.
+    row.grossSources = { ...row.sources };
+    row.grossTotalIncome = row.totalIncome;
+
+
     // LTC care cost draws are excluded: they are expense-covering draws, not income.
     row.grossSources = { ...row.sources };
     row.grossTotalIncome = row.totalIncome;
@@ -1045,12 +1053,6 @@ function projectArc(inputs) {
                        + (row.spouseLtcEvent ? (row.spouseLtcUncovered || 0) : 0);
     const isAnyLtcEvent = row.ltcEvent || row.spouseLtcEvent;
 
-    // State tax rate used in gross-up brackets — ensures IRA draws are sized for the
-    // combined federal + state burden. Without this, non-exempt states (CA, OR, MN etc.)
-    // produce draws that are too small, leaving a residual gap in the chart.
-    const gapFillStateRate = (customStateRate !== '' && customStateRate !== undefined)
-      ? Math.min(parseFloat(customStateRate) / 100 + stressAdder, 0.99)
-      : Math.min((STATE_TAX_DATA[stateCode]?.rate || 0) + stressAdder, 0.99);
 
     if (row.gap < 0) {
       const needed = Math.abs(row.gap);
@@ -1063,7 +1065,7 @@ function projectArc(inputs) {
       // --- Taxable brokerage: LTCG gross-up, stacked on ordinary income ---
       if (taxable > 0 && remaining > 0) {
         const ltcgBracketsEff = (isMFJeff ? LTCG_MFJ_2025 : LTCG_SINGLE_2025)
-          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder + gapFillStateRate, 0.99) }));
+          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
         // LTCG stacks on top of ordinary income — start bracket walk at baseOrdAGI
         const netToDraw = Math.min(remaining, taxable * 0.9);
         const { grossDraw, taxOnDraw } = grossUpIterative(netToDraw, ltcgBracketsEff, baseOrdAGI);
@@ -1099,7 +1101,7 @@ function projectArc(inputs) {
       // --- Traditional / IRA: ordinary income gross-up ---
       if (remaining > 0 && trad > 0) {
         const ordBracketsEff = (isMFJeff ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025)
-          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder + gapFillStateRate, 0.99) }));
+          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
         // Start ordinary bracket walk at baseOrdAGI + any taxable gross-up already added
         const adjOrdAGI = baseOrdAGI + (row.sources.taxable || 0) * 0.15;
         const netToDraw = Math.min(remaining, trad);
@@ -1126,7 +1128,7 @@ function projectArc(inputs) {
       // --- Spouse Traditional IRA: draw if primary trad is exhausted and gap remains (MFJ only) ---
       if (remaining > 0 && spouseTrad > 0 && filingStatus === 'mfj') {
         const ordBracketsEff = (isMFJeff ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025)
-          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder + gapFillStateRate, 0.99) }));
+          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
         const adjOrdAGI = baseOrdAGI + (row.sources.taxable || 0) * 0.15 + (row.sources.rmd || 0);
         const netToDraw = Math.min(remaining, spouseTrad);
         const { grossDraw, taxOnDraw } = grossUpIterative(netToDraw, ordBracketsEff, adjOrdAGI);
@@ -1171,7 +1173,7 @@ function projectArc(inputs) {
       // Draw from taxable (LTCG gross-up)
       if (taxable > 0 && ltcRemaining > 0) {
         const ltcgBracketsEff = (isMFJeff ? LTCG_MFJ_2025 : LTCG_SINGLE_2025)
-          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder + gapFillStateRate, 0.99) }));
+          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
         const netToDraw = Math.min(ltcRemaining, taxable * 0.9);
         const { grossDraw, taxOnDraw } = grossUpIterative(netToDraw, ltcgBracketsEff, baseOrdAGI);
         const actualGross = Math.min(taxable, grossDraw);
@@ -1189,7 +1191,7 @@ function projectArc(inputs) {
       // Draw from traditional IRA (ordinary income gross-up) — the primary vehicle
       if (trad > 0 && ltcRemaining > 0) {
         const ordBracketsEff = (isMFJeff ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025)
-          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder + gapFillStateRate, 0.99) }));
+          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
         const adjOrdAGI = baseOrdAGI + (row.sources.taxable || 0) * 0.15;
         const netToDraw = Math.min(ltcRemaining, trad);
         const { grossDraw, taxOnDraw } = grossUpIterative(netToDraw, ordBracketsEff, adjOrdAGI);
@@ -1207,7 +1209,7 @@ function projectArc(inputs) {
       // Draw from spouse traditional IRA if primary trad exhausted and gap remains (MFJ only)
       if (spouseTrad > 0 && ltcRemaining > 0 && filingStatus === 'mfj') {
         const ordBracketsEff = (isMFJeff ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025)
-          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder + gapFillStateRate, 0.99) }));
+          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
         const adjOrdAGI = baseOrdAGI + (row.sources.taxable || 0) * 0.15 + (row.sources.rmd || 0);
         const netToDraw = Math.min(ltcRemaining, spouseTrad);
         const { grossDraw, taxOnDraw } = grossUpIterative(netToDraw, ordBracketsEff, adjOrdAGI);
@@ -1243,7 +1245,7 @@ function projectArc(inputs) {
       // Draw from taxable (LTCG gross-up)
       if (taxable > 0 && ltcRemaining > 0) {
         const ltcgBracketsEff = (isMFJeff ? LTCG_MFJ_2025 : LTCG_SINGLE_2025)
-          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder + gapFillStateRate, 0.99) }));
+          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
         const netToDraw = Math.min(ltcRemaining, taxable * 0.9);
         const { grossDraw, taxOnDraw } = grossUpIterative(netToDraw, ltcgBracketsEff, baseOrdAGI);
         const actualGross = Math.min(taxable, grossDraw);
@@ -1404,12 +1406,6 @@ function projectArc(inputs) {
       }
       delete row._conversionOveragePending;
     }
-
-    // portfolioDrawSegment = all draws added AFTER grossSources snapshot (gap-fill + IRMAA fills).
-    // Used as a chart bar segment so bars always visually meet the expense line.
-    // This is purely aesthetic — the model math is unchanged. The segment shows the viewer
-    // exactly how much of each year's income came from portfolio draws vs structured sources.
-    row.portfolioDrawSegment = Math.max(0, row.totalIncome - row.grossTotalIncome);
 
     // estimatedTax captured here — after overage gross-up resolves so the tax on
     // the gross-up draw (which increased totalIncome) is fully reflected.
