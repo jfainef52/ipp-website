@@ -2290,7 +2290,7 @@ function App() {
 
   // Key stats
   const retireData = years[0];
-  const age90Data = years.find(y => y.age === 90);
+  const age90Data = yearsWithLtc.find(y => y.age === 90);
   const peakIrmaa = Math.max(...years.map(y => y.irmaa || 0));
   const totalIrmaa = years.reduce((sum, y) => sum + (y.irmaa||0), 0);
   const totalEstTax = years.reduce((sum, y) => sum + (y.estimatedTax||0), 0);
@@ -4225,13 +4225,61 @@ function App() {
             </div>
           )}
 
+          {/* Portfolio Depletion Warning Banner */}
+          {exhaustionYear && (
+            <div style={{
+              background:'rgba(196,106,106,.12)',
+              border:'2px solid rgba(196,106,106,.6)',
+              borderRadius:10,
+              padding:'14px 20px',
+              marginBottom:16,
+              display:'flex',
+              alignItems:'center',
+              gap:16,
+            }}>
+              <div style={{fontSize:28,lineHeight:1}}>⚠</div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:14,fontWeight:700,color:'#C47A7A',letterSpacing:'.1em',textTransform:'uppercase',marginBottom:4}}>
+                  Portfolio Depleted at Age {exhaustionYear.age}
+                </div>
+                <div style={{fontSize:13,color:'#DDD6C4',lineHeight:1.6}}>
+                  Based on current inputs, the portfolio is exhausted at age <strong style={{color:'#C47A7A'}}>{exhaustionYear.age}</strong> — {inputs.planToAge - exhaustionYear.age} year{inputs.planToAge - exhaustionYear.age !== 1 ? 's' : ''} before the plan end age of {inputs.planToAge}.
+                  Income from Social Security{inputs.pensionMonthly > 0 ? ', pension' : ''} continues, but all portfolio-dependent income sources cease.
+                  {inputs.architectureEnabled
+                    ? ' Review Architecture inputs — Layer 1 and Layer 3 income continues but portfolio draws will fail.'
+                    : ' Consider enabling Architecture to model guaranteed income floor options.'}
+                </div>
+              </div>
+              <div style={{
+                background:'rgba(196,106,106,.15)',
+                border:'1px solid rgba(196,106,106,.35)',
+                borderRadius:8,
+                padding:'10px 16px',
+                textAlign:'center',
+                minWidth:100,
+                flexShrink:0,
+              }}>
+                <div style={{fontSize:11,color:'#C47A7A',fontWeight:700,letterSpacing:'.08em',textTransform:'uppercase',marginBottom:2}}>Years Short</div>
+                <div style={{fontSize:28,fontWeight:700,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif",lineHeight:1}}>{inputs.planToAge - exhaustionYear.age}</div>
+                <div style={{fontSize:11,color:'#8DAFC8',marginTop:2}}>of plan end</div>
+              </div>
+            </div>
+          )}
+
           {/* Key stats row */}
           <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:20}}>
             {[
               { label:'Portfolio at Retirement', value: fmtM(totalPortfolioAtRetire), sub:'Starting balance', color:'#C8A96E' },
               { label:'Guaranteed Income', value: guaranteedPct+'%', sub: `SS · pension · annuity (age ${inputs.retireAge}–${inputs.planToAge})`, color: guaranteedPct>=50?'#4A9B7A':'#C8A030' },
               { label:'Total IRMAA Exposure', value: totalIrmaa>0?'$'+Math.round(totalIrmaa/1000)+'K':'None', sub: isMarried ? 'Est. surcharges (MFJ brackets)' : 'Est. Medicare surcharges', color: totalIrmaa>0?'#E8943A':'#4A9B7A' },
-              { label:'Portfolio at Age 90', value: age90Data?fmtM(age90Data.totalPortfolio):'—', sub:'Est. remaining balance', color: age90Data&&age90Data.totalPortfolio>0?'#7BAF84':'#C47A7A' },
+              { label:'Portfolio at Age 90',
+                value: exhaustionYear && exhaustionYear.age <= 90
+                  ? '⚠ Depleted'
+                  : age90Data ? fmtM(age90Data.totalPortfolio) : '—',
+                sub: exhaustionYear && exhaustionYear.age <= 90
+                  ? `Portfolio exhausted at age ${exhaustionYear.age}`
+                  : 'Est. remaining balance',
+                color: exhaustionYear && exhaustionYear.age <= 90 ? '#C47A7A' : age90Data&&age90Data.totalPortfolio>0?'#7BAF84':'#C47A7A' },
               { label:'Est. Lifetime Tax', value: totalEstTax>0?(totalEstTax>=1000000?'$'+(totalEstTax/1000000).toFixed(1)+'M':'$'+Math.round(totalEstTax/1000)+'K'):'—', sub:'Fed '+(totalFedTax>=1000000?'$'+(totalFedTax/1000000).toFixed(1)+'M':'$'+Math.round(totalFedTax/1000)+'K')+' · State '+(totalStateTax>=1000000?'$'+(totalStateTax/1000000).toFixed(1)+'M':'$'+Math.round(totalStateTax/1000)+'K')+(inputs.taxRateStressAdder>0?' · ⚠ stress +'+inputs.taxRateStressAdder+'%':''), color:'#C47A7A' },
               { label:'Total Gross Income', value: totalGrossIncome>=1000000?'$'+(totalGrossIncome/1000000).toFixed(1)+'M':'$'+Math.round(totalGrossIncome/1000)+'K', sub:`All sources · age ${inputs.retireAge}–${inputs.planToAge}`, color:'#C8A96E' },
               { label:'Total Net Income', value: totalNetIncome>=1000000?'$'+(totalNetIncome/1000000).toFixed(1)+'M':'$'+Math.round(totalNetIncome/1000)+'K', sub:'After fed · state · IRMAA', color:'#7BAF84' },
@@ -4477,6 +4525,26 @@ function App() {
               <>
                 <Legend insuredData={yearsInsured}/>
                 <ArcChart data={yearsUninsured || yearsWithLtc} view={view} insuredData={yearsInsured} sorrEnabled={inputs.sorrEnabled}/>
+                {exhaustionYear && (
+                  <div style={{
+                    marginTop:8,
+                    display:'flex',
+                    alignItems:'center',
+                    gap:10,
+                    background:'rgba(196,106,106,.1)',
+                    border:'1px solid rgba(196,106,106,.4)',
+                    borderRadius:8,
+                    padding:'9px 14px',
+                  }}>
+                    <span style={{fontSize:16}}>⚠</span>
+                    <span style={{fontSize:13,color:'#C47A7A',fontWeight:700}}>
+                      Portfolio depleted at age {exhaustionYear.age}
+                    </span>
+                    <span style={{fontSize:13,color:'#8DAFC8'}}>
+                      — {inputs.planToAge - exhaustionYear.age} year{inputs.planToAge - exhaustionYear.age !== 1 ? 's' : ''} before plan end · income from guaranteed sources continues but all portfolio draws cease
+                    </span>
+                  </div>
+                )}
               </>
             ) : view === 'numbers' ? (
               <DataTable data={yearsWithLtc}/>
