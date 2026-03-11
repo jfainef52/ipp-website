@@ -125,6 +125,7 @@ const COLORS = {
   fedtax:    { fill: '#7A4A4A', label: 'Federal Tax',         tax: null         },
   statetax:  { fill: '#8A5A3A', label: 'State Tax',           tax: null         },
   ltcpool:   { fill: '#4A7A9B', label: 'Layer 2 Benefit Pool',tax: null         },
+  portdraw:  { fill: '#5A6A7A', label: 'Portfolio Draw',      tax: null         },
   expense:   { fill: 'rgba(196,106,106,.25)', label: 'Expenses', tax: null      },
 };
 
@@ -1044,6 +1045,13 @@ function projectArc(inputs) {
                        + (row.spouseLtcEvent ? (row.spouseLtcUncovered || 0) : 0);
     const isAnyLtcEvent = row.ltcEvent || row.spouseLtcEvent;
 
+    // State tax rate used in gross-up brackets — ensures IRA draws are sized for the
+    // combined federal + state burden. Without this, non-exempt states (CA, OR, MN etc.)
+    // produce draws that are too small, leaving a residual gap in the chart.
+    const gapFillStateRate = (customStateRate !== '' && customStateRate !== undefined)
+      ? Math.min(parseFloat(customStateRate) / 100 + stressAdder, 0.99)
+      : Math.min((STATE_TAX_DATA[stateCode]?.rate || 0) + stressAdder, 0.99);
+
     if (row.gap < 0) {
       const needed = Math.abs(row.gap);
       let remaining = needed;
@@ -1055,7 +1063,7 @@ function projectArc(inputs) {
       // --- Taxable brokerage: LTCG gross-up, stacked on ordinary income ---
       if (taxable > 0 && remaining > 0) {
         const ltcgBracketsEff = (isMFJeff ? LTCG_MFJ_2025 : LTCG_SINGLE_2025)
-          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
+          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder + gapFillStateRate, 0.99) }));
         // LTCG stacks on top of ordinary income — start bracket walk at baseOrdAGI
         const netToDraw = Math.min(remaining, taxable * 0.9);
         const { grossDraw, taxOnDraw } = grossUpIterative(netToDraw, ltcgBracketsEff, baseOrdAGI);
@@ -1091,7 +1099,7 @@ function projectArc(inputs) {
       // --- Traditional / IRA: ordinary income gross-up ---
       if (remaining > 0 && trad > 0) {
         const ordBracketsEff = (isMFJeff ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025)
-          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
+          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder + gapFillStateRate, 0.99) }));
         // Start ordinary bracket walk at baseOrdAGI + any taxable gross-up already added
         const adjOrdAGI = baseOrdAGI + (row.sources.taxable || 0) * 0.15;
         const netToDraw = Math.min(remaining, trad);
@@ -1118,7 +1126,7 @@ function projectArc(inputs) {
       // --- Spouse Traditional IRA: draw if primary trad is exhausted and gap remains (MFJ only) ---
       if (remaining > 0 && spouseTrad > 0 && filingStatus === 'mfj') {
         const ordBracketsEff = (isMFJeff ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025)
-          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
+          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder + gapFillStateRate, 0.99) }));
         const adjOrdAGI = baseOrdAGI + (row.sources.taxable || 0) * 0.15 + (row.sources.rmd || 0);
         const netToDraw = Math.min(remaining, spouseTrad);
         const { grossDraw, taxOnDraw } = grossUpIterative(netToDraw, ordBracketsEff, adjOrdAGI);
@@ -1163,7 +1171,7 @@ function projectArc(inputs) {
       // Draw from taxable (LTCG gross-up)
       if (taxable > 0 && ltcRemaining > 0) {
         const ltcgBracketsEff = (isMFJeff ? LTCG_MFJ_2025 : LTCG_SINGLE_2025)
-          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
+          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder + gapFillStateRate, 0.99) }));
         const netToDraw = Math.min(ltcRemaining, taxable * 0.9);
         const { grossDraw, taxOnDraw } = grossUpIterative(netToDraw, ltcgBracketsEff, baseOrdAGI);
         const actualGross = Math.min(taxable, grossDraw);
@@ -1181,7 +1189,7 @@ function projectArc(inputs) {
       // Draw from traditional IRA (ordinary income gross-up) — the primary vehicle
       if (trad > 0 && ltcRemaining > 0) {
         const ordBracketsEff = (isMFJeff ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025)
-          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
+          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder + gapFillStateRate, 0.99) }));
         const adjOrdAGI = baseOrdAGI + (row.sources.taxable || 0) * 0.15;
         const netToDraw = Math.min(ltcRemaining, trad);
         const { grossDraw, taxOnDraw } = grossUpIterative(netToDraw, ordBracketsEff, adjOrdAGI);
@@ -1199,7 +1207,7 @@ function projectArc(inputs) {
       // Draw from spouse traditional IRA if primary trad exhausted and gap remains (MFJ only)
       if (spouseTrad > 0 && ltcRemaining > 0 && filingStatus === 'mfj') {
         const ordBracketsEff = (isMFJeff ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025)
-          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
+          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder + gapFillStateRate, 0.99) }));
         const adjOrdAGI = baseOrdAGI + (row.sources.taxable || 0) * 0.15 + (row.sources.rmd || 0);
         const netToDraw = Math.min(ltcRemaining, spouseTrad);
         const { grossDraw, taxOnDraw } = grossUpIterative(netToDraw, ordBracketsEff, adjOrdAGI);
@@ -1235,7 +1243,7 @@ function projectArc(inputs) {
       // Draw from taxable (LTCG gross-up)
       if (taxable > 0 && ltcRemaining > 0) {
         const ltcgBracketsEff = (isMFJeff ? LTCG_MFJ_2025 : LTCG_SINGLE_2025)
-          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
+          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder + gapFillStateRate, 0.99) }));
         const netToDraw = Math.min(ltcRemaining, taxable * 0.9);
         const { grossDraw, taxOnDraw } = grossUpIterative(netToDraw, ltcgBracketsEff, baseOrdAGI);
         const actualGross = Math.min(taxable, grossDraw);
@@ -1396,6 +1404,12 @@ function projectArc(inputs) {
       }
       delete row._conversionOveragePending;
     }
+
+    // portfolioDrawSegment = all draws added AFTER grossSources snapshot (gap-fill + IRMAA fills).
+    // Used as a chart bar segment so bars always visually meet the expense line.
+    // This is purely aesthetic — the model math is unchanged. The segment shows the viewer
+    // exactly how much of each year's income came from portfolio draws vs structured sources.
+    row.portfolioDrawSegment = Math.max(0, row.totalIncome - row.grossTotalIncome);
 
     // estimatedTax captured here — after overage gross-up resolves so the tax on
     // the gross-up draw (which increased totalIncome) is fully reflected.
@@ -1657,7 +1671,7 @@ function ArcChart({ data, view, insuredData, uninsuredData, sorrEnabled }) {
   if (!data || data.length === 0) return null;
 
   const maxVal = Math.max(...data.map(d => Math.max(
-    (d.grossTotalIncome || d.totalIncome) + (d.federalTax || 0) + (d.stateTax || 0),
+    (d.grossTotalIncome || d.totalIncome) + (d.federalTax || 0) + (d.stateTax || 0) + (d.ltcCoverage || 0) + (d.spouseLtcCoverage || 0) + (d.portfolioDrawSegment || 0),
     d.totalExpenseGross ?? d.totalExpense
   ))) * 1.1;
   const barW = Math.max(4, Math.floor(chartW / data.length) - 2);
@@ -1671,7 +1685,7 @@ function ArcChart({ data, view, insuredData, uninsuredData, sorrEnabled }) {
   ).join(' ');
 
   // Source keys in stack order — tax segments on top, ltcpool fills care event gap
-  const sourceKeys = ['ss','pension','annuity','parttime','roth','eta','taxable','rmd','ltcpool','fedtax','statetax'];
+  const sourceKeys = ['ss','pension','annuity','parttime','roth','eta','taxable','rmd','ltcpool','portdraw','fedtax','statetax'];
 
   const fmt = v => v >= 1000000 ? `$${(v/1000000).toFixed(1)}M` : v >= 1000 ? `$${Math.round(v/1000)}K` : `$${Math.round(v)}`;
 
@@ -1721,6 +1735,8 @@ function ArcChart({ data, view, insuredData, uninsuredData, sorrEnabled }) {
                 ? (d.stateTax || 0)
                 : k === 'ltcpool'
                 ? ((d.ltcCoverage || 0) + (d.spouseLtcCoverage || 0))
+                : k === 'portdraw'
+                ? (d.portfolioDrawSegment || 0)
                 : (d.grossSources && d.grossSources[k]) || d.sources[k] || 0;
               if (v <= 0) return null;
               const barH = (v / maxVal) * chartH;
@@ -1815,10 +1831,29 @@ function ArcChart({ data, view, insuredData, uninsuredData, sorrEnabled }) {
         );
       })}
 
-      {/* Single expense line — expenses are the same regardless of architecture state */}
-      <path d={expensePath} fill="none" stroke="url(#grad-expense)" strokeWidth="2"
-        strokeDasharray="2000" strokeDashoffset="0" filter="url(#glow)"
-        style={{animation:'arcDraw 1.5s ease both'}}/>
+      {/* Expense line — segmented by insurance coverage.
+           Steel blue (#4A7A9B) when Layer 2 insurance is covering care that year,
+           amber/red gradient otherwise. This signals to the viewer that the spike
+           in expenses is absorbed by the insurance pool, not the portfolio. */}
+      {data.map((d, i) => {
+        if (i === 0) return null;
+        const prev = data[i - 1];
+        const x1 = xScale(i - 1).toFixed(1);
+        const y1 = yScale(prev.totalExpenseGross ?? prev.totalExpense).toFixed(1);
+        const x2 = xScale(i).toFixed(1);
+        const y2 = yScale(d.totalExpenseGross ?? d.totalExpense).toFixed(1);
+        const insured = (d.ltcCoverage || 0) + (d.spouseLtcCoverage || 0) > 0
+                     || (prev.ltcCoverage || 0) + (prev.spouseLtcCoverage || 0) > 0;
+        return (
+          <line key={`exp-${i}`}
+            x1={x1} y1={y1} x2={x2} y2={y2}
+            stroke={insured ? '#4A9BB8' : '#E09040'}
+            strokeWidth={insured ? 2.5 : 2}
+            strokeOpacity={insured ? 1 : 0.85}
+            filter="url(#glow)"
+          />
+        );
+      })}
 
       {/* Main chart bottom border */}
       <line x1={PAD.l} x2={W-PAD.r} y1={PAD.t+chartH} y2={PAD.t+chartH} stroke="rgba(255,255,255,.08)" strokeWidth="1"/>
@@ -2205,9 +2240,15 @@ function Legend({ insuredData }) {
         </div>
       ))}
       <div style={{display:'flex',alignItems:'center',gap:5}}>
-        <div style={{width:18,height:2,background:'linear-gradient(90deg,#C47A7A,#C8A030)',borderRadius:1}}/>
+        <div style={{width:18,height:2,background:'linear-gradient(90deg,#E09040,#E09040)',borderRadius:1}}/>
         <span style={{fontSize:13,color:'#9EB8CC'}}>Expense Line</span>
       </div>
+      {insuredData && insuredData.some(d => (d.ltcCoverage||0)+(d.spouseLtcCoverage||0) > 0) && (
+        <div style={{display:'flex',alignItems:'center',gap:5}}>
+          <div style={{width:18,height:2,background:'#4A9BB8',borderRadius:1}}/>
+          <span style={{fontSize:13,color:'#9EB8CC'}}>Expense Line — Insurance Covered</span>
+        </div>
+      )}
       <div style={{display:'flex',alignItems:'center',gap:5}}>
         <div style={{width:14,height:10,borderRadius:2,background:'#7A4A4A',opacity:.85,flexShrink:0}}/>
         <span style={{fontSize:13,color:'#9EB8CC'}}>Federal Tax</span>
@@ -2216,6 +2257,12 @@ function Legend({ insuredData }) {
         <div style={{display:'flex',alignItems:'center',gap:5}}>
           <div style={{width:14,height:10,borderRadius:2,background:'#4A7A9B',opacity:.85,flexShrink:0}}/>
           <span style={{fontSize:13,color:'#9EB8CC'}}>Layer 2 Benefit Pool</span>
+        </div>
+      )}
+      {insuredData && insuredData.some(d => (d.portfolioDrawSegment||0) > 0) && (
+        <div style={{display:'flex',alignItems:'center',gap:5}}>
+          <div style={{width:14,height:10,borderRadius:2,background:'#5A6A7A',opacity:.85,flexShrink:0}}/>
+          <span style={{fontSize:13,color:'#9EB8CC'}}>Portfolio Draw</span>
         </div>
       )}
       {insuredData && insuredData.some(d => (d.stateTax||0) > 0) && (
