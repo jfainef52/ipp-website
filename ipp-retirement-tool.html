@@ -205,7 +205,7 @@ function seededRandom(seed) {
   };
 }
 
-function runMonteCarlo(startBalance, annualWithdraw, years, trials=500, mean=0.065, inflation=0.028, ssIncome=0, fixedStreams=[], totalExpensesY1=0, ltcShockYear=-1, ltcShockAnnual=0, ltcShockDuration=0, spouseLtcShockYear=-1, spouseLtcShockAnnual=0, spouseLtcShockDuration=0) {
+function runMonteCarlo(startBalance, annualWithdraw, years, trials=500, mean=0.065, inflation=0.028, ssIncome=0, fixedStreams=[], totalExpensesY1=0, ltcShockYear=-1, ltcShockAnnual=0, ltcShockDuration=0, spouseLtcShockYear=-1, spouseLtcShockAnnual=0, spouseLtcShockDuration=0, ltcCareInflation=0.04) {
   // ltcShockAnnual / spouseLtcShockAnnual: today's-dollar NET care costs.
   // MC grosses up by 1/(1-MC_TAX_RATE) and inflates to care-year dollars.
   // netDraw also grossed up — withdrawing $X net from IRA requires ~$X/(1-0.28) gross.
@@ -244,12 +244,13 @@ function runMonteCarlo(startBalance, annualWithdraw, years, trials=500, mean=0.0
       // Gross up net shortfall — IRA draw needs to cover both expense and tax on the draw
       const netShortfall = Math.max(0, expensesThisYear - ssThisYear - fixedThisYear);
       const grossDraw = netShortfall / (1 - MC_TAX_RATE);
-      // Primary care cost: inflate to event-year dollars, then gross up for pre-tax IRA draw
+      // Primary care cost: inflate using care-specific inflation rate to event-year dollars, then gross up
+      const ltcCareInflFactor = Math.pow(1 + ltcCareInflation, y);
       const ltcShock = (ltcShockYear >= 0 && y >= ltcShockYear && y < ltcShockYear + ltcShockDuration)
-        ? (ltcShockAnnual * inflFactor) / (1 - MC_TAX_RATE) : 0;
-      // Spouse care cost: independent event at different age
+        ? (ltcShockAnnual * ltcCareInflFactor) / (1 - MC_TAX_RATE) : 0;
+      // Spouse care cost: independent event, same care inflation rate
       const spouseLtcShock = (spouseLtcShockYear >= 0 && y >= spouseLtcShockYear && y < spouseLtcShockYear + spouseLtcShockDuration)
-        ? (spouseLtcShockAnnual * inflFactor) / (1 - MC_TAX_RATE) : 0;
+        ? (spouseLtcShockAnnual * ltcCareInflFactor) / (1 - MC_TAX_RATE) : 0;
       bal = bal * (1 + r) - grossDraw - ltcShock - spouseLtcShock;
       if (bal <= 0) { failed = true; break; }
     }
@@ -502,6 +503,7 @@ function projectArc(inputs) {
     fixedExpenses, lifestyleExpenses,
     stateCode = 'IL', customStateRate, taxRateStressAdder = 0,
     ltcEventAge, ltcMonthlyCost, ltcDuration, ltcShowComparison = true, ltcMonthlyBenefit, ltcBenefitDuration, ltcInsured = false,
+    ltcCareInflationRate = 0.04,
     spouseLtcEventAge = 0, spouseLtcMonthlyCost = 0, spouseLtcDuration = 3,
     spouseLtcMonthlyBenefit = 0, spouseLtcBenefitDuration = 3, spouseLtcInsured = false,
     ltcNetAmount = 0, ltcFundingAge = 0,
@@ -879,7 +881,10 @@ function projectArc(inputs) {
 
     // LTC event — net cost after any Layer 2 benefit coverage
     if (ltcEventAge > 0 && age >= ltcEventAge && age < ltcEventAge + ltcDuration) {
-      const ltcAnnualCost = ltcMonthlyCost * 12;
+      // Inflate from today's dollars to event-year dollars using care-specific inflation rate
+      const careInflYrs = ltcEventAge - retireAge;
+      const ltcInflFactor = Math.pow(1 + ltcCareInflationRate, careInflYrs);
+      const ltcAnnualCost = ltcMonthlyCost * 12 * ltcInflFactor;
       const benefitCoverage = ltcInsured ? ltcAnnualCost : 0;
       const uncoveredLtcCost = ltcAnnualCost - benefitCoverage;
       expenses += uncoveredLtcCost;
@@ -887,11 +892,14 @@ function projectArc(inputs) {
       row.ltcAnnualCost = ltcAnnualCost;
       row.ltcCoverage = benefitCoverage;
       row.ltcUncovered = uncoveredLtcCost;
+      row.ltcInflFactor = ltcInflFactor;
     }
 
     // Spouse LTC event — same mechanics, independent age/cost/duration
     if (spouseLtcEventAge > 0 && age >= spouseLtcEventAge && age < spouseLtcEventAge + spouseLtcDuration) {
-      const spLtcAnnualCost = spouseLtcMonthlyCost * 12;
+      const spCareInflYrs = spouseLtcEventAge - retireAge;
+      const spLtcInflFactor = Math.pow(1 + ltcCareInflationRate, spCareInflYrs);
+      const spLtcAnnualCost = spouseLtcMonthlyCost * 12 * spLtcInflFactor;
       const spBenefitCoverage = spouseLtcInsured ? spLtcAnnualCost : 0;
       const spUncoveredLtcCost = spLtcAnnualCost - spBenefitCoverage;
       expenses += spUncoveredLtcCost;
@@ -899,6 +907,7 @@ function projectArc(inputs) {
       row.spouseLtcAnnualCost = spLtcAnnualCost;
       row.spouseLtcCoverage = spBenefitCoverage;
       row.spouseLtcUncovered = spUncoveredLtcCost;
+      row.spouseLtcInflFactor = spLtcInflFactor;
     }
 
     row.totalExpense = expenses;
@@ -1372,7 +1381,8 @@ function projectArc(inputs) {
     ltcDuration,
     spouseLtcShockYear,
     spouseLtcShockAnnual,
-    spouseLtcDuration
+    spouseLtcDuration,
+    ltcCareInflationRate
   );
 
   return { years, confidence, fixedStreams, mcStartAge };
@@ -2224,7 +2234,7 @@ function App() {
     partTimeMonthly: 0, partTimeEndAge: 68,
     fixedExpenses: 15000, lifestyleExpenses: 8500,
     householdIncome: 0,
-    ltcEventAge: 0, ltcMonthlyCost: 7500, ltcDuration: 3, ltcShowComparison: false, ltcMonthlyBenefit: 7500, ltcBenefitDuration: 3, ltcEventEnabled: false,
+    ltcEventAge: 0, ltcMonthlyCost: 7500, ltcDuration: 3, ltcShowComparison: false, ltcMonthlyBenefit: 7500, ltcBenefitDuration: 3, ltcEventEnabled: false, ltcCareInflationRate: 4,
     spouseLtcEventAge: 0, spouseLtcMonthlyCost: 7500, spouseLtcDuration: 3, spouseLtcMonthlyBenefit: 7500, spouseLtcBenefitDuration: 3, spouseLtcInsured: false, spouseLtcEventEnabled: false,
     stateCode: 'IL', customStateRate: '', taxRateStressAdder: 0,
     annualTradDrawdown: 0, tradDrawdownStartAge: 0, tradDrawdownEndAge: 0,
@@ -2244,6 +2254,7 @@ function App() {
     portfolioReturn: inputs.portfolioReturn / 100,
     inflation: inputs.inflation / 100,
     etaColaRate: (inputs.etaColaRate || 0) / 100,
+    ltcCareInflationRate: (inputs.ltcCareInflationRate || 4) / 100,
   };
   // Primary projection — NO LTC shock. This is the clean baseline plan survival score
   // regardless of any healthcare event inputs. The main confidence score reflects the
@@ -3931,8 +3942,13 @@ function App() {
                 </p>
               </div>
 
+              {/* ── Care Inflation Rate ── */}
+              <Field label="Care Cost Inflation Rate" hint="Long-term care costs historically inflate at 4–5%/yr — faster than general inflation. Today's-dollar inputs are grown to event-year dollars at this rate.">
+                <NumInput value={inputs.ltcCareInflationRate} onChange={v=>set('ltcCareInflationRate',v)} suffix="% / yr"/>
+              </Field>
+
               {/* ── Primary Health Event ── */}
-              <div style={{fontSize:13,fontWeight:700,color:'#9EB8CC',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8}}>
+              <div style={{fontSize:13,fontWeight:700,color:'#9EB8CC',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8,marginTop:8}}>
                 {inputs.filingStatus === 'mfj' ? 'Primary' : 'Care Event'}
               </div>
               <Field label="Model Care Event at Age" hint="Enter age · toggle below to activate impact on projection">
@@ -4566,28 +4582,32 @@ function App() {
             const uninsuredFinal = yearsUninsured[yearsUninsured.length-1];
             const insuredFinal = yearsInsured[yearsInsured.length-1];
 
-            // Raw care cost (net expense, before tax friction)
-            const totalLtcCost = inputs.ltcMonthlyCost * 12 * inputs.ltcDuration;
-            const coveredAmt = totalLtcCost; // policy fully covers care cost (hardwired)
+            // Inflated care cost — sum actual event-year costs from projection rows (already inflated by engine)
+            const totalLtcCost = yearsUninsured
+              .filter(r => r.age >= ltcAge && r.age < ltcEnd)
+              .reduce((sum, r) => sum + (r.ltcAnnualCost || 0), 0);
 
             // Gross-up tax actually incurred in the uninsured projection during LTC years
-            // This is the real additional tax burden caused by forced grossed-up withdrawals
             const grossUpTaxTotal = yearsUninsured
               .filter(r => r.age >= ltcAge && r.age < ltcEnd)
               .reduce((sum, r) => sum + (r.ltcGrossUpTax || 0), 0);
 
-            // True total cost = care cost + gross-up tax friction
+            // True portfolio draw = inflated care cost + gross-up tax friction
             const trueTotalCost = totalLtcCost + grossUpTaxTotal;
 
-            // Portfolio preserved = full ending balance difference — captures gross-up AND compounding
+            // Portfolio preserved = full ending balance difference — captures gross-up AND compounding loss
             const portfolioDiff = insuredFinal && uninsuredFinal
               ? (insuredFinal.totalPortfolio - uninsuredFinal.totalPortfolio)
               : 0;
 
-            // Compounding loss = portfolioDiff minus the direct costs (care + gross-up tax)
-            // This is the pure growth the depleted portfolio never earned from event age → plan-to age
-            // portfolioDiff is the authoritative number — both projections ran full engine independently
+            // Compounding loss = what those drawn dollars would have grown to from event end → plan age
+            // portfolioDiff is authoritative — both projections ran full engine independently
             const compoundingLoss = Math.max(0, portfolioDiff - trueTotalCost);
+
+            // Today's-dollar reference cost for display context
+            const todayDollarCost = inputs.ltcMonthlyCost * 12 * inputs.ltcDuration;
+            const careInflRate = inputs.ltcCareInflationRate || 4;
+            const yearsToEvent = Math.max(0, ltcAge - inputs.retireAge);
 
             // "Covered by Income" = how much of the care cost is absorbed by income surplus
             // AFTER fixed + lifestyle expenses are already paid.
@@ -4621,17 +4641,20 @@ function App() {
             const fmtD = v => v >= 1000000 ? `$${(v/1000000).toFixed(2)}M` : `$${Math.round(v/1000)}K`;
             return (
               <div style={{background:'rgba(74,155,122,.04)',border:'1px solid rgba(74,155,122,.2)',borderRadius:12,padding:'18px 20px',marginBottom:16}}>
-                <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14}}>
+                <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14,flexWrap:'wrap'}}>
                   <div style={{fontSize:13,fontWeight:700,letterSpacing:'.14em',textTransform:'uppercase',color:'#4A9B7A'}}>
                     Healthcare Event — Layer 2 Impact Analysis
                   </div>
                   <div style={{fontSize:13,color:'#8DAFC8',background:'rgba(74,155,122,.08)',padding:'2px 8px',borderRadius:4,border:'1px solid rgba(74,155,122,.15)'}}>
                     Age {ltcAge}–{ltcEnd} · {inputs.ltcDuration} yr event
                   </div>
+                  <div style={{fontSize:12,color:'#C8A030',background:'rgba(200,160,48,.07)',padding:'2px 8px',borderRadius:4,border:'1px solid rgba(200,160,48,.2)'}}>
+                    Today's ${Math.round(inputs.ltcMonthlyCost/1000)}K/mo → inflated at {careInflRate}%/yr → {fmtD(totalLtcCost / inputs.ltcDuration / 12)}/mo at age {ltcAge}
+                  </div>
                 </div>
                 <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:10,marginBottom:14}}>
                   {[
-                    { label:'Total Care Cost', value: fmtD(totalLtcCost), sub:'Full cost if uninsured', color:'#C47A7A' },
+                    { label:'Total Care Cost', value: fmtD(totalLtcCost), sub:`Inflated at ${careInflRate}%/yr · today's dollars: ${fmtD(todayDollarCost)}`, color:'#C47A7A' },
                     showBenefitCard
                       ? { label:'Layer 2 Benefit', value: fmtD(totalBenefit), sub: benefitGap > 0 ? `$${Math.round(benefitGap/1000)}K gap remains` : 'Fully covers care cost', color:'#4A9B7A' }
                       : { label:'Covered by Income', value: incomeOffset > 0 ? fmtD(incomeOffset) : '—', sub:'Income surplus after living expenses (e.g. RMDs exceeding bills)', color:'#8DAFC8' },
@@ -4738,10 +4761,14 @@ function App() {
           {showSpouseLtcComparison && yearsSpouseInsured && yearsSpouseUninsured && (() => {
             const ltcAge = inputs.spouseLtcEventAge;
             const ltcEnd = ltcAge + inputs.spouseLtcDuration;
-            const totalLtcCost = inputs.spouseLtcMonthlyCost * 12 * inputs.spouseLtcDuration;
 
             const uninsuredFinal = yearsSpouseUninsured[yearsSpouseUninsured.length-1];
             const insuredFinal   = yearsSpouseInsured[yearsSpouseInsured.length-1];
+
+            // Inflated care cost from projection rows
+            const totalLtcCost = yearsSpouseUninsured
+              .filter(r => r.age >= ltcAge && r.age < ltcEnd)
+              .reduce((sum, r) => sum + (r.spouseLtcAnnualCost || 0), 0);
 
             const grossUpTaxTotal = yearsSpouseUninsured
               .filter(r => r.age >= ltcAge && r.age < ltcEnd)
@@ -4754,27 +4781,31 @@ function App() {
             const trueTotalCost = totalLtcCost + grossUpTaxTotal;
             const compoundingLoss = Math.max(0, portfolioDiff - trueTotalCost);
 
-            const uninsuredDraws = yearsSpouseUninsured
+            const extraGrossDraws = yearsSpouseUninsured
               .filter(r => r.age >= ltcAge && r.age < ltcEnd)
               .reduce((sum, r) => sum + (r.ltcPortfolioDraw || 0), 0);
-            const extraGrossDraws = uninsuredDraws;
 
+            const todayDollarCostSp = inputs.spouseLtcMonthlyCost * 12 * inputs.spouseLtcDuration;
+            const careInflRateSp = inputs.ltcCareInflationRate || 4;
             const fmtD = v => v >= 1000000 ? `$${(v/1000000).toFixed(2)}M` : `$${Math.round(v/1000)}K`;
             const spouseName = inputs.spouseName || 'Spouse';
             return (
               <div style={{background:'rgba(74,155,122,.04)',border:'1px solid rgba(74,155,122,.2)',borderRadius:12,padding:'18px 20px',marginBottom:16}}>
-                <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14}}>
+                <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14,flexWrap:'wrap'}}>
                   <div style={{fontSize:13,fontWeight:700,letterSpacing:'.14em',textTransform:'uppercase',color:'#4A9B7A'}}>
                     {spouseName} Healthcare Event — Layer 2 Impact Analysis
                   </div>
                   <div style={{fontSize:13,color:'#8DAFC8',background:'rgba(74,155,122,.08)',padding:'2px 8px',borderRadius:4,border:'1px solid rgba(74,155,122,.15)'}}>
                     Primary Age {ltcAge}–{ltcEnd} · {inputs.spouseLtcDuration} yr event
                   </div>
+                  <div style={{fontSize:12,color:'#C8A030',background:'rgba(200,160,48,.07)',padding:'2px 8px',borderRadius:4,border:'1px solid rgba(200,160,48,.2)'}}>
+                    Today's ${Math.round(inputs.spouseLtcMonthlyCost/1000)}K/mo → inflated at {careInflRateSp}%/yr → {fmtD(totalLtcCost / inputs.spouseLtcDuration / 12)}/mo at age {ltcAge}
+                  </div>
                 </div>
                 <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:10,marginBottom:14}}>
                   {[
-                    { label:'Total Care Cost', value: fmtD(totalLtcCost), sub:'Full cost if uninsured', color:'#C47A7A' },
-                    { label:'Layer 2 Benefit', value: fmtD(totalLtcCost), sub:'Fully covers care cost', color:'#4A9B7A' },
+                    { label:'Total Care Cost', value: fmtD(totalLtcCost), sub:`Inflated at ${careInflRateSp}%/yr · today's: ${fmtD(todayDollarCostSp)}`, color:'#C47A7A' },
+                    { label:'Layer 2 Benefit', value: fmtD(totalLtcCost), sub:'Fully covers inflated care cost', color:'#4A9B7A' },
                     { label:'Forced Portfolio Draws', value: extraGrossDraws > 0 ? fmtD(extraGrossDraws) : '—', sub: extraGrossDraws === 0 ? 'None — policy absorbs all' : 'Gross IRA/taxable drawn above income', color: extraGrossDraws > 0 ? '#C47A7A' : '#4A9B7A' },
                     { label:'Gross-Up Tax Cost', value: grossUpTaxTotal > 0 ? fmtD(grossUpTaxTotal) : '—', sub: grossUpTaxTotal > 0 ? 'Extra tax on forced IRA draws' : 'None — no forced IRA draws', color: grossUpTaxTotal > 0 ? '#C47A7A' : '#4A9B7A' },
                     { label:'Portfolio Preserved', value: fmtD(portfolioDiff), sub:'Draws + tax + compounding — full Layer 2 benefit', color: portfolioDiff > 0 ? '#4A9B7A' : '#C47A7A' },
@@ -4851,21 +4882,23 @@ function App() {
           {showLtcComparison && showSpouseLtcComparison && yearsInsured && yearsUninsured && yearsSpouseInsured && yearsSpouseUninsured && (() => {
             const fmtD = v => v >= 1000000 ? `$${(v/1000000).toFixed(2)}M` : `$${Math.round(v/1000)}K`;
 
-            // Primary values
+            // Primary values — use inflated costs from projection rows
             const pLtcAge = inputs.ltcEventAge, pLtcEnd = pLtcAge + inputs.ltcDuration;
-            const pTotalLtcCost = inputs.ltcMonthlyCost * 12 * inputs.ltcDuration;
+            const pTotalLtcCost = yearsUninsured.filter(r => r.age >= pLtcAge && r.age < pLtcEnd).reduce((s,r) => s+(r.ltcAnnualCost||0), 0);
+            const pTodayDollar = inputs.ltcMonthlyCost * 12 * inputs.ltcDuration;
             const pGrossUpTax = yearsUninsured.filter(r => r.age >= pLtcAge && r.age < pLtcEnd).reduce((s,r) => s+(r.ltcGrossUpTax||0), 0);
             const pPortfolioDiff = (yearsInsured[yearsInsured.length-1]?.totalPortfolio||0) - (yearsUninsured[yearsUninsured.length-1]?.totalPortfolio||0);
             const pDraws = yearsUninsured.filter(r => r.age >= pLtcAge && r.age < pLtcEnd).reduce((s,r) => s+(r.ltcPortfolioDraw||0), 0);
-            const pBenefit = (inputs.ltcMonthlyBenefit || inputs.ltcMonthlyCost) * 12 * inputs.ltcDuration;
+            const pBenefit = pTotalLtcCost; // policy covers inflated cost
 
-            // Spouse values
+            // Spouse values — use inflated costs from projection rows
             const sLtcAge = inputs.spouseLtcEventAge, sLtcEnd = sLtcAge + inputs.spouseLtcDuration;
-            const sTotalLtcCost = inputs.spouseLtcMonthlyCost * 12 * inputs.spouseLtcDuration;
+            const sTotalLtcCost = yearsSpouseUninsured.filter(r => r.age >= sLtcAge && r.age < sLtcEnd).reduce((s,r) => s+(r.spouseLtcAnnualCost||0), 0);
+            const sTodayDollar = inputs.spouseLtcMonthlyCost * 12 * inputs.spouseLtcDuration;
             const sGrossUpTax = yearsSpouseUninsured.filter(r => r.age >= sLtcAge && r.age < sLtcEnd).reduce((s,r) => s+(r.ltcGrossUpTax||0), 0);
             const sPortfolioDiff = (yearsSpouseInsured[yearsSpouseInsured.length-1]?.totalPortfolio||0) - (yearsSpouseUninsured[yearsSpouseUninsured.length-1]?.totalPortfolio||0);
             const sDraws = yearsSpouseUninsured.filter(r => r.age >= sLtcAge && r.age < sLtcEnd).reduce((s,r) => s+(r.ltcPortfolioDraw||0), 0);
-            const sBenefit = (inputs.spouseLtcMonthlyBenefit || inputs.spouseLtcMonthlyCost) * 12 * inputs.spouseLtcDuration;
+            const sBenefit = sTotalLtcCost; // policy covers inflated cost
 
             // Combined
             const totalCareCost   = pTotalLtcCost + sTotalLtcCost;
@@ -4888,7 +4921,7 @@ function App() {
                 </div>
                 <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:10,marginBottom:14}}>
                   {[
-                    { label:'Total Care Costs', value: fmtD(totalCareCost), sub:'Combined if both uninsured', color:'#C47A7A' },
+                    { label:'Total Care Costs', value: fmtD(totalCareCost), sub:`Inflated · today's dollars: ${fmtD(pTodayDollar + sTodayDollar)}`, color:'#C47A7A' },
                     { label:'Combined L2 Benefit', value: fmtD(totalBenefit), sub:'Total care cost covered by policy', color:'#4A9B7A' },
                     { label:'Forced Portfolio Draws', value: totalDraws > 0 ? fmtD(totalDraws) : '—', sub: totalDraws === 0 ? 'None — policies absorb all' : 'Gross IRA/taxable drawn above income', color: totalDraws > 0 ? '#C47A7A' : '#4A9B7A' },
                     { label:'Gross-Up Tax Cost', value: totalGrossUpTax > 0 ? fmtD(totalGrossUpTax) : '—', sub: totalGrossUpTax > 0 ? 'Extra tax on forced IRA draws' : 'None — no forced IRA draws', color: totalGrossUpTax > 0 ? '#C47A7A' : '#4A9B7A' },
