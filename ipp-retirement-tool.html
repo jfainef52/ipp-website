@@ -1785,6 +1785,29 @@ function DataTable({ data }) {
             </tr>
           ))}
         </tbody>
+        <tfoot>
+          <tr style={{borderTop:'2px solid rgba(255,255,255,.15)',background:'rgba(200,169,110,.04)'}}>
+            <td style={{padding:'5px 8px',textAlign:'center',color:'#C8A96E',fontWeight:700,fontSize:11,letterSpacing:'.06em'}}>TOTAL</td>
+            <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.ss.fill,fontWeight:700}}>{fmtM(data.reduce((s,d)=>s+(d.sources.ss||0),0))}</td>
+            <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.pension.fill,fontWeight:700}}>{fmtM(data.reduce((s,d)=>s+(d.sources.pension||0),0))}</td>
+            <td style={{padding:'5px 8px',textAlign:'right',color:'#4A9B7A',fontWeight:700}}>{fmtM(data.reduce((s,d)=>s+(d.rothAnnuityIncome||0),0))}</td>
+            <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.annuity.fill,fontWeight:700}}>{fmtM(data.reduce((s,d)=>s+(d.nonQualAnnuityIncome||0),0))}</td>
+            <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.eta.fill,fontWeight:700}}>{fmtM(data.reduce((s,d)=>s+(d.etaIncome||0),0))}</td>
+            <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.rmd.fill,fontWeight:700}}>{fmtM(data.reduce((s,d)=>s+(d.sources.rmd||0),0))}</td>
+            <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.roth.fill,fontWeight:700}}>{fmtM(data.reduce((s,d)=>s+(d.sources.roth||0),0))}</td>
+            <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.taxable.fill,fontWeight:700}}>{fmtM(data.reduce((s,d)=>s+(d.sources.taxable||0),0))}</td>
+            <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.parttime.fill,fontWeight:700}}>{fmtM(data.reduce((s,d)=>s+(d.sources.parttime||0),0))}</td>
+            <td style={{padding:'5px 8px',textAlign:'right',color:'#8DAFC8',fontWeight:700}}>{fmtM(data.reduce((s,d)=>s+(d.grossIncome||d.totalIncome||0),0))}</td>
+            <td style={{padding:'5px 8px',textAlign:'right',color:'#C47A7A',fontWeight:700}}>{fmtM(data.reduce((s,d)=>s+(d.federalTax||0),0))}</td>
+            <td style={{padding:'5px 8px',textAlign:'right',color:'#C8A030',fontWeight:700}}>{fmtM(data.reduce((s,d)=>s+(d.stateTax||0),0))}</td>
+            <td style={{padding:'5px 8px',textAlign:'right',color:'#9EB8CC'}}>—</td>
+            <td style={{padding:'5px 8px',textAlign:'right',color:'#9B7EC8'}}>—</td>
+            <td style={{padding:'5px 8px',textAlign:'right',color:'#F5F2EC',fontWeight:700}}>{fmtM(data.reduce((s,d)=>s+(d.totalIncome||0),0))}</td>
+            <td style={{padding:'5px 8px',textAlign:'right',color:'#C47A7A',fontWeight:700}}>{fmtM(data.reduce((s,d)=>s+(d.totalExpense||0),0))}</td>
+            <td style={{padding:'5px 8px',textAlign:'right',color:'#E8943A',fontWeight:700}}>{fmtM(data.reduce((s,d)=>s+(d.irmaa||0),0))}</td>
+            <td style={{padding:'5px 8px',textAlign:'right',color:'#9EB8CC'}}>—</td>
+          </tr>
+        </tfoot>
       </table>
     </div>
   );
@@ -1854,7 +1877,7 @@ function BalancesTable({ data }) {
       <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
         <thead>
           <tr>
-            {['Age','Trad / IRA','Roth IRA','Taxable','Sp. Trad','Total Portfolio','Yield'].map(h=>(
+            {['Age','Trad / IRA','Roth IRA','Taxable','Sp. Trad','Total Portfolio','Coverage'].map(h=>(
               <th key={h} style={th}>{h}</th>
             ))}
           </tr>
@@ -1868,7 +1891,7 @@ function BalancesTable({ data }) {
               <td style={td('#C8A030')}>{fmt$(d.taxableBalance||0)}</td>
               <td style={td('#5B8FA8')}>{(d.spouseTradBalance||0)>0?fmt$(d.spouseTradBalance):'—'}</td>
               <td style={{...td('#DDD6C4'),fontWeight:700}}>{fmt$(d.totalPortfolio||0)}</td>
-              <td style={td('#8DAFC8')}>{d.totalPortfolio>0&&d.grossIncome>0?'$'+Math.round((d.totalPortfolio/(d.grossIncome||1))*10)/10+'x':'—'}</td>
+              <td title="Portfolio ÷ Annual Gross Income — years of income the portfolio could cover" style={td('#8DAFC8')}>{d.totalPortfolio>0&&d.grossIncome>0?(Math.round((d.totalPortfolio/(d.grossIncome||1))*10)/10).toFixed(1)+'x':'—'}</td>
             </tr>
           ))}
         </tbody>
@@ -2211,8 +2234,8 @@ function App() {
     partTimeMonthly: 0, partTimeEndAge: 68,
     fixedExpenses: 15000, lifestyleExpenses: 8500,
     householdIncome: 0,
-    ltcEventAge: 0, ltcMonthlyCost: 7500, ltcDuration: 3, ltcShowComparison: false, ltcMonthlyBenefit: 7500, ltcBenefitDuration: 3,
-    spouseLtcEventAge: 0, spouseLtcMonthlyCost: 7500, spouseLtcDuration: 3, spouseLtcMonthlyBenefit: 7500, spouseLtcBenefitDuration: 3, spouseLtcInsured: false,
+    ltcEventAge: 0, ltcMonthlyCost: 7500, ltcDuration: 3, ltcShowComparison: false, ltcMonthlyBenefit: 7500, ltcBenefitDuration: 3, ltcEventEnabled: false,
+    spouseLtcEventAge: 0, spouseLtcMonthlyCost: 7500, spouseLtcDuration: 3, spouseLtcMonthlyBenefit: 7500, spouseLtcBenefitDuration: 3, spouseLtcInsured: false, spouseLtcEventEnabled: false,
     stateCode: 'IL', customStateRate: '', taxRateStressAdder: 0,
     annualTradDrawdown: 0, tradDrawdownStartAge: 0, tradDrawdownEndAge: 0,
     annualTaxableDrawdown: 0, taxableDrawdownStartAge: 0, taxableDrawdownEndAge: 0,
@@ -2239,7 +2262,7 @@ function App() {
 
   // Primary display projection — includes LTC event if entered (uninsured view)
   // This is what the chart and number table show when architecture is OFF or no LTC comparison
-  const hasLtcEvent = inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
+  const hasLtcEvent = inputs.ltcEventEnabled && inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
   const { years: yearsWithLtc } = hasLtcEvent
     ? projectArc({ ...baseProjectionInputs, ltcInsured: false })
     : { years: years };
@@ -2249,9 +2272,12 @@ function App() {
   // does not distort the comparison. We are isolating the care event shock impact only.
   // confidenceUninsured = plan survival WITH care event and NO policy (shock applied)
   // confidenceInsured   = plan survival WITH care event and Layer 2 policy (shock absorbed)
-  const ltcCompareBase = { ...baseProjectionInputs, ltcNetAmount: 0, spouseLtcNetAmount: 0 };
+  // Option C: HC comparison scores use pure portfolio — no L1/L3 income in either score.
+  // This isolates exactly what Layer 2 contributes vs. not having it, on a level playing field.
+  // The main confidence ring still includes L1+L3 when architecture is on.
+  const ltcCompareBase = { ...baseProjectionInputs, architectureEnabled: false, ltcNetAmount: 0, spouseLtcNetAmount: 0 };
   const isMarried = inputs.filingStatus === 'mfj';
-  const showLtcComparison = inputs.architectureEnabled && inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
+  const showLtcComparison = inputs.architectureEnabled && inputs.ltcEventEnabled && inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
   const { years: yearsUninsured, confidence: confidenceUninsured } = showLtcComparison
     ? projectArc({ ...ltcCompareBase, ltcInsured: false })
     : { years: null, confidence: null };
@@ -2260,7 +2286,7 @@ function App() {
     : { years: null, confidence: null };
 
   // Spouse LTC comparison — only when MFJ and spouse LTC entered
-  const showSpouseLtcComparison = inputs.architectureEnabled && isMarried && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
+  const showSpouseLtcComparison = inputs.architectureEnabled && isMarried && inputs.spouseLtcEventEnabled && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
   const { years: yearsSpouseUninsured, confidence: confidenceSpouseUninsured } = showSpouseLtcComparison
     ? projectArc({ ...ltcCompareBase, spouseLtcInsured: false })
     : { years: null, confidence: null };
@@ -2869,7 +2895,6 @@ function App() {
           <div style={{display:'flex',gap:6,background:'rgba(255,255,255,.03)',borderRadius:8,padding:4,border:'1px solid rgba(255,255,255,.06)'}}>
             <button className={`tab-btn ${view==='visual'?'active':''}`} onClick={()=>setView('visual')}>Visual Arc</button>
             <button className={`tab-btn ${view==='numbers'?'active':''}`} onClick={()=>setView('numbers')}>Number Table</button>
-            <button className={`tab-btn ${view==='totals'?'active':''}`} onClick={()=>setView('totals')}>Totals</button>
             <button className={`tab-btn ${view==='balances'?'active':''}`} onClick={()=>setView('balances')}>Balances</button>
             <button className={`tab-btn ${view==='credits'?'active':''}`} onClick={()=>setView('credits')}>Credits</button>
             <button className={`tab-btn ${view==='debits'?'active':''}`} onClick={()=>setView('debits')}>Debits</button>
@@ -3164,6 +3189,46 @@ function App() {
               <Field label="Lifestyle Monthly Expenses" hint="Travel, dining, family, discretionary">
                 <NumInput value={inputs.lifestyleExpenses} onChange={v=>set('lifestyleExpenses',v)} prefix="$" suffix="/mo"/>
               </Field>
+
+              {/* Unexpected Large Expense Shock */}
+              <div style={{marginTop:14,paddingTop:14,borderTop:'1px solid rgba(255,255,255,.06)'}}>
+                <div style={{fontSize:12,fontWeight:700,color:'#C8A030',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:6}}>
+                  Unexpected Large Expenses
+                </div>
+                <div style={{fontSize:12,color:'#8DAFC8',lineHeight:1.6,marginBottom:10}}>
+                  Models recurring large unplanned expenses (roof, HVAC, vehicle, home repairs) that stress the portfolio at regular intervals throughout retirement.
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:12,marginBottom: inputs.expenseShockEnabled ? 12 : 0}}>
+                  <div
+                    onClick={()=>set('expenseShockEnabled', !inputs.expenseShockEnabled)}
+                    style={{
+                      width:44, height:24, borderRadius:12, cursor:'pointer',
+                      background: inputs.expenseShockEnabled ? '#C8A030' : 'rgba(255,255,255,.1)',
+                      position:'relative', transition:'background .2s', flexShrink:0,
+                      border: inputs.expenseShockEnabled ? '1px solid #C8A030' : '1px solid rgba(255,255,255,.15)',
+                    }}>
+                    <div style={{
+                      position:'absolute', top:3, left: inputs.expenseShockEnabled ? 22 : 3,
+                      width:16, height:16, borderRadius:8,
+                      background:'#F5F2EC', transition:'left .2s',
+                      boxShadow:'0 1px 3px rgba(0,0,0,.3)',
+                    }}/>
+                  </div>
+                  <span style={{fontSize:13,color: inputs.expenseShockEnabled ? '#C8A030' : '#8DAFC8', fontWeight: inputs.expenseShockEnabled ? 700 : 400}}>
+                    {inputs.expenseShockEnabled ? 'Expense Shocks Active' : 'Off — no unplanned expenses'}
+                  </span>
+                </div>
+                {inputs.expenseShockEnabled && (
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                    <Field label="Shock Amount" hint="One-time expense amount per occurrence">
+                      <NumInput value={inputs.expenseShockAmount||50000} onChange={v=>set('expenseShockAmount',v)} prefix="$"/>
+                    </Field>
+                    <Field label="Every N Years" hint="How frequently the expense recurs (e.g. every 8 years)">
+                      <NumInput value={inputs.expenseShockFrequency||8} onChange={v=>set('expenseShockFrequency',v)} suffix="yrs"/>
+                    </Field>
+                  </div>
+                )}
+              </div>
             </Section>
 
 
@@ -3880,7 +3945,7 @@ function App() {
               <div style={{fontSize:13,fontWeight:700,color:'#9EB8CC',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8}}>
                 {inputs.filingStatus === 'mfj' ? 'Primary' : 'Care Event'}
               </div>
-              <Field label="Model Care Event at Age" hint="Enter 0 to exclude · Shows portfolio impact without a dedicated Layer 2 protection layer">
+              <Field label="Model Care Event at Age" hint="Enter age · toggle below to activate impact on projection">
                 <NumInput value={inputs.ltcEventAge} onChange={v=>set('ltcEventAge',v)} suffix="yrs"/>
               </Field>
               {inputs.ltcEventAge > 0 && <>
@@ -3890,6 +3955,40 @@ function App() {
                 <Field label="Duration">
                   <NumInput value={inputs.ltcDuration} onChange={v=>set('ltcDuration',v)} suffix="yrs"/>
                 </Field>
+
+                {/* Health Event Impact Toggle */}
+                <div style={{marginTop:10,marginBottom:6,padding:'10px 12px',background: inputs.ltcEventEnabled ? 'rgba(196,106,106,.08)' : 'rgba(255,255,255,.03)',border:`1px solid ${inputs.ltcEventEnabled ? 'rgba(196,106,106,.35)' : 'rgba(255,255,255,.1)'}`,borderRadius:8}}>
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom: inputs.ltcEventEnabled ? 6 : 0}}>
+                    <div style={{fontSize:13,fontWeight:700,color: inputs.ltcEventEnabled ? '#C47A7A' : '#8DAFC8',letterSpacing:'.06em',textTransform:'uppercase'}}>
+                      Model Impact ON/OFF
+                    </div>
+                    <div
+                      onClick={()=>set('ltcEventEnabled', !inputs.ltcEventEnabled)}
+                      style={{
+                        width:44, height:24, borderRadius:12, cursor:'pointer',
+                        background: inputs.ltcEventEnabled ? '#C47A7A' : 'rgba(255,255,255,.1)',
+                        position:'relative', transition:'background .2s', flexShrink:0,
+                        border: inputs.ltcEventEnabled ? '1px solid #C47A7A' : '1px solid rgba(255,255,255,.15)',
+                      }}>
+                      <div style={{
+                        position:'absolute', top:3, left: inputs.ltcEventEnabled ? 22 : 3,
+                        width:16, height:16, borderRadius:8,
+                        background:'#F5F2EC', transition:'left .2s',
+                        boxShadow:'0 1px 3px rgba(0,0,0,.3)',
+                      }}/>
+                    </div>
+                  </div>
+                  {inputs.ltcEventEnabled && (
+                    <div style={{fontSize:12,color:'#C47A7A',lineHeight:1.5}}>
+                      Care event is active in projection — portfolio impact visible in chart and tables.
+                    </div>
+                  )}
+                  {!inputs.ltcEventEnabled && (
+                    <div style={{fontSize:12,color:'#6B8FA8',lineHeight:1.5,marginTop:4}}>
+                      Data saved · toggle on to apply impact to projection.
+                    </div>
+                  )}
+                </div>
 
                 {/* Layer 2 Insurance Option — always visible for pre-fill; engine gates on architectureEnabled */}
                 <div style={{marginTop:10,padding:'10px 12px',background:'rgba(74,155,122,.05)',border:`1px solid ${inputs.architectureEnabled ? 'rgba(74,155,122,.35)' : 'rgba(74,155,122,.12)'}`,borderRadius:8,opacity: inputs.architectureEnabled ? 1 : 0.6}}>
@@ -3973,7 +4072,7 @@ function App() {
                 <div style={{marginTop:14,paddingTop:12,borderTop:'1px solid rgba(255,255,255,.06)',fontSize:13,fontWeight:700,color:'#9EB8CC',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8}}>
                   Spouse
                 </div>
-                <Field label="Model Spouse Care Event at Age" hint="Enter 0 to exclude · Uses primary's age as the projection axis">
+                <Field label="Model Spouse Care Event at Age" hint="Enter age · toggle below to activate impact on projection">
                   <NumInput value={inputs.spouseLtcEventAge} onChange={v=>set('spouseLtcEventAge',v)} suffix="yrs (primary age)"/>
                 </Field>
                 {inputs.spouseLtcEventAge > 0 && <>
@@ -3983,6 +4082,40 @@ function App() {
                   <Field label="Duration">
                     <NumInput value={inputs.spouseLtcDuration} onChange={v=>set('spouseLtcDuration',v)} suffix="yrs"/>
                   </Field>
+
+                  {/* Spouse Health Event Impact Toggle */}
+                  <div style={{marginTop:10,marginBottom:6,padding:'10px 12px',background: inputs.spouseLtcEventEnabled ? 'rgba(196,106,106,.08)' : 'rgba(255,255,255,.03)',border:`1px solid ${inputs.spouseLtcEventEnabled ? 'rgba(196,106,106,.35)' : 'rgba(255,255,255,.1)'}`,borderRadius:8}}>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom: inputs.spouseLtcEventEnabled ? 6 : 0}}>
+                      <div style={{fontSize:13,fontWeight:700,color: inputs.spouseLtcEventEnabled ? '#C47A7A' : '#8DAFC8',letterSpacing:'.06em',textTransform:'uppercase'}}>
+                        Spouse Impact ON/OFF
+                      </div>
+                      <div
+                        onClick={()=>set('spouseLtcEventEnabled', !inputs.spouseLtcEventEnabled)}
+                        style={{
+                          width:44, height:24, borderRadius:12, cursor:'pointer',
+                          background: inputs.spouseLtcEventEnabled ? '#C47A7A' : 'rgba(255,255,255,.1)',
+                          position:'relative', transition:'background .2s', flexShrink:0,
+                          border: inputs.spouseLtcEventEnabled ? '1px solid #C47A7A' : '1px solid rgba(255,255,255,.15)',
+                        }}>
+                        <div style={{
+                          position:'absolute', top:3, left: inputs.spouseLtcEventEnabled ? 22 : 3,
+                          width:16, height:16, borderRadius:8,
+                          background:'#F5F2EC', transition:'left .2s',
+                          boxShadow:'0 1px 3px rgba(0,0,0,.3)',
+                        }}/>
+                      </div>
+                    </div>
+                    {inputs.spouseLtcEventEnabled && (
+                      <div style={{fontSize:12,color:'#C47A7A',lineHeight:1.5}}>
+                        Spouse care event is active in projection.
+                      </div>
+                    )}
+                    {!inputs.spouseLtcEventEnabled && (
+                      <div style={{fontSize:12,color:'#6B8FA8',lineHeight:1.5,marginTop:4}}>
+                        Data saved · toggle on to apply impact to projection.
+                      </div>
+                    )}
+                  </div>
 
                   {/* Spouse Layer 2 Insurance — always visible for pre-fill; engine gates on architectureEnabled */}
                   <div style={{marginTop:10,padding:'10px 12px',background:'rgba(74,155,122,.05)',border:`1px solid ${inputs.architectureEnabled ? 'rgba(74,155,122,.35)' : 'rgba(74,155,122,.12)'}`,borderRadius:8,opacity: inputs.architectureEnabled ? 1 : 0.6}}>
@@ -4357,8 +4490,6 @@ function App() {
               </>
             ) : view === 'numbers' ? (
               <DataTable data={yearsWithLtc}/>
-            ) : view === 'totals' ? (
-              <TotalsTable data={yearsWithLtc} inputs={inputs}/>
             ) : view === 'balances' ? (
               <BalancesTable data={yearsWithLtc}/>
             ) : view === 'credits' ? (
@@ -4654,6 +4785,77 @@ function App() {
                     </div>
                   );
                 })()}
+              </div>
+            );
+          })()}
+
+          {/* ── Combined Healthcare Event Totals (both primary + spouse) ── */}
+          {showLtcComparison && showSpouseLtcComparison && yearsInsured && yearsUninsured && yearsSpouseInsured && yearsSpouseUninsured && (() => {
+            const fmtD = v => v >= 1000000 ? `$${(v/1000000).toFixed(2)}M` : `$${Math.round(v/1000)}K`;
+
+            // Primary values
+            const pLtcAge = inputs.ltcEventAge, pLtcEnd = pLtcAge + inputs.ltcDuration;
+            const pTotalLtcCost = inputs.ltcMonthlyCost * 12 * inputs.ltcDuration;
+            const pGrossUpTax = yearsUninsured.filter(r => r.age >= pLtcAge && r.age < pLtcEnd).reduce((s,r) => s+(r.ltcGrossUpTax||0), 0);
+            const pPortfolioDiff = (yearsInsured[yearsInsured.length-1]?.totalPortfolio||0) - (yearsUninsured[yearsUninsured.length-1]?.totalPortfolio||0);
+            const pDraws = yearsUninsured.filter(r => r.age >= pLtcAge && r.age < pLtcEnd).reduce((s,r) => s+(r.ltcPortfolioDraw||0), 0);
+            const pBenefit = (inputs.ltcMonthlyBenefit || inputs.ltcMonthlyCost) * 12 * inputs.ltcDuration;
+
+            // Spouse values
+            const sLtcAge = inputs.spouseLtcEventAge, sLtcEnd = sLtcAge + inputs.spouseLtcDuration;
+            const sTotalLtcCost = inputs.spouseLtcMonthlyCost * 12 * inputs.spouseLtcDuration;
+            const sGrossUpTax = yearsSpouseUninsured.filter(r => r.age >= sLtcAge && r.age < sLtcEnd).reduce((s,r) => s+(r.ltcGrossUpTax||0), 0);
+            const sPortfolioDiff = (yearsSpouseInsured[yearsSpouseInsured.length-1]?.totalPortfolio||0) - (yearsSpouseUninsured[yearsSpouseUninsured.length-1]?.totalPortfolio||0);
+            const sDraws = yearsSpouseUninsured.filter(r => r.age >= sLtcAge && r.age < sLtcEnd).reduce((s,r) => s+(r.ltcPortfolioDraw||0), 0);
+            const sBenefit = (inputs.spouseLtcMonthlyBenefit || inputs.spouseLtcMonthlyCost) * 12 * inputs.spouseLtcDuration;
+
+            // Combined
+            const totalCareCost   = pTotalLtcCost + sTotalLtcCost;
+            const totalBenefit    = pBenefit + sBenefit;
+            const totalDraws      = pDraws + sDraws;
+            const totalGrossUpTax = pGrossUpTax + sGrossUpTax;
+            const totalPreserved  = pPortfolioDiff + sPortfolioDiff;
+            const totalTrueCost   = totalCareCost + totalGrossUpTax;
+            const totalCompounding = Math.max(0, totalPreserved - totalTrueCost);
+
+            return (
+              <div style={{background:'rgba(200,169,110,.04)',border:'1px solid rgba(200,169,110,.25)',borderRadius:12,padding:'18px 20px',marginBottom:16}}>
+                <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14}}>
+                  <div style={{fontSize:13,fontWeight:700,letterSpacing:'.14em',textTransform:'uppercase',color:'#C8A96E'}}>
+                    Combined Healthcare Impact — Both Partners
+                  </div>
+                  <div style={{fontSize:13,color:'#8DAFC8',background:'rgba(200,169,110,.08)',padding:'2px 8px',borderRadius:4,border:'1px solid rgba(200,169,110,.2)'}}>
+                    Primary + {inputs.spouseName || 'Spouse'} · Total Portfolio Effect
+                  </div>
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:10,marginBottom:14}}>
+                  {[
+                    { label:'Total Care Costs', value: fmtD(totalCareCost), sub:'Combined if both uninsured', color:'#C47A7A' },
+                    { label:'Combined L2 Benefit', value: fmtD(totalBenefit), sub:'Total care cost covered by policy', color:'#4A9B7A' },
+                    { label:'Forced Portfolio Draws', value: totalDraws > 0 ? fmtD(totalDraws) : '—', sub: totalDraws === 0 ? 'None — policies absorb all' : 'Gross IRA/taxable drawn above income', color: totalDraws > 0 ? '#C47A7A' : '#4A9B7A' },
+                    { label:'Gross-Up Tax Cost', value: totalGrossUpTax > 0 ? fmtD(totalGrossUpTax) : '—', sub: totalGrossUpTax > 0 ? 'Extra tax on forced IRA draws' : 'None — no forced IRA draws', color: totalGrossUpTax > 0 ? '#C47A7A' : '#4A9B7A' },
+                    { label:'Total Portfolio Preserved', value: fmtD(totalPreserved), sub:'Combined draws + tax + compounding', color: totalPreserved > 0 ? '#4A9B7A' : '#C47A7A' },
+                  ].map(s => (
+                    <div key={s.label} style={{background:'rgba(255,255,255,.03)',borderRadius:8,padding:'10px 12px',border:'1px solid rgba(200,169,110,.1)'}}>
+                      <div style={{fontSize:12,color:'#8DAFC8',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:4}}>{s.label}</div>
+                      <div style={{fontSize:18,fontWeight:700,color:s.color,fontFamily:"'Cormorant Garamond',serif"}}>{s.value}</div>
+                      <div style={{fontSize:12,color:'#8DAFC8',marginTop:3}}>{s.sub}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',fontSize:12,color:'#8DAFC8',background:'rgba(255,255,255,.02)',borderRadius:6,padding:'7px 12px',border:'1px solid rgba(200,169,110,.1)'}}>
+                  <span style={{color:'#C47A7A',fontWeight:600}}>{fmtD(totalDraws)}</span>
+                  <span>forced draws</span>
+                  <span style={{color:'#8DAFC8',margin:'0 2px'}}>+</span>
+                  <span style={{color:'#C47A7A',fontWeight:600}}>{totalGrossUpTax > 0 ? fmtD(totalGrossUpTax) : '$0'}</span>
+                  <span>gross-up tax</span>
+                  <span style={{color:'#8DAFC8',margin:'0 2px'}}>+</span>
+                  <span style={{color:'#C47A7A',fontWeight:600}}>{fmtD(totalCompounding)}</span>
+                  <span>compounding loss</span>
+                  <span style={{color:'#8DAFC8',margin:'0 2px'}}>=</span>
+                  <span style={{color:'#C8A96E',fontWeight:700}}>{fmtD(totalPreserved)}</span>
+                  <span style={{color:'#C8A96E'}}>Combined Portfolio Preserved</span>
+                </div>
               </div>
             );
           })()}
