@@ -204,11 +204,9 @@ function seededRandom(seed) {
 }
 
 function runMonteCarlo(startBalance, annualWithdraw, years, trials=500, mean=0.065, inflation=0.028, ssIncome=0, fixedStreams=[], totalExpensesY1=0, ltcShockYear=-1, ltcShockAnnual=0, ltcShockDuration=0, spouseLtcShockYear=-1, spouseLtcShockAnnual=0, spouseLtcShockDuration=0) {
-  // ltcShockAnnual and spouseLtcShockAnnual are passed as today's-dollar NET care costs.
-  // The MC grosses them up by 1/(1-0.28) to represent the pre-tax IRA draw required,
-  // and inflates them to the care-event year using the same inflFactor as expenses.
-  // netDraw is also grossed up at 28% — to withdraw $X net from an IRA requires ~$X/(1-0.28) gross.
-  // SS and fixed streams are already gross (SS is not taxed at 100% but this is conservative).
+  // ltcShockAnnual / spouseLtcShockAnnual are today's-dollar NET care costs.
+  // MC inflates them to the event year and grosses up for the pre-tax IRA draw required.
+  // netDraw is also grossed up — you need more than $1 gross from an IRA to net $1 after tax.
   const MC_TAX_RATE = 0.28;
   let successes = 0;
   const stddev = 0.12;
@@ -241,13 +239,13 @@ function runMonteCarlo(startBalance, annualWithdraw, years, trials=500, mean=0.0
       const expensesThisYear = totalExpensesY1 * inflFactor;
       const ssThisYear = ssIncome * inflFactor;
       const fixedThisYear = streams.reduce((sum, s) => sum + (y >= s.yearOffset ? s.annual : 0), 0);
-      // Gross up the net portfolio draw needed — requires more than $1 gross from IRA to net $1
+      // Gross up net shortfall — an IRA must distribute more than the net amount needed
       const netShortfall = Math.max(0, expensesThisYear - ssThisYear - fixedThisYear);
       const grossDraw = netShortfall / (1 - MC_TAX_RATE);
-      // Care cost shock: inflate to care-year dollars, then gross up for pre-tax IRA draw
+      // Primary care shock: inflated to event-year dollars, then grossed up for IRA draw
       const ltcShock = (ltcShockYear >= 0 && y >= ltcShockYear && y < ltcShockYear + ltcShockDuration)
         ? (ltcShockAnnual * inflFactor) / (1 - MC_TAX_RATE) : 0;
-      // Spouse care cost shock: independent event at a different age
+      // Spouse care shock: independent event, different year offset
       const spouseLtcShock = (spouseLtcShockYear >= 0 && y >= spouseLtcShockYear && y < spouseLtcShockYear + spouseLtcShockDuration)
         ? (spouseLtcShockAnnual * inflFactor) / (1 - MC_TAX_RATE) : 0;
       bal = bal * (1 + r) - grossDraw - ltcShock - spouseLtcShock;
@@ -512,7 +510,6 @@ function projectArc(inputs) {
     taxableContributionEndAge = 0,
     annualSpouseTradContribution = 0,
     spouseTradContributionEndAge = 0,
-    householdIncome = 0,
   } = inputs;
 
   // Sequence of Returns Risk overrides — years 0-4 of retirement (index = age - retireAge)
@@ -553,41 +550,24 @@ function projectArc(inputs) {
       const tradContrib    = (annualTradContribution    > 0 && a < tradStopAge)    ? annualTradContribution    : 0;
       const taxableContrib = (annualTaxableContribution > 0 && a < taxableStopAge) ? annualTaxableContribution : 0;
       const spouseTradContrib = (annualSpouseTradContribution > 0 && a < spouseTradStopAge) ? annualSpouseTradContribution : 0;
-      // Pre-retirement marginal rate: walk tax brackets using householdIncome as the
-      // base AGI. This determines the correct gross-up for all pre-retirement IRA draws
-      // (ETA funding, LTC policy, Roth conversion) — replacing the hardcoded 24%.
-      const preRetBrackets = filingStatus === 'mfj' ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025;
-      const preRetStdDed   = filingStatus === 'mfj' ? STD_DEDUCTION_MFJ : STD_DEDUCTION_SINGLE;
-      const preRetTaxableIncome = Math.max(0, preRetireMagi - preRetStdDed);
-      let preRetMarginalRate = preRetBrackets[0].rate;
-      let prevLimit = 0;
-      for (const b of preRetBrackets) {
-        if (preRetTaxableIncome > prevLimit) preRetMarginalRate = b.rate;
-        prevLimit = b.limit;
-      }
-
-      // ETA funding event — gross up the IRA draw using actual marginal rate
+      // ETA funding event — reduce trad balance in the funding year (pre-retirement)
       if (archEtaFundingAmount > 0 && etaFundingAge > 0 && a === etaFundingAge) {
-        const etaPenalty = etaFundingAge < 59.5 ? 0.10 : 0;
-        const etaGross = archEtaFundingAmount / Math.max(0.01, 1 - preRetMarginalRate - etaPenalty);
-        trad = Math.max(0, trad - etaGross);
+        trad = Math.max(0, trad - archEtaFundingAmount);
       }
-      // Roth conversion event — gross up using actual marginal rate
+      // Roth conversion event — reduce trad balance in conversion year (pre-retirement)
       if (archRothConversionAmount > 0 && rothConversionAge > 0 && a === rothConversionAge) {
-        const convPenalty = rothConversionAge < 59.5 ? 0.10 : 0;
-        const convGross = archRothConversionAmount / Math.max(0.01, 1 - preRetMarginalRate - convPenalty);
-        trad = Math.max(0, trad - convGross);
+        trad = Math.max(0, trad - archRothConversionAmount);
       }
-      // LTC policy funding draw — gross up using actual marginal rate
+      // LTC policy funding draw — reduce trad balance (pre-retirement, approximate gross-up at 24% + penalty)
       if (archLtcNetAmount > 0 && ltcFundingAge > 0 && a === ltcFundingAge) {
-        const ltcPenalty = ltcFundingAge < 59.5 ? 0.10 : 0;
-        const ltcGross = archLtcNetAmount / Math.max(0.01, 1 - preRetMarginalRate - ltcPenalty);
-        trad = Math.max(0, trad - ltcGross);
+        const preRetPenalty = ltcFundingAge < 59.5 ? 0.10 : 0;
+        const approxGross = archLtcNetAmount / Math.max(0.01, 1 - 0.24 - preRetPenalty);
+        trad = Math.max(0, trad - approxGross - (approxGross * preRetPenalty));
       }
       if (archSpouseLtcNetAmount > 0 && spouseLtcFundingAge > 0 && a === spouseLtcFundingAge) {
-        const spLtcPenalty = spouseLtcFundingAge < 59.5 ? 0.10 : 0;
-        const spLtcGross = archSpouseLtcNetAmount / Math.max(0.01, 1 - preRetMarginalRate - spLtcPenalty);
-        trad = Math.max(0, trad - spLtcGross);
+        const preRetPenaltySp = spouseLtcFundingAge < 59.5 ? 0.10 : 0;
+        const approxGrossSp = archSpouseLtcNetAmount / Math.max(0.01, 1 - 0.24 - preRetPenaltySp);
+        trad = Math.max(0, trad - approxGrossSp - (approxGrossSp * preRetPenaltySp));
       }
       // Grow existing balance then add contribution (end-of-year)
       trad    = trad    * (1 + portfolioReturn) + tradContrib;
@@ -606,10 +586,7 @@ function projectArc(inputs) {
   // don't fall back to current MAGI. Pre-retirement MAGI estimate: SS not yet started
   // (if claiming at/after retireAge), pension may have started, no RMDs, part-time may be active.
   // Conservative: use pension + part-time income as a floor for pre-retirement MAGI.
-  // preRetireMagi: include household earned income so IRMAA lookback and
-  // pre-retirement funding tax rates reflect the client's actual working income.
-  const preRetireMagi = (householdIncome > 0 ? householdIncome : 0)
-    + (pensionMonthly > 0 ? pensionMonthly * 12 : 0)
+  const preRetireMagi = (pensionMonthly > 0 ? pensionMonthly * 12 : 0)
     + (partTimeMonthly > 0 ? partTimeMonthly * 12 : 0);
   magiHistory[retireAge - 2] = preRetireMagi;
   magiHistory[retireAge - 1] = preRetireMagi;
@@ -1354,16 +1331,14 @@ function projectArc(inputs) {
     fixedStreams.push({ yearOffset: offset, annual: archEtaAnnualIncome });
   }
 
-  // LTC shock for Monte Carlo: the actual gross portfolio draws made during care years
-  // (tracked as ltcPortfolioDraw in each row) plus the gross-up tax friction.
-  // LTC shock: pass today's-dollar net care cost to MC.
-  // MC now handles both inflation (inflates to care-year dollars) and gross-up (pre-tax IRA draw).
-  // Do NOT use ltcPortfolioDraw — it is zero when RMDs/income cover care costs in the
-  // deterministic run, which causes MC to see no shock at all on large portfolios.
+  // LTC shock for Monte Carlo: use today's-dollar net care cost directly.
+  // ltcPortfolioDraw is zero when RMDs/income cover care costs in the deterministic run
+  // (common with large portfolios at age 79+ where RMDs alone can absorb care costs).
+  // MC now handles inflation (inflates to event-year dollars) and gross-up (pre-tax IRA draw).
   const ltcShockYear = (ltcEventAge > 0 && !ltcInsured) ? ltcEventAge - retireAge : -1;
-  const ltcShockAnnual = (ltcShockYear >= 0) ? ltcMonthlyCost * 12 : 0;
+  const ltcShockAnnual = ltcShockYear >= 0 ? ltcMonthlyCost * 12 : 0;
   const spouseLtcShockYear = (spouseLtcEventAge > 0 && !spouseLtcInsured) ? spouseLtcEventAge - retireAge : -1;
-  const spouseLtcShockAnnual = (spouseLtcShockYear >= 0) ? spouseLtcMonthlyCost * 12 : 0;
+  const spouseLtcShockAnnual = spouseLtcShockYear >= 0 ? spouseLtcMonthlyCost * 12 : 0;
 
   const confidence = runMonteCarlo(
     mcStartBalance,
@@ -1991,7 +1966,6 @@ function App() {
     annualTradContribution: 0, tradContributionEndAge: 0,
     annualTaxableContribution: 0, taxableContributionEndAge: 0,
     annualSpouseTradContribution: 0, spouseTradContributionEndAge: 0,
-    householdIncome: 0,
   });
 
   const set = (k, v) => setInputs(prev => ({...prev, [k]: v}));
@@ -2822,13 +2796,10 @@ function App() {
                 <NumInput value={inputs.taxableBalance} onChange={v=>set('taxableBalance',v)} prefix="$"/>
               </Field>
 
-              {/* Household income + contributions — only show if pre-retirement */}
+              {/* Primary contributions — only show if pre-retirement */}
               {inputs.currentAge < inputs.retireAge && (
                 <div style={{marginTop:12,paddingTop:12,borderTop:'1px solid rgba(255,255,255,.06)'}}>
-                  <Field label="Household Income" hint="Combined pre-retirement earned income (W-2, self-employment). Used to determine the correct marginal tax rate for Layer 1, 2, and 3 funding draws from your IRA.">
-                    <NumInput value={inputs.householdIncome} onChange={v=>set('householdIncome',v)} prefix="$" suffix="/yr"/>
-                  </Field>
-                  <div style={{fontSize:13,fontWeight:700,color:'#9EB8CC',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8,marginTop:8}}>
+                  <div style={{fontSize:13,fontWeight:700,color:'#9EB8CC',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8}}>
                     {inputs.filingStatus === 'mfj' ? 'Primary Annual Contributions' : 'Annual Contributions'}
                   </div>
                   <Field label="Traditional / Pre-Tax Contribution" hint="Annual 401(k) or IRA contribution — grows tax-deferred to retirement">
