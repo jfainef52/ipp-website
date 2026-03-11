@@ -4861,7 +4861,7 @@ function App() {
                           <div style={{height:8,background:'rgba(255,255,255,.06)',borderRadius:4,overflow:'hidden'}}>
                             <div style={{height:'100%',width:barW(confidenceSpouseUninsured),background:'#C47A7A',borderRadius:4}}/>
                           </div>
-                          <div style={{fontSize:11,color:'#8DAFC8',marginTop:4}}>Portfolio depleted by {fmtD(trueTotalCost)} in care years</div>
+                          <div style={{fontSize:11,color:'#8DAFC8',marginTop:4}}>Portfolio depleted by {fmtD(directCosts)} in care years</div>
                         </div>
                         <div>
                           <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:6}}>
@@ -4944,14 +4944,14 @@ function App() {
                   ))}
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',fontSize:12,color:'#8DAFC8',background:'rgba(255,255,255,.02)',borderRadius:6,padding:'7px 12px',border:'1px solid rgba(200,169,110,.1)'}}>
-                  <span style={{color:'#C47A7A',fontWeight:600}}>{fmtD(totalDraws)}</span>
-                  <span>forced draws</span>
+                  <span style={{color:'#C47A7A',fontWeight:600}}>{fmtD(totalCareCost)}</span>
+                  <span>inflated care cost</span>
                   <span style={{color:'#8DAFC8',margin:'0 2px'}}>+</span>
                   <span style={{color:'#C47A7A',fontWeight:600}}>{totalGrossUpTax > 0 ? fmtD(totalGrossUpTax) : '$0'}</span>
                   <span>gross-up tax</span>
                   <span style={{color:'#8DAFC8',margin:'0 2px'}}>+</span>
                   <span style={{color:'#C47A7A',fontWeight:600}}>{fmtD(totalCompounding)}</span>
-                  <span>compounding loss</span>
+                  <span>compounding lost</span>
                   <span style={{color:'#8DAFC8',margin:'0 2px'}}>=</span>
                   <span style={{color:'#C8A96E',fontWeight:700}}>{fmtD(totalPreserved)}</span>
                   <span style={{color:'#C8A96E'}}>Combined Portfolio Preserved</span>
