@@ -2835,89 +2835,389 @@ function App() {
                 onClick={async()=>{
                   if(!clientInfo.advisorEmail || reportSending) return;
                   setReportSending(true); setReportSent(false); setReportError(false);
+
                   const clientLabel = clientInfo.primaryName || 'Client';
                   const spouseLabel = inputs.filingStatus==='mfj'&&clientInfo.spouseName ? ` & ${clientInfo.spouseName}` : '';
                   const fullName = clientLabel + spouseLabel;
                   const stateInfo2 = STATE_TAX_DATA[inputs.stateCode];
-                  const yr1 = years[0];
-                  const htmlContent = `
-<div style="font-family:'DM Sans',Arial,sans-serif;max-width:620px;margin:0 auto;background:#07101A;color:#F5F2EC;border-radius:12px;overflow:hidden;border:1px solid rgba(200,169,110,.2);">
-  <div style="background:#0B1928;padding:24px 28px;border-bottom:1px solid rgba(200,169,110,.18);">
-    <div style="font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#C8A96E;margin-bottom:6px;">Integrated Planning Partners</div>
-    <div style="font-size:26px;font-family:Georgia,serif;font-weight:400;color:#F5F2EC;margin-bottom:4px;">IncomeArc™ Projection Report</div>
-    <div style="font-size:13px;color:#8DAFC8;">Retirement Income Architecture · Conceptual Illustration</div>
-  </div>
-  <div style="padding:24px 28px;">
-    <div style="margin-bottom:20px;">
-      <div style="font-size:13px;color:#8DAFC8;margin-bottom:2px;">Prepared for</div>
-      <div style="font-size:20px;font-family:Georgia,serif;color:#C8A96E;">${fullName}</div>
-      <div style="font-size:12px;color:#8DAFC8;margin-top:4px;">${inputs.filingStatus==='mfj'?'Married Filing Jointly':'Single'} · Age ${inputs.currentAge} · ${stateInfo2?stateInfo2.name:inputs.stateCode} · Retire Age ${inputs.retireAge}</div>
+                  const isArch = inputs.architectureEnabled;
+                  const isMFJ = inputs.filingStatus === 'mfj';
+                  const pAge = inputs.planToAge;
+                  const rAge = inputs.retireAge;
+                  const fmtD = v => v >= 1000000 ? '$'+(v/1000000).toFixed(2)+'M' : v >= 1000 ? '$'+Math.round(v/1000)+'K' : '$0';
+                  const fmtPct = v => Math.round((v||0)*100)+'%';
+                  const confColor = c => c >= 85 ? '#1A6B45' : c >= 70 ? '#8B6914' : '#8B1A1A';
+                  const confBg   = c => c >= 85 ? '#EAF5EF' : c >= 70 ? '#FDF5E0' : '#FBECEC';
+                  const confLabel = c => c >= 85 ? 'Strong' : c >= 70 ? 'Moderate' : 'At Risk';
+                  const portColor = v => v > 500000 ? '#1A6B45' : v > 0 ? '#8B6914' : '#8B1A1A';
+
+                  // ── Run stress-test projections for all four narrative sections ──
+                  const sqBase = { ...baseProjectionInputs, architectureEnabled: false, sorrEnabled: false, expenseShockEnabled: false, ltcEventEnabled: false };
+                  const sqFull = { ...baseProjectionInputs, architectureEnabled: false };
+                  const sorrOnly = { ...sqBase, sorrEnabled: true };
+                  const shockOnly = { ...sqBase, expenseShockEnabled: inputs.expenseShockEnabled, expenseShockAmount: inputs.expenseShockAmount, expenseShockFrequency: inputs.expenseShockFrequency };
+                  const hcOnly = { ...sqBase, ltcEventEnabled: true, ltcEventAge: inputs.ltcEventAge, spouseLtcEventAge: inputs.spouseLtcEventAge, ltcMonthlyCost: inputs.ltcMonthlyCost, spouseLtcMonthlyCost: inputs.spouseLtcMonthlyCost, ltcDuration: inputs.ltcDuration, spouseLtcDuration: inputs.spouseLtcDuration, ltcInsured: false, spouseLtcInsured: false, ltcCareInflationRate: baseProjectionInputs.ltcCareInflationRate };
+                  const hcInsured = { ...sqBase, ltcEventEnabled: true, ltcEventAge: inputs.ltcEventAge, spouseLtcEventAge: inputs.spouseLtcEventAge, ltcMonthlyCost: inputs.ltcMonthlyCost, spouseLtcMonthlyCost: inputs.spouseLtcMonthlyCost, ltcDuration: inputs.ltcDuration, spouseLtcDuration: inputs.spouseLtcDuration, ltcInsured: true, spouseLtcInsured: true, ltcCareInflationRate: baseProjectionInputs.ltcCareInflationRate };
+                  const stormSQ = { ...sqBase, sorrEnabled: true, expenseShockEnabled: inputs.expenseShockEnabled||true, expenseShockAmount: inputs.expenseShockAmount||50000, expenseShockFrequency: inputs.expenseShockFrequency||8, ltcEventEnabled: true, ltcEventAge: inputs.ltcEventAge, spouseLtcEventAge: inputs.spouseLtcEventAge, ltcMonthlyCost: inputs.ltcMonthlyCost, spouseLtcMonthlyCost: inputs.spouseLtcMonthlyCost, ltcDuration: inputs.ltcDuration, spouseLtcDuration: inputs.spouseLtcDuration, ltcInsured: false, spouseLtcInsured: false, ltcCareInflationRate: baseProjectionInputs.ltcCareInflationRate };
+                  const stormArch = { ...baseProjectionInputs, sorrEnabled: true, expenseShockEnabled: inputs.expenseShockEnabled||true, expenseShockAmount: inputs.expenseShockAmount||50000, expenseShockFrequency: inputs.expenseShockFrequency||8, ltcEventEnabled: true, ltcInsured: true, spouseLtcInsured: true };
+
+                  const { years: sqYears, confidence: sqConf } = projectArc(sqBase);
+                  const { years: sqFullYears, confidence: sqFullConf } = projectArc(sqFull);
+                  const { confidence: sorrConf } = projectArc(sorrOnly);
+                  const { years: shockYears, confidence: shockConf } = projectArc(shockOnly);
+                  const { years: hcYears, confidence: hcConf } = projectArc(hcOnly);
+                  const { years: hcInsYears, confidence: hcInsConf } = projectArc(hcInsured);
+                  const { years: stormSQYears, confidence: stormSQConf } = projectArc(stormSQ);
+                  const { years: stormArchYears, confidence: stormArchConf } = projectArc(stormArch);
+
+                  const exhaust = yr => yr.find(y => y.totalPortfolio < 1000);
+                  const portFinal = yr => yr[yr.length-1]?.totalPortfolio || 0;
+                  const portAt = (yr, age) => (yr.find(y => y.age===age)||{}).totalPortfolio || 0;
+
+                  const sqExhaust = exhaust(sqYears);
+                  const sqFullExhaust = exhaust(sqFullYears);
+                  const sorrSQYears = projectArc(sorrOnly).years;
+                  const sorrExhaust = exhaust(sorrSQYears);
+                  const shockExhaust = exhaust(shockYears);
+                  const hcExhaust = exhaust(hcYears);
+                  const hcInsExhaust = exhaust(hcInsYears);
+                  const stormSQExhaust = exhaust(stormSQYears);
+                  const stormArchExhaust = exhaust(stormArchYears);
+
+                  const archFinalPort = portFinal(yearsWithLtc);
+                  const archExhaust = exhaustionYear;
+                  const archPort90 = portAt(yearsWithLtc, 90);
+                  const sqPort90 = portAt(sqYears, 90);
+
+                  // LTC cost estimates
+                  const ltcInfl = (inputs.ltcCareInflationRate||4)/100;
+                  const ltcInflated = (inputs.ltcMonthlyCost||0)*12 * Math.pow(1+ltcInfl, Math.max(0,(inputs.ltcEventAge||79)-rAge));
+                  const ltcTotal = ltcInflated * (inputs.ltcDuration||0);
+                  const spLtcInflated = (inputs.spouseLtcMonthlyCost||0)*12 * Math.pow(1+ltcInfl, Math.max(0,(inputs.spouseLtcEventAge||84)-rAge));
+                  const spLtcTotal = spLtcInflated * (inputs.spouseLtcDuration||0);
+                  const totalLtcExposure = ltcTotal + spLtcTotal;
+
+                  const hasLtcNarr = (inputs.ltcEventAge||0)>0 && (inputs.ltcMonthlyCost||0)>0;
+                  const hasSpLtcNarr = isMFJ && (inputs.spouseLtcEventAge||0)>0 && (inputs.spouseLtcMonthlyCost||0)>0;
+                  const hasShock = (inputs.expenseShockAmount||0)>0;
+
+                  const depleteStr = (ex, finalYrs) => ex
+                    ? `<span style="color:#8B1A1A;font-weight:700;">Portfolio depletes at age ${ex.age}</span>`
+                    : `<span style="color:#1A6B45;font-weight:700;">${fmtD(portFinal(finalYrs))} remaining at age ${pAge}</span>`;
+
+                  const yr1arch = yearsWithLtc.find(y => y.age === rAge) || yearsWithLtc[0];
+
+                  // ── Print-friendly light design ──
+                  const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&family=DM+Sans:wght@300;400;500;600&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #F8F6F2; font-family: 'DM Sans', Arial, sans-serif; color: #1A2332; }
+  @page {
+    size: letter portrait;
+    margin: 0.55in 0.6in;
+  }
+  @media print {
+    body { background: white; padding: 0; }
+    .page-break { page-break-before: always; }
+    div[style*="max-width:700px"] { border: none !important; border-radius: 0 !important; max-width: 100% !important; }
+  }
+</style>
+</head>
+<body style="margin:0;padding:24px;background:#F8F6F2;">
+<div style="max-width:760px;margin:0 auto;background:white;border:1px solid #DDD;border-radius:4px;overflow:hidden;">
+
+  <!-- HEADER -->
+  <div style="background:#1A2B3C;padding:28px 36px;position:relative;">
+    <div style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#C8A96E,#D4873A,#9B7EC8);"></div>
+    <div style="font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#C8A96E;margin-bottom:6px;font-family:'DM Sans',sans-serif;">Integrated Planning Partners</div>
+    <div style="font-size:30px;font-family:'Cormorant Garamond',Georgia,serif;font-weight:400;color:#F5F0E8;margin-bottom:3px;">IncomeArc™ Retirement Report</div>
+    <div style="font-size:12px;color:#7A9AB8;letter-spacing:.04em;">Retirement Income Architecture Analysis &nbsp;·&nbsp; Conceptual Illustration Only</div>
+    <div style="margin-top:16px;display:flex;gap:24px;flex-wrap:wrap;">
+      <div style="font-size:12px;color:#A8BFD0;"><span style="color:#C8A96E;font-weight:600;">${fullName}</span></div>
+      <div style="font-size:12px;color:#A8BFD0;">${isMFJ?'Married Filing Jointly':'Single'}</div>
+      <div style="font-size:12px;color:#A8BFD0;">Age ${inputs.currentAge} · Retire ${rAge} · Plan to ${pAge}</div>
+      <div style="font-size:12px;color:#A8BFD0;">${stateInfo2?stateInfo2.name:inputs.stateCode}</div>
+      <div style="font-size:12px;color:#A8BFD0;">Generated ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</div>
     </div>
-    <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:18px;margin-bottom:20px;">
-      <div style="font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:#C8A96E;margin-bottom:14px;">Key Projections</div>
-      <table style="width:100%;border-collapse:collapse;">
+  </div>
+
+  <div style="padding:32px 36px;">
+
+    <!-- EXECUTIVE SUMMARY -->
+    <div style="margin-bottom:36px;">
+      <div style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#C8A96E;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #C8A96E;font-family:'DM Sans',sans-serif;">Executive Summary</div>
+      <p style="font-size:14px;color:#2A3A4A;line-height:1.75;margin-bottom:14px;">
+        This report analyzes the retirement income plan for <strong>${fullName}</strong> under two distinct scenarios. The <strong style="color:#8B1A1A;">Status Quo</strong> scenario projects outcomes without structural planning — relying solely on portfolio withdrawals, Social Security, and existing income sources. The <strong style="color:#1A6B45;">IncomeArc™ Architecture</strong> scenario applies a coordinated, layered approach designed to insulate retirement income against the four primary threats to financial security: sequence of returns risk, unplanned large expenses, long-term care events, and the combination of all three occurring simultaneously.
+      </p>
+      <!-- Summary scorecard -->
+      <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+        <tr style="background:#F0F4F8;">
+          <td style="padding:10px 14px;font-size:11px;font-weight:600;color:#4A6070;text-transform:uppercase;letter-spacing:.06em;width:34%;border:1px solid #DDE4EC;">Metric</td>
+          <td style="padding:10px 14px;font-size:11px;font-weight:600;color:#8B1A1A;text-transform:uppercase;letter-spacing:.06em;text-align:center;border:1px solid #DDE4EC;">Status Quo</td>
+          <td style="padding:10px 14px;font-size:11px;font-weight:600;color:#1A6B45;text-transform:uppercase;letter-spacing:.06em;text-align:center;border:1px solid #DDE4EC;">IncomeArc™ Architecture</td>
+        </tr>
         ${[
-          ['Monte Carlo Confidence','#4A9B7A',confidence+'%'],
-          ['Portfolio at Retirement','#C8A96E',fmtM(totalPortfolioAtRetire)],
-          ['Portfolio at Age 90','#7BAF84',age90Data?fmtM(age90Data.totalPortfolio):'—'],
-          ['Guaranteed Income (Lifetime Avg)','#7BAF84',guaranteedPct+'%'],
-          ['Est. Lifetime Federal Tax','#C47A7A',totalFedTax>=1000000?'$'+(totalFedTax/1000000).toFixed(1)+'M':'$'+Math.round(totalFedTax/1000)+'K'],
-          ['Est. Lifetime State Tax','#C47A7A',totalStateTax>=1000000?'$'+(totalStateTax/1000000).toFixed(1)+'M':'$'+Math.round(totalStateTax/1000)+'K'],
-          ['Est. Lifetime Total Tax','#C47A7A',totalEstTax>=1000000?'$'+(totalEstTax/1000000).toFixed(1)+'M':'$'+Math.round(totalEstTax/1000)+'K'],
-          ...(totalIrmaa>0?[['Total IRMAA Exposure','#E8943A','$'+Math.round(totalIrmaa/1000)+'K']]:[] ),
-          ['Year 1 All-In Marginal Rate','#9B7EC8',Math.round(allInMarginalRate*100)+'%'],
-          ['Year 1 All-In Effective Rate','#9B7EC8',Math.round(allInEffectiveRate*100)+'%'],
-        ].map(([label,color,val])=>`
-        <tr style="border-bottom:1px solid rgba(255,255,255,.05);">
-          <td style="padding:8px 0;font-size:13px;color:#8DAFC8;">${label}</td>
-          <td style="padding:8px 0;font-size:15px;font-weight:600;color:${color};text-align:right;">${val}</td>
+          ['MC Confidence Score', `<span style="font-weight:700;color:${confColor(sqFullConf)};background:${confBg(sqFullConf)};padding:2px 8px;border-radius:3px;">${sqFullConf}% — ${confLabel(sqFullConf)}</span>`, `<span style="font-weight:700;color:${confColor(confidence)};background:${confBg(confidence)};padding:2px 8px;border-radius:3px;">${confidence}% — ${confLabel(confidence)}</span>`],
+          ['Portfolio at Retirement', fmtD(totalPortfolioAtRetire), fmtD(totalPortfolioAtRetire)],
+          ['Portfolio at Age 90', sqExhaust && sqExhaust.age<=90 ? `<span style="color:#8B1A1A;font-weight:600;">Depleted age ${sqExhaust.age}</span>` : fmtD(sqPort90), archExhaust && archExhaust.age<=90 ? `<span style="color:#8B1A1A;font-weight:600;">Depleted age ${archExhaust.age}</span>` : fmtD(archPort90)],
+          [`Portfolio at Age ${pAge}`, sqExhaust ? `<span style="color:#8B1A1A;font-weight:600;">Depleted age ${sqExhaust.age}</span>` : fmtD(portFinal(sqYears)), archExhaust ? `<span style="color:#8B1A1A;font-weight:600;">Depleted age ${archExhaust.age}</span>` : fmtD(archFinalPort)],
+          ['Guaranteed Income Floor', (sqFullYears[0] ? Math.round((sqFullYears[0].grossGuaranteedIncome||0)/(sqFullYears[0].grossIncome||1)*100) : 0)+'%', guaranteedPct+'%'],
+          ['Est. Lifetime Tax Burden', fmtD(totalEstTax), fmtD(totalEstTax)],
+        ].map(([label, sq, arch], i) => `
+        <tr style="background:${i%2===0?'white':'#FAFBFC'};">
+          <td style="padding:9px 14px;font-size:13px;color:#3A4A5A;border:1px solid #DDE4EC;">${label}</td>
+          <td style="padding:9px 14px;font-size:13px;text-align:center;border:1px solid #DDE4EC;">${sq}</td>
+          <td style="padding:9px 14px;font-size:13px;text-align:center;border:1px solid #DDE4EC;">${arch}</td>
         </tr>`).join('')}
       </table>
     </div>
-    <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:18px;margin-bottom:20px;">
-      <div style="font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:#C8A96E;margin-bottom:14px;">Income Architecture (Year 1 of Retirement)</div>
-      <table style="width:100%;border-collapse:collapse;">
-        ${yr1 ? Object.entries(COLORS).filter(([k])=>k!=='expense'&&yr1.sources&&yr1.sources[k]>0).map(([k,c])=>`
-        <tr style="border-bottom:1px solid rgba(255,255,255,.05);">
-          <td style="padding:7px 0;font-size:13px;color:#8DAFC8;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${c.fill};margin-right:8px;vertical-align:middle;"></span>${c.label}</td>
-          <td style="padding:7px 0;font-size:13px;color:#F5F2EC;text-align:right;">$${Math.round((yr1.sources[k]||0)/12/1000*10)/10}K/mo</td>
-        </tr>`).join('') : '' }
+
+    <!-- DIVIDER -->
+    <div style="height:1px;background:#E5E9EE;margin-bottom:32px;"></div>
+
+    <!-- SECTION 1: SORR -->
+    <div style="margin-bottom:36px;">
+      <div style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#C8A96E;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #C8A96E;">Section 1 &nbsp;·&nbsp; Sequence of Returns Risk</div>
+      <p style="font-size:14px;color:#2A3A4A;line-height:1.75;margin-bottom:12px;">
+        Sequence of returns risk is among the most underestimated threats in retirement. A significant market decline in the <strong>first three to five years</strong> of retirement creates permanent, compounding damage that no amount of long-term average returns can repair. The reason is straightforward: when a portfolio is both losing value and being drawn down for living expenses simultaneously, each withdrawal locks in losses at the worst possible price. The capital that would have recovered is gone.
+      </p>
+      <p style="font-size:14px;color:#2A3A4A;line-height:1.75;margin-bottom:16px;">
+        A Status Quo plan — one that relies entirely on portfolio withdrawals for income — has no buffer against this sequence. Every expense, from groceries to utilities, must be funded by selling assets regardless of market conditions. The portfolio is always fully exposed.
+      </p>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+        <tr style="background:#F0F4F8;">
+          <td style="padding:9px 14px;font-size:11px;font-weight:600;color:#4A6070;text-transform:uppercase;letter-spacing:.06em;border:1px solid #DDE4EC;">Scenario</td>
+          <td style="padding:9px 14px;font-size:11px;font-weight:600;color:#4A6070;text-transform:uppercase;letter-spacing:.06em;text-align:center;border:1px solid #DDE4EC;">MC Confidence</td>
+          <td style="padding:9px 14px;font-size:11px;font-weight:600;color:#4A6070;text-transform:uppercase;letter-spacing:.06em;text-align:right;border:1px solid #DDE4EC;">Portfolio Outcome</td>
+        </tr>
+        <tr style="background:white;">
+          <td style="padding:9px 14px;font-size:13px;color:#3A4A5A;border:1px solid #DDE4EC;">Status Quo — No stress events</td>
+          <td style="padding:9px 14px;font-size:13px;text-align:center;border:1px solid #DDE4EC;"><span style="color:${confColor(sqConf)};font-weight:600;">${sqConf}%</span></td>
+          <td style="padding:9px 14px;font-size:13px;text-align:right;border:1px solid #DDE4EC;">${depleteStr(sqExhaust, sqYears)}</td>
+        </tr>
+        <tr style="background:#FDF2F2;">
+          <td style="padding:9px 14px;font-size:13px;color:#3A4A5A;border:1px solid #DDE4EC;">Status Quo + SORR (5-year decline)</td>
+          <td style="padding:9px 14px;font-size:13px;text-align:center;border:1px solid #DDE4EC;"><span style="color:${confColor(sorrConf)};font-weight:600;">${sorrConf}%</span></td>
+          <td style="padding:9px 14px;font-size:13px;text-align:right;border:1px solid #DDE4EC;">${depleteStr(sorrExhaust, sorrSQYears)}</td>
+        </tr>
+        <tr style="background:#EAF5EF;">
+          <td style="padding:9px 14px;font-size:13px;color:#3A4A5A;border:1px solid #DDE4EC;">IncomeArc™ Architecture — All risks active</td>
+          <td style="padding:9px 14px;font-size:13px;text-align:center;border:1px solid #DDE4EC;"><span style="color:${confColor(confidence)};font-weight:600;">${confidence}%</span></td>
+          <td style="padding:9px 14px;font-size:13px;text-align:right;border:1px solid #DDE4EC;">${depleteStr(archExhaust, yearsWithLtc)}</td>
+        </tr>
       </table>
+      <div style="background:#F0F7FF;border-left:3px solid #3A7CC8;padding:12px 16px;font-size:13px;color:#2A3A5A;line-height:1.65;">
+        <strong>IncomeArc™ Response:</strong> ${isArch && inputs.rothAnnuityMonthly > 0 ? `The Roth Fixed Indexed Annuity (Layer 1) provides contractual income that never requires portfolio liquidation — the GLWB rider pays regardless of market performance. ` : ''}${isArch && inputs.qualAnnuityMonthly > 0 ? `The Qualified Annuity (Layer 1) creates a pension-like floor from a qualified rollover, guaranteed for life without portfolio exposure. ` : ''}When guaranteed income covers essential expenses, the portfolio is never forced to sell at depressed prices. It can remain invested and recover — permanently changing the trajectory.
+      </div>
     </div>
-    <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:18px;margin-bottom:20px;">
-      <div style="font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:#C8A96E;margin-bottom:14px;">Assumptions</div>
-      <table style="width:100%;border-collapse:collapse;">
+
+    <div style="height:1px;background:#E5E9EE;margin-bottom:32px;"></div>
+
+    <!-- SECTION 2: UNPLANNED EXPENSES -->
+    <div style="margin-bottom:36px;">
+      <div style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#C8A96E;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #C8A96E;">Section 2 &nbsp;·&nbsp; Unplanned Large Expenses</div>
+      <p style="font-size:14px;color:#2A3A4A;line-height:1.75;margin-bottom:12px;">
+        Standard retirement projections model smooth, predictable spending. Actual retirements do not. Roof replacements, HVAC systems, vehicle failures, dental work not covered by Medicare, home modifications for aging in place, unexpected family support — these are not exceptional events. They are the ordinary texture of a 30-year retirement. ${hasShock ? `Modeled here at $${Math.round(inputs.expenseShockAmount/1000)}K recurring every ${inputs.expenseShockFrequency} years, these shocks represent a conservative baseline.` : 'Modeled at a conservative $50K recurring every 8 years.'}
+      </p>
+      <p style="font-size:14px;color:#2A3A4A;line-height:1.75;margin-bottom:16px;">
+        The compounding effect is critical: a large expense shock during a market downturn forces the liquidation of depressed assets to fund it. Both the loss and the lost recovery compound against the portfolio for the remaining decades of retirement.
+      </p>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+        <tr style="background:#F0F4F8;">
+          <td style="padding:9px 14px;font-size:11px;font-weight:600;color:#4A6070;text-transform:uppercase;letter-spacing:.06em;border:1px solid #DDE4EC;">Scenario</td>
+          <td style="padding:9px 14px;font-size:11px;font-weight:600;color:#4A6070;text-transform:uppercase;letter-spacing:.06em;text-align:center;border:1px solid #DDE4EC;">MC Confidence</td>
+          <td style="padding:9px 14px;font-size:11px;font-weight:600;color:#4A6070;text-transform:uppercase;letter-spacing:.06em;text-align:right;border:1px solid #DDE4EC;">Portfolio Outcome</td>
+        </tr>
+        <tr style="background:white;">
+          <td style="padding:9px 14px;font-size:13px;color:#3A4A5A;border:1px solid #DDE4EC;">Status Quo — No expense shocks</td>
+          <td style="padding:9px 14px;font-size:13px;text-align:center;border:1px solid #DDE4EC;"><span style="color:${confColor(sqConf)};font-weight:600;">${sqConf}%</span></td>
+          <td style="padding:9px 14px;font-size:13px;text-align:right;border:1px solid #DDE4EC;">${depleteStr(sqExhaust, sqYears)}</td>
+        </tr>
+        <tr style="background:#FDF2F2;">
+          <td style="padding:9px 14px;font-size:13px;color:#3A4A5A;border:1px solid #DDE4EC;">Status Quo + Recurring Expense Shocks</td>
+          <td style="padding:9px 14px;font-size:13px;text-align:center;border:1px solid #DDE4EC;"><span style="color:${confColor(shockConf)};font-weight:600;">${shockConf}%</span></td>
+          <td style="padding:9px 14px;font-size:13px;text-align:right;border:1px solid #DDE4EC;">${depleteStr(shockExhaust, shockYears)}</td>
+        </tr>
+        <tr style="background:#EAF5EF;">
+          <td style="padding:9px 14px;font-size:13px;color:#3A4A5A;border:1px solid #DDE4EC;">IncomeArc™ Architecture — All risks active</td>
+          <td style="padding:9px 14px;font-size:13px;text-align:center;border:1px solid #DDE4EC;"><span style="color:${confColor(confidence)};font-weight:600;">${confidence}%</span></td>
+          <td style="padding:9px 14px;font-size:13px;text-align:right;border:1px solid #DDE4EC;">${depleteStr(archExhaust, yearsWithLtc)}</td>
+        </tr>
+      </table>
+      <div style="background:#F0F7FF;border-left:3px solid #3A7CC8;padding:12px 16px;font-size:13px;color:#2A3A5A;line-height:1.65;">
+        <strong>IncomeArc™ Response:</strong> A larger, less-stressed portfolio — preserved by guaranteed income streams that cover baseline expenses — is inherently better positioned to absorb irregular shocks. ${isArch && inputs.etaAnnualIncome > 0 ? `The ETA policy loan income (Layer 3) additionally provides tax-free liquidity that can be accessed without creating a taxable event or MAGI spike — a purpose-built reserve layer for exactly these situations.` : 'The guaranteed income floor created by the architecture layers preserves portfolio capital so that when shocks arrive, there is substance to absorb them.'}
+      </div>
+    </div>
+
+    <div style="height:1px;background:#E5E9EE;margin-bottom:32px;"></div>
+
+    <!-- SECTION 3: HEALTHCARE EVENTS -->
+    ${hasLtcNarr || hasSpLtcNarr ? `
+    <div style="margin-bottom:36px;">
+      <div style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#C8A96E;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #C8A96E;">Section 3 &nbsp;·&nbsp; Long-Term Care & Healthcare Events</div>
+      <p style="font-size:14px;color:#2A3A4A;line-height:1.75;margin-bottom:12px;">
+        According to the U.S. Department of Health and Human Services, 70% of people reaching age 65 will require some form of long-term care in their lifetime. Yet most retirement portfolios are entirely exposed to this risk with no dedicated protection. The financial consequences of an uninsured care event extend far beyond the direct cost of care.
+      </p>
+      <p style="font-size:14px;color:#2A3A4A;line-height:1.75;margin-bottom:16px;">
+        Every dollar of care cost drawn from a traditional IRA must be grossed up for taxes. At a 24–32% marginal rate, a $${Math.round((inputs.ltcMonthlyCost||0)).toLocaleString()}/month care cost requires approximately $${Math.round((inputs.ltcMonthlyCost||0)/(1-0.27)).toLocaleString()}/month in gross IRA distributions. This cascade simultaneously draws down the portfolio, elevates MAGI, spikes IRMAA Medicare surcharges, and may push income into higher tax brackets — compounding the damage for years after the care event ends.
+      </p>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+        <tr style="background:#F0F4F8;">
+          <td style="padding:8px 14px;font-size:11px;font-weight:600;color:#4A6070;text-transform:uppercase;letter-spacing:.06em;border:1px solid #DDE4EC;">Care Event Details</td>
+          ${hasLtcNarr ? `<td style="padding:8px 14px;font-size:11px;font-weight:600;color:#4A6070;text-transform:uppercase;letter-spacing:.06em;text-align:center;border:1px solid #DDE4EC;">${clientLabel}</td>` : ''}
+          ${hasSpLtcNarr ? `<td style="padding:8px 14px;font-size:11px;font-weight:600;color:#4A6070;text-transform:uppercase;letter-spacing:.06em;text-align:center;border:1px solid #DDE4EC;">${clientInfo.spouseName||'Spouse'}</td>` : ''}
+        </tr>
         ${[
-          ['Portfolio Return',inputs.portfolioReturn+'%'],
-          ['Inflation Rate',inputs.inflation+'%'],
-          ['Fixed Monthly Expenses','$'+inputs.fixedExpenses.toLocaleString()],
-          ['Lifestyle Monthly Expenses','$'+inputs.lifestyleExpenses.toLocaleString()],
-          ['Traditional Balance (Today)',fmtM(inputs.traditionalBalance)],
-          ['Roth Balance (Today)',fmtM(inputs.rothBalance)],
-          ['Taxable Balance (Today)',fmtM(inputs.taxableBalance)],
-          ...(inputs.filingStatus==='mfj' && inputs.spouseTraditionalBalance > 0 ? [['Spouse Traditional (Today)', fmtM(inputs.spouseTraditionalBalance)]] : []),
-          ...(inputs.filingStatus==='mfj' && inputs.annualSpouseTradContribution > 0 ? [['Spouse Annual Contribution', fmtM(inputs.annualSpouseTradContribution)+'/yr']] : []),
-          ['Portfolio at Retirement (Projected)',fmtM(totalPortfolioAtRetire)],
-          ...(inputs.sorrEnabled?[['SORR Stress Scenario','Active — First 5 Yrs']]:[] ),
-          ...(inputs.taxRateStressAdder>0?[['Tax Rate Stress Adder','+'+inputs.taxRateStressAdder+'%']]:[] ),
-        ].map(([l,v])=>`
-        <tr style="border-bottom:1px solid rgba(255,255,255,.05);">
-          <td style="padding:7px 0;font-size:13px;color:#8DAFC8;">${l}</td>
-          <td style="padding:7px 0;font-size:13px;color:#F5F2EC;text-align:right;">${v}</td>
+          ['Event begins at age', hasLtcNarr?`Age ${inputs.ltcEventAge}`:'', hasSpLtcNarr?`Age ${inputs.spouseLtcEventAge}`:''],
+          ['Duration', hasLtcNarr?`${inputs.ltcDuration} years`:'', hasSpLtcNarr?`${inputs.spouseLtcDuration} years`:''],
+          ['Monthly cost (today\'s $)', hasLtcNarr?`$${Math.round(inputs.ltcMonthlyCost||0).toLocaleString()}/mo`:'', hasSpLtcNarr?`$${Math.round(inputs.spouseLtcMonthlyCost||0).toLocaleString()}/mo`:''],
+          ['Inflated cost at event age', hasLtcNarr?`$${Math.round(ltcInflated/12).toLocaleString()}/mo`:'', hasSpLtcNarr?`$${Math.round(spLtcInflated/12).toLocaleString()}/mo`:''],
+          ['Total cost over care period', hasLtcNarr?`<strong style="color:#8B1A1A;">${fmtD(ltcTotal)}</strong>`:'', hasSpLtcNarr?`<strong style="color:#8B1A1A;">${fmtD(spLtcTotal)}</strong>`:''],
+        ].map(([label, pVal, spVal], i) => `
+        <tr style="background:${i%2===0?'white':'#FAFBFC'};">
+          <td style="padding:8px 14px;font-size:13px;color:#3A4A5A;border:1px solid #DDE4EC;">${label}</td>
+          ${hasLtcNarr ? `<td style="padding:8px 14px;font-size:13px;text-align:center;border:1px solid #DDE4EC;">${pVal}</td>` : ''}
+          ${hasSpLtcNarr ? `<td style="padding:8px 14px;font-size:13px;text-align:center;border:1px solid #DDE4EC;">${spVal}</td>` : ''}
+        </tr>`).join('')}
+        ${hasLtcNarr && hasSpLtcNarr ? `
+        <tr style="background:#FDF5E0;">
+          <td style="padding:8px 14px;font-size:13px;font-weight:600;color:#3A4A5A;border:1px solid #DDE4EC;">Combined care exposure</td>
+          <td colspan="2" style="padding:8px 14px;font-size:14px;font-weight:700;color:#8B1A1A;text-align:center;border:1px solid #DDE4EC;">${fmtD(totalLtcExposure)} <span style="font-size:11px;font-weight:400;color:#6A7A8A;">(before tax gross-up)</span></td>
+        </tr>` : ''}
+      </table>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+        <tr style="background:#F0F4F8;">
+          <td style="padding:9px 14px;font-size:11px;font-weight:600;color:#4A6070;text-transform:uppercase;letter-spacing:.06em;border:1px solid #DDE4EC;">Scenario</td>
+          <td style="padding:9px 14px;font-size:11px;font-weight:600;color:#4A6070;text-transform:uppercase;letter-spacing:.06em;text-align:center;border:1px solid #DDE4EC;">MC Confidence</td>
+          <td style="padding:9px 14px;font-size:11px;font-weight:600;color:#4A6070;text-transform:uppercase;letter-spacing:.06em;text-align:right;border:1px solid #DDE4EC;">Portfolio Outcome</td>
+        </tr>
+        <tr style="background:white;">
+          <td style="padding:9px 14px;font-size:13px;color:#3A4A5A;border:1px solid #DDE4EC;">Status Quo — No care event</td>
+          <td style="padding:9px 14px;font-size:13px;text-align:center;border:1px solid #DDE4EC;"><span style="color:${confColor(sqConf)};font-weight:600;">${sqConf}%</span></td>
+          <td style="padding:9px 14px;font-size:13px;text-align:right;border:1px solid #DDE4EC;">${depleteStr(sqExhaust, sqYears)}</td>
+        </tr>
+        <tr style="background:#FDF2F2;">
+          <td style="padding:9px 14px;font-size:13px;color:#3A4A5A;border:1px solid #DDE4EC;">Status Quo + Uninsured Care Event</td>
+          <td style="padding:9px 14px;font-size:13px;text-align:center;border:1px solid #DDE4EC;"><span style="color:${confColor(hcConf)};font-weight:600;">${hcConf}%</span></td>
+          <td style="padding:9px 14px;font-size:13px;text-align:right;border:1px solid #DDE4EC;">${depleteStr(hcExhaust, hcYears)}</td>
+        </tr>
+        <tr style="background:#EAF5EF;">
+          <td style="padding:9px 14px;font-size:13px;color:#3A4A5A;border:1px solid #DDE4EC;">Layer 2 Insured — Care event, portfolio protected</td>
+          <td style="padding:9px 14px;font-size:13px;text-align:center;border:1px solid #DDE4EC;"><span style="color:${confColor(hcInsConf)};font-weight:600;">${hcInsConf}%</span></td>
+          <td style="padding:9px 14px;font-size:13px;text-align:right;border:1px solid #DDE4EC;">${depleteStr(hcInsExhaust, hcInsYears)}</td>
+        </tr>
+      </table>
+      <div style="background:#F0F7FF;border-left:3px solid #3A7CC8;padding:12px 16px;font-size:13px;color:#2A3A5A;line-height:1.65;margin-bottom:12px;">
+        <strong>IncomeArc™ Layer 2 Response:</strong> The Living Benefits IUL with chronic care rider creates a dedicated pool for healthcare costs that is completely isolated from the retirement portfolio. When a qualifying care event occurs, the policy's death benefit accelerates tax-free — the portfolio is never touched. The tax gross-up problem is eliminated entirely: there is no IRA withdrawal, no MAGI spike, no IRMAA cascade.
+      </div>
+      <div style="background:#FDF5E0;border-left:3px solid #C8A96E;padding:12px 16px;font-size:13px;color:#3A3010;line-height:1.65;">
+        <strong>If care is never needed:</strong> The policy continues building cash value and delivers tax-free income in retirement with a tax-free death benefit for legacy. Unlike traditional long-term care insurance, no premium is ever wasted.
+      </div>
+    </div>
+
+    <div style="height:1px;background:#E5E9EE;margin-bottom:32px;"></div>` : ''}
+
+    <!-- SECTION 4: THE PERFECT STORM -->
+    <div style="margin-bottom:36px;">
+      <div style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#C8A96E;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #C8A96E;">Section 4 &nbsp;·&nbsp; The Perfect Storm — All Risks Combined</div>
+      <p style="font-size:14px;color:#2A3A4A;line-height:1.75;margin-bottom:12px;">
+        Retirement risks rarely arrive in isolation. A market correction in the first years of retirement stresses the portfolio. A roof replacement arrives during that same downturn. A care event begins just as the portfolio is most vulnerable. This is not a paranoid scenario — it is a plausible sequence for any 30-year retirement and the precise scenario that most plans are not structured to survive.
+      </p>
+      <p style="font-size:14px;color:#2A3A4A;line-height:1.75;margin-bottom:16px;">
+        The analysis below models all three threats simultaneously: sequence of returns risk, recurring large expense shocks, and an uninsured care event. It then applies the full IncomeArc™ architecture to that identical environment to show the structural difference between exposure and protection.
+      </p>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+        <tr style="background:#F0F4F8;">
+          <td style="padding:9px 14px;font-size:11px;font-weight:600;color:#4A6070;text-transform:uppercase;letter-spacing:.06em;border:1px solid #DDE4EC;">Scenario</td>
+          <td style="padding:9px 14px;font-size:11px;font-weight:600;color:#4A6070;text-transform:uppercase;letter-spacing:.06em;text-align:center;border:1px solid #DDE4EC;">MC Confidence</td>
+          <td style="padding:9px 14px;font-size:11px;font-weight:600;color:#4A6070;text-transform:uppercase;letter-spacing:.06em;text-align:right;border:1px solid #DDE4EC;">Portfolio Outcome</td>
+        </tr>
+        <tr style="background:white;">
+          <td style="padding:9px 14px;font-size:13px;color:#3A4A5A;border:1px solid #DDE4EC;">Status Quo — No stress events</td>
+          <td style="padding:9px 14px;font-size:13px;text-align:center;border:1px solid #DDE4EC;"><span style="color:${confColor(sqConf)};font-weight:600;">${sqConf}%</span></td>
+          <td style="padding:9px 14px;font-size:13px;text-align:right;border:1px solid #DDE4EC;">${depleteStr(sqExhaust, sqYears)}</td>
+        </tr>
+        <tr style="background:#FDF2F2;">
+          <td style="padding:9px 14px;font-size:13px;color:#3A4A5A;border:1px solid #DDE4EC;"><strong>Status Quo — SORR + Expense Shocks + Uninsured Care</strong></td>
+          <td style="padding:9px 14px;font-size:13px;text-align:center;border:1px solid #DDE4EC;"><span style="color:${confColor(stormSQConf)};font-weight:700;font-size:14px;">${stormSQConf}%</span></td>
+          <td style="padding:9px 14px;font-size:13px;text-align:right;border:1px solid #DDE4EC;">${depleteStr(stormSQExhaust, stormSQYears)}</td>
+        </tr>
+        <tr style="background:#EAF5EF;">
+          <td style="padding:9px 14px;font-size:13px;color:#3A4A5A;border:1px solid #DDE4EC;"><strong>IncomeArc™ Architecture — Same perfect storm environment</strong></td>
+          <td style="padding:9px 14px;font-size:13px;text-align:center;border:1px solid #DDE4EC;"><span style="color:${confColor(stormArchConf)};font-weight:700;font-size:14px;">${stormArchConf}%</span></td>
+          <td style="padding:9px 14px;font-size:13px;text-align:right;border:1px solid #DDE4EC;">${depleteStr(stormArchExhaust, stormArchYears)}</td>
+        </tr>
+      </table>
+      ${stormSQExhaust ? `
+      <div style="background:#FBECEC;border-left:3px solid #C44;padding:12px 16px;font-size:13px;color:#5A1A1A;line-height:1.65;margin-bottom:12px;">
+        <strong>⚠ Status Quo Result:</strong> When all three risks converge, the unstructured plan depletes at age <strong>${stormSQExhaust.age}</strong> — ${pAge - stormSQExhaust.age} years before the end of the plan. There is no income, no portfolio, and no protection. This is the outcome that retirement architecture exists to prevent.
+      </div>` : ''}
+      ${stormSQExhaust && !stormArchExhaust ? `
+      <div style="background:#EAF5EF;border-left:3px solid #2A8A55;padding:12px 16px;font-size:13px;color:#1A3A28;line-height:1.65;">
+        <strong>✓ Architecture Result:</strong> Facing the identical perfect storm environment, the IncomeArc™ architecture reaches age ${pAge} with <strong>${fmtD(portFinal(stormArchYears))}</strong> remaining — converting a plan that fails at age ${stormSQExhaust.age} into one that survives to plan end. The ${Math.max(0, stormArchConf - stormSQConf)}-point confidence improvement represents the structural resilience built into every layer of the architecture.
+      </div>` : `
+      <div style="background:#F0F7FF;border-left:3px solid #3A7CC8;padding:12px 16px;font-size:13px;color:#2A3A5A;line-height:1.65;">
+        <strong>Architecture Result:</strong> In the same perfect storm environment, the IncomeArc™ architecture achieves a <strong>${stormArchConf}%</strong> confidence score versus <strong>${stormSQConf}%</strong> without architecture — a <strong>${Math.max(0, stormArchConf - stormSQConf)}-point improvement</strong> under maximum stress conditions.
+      </div>`}
+      <p style="font-size:13px;color:#5A6A7A;line-height:1.65;margin-top:16px;font-style:italic;">
+        This is the purpose of the IncomeArc™ system: not to optimize for the average scenario, but to build a structure that holds under the worst realistic combination of circumstances. Each layer addresses a specific failure mode. Together they create a retirement income architecture that is genuinely resilient.
+      </p>
+    </div>
+
+    <div style="height:1px;background:#E5E9EE;margin-bottom:32px;"></div>
+
+    <!-- PLAN DETAILS -->
+    <div style="margin-bottom:32px;">
+      <div style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#C8A96E;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #C8A96E;">Plan Parameters & Assumptions</div>
+      <table style="width:100%;border-collapse:collapse;">
+        <tr style="background:#F0F4F8;">
+          <td colspan="4" style="padding:8px 14px;font-size:11px;font-weight:600;color:#4A6070;text-transform:uppercase;letter-spacing:.06em;border:1px solid #DDE4EC;">Model Inputs</td>
+        </tr>
+        ${[
+          ['Portfolio Return', inputs.portfolioReturn+'%', 'Inflation Rate', inputs.inflation+'%'],
+          ['Monte Carlo Trials', '500', 'Std Deviation', '12%'],
+          ['Traditional Balance', fmtD(inputs.traditionalBalance||0), 'Roth Balance', fmtD(inputs.rothBalance||0)],
+          ['Taxable Balance', fmtD(inputs.taxableBalance||0), isMFJ&&inputs.spouseTraditionalBalance>0 ? 'Spouse Traditional' : 'Fixed Expenses', isMFJ&&inputs.spouseTraditionalBalance>0 ? fmtD(inputs.spouseTraditionalBalance) : '$'+(inputs.fixedExpenses||0).toLocaleString()+'/mo'],
+          ['Monthly Fixed Expenses', '$'+(inputs.fixedExpenses||0).toLocaleString(), 'Monthly Lifestyle', '$'+(inputs.lifestyleExpenses||0).toLocaleString()],
+          ['SORR Stress', inputs.sorrEnabled?'Active — Years 1–5':'Not modeled in base plan', 'Expense Shock', hasShock?'$'+Math.round((inputs.expenseShockAmount||0)/1000)+'K every '+(inputs.expenseShockFrequency||8)+' yrs':'Not modeled in base plan'],
+        ].map(([l1,v1,l2,v2], i) => `
+        <tr style="background:${i%2===0?'white':'#FAFBFC'};">
+          <td style="padding:7px 14px;font-size:12px;color:#5A6A7A;border:1px solid #DDE4EC;width:25%;">${l1}</td>
+          <td style="padding:7px 14px;font-size:12px;font-weight:500;color:#1A2332;border:1px solid #DDE4EC;width:25%;">${v1}</td>
+          <td style="padding:7px 14px;font-size:12px;color:#5A6A7A;border:1px solid #DDE4EC;width:25%;">${l2}</td>
+          <td style="padding:7px 14px;font-size:12px;font-weight:500;color:#1A2332;border:1px solid #DDE4EC;width:25%;">${v2}</td>
         </tr>`).join('')}
       </table>
     </div>
-    <div style="padding:14px 16px;background:rgba(196,106,106,.06);border:1px solid rgba(196,106,106,.2);border-radius:8px;font-size:11px;color:#8DAFC8;line-height:1.7;">
-      <strong style="color:#C47A7A;">Important Disclosure:</strong> These projections are hypothetical illustrations for conceptual and educational purposes only. They are not a guarantee, prediction, or promise of future performance, results, or returns. Actual results will vary based on market conditions, tax law changes, and individual circumstances. This report is intended for use by licensed financial professionals in conjunction with a comprehensive financial planning engagement.
+
+    <!-- DISCLOSURE -->
+    <div style="background:#F5F5F5;border:1px solid #DDD;border-radius:4px;padding:14px 16px;font-size:11px;color:#5A6A7A;line-height:1.7;">
+      <strong style="color:#3A4A5A;">Important Disclosure:</strong> These projections are hypothetical illustrations for conceptual and educational purposes only. They do not constitute a guarantee, prediction, or promise of future performance, results, or returns. Monte Carlo simulations model probability distributions based on assumed mean returns and standard deviations — actual market conditions will differ materially. Tax calculations are estimates based on current law and are subject to change. LTC cost projections reflect assumed care inflation and may not match actual costs. This report is prepared for use by licensed financial professionals in conjunction with a comprehensive financial planning engagement and is not investment advice. Past performance does not guarantee future results.
+    </div>
+
+  </div>
+
+  <!-- FOOTER -->
+  <div style="background:#1A2B3C;padding:16px 36px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+    <div>
+      <div style="font-size:12px;color:#C8A96E;font-weight:600;margin-bottom:2px;">Integrated Planning Partners</div>
+      <div style="font-size:11px;color:#7A9AB8;">Jeffrey Faine, CLU, RICP® &nbsp;·&nbsp; support@integratedplanningpartners.com</div>
+    </div>
+    <div style="text-align:right;">
+      <div style="font-size:11px;color:#7A9AB8;">IncomeArc™ is a proprietary methodology</div>
+      <div style="font-size:11px;color:#5A7A8A;">© 2026 Integrated Planning Partners. All rights reserved.</div>
     </div>
   </div>
-  <div style="padding:16px 28px;background:#0B1928;border-top:1px solid rgba(255,255,255,.06);font-size:11px;color:#8DAFC8;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-    <span>Integrated Planning Partners · support@integratedplanningpartners.com</span>
-    <span>Generated ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</span>
-  </div>
-</div>`;
+
+</div>
+</body></html>`;
+
                   try {
-                    const res = await fetch('https://api.emailjs.com/api/v1.0/email/send',{
+                    const res1 = await fetch('https://api.emailjs.com/api/v1.0/email/send',{
                       method:'POST',headers:{'Content-Type':'application/json'},
                       body:JSON.stringify({
                         service_id:'IPP Support',
@@ -2930,7 +3230,21 @@ function App() {
                         }
                       })
                     });
-                    if(!res.ok) throw new Error(await res.text());
+                    if(!res1.ok) throw new Error(await res1.text());
+                    // Copy to IPP support
+                    await fetch('https://api.emailjs.com/api/v1.0/email/send',{
+                      method:'POST',headers:{'Content-Type':'application/json'},
+                      body:JSON.stringify({
+                        service_id:'IPP Support',
+                        template_id:'template_qxximsu',
+                        user_id:'XyWTKKWFoeYOhfFbV',
+                        template_params:{
+                          to_email: 'support@integratedplanningpartners.com',
+                          client_name: fullName,
+                          html_content: htmlContent,
+                        }
+                      })
+                    });
                     setReportSent(true);
                   } catch(e) {
                     console.error('Report email error:',e);
