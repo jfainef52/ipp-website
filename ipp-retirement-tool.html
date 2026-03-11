@@ -125,7 +125,6 @@ const COLORS = {
   fedtax:    { fill: '#7A4A4A', label: 'Federal Tax',         tax: null         },
   statetax:  { fill: '#8A5A3A', label: 'State Tax',           tax: null         },
   ltcpool:   { fill: '#4A7A9B', label: 'Layer 2 Benefit Pool',tax: null         },
-  portdraw:  { fill: '#5A6A7A', label: 'Portfolio Draw',      tax: null         },
   expense:   { fill: 'rgba(196,106,106,.25)', label: 'Expenses', tax: null      },
 };
 
@@ -983,18 +982,16 @@ function projectArc(inputs) {
     row.spendableIncome = row.totalIncome - nonSpendableEvents;
     row.gap = row.spendableIncome - expenses;
 
-    // portfolioDrawSegment = net expense shortfall that the portfolio must cover.
-    // Captured HERE at the net level — NOT as the gross IRA draw (which is larger due
-    // to tax gross-up). This keeps the bar segment proportional to actual expense need,
-    // not the inflated pre-tax IRA pull. Purely aesthetic — model math unchanged.
-    row.portfolioDrawSegment = Math.max(0, -row.gap);
-
     // Snapshot gross (pre-tax, pre-gap-fill) sources for chart bars.
     row.grossSources = { ...row.sources };
     row.grossTotalIncome = row.totalIncome;
 
 
-    // LTC care cost draws are excluded: they are expense-covering draws, not income.
+    // Snapshot gross sources for chart bars — captured HERE before gap-fill draws run.
+    // Architecture events (ETA, LTC funding, Roth conversion) have already fired above
+    // and are intentionally excluded: they are non-spendable IRA repositioning draws,
+    // not income. Gap-fill draws run below; they show implicitly via the tax segments
+    // (gross draw = net expenses + taxes, so bars meet the line once fedtax+statetax stack).
     row.grossSources = { ...row.sources };
     row.grossTotalIncome = row.totalIncome;
 
@@ -1151,6 +1148,15 @@ function projectArc(inputs) {
       }
 
       row.gap = 0;
+
+      // Update grossSources with gap-fill draws so chart bars reflect actual portfolio draws.
+      // These are legitimate expense-covering draws — they belong in the bars.
+      // LTC gross-up draws are excluded via ltcPortfolioDraw (already tracked above).
+      const ltcGrossUpExclude = row.ltcPortfolioDraw || 0;
+      row.grossSources.rmd = Math.max(0, (row.sources.rmd || 0) - ltcGrossUpExclude);
+      row.grossSources.roth = row.sources.roth || 0;
+      row.grossSources.taxable = row.sources.taxable || 0;
+      row.grossTotalIncome = row.totalIncome - ltcGrossUpExclude;
     } else if (row.ltcEvent && row.ltcUncovered > 0 && !ltcInsured) {
       // ── Dedicated LTC gross-up draw (surplus year with care costs) ──
       // When regular income covers living expenses but NOT care costs, row.gap may be >= 0
@@ -1667,7 +1673,7 @@ function ArcChart({ data, view, insuredData, uninsuredData, sorrEnabled }) {
   if (!data || data.length === 0) return null;
 
   const maxVal = Math.max(...data.map(d => Math.max(
-    (d.grossTotalIncome || d.totalIncome) + (d.federalTax || 0) + (d.stateTax || 0) + (d.ltcCoverage || 0) + (d.spouseLtcCoverage || 0) + (d.portfolioDrawSegment || 0),
+    (d.grossTotalIncome || d.totalIncome) + (d.federalTax || 0) + (d.stateTax || 0) + (d.ltcCoverage || 0) + (d.spouseLtcCoverage || 0),
     d.totalExpenseGross ?? d.totalExpense
   ))) * 1.1;
   const barW = Math.max(4, Math.floor(chartW / data.length) - 2);
@@ -1681,7 +1687,7 @@ function ArcChart({ data, view, insuredData, uninsuredData, sorrEnabled }) {
   ).join(' ');
 
   // Source keys in stack order — tax segments on top, ltcpool fills care event gap
-  const sourceKeys = ['ss','pension','annuity','parttime','roth','eta','taxable','rmd','ltcpool','portdraw','fedtax','statetax'];
+  const sourceKeys = ['ss','pension','annuity','parttime','roth','eta','taxable','rmd','ltcpool','fedtax','statetax'];
 
   const fmt = v => v >= 1000000 ? `$${(v/1000000).toFixed(1)}M` : v >= 1000 ? `$${Math.round(v/1000)}K` : `$${Math.round(v)}`;
 
@@ -1731,8 +1737,6 @@ function ArcChart({ data, view, insuredData, uninsuredData, sorrEnabled }) {
                 ? (d.stateTax || 0)
                 : k === 'ltcpool'
                 ? ((d.ltcCoverage || 0) + (d.spouseLtcCoverage || 0))
-                : k === 'portdraw'
-                ? (d.portfolioDrawSegment || 0)
                 : (d.grossSources && d.grossSources[k]) || d.sources[k] || 0;
               if (v <= 0) return null;
               const barH = (v / maxVal) * chartH;
@@ -2253,12 +2257,6 @@ function Legend({ insuredData }) {
         <div style={{display:'flex',alignItems:'center',gap:5}}>
           <div style={{width:14,height:10,borderRadius:2,background:'#4A7A9B',opacity:.85,flexShrink:0}}/>
           <span style={{fontSize:13,color:'#9EB8CC'}}>Layer 2 Benefit Pool</span>
-        </div>
-      )}
-      {insuredData && insuredData.some(d => (d.portfolioDrawSegment||0) > 0) && (
-        <div style={{display:'flex',alignItems:'center',gap:5}}>
-          <div style={{width:14,height:10,borderRadius:2,background:'#5A6A7A',opacity:.85,flexShrink:0}}/>
-          <span style={{fontSize:13,color:'#9EB8CC'}}>Portfolio Draw</span>
         </div>
       )}
       {insuredData && insuredData.some(d => (d.stateTax||0) > 0) && (
