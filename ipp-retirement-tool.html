@@ -3778,51 +3778,45 @@ function App() {
                 <div style={{fontSize:13,color:'#8DAFC8',marginBottom:10,lineHeight:1.55}}>
                   Single-premium qualified annuity · Deferred income · 100% ordinary income · Impacts IRMAA &amp; tax brackets
                 </div>
-                {!inputs.architectureEnabled ? (
-                  <div style={{fontSize:13,color:'#5A7A8A',fontStyle:'italic',padding:'6px 0'}}>
-                    Toggle Architecture On to model the qualified annuity layer.
-                  </div>
-                ) : (<>
-                  <Field label="Single Premium" hint="Gross amount rolled from primary pre-tax account (IRA/401k) into the qualified annuity — reduces traditional balance at premium age. Qualified rollover — not a taxable event.">
-                    <NumInput value={inputs.qualAnnuityPremium} onChange={v=>set('qualAnnuityPremium',v)} prefix="$"/>
+                <Field label="Single Premium" hint="Gross amount rolled from primary pre-tax account (IRA/401k) into the qualified annuity — reduces traditional balance at premium age. Qualified rollover — not a taxable event.">
+                  <NumInput value={inputs.qualAnnuityPremium} onChange={v=>set('qualAnnuityPremium',v)} prefix="$"/>
+                </Field>
+                {inputs.qualAnnuityPremium > 0 && (<>
+                  <Field label="Premium Age" hint="Age at which the qualified rollover/repositioning occurs — reduces pre-tax balance at this age">
+                    <NumInput value={inputs.qualAnnuityPremiumAge} onChange={v=>set('qualAnnuityPremiumAge',v)} suffix="yrs"/>
                   </Field>
-                  {inputs.qualAnnuityPremium > 0 && (<>
-                    <Field label="Premium Age" hint="Age at which the qualified rollover/repositioning occurs — reduces pre-tax balance at this age">
-                      <NumInput value={inputs.qualAnnuityPremiumAge} onChange={v=>set('qualAnnuityPremiumAge',v)} suffix="yrs"/>
+                  <Field label="Monthly Income" hint="Guaranteed lifetime income from the qualified annuity — 100% ordinary income, fully taxable">
+                    <NumInput value={inputs.qualAnnuityMonthly} onChange={v=>set('qualAnnuityMonthly',v)} prefix="$" suffix="/mo"/>
+                  </Field>
+                  {inputs.qualAnnuityMonthly > 0 && (
+                    <Field label="Income Start Age" hint="Age when income payments begin — may differ from premium age for deferred annuitization">
+                      <NumInput value={inputs.qualAnnuityStartAge} onChange={v=>set('qualAnnuityStartAge',v)} suffix="yrs"/>
                     </Field>
-                    <Field label="Monthly Income" hint="Guaranteed lifetime income from the qualified annuity — 100% ordinary income, fully taxable">
-                      <NumInput value={inputs.qualAnnuityMonthly} onChange={v=>set('qualAnnuityMonthly',v)} prefix="$" suffix="/mo"/>
-                    </Field>
-                    {inputs.qualAnnuityMonthly > 0 && (
-                      <Field label="Income Start Age" hint="Age when income payments begin — may differ from premium age for deferred annuitization">
-                        <NumInput value={inputs.qualAnnuityStartAge} onChange={v=>set('qualAnnuityStartAge',v)} suffix="yrs"/>
-                      </Field>
-                    )}
-                    {inputs.qualAnnuityMonthly > 0 && inputs.qualAnnuityStartAge > 0 && (
-                      <div style={{padding:'10px 12px',background:'rgba(212,135,58,.06)',border:'1px solid rgba(212,135,58,.2)',borderRadius:7,marginTop:6}}>
-                        <div style={{fontSize:13,fontWeight:700,color:'#D4873A',letterSpacing:'.07em',textTransform:'uppercase',marginBottom:6}}>
-                          Income Summary
+                  )}
+                  {inputs.qualAnnuityMonthly > 0 && inputs.qualAnnuityStartAge > 0 && (
+                    <div style={{padding:'10px 12px',background:'rgba(212,135,58,.06)',border:'1px solid rgba(212,135,58,.2)',borderRadius:7,marginTop:6}}>
+                      <div style={{fontSize:13,fontWeight:700,color:'#D4873A',letterSpacing:'.07em',textTransform:'uppercase',marginBottom:6}}>
+                        Income Summary
+                      </div>
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                        <div style={{textAlign:'center'}}>
+                          <div style={{fontSize:12,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:2}}>Annual Income</div>
+                          <div style={{fontSize:15,fontWeight:600,color:'#D4873A',fontFamily:"'Cormorant Garamond',serif"}}>${Math.round((inputs.qualAnnuityMonthly||0)*12).toLocaleString()}/yr</div>
                         </div>
-                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-                          <div style={{textAlign:'center'}}>
-                            <div style={{fontSize:12,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:2}}>Annual Income</div>
-                            <div style={{fontSize:15,fontWeight:600,color:'#D4873A',fontFamily:"'Cormorant Garamond',serif"}}>${Math.round((inputs.qualAnnuityMonthly||0)*12).toLocaleString()}/yr</div>
+                        <div style={{textAlign:'center'}}>
+                          <div style={{fontSize:12,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:2}}>Deferral</div>
+                          <div style={{fontSize:15,fontWeight:600,color:'#D4873A',fontFamily:"'Cormorant Garamond',serif"}}>
+                            {inputs.qualAnnuityStartAge > inputs.qualAnnuityPremiumAge
+                              ? `${inputs.qualAnnuityStartAge - inputs.qualAnnuityPremiumAge} yr`
+                              : 'Immediate'}
                           </div>
-                          <div style={{textAlign:'center'}}>
-                            <div style={{fontSize:12,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:2}}>Deferral</div>
-                            <div style={{fontSize:15,fontWeight:600,color:'#D4873A',fontFamily:"'Cormorant Garamond',serif"}}>
-                              {inputs.qualAnnuityStartAge > inputs.qualAnnuityPremiumAge
-                                ? `${inputs.qualAnnuityStartAge - inputs.qualAnnuityPremiumAge} yr`
-                                : 'Immediate'}
-                            </div>
-                          </div>
-                        </div>
-                        <div style={{marginTop:8,fontSize:12,color:'#C47A7A',lineHeight:1.5}}>
-                          ⚠ 100% ordinary income — all payments taxable, flows into MAGI and IRMAA calculations
                         </div>
                       </div>
-                    )}
-                  </>)}
+                      <div style={{marginTop:8,fontSize:12,color:'#C47A7A',lineHeight:1.5}}>
+                        ⚠ 100% ordinary income — all payments taxable, flows into MAGI and IRMAA calculations
+                      </div>
+                    </div>
+                  )}
                 </>)}
               </div>
 
