@@ -2259,13 +2259,19 @@ function App() {
   // Primary projection — NO LTC shock. This is the clean baseline plan survival score
   // regardless of any healthcare event inputs. The main confidence score reflects the
   // plan's fundamental strength (income, portfolio, architecture) without a care shock.
-  const { years, confidence, fixedStreams, mcStartAge } = projectArc({ ...baseProjectionInputs, ltcInsured: false, ltcEventAge: 0 });
+  const { years, confidence, fixedStreams, mcStartAge } = projectArc({ ...baseProjectionInputs, ltcInsured: false, ltcEventAge: 0, spouseLtcEventAge: 0 });
 
   // Primary display projection — includes LTC event if entered (uninsured view)
   // This is what the chart and number table show when architecture is OFF or no LTC comparison
   const hasLtcEvent = inputs.ltcEventEnabled && inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
-  const { years: yearsWithLtc } = hasLtcEvent
-    ? projectArc({ ...baseProjectionInputs, ltcInsured: false })
+  const hasSpouseLtcEvent = inputs.spouseLtcEventEnabled && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
+  const { years: yearsWithLtc } = (hasLtcEvent || hasSpouseLtcEvent)
+    ? projectArc({
+        ...baseProjectionInputs,
+        ltcInsured: false,
+        ltcEventAge: hasLtcEvent ? inputs.ltcEventAge : 0,
+        spouseLtcEventAge: hasSpouseLtcEvent ? inputs.spouseLtcEventAge : 0,
+      })
     : { years: years };
 
   // LTC comparison projections — only when architecture is enabled and LTC inputs are set.
