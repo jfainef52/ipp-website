@@ -923,7 +923,6 @@ function projectArc(inputs) {
 
     // Expenses
     let expenses = (fixedExpenses + lifestyleExpenses) * 12 * inflFactor;
-    const baselineExpenseAmt = expenses; // fixed + lifestyle only, before care/shock
 
     // LTC event — net cost after any Layer 2 benefit coverage
     // Care costs inflated from today's dollars to the event age using ltcCareInflationRate
@@ -982,11 +981,6 @@ function projectArc(inputs) {
       + (row.ltcFundingAmount || 0);
     row.spendableIncome = row.totalIncome - nonSpendableEvents;
     row.gap = row.spendableIncome - expenses;
-
-    // Snapshot gross (pre-tax, pre-gap-fill) sources for chart bars.
-    row.grossSources = { ...row.sources };
-    row.grossTotalIncome = row.totalIncome;
-
 
     // Snapshot gross sources for chart bars — captured HERE before gap-fill draws run.
     // Architecture events (ETA, LTC funding, Roth conversion) have already fired above
@@ -1055,6 +1049,7 @@ function projectArc(inputs) {
     if (row.gap < 0) {
       const needed = Math.abs(row.gap);
       let remaining = needed;
+      const netGapFillNeeded = needed; // capture for grossSources update below
       // Track how much of the draw is attributable to LTC vs baseline gap
       const baselineGapAmt = Math.max(0, baseGapWithoutLtc !== null ? -baseGapWithoutLtc : needed);
       const ltcPortionOfGap = Math.min(needed, ltcDrivenGap);
@@ -1150,14 +1145,18 @@ function projectArc(inputs) {
 
       row.gap = 0;
 
-      // Update grossSources with gap-fill draws so chart bars reflect actual portfolio draws.
-      // These are legitimate expense-covering draws — they belong in the bars.
-      // LTC gross-up draws are excluded via ltcPortfolioDraw (already tracked above).
-      const ltcGrossUpExclude = row.ltcPortfolioDraw || 0;
-      row.grossSources.rmd = Math.max(0, (row.sources.rmd || 0) - ltcGrossUpExclude);
-      row.grossSources.roth = row.sources.roth || 0;
-      row.grossSources.taxable = row.sources.taxable || 0;
-      row.grossTotalIncome = row.totalIncome - ltcGrossUpExclude;
+      // Update grossSources with NET gap-fill draw so chart bars reflect actual spendable draws.
+      // We use netGapFillNeeded (the pre-gross-up shortfall) distributed proportionally across
+      // the buckets that were drawn from. Gross-up tax is already in fedtax/statetax segments.
+      const grossAfterFill = (row.sources.rmd||0) + (row.sources.roth||0) + (row.sources.taxable||0);
+      const grossBeforeFill = (row.grossSources.rmd||0) + (row.grossSources.roth||0) + (row.grossSources.taxable||0);
+      const grossDrawAdded = grossAfterFill - grossBeforeFill;
+      // Scale the added draws down to net (remove tax gross-up portion)
+      const netScale = grossDrawAdded > 0 ? Math.min(1, netGapFillNeeded / grossDrawAdded) : 1;
+      row.grossSources.rmd     = (row.grossSources.rmd||0)     + Math.max(0, ((row.sources.rmd||0)     - (row.grossSources.rmd||0))     * netScale);
+      row.grossSources.roth    = (row.grossSources.roth||0)    + Math.max(0, ((row.sources.roth||0)    - (row.grossSources.roth||0))    * netScale);
+      row.grossSources.taxable = (row.grossSources.taxable||0) + Math.max(0, ((row.sources.taxable||0) - (row.grossSources.taxable||0)) * netScale);
+      row.grossTotalIncome = Object.values(row.grossSources).reduce((s,v)=>s+(v||0),0);
     } else if (row.ltcEvent && row.ltcUncovered > 0 && !ltcInsured) {
       // ── Dedicated LTC gross-up draw (surplus year with care costs) ──
       // When regular income covers living expenses but NOT care costs, row.gap may be >= 0
@@ -1422,15 +1421,15 @@ function projectArc(inputs) {
     row.stateTax   = stateTax + (row.rothConversionOverage || 0) * stateEffRate;
     row.estimatedTax = row.federalTax + row.stateTax;
 
-    // baselineExpenseGross = what the expense line would be with NO care event —
-    // fixed + lifestyle + IRMAA + taxes. Used to draw the "normal" expense line
-    // continuously through care years, with the care overage as a separate line.
-    row.baselineExpenseGross = baselineExpenseAmt + (row.irmaaExpense || 0) + row.federalTax + row.stateTax;
-
     // Now that taxes are finalized, update totalExpenseGross to include them.
     // The chart expense line = living costs + care (insured or not) + IRMAA + fed tax + state tax.
     // This makes it align with the stacked bars (income sources + fedtax + statetax).
     row.totalExpenseGross = (row.totalExpenseGross || 0) + row.federalTax + row.stateTax;
+
+    // baselineExpenseGross = expense line as if no care event occurred.
+    // = totalExpenseGross minus whatever insurance covers (ltcCoverage + spouseLtcCoverage).
+    // The orange line always tracks this. The blue care overage line shows the delta.
+    row.baselineExpenseGross = row.totalExpenseGross - (row.ltcCoverage || 0) - (row.spouseLtcCoverage || 0);
 
     // Capture gross income (pre-tax, excludes overage gross-up draw which is a tax-covering draw not spendable income)
     row.grossIncome = row.totalIncome - (row.rothConversionOverage || 0);
@@ -4373,6 +4372,7 @@ function App() {
                 <p style={{fontSize:13,color:'#8DAFC8'}}>
                   Gross income by source · gross expense line · {inputs.ltcEventAge > 0 ? 'healthcare event marked' : 'no healthcare event modeled'}
                 </p>
+                {view === 'visual' && <Legend insuredData={yearsInsured}/>}
               </div>
               <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:10}}>
                 <ConfidenceRing score={confidence}/>
@@ -4418,7 +4418,6 @@ function App() {
 
             {view === 'visual' ? (
               <>
-                <Legend insuredData={yearsInsured}/>
                 <ArcChart data={yearsWithLtc} view={view} insuredData={yearsInsured} uninsuredData={yearsUninsured} sorrEnabled={inputs.sorrEnabled}/>
               </>
             ) : view === 'numbers' ? (
