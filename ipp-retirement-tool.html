@@ -4380,16 +4380,7 @@ function App() {
                 </p>
                 {view === 'visual' && <Legend data={yearsWithLtc}/>}
               </div>
-              <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:10}}>
-                <ConfidenceRing score={confidence}/>
-                {/* Dynamic label showing what risks are included in this MC score */}
-                <div style={{fontSize:11,color:'#5A7A8A',textAlign:'right',lineHeight:1.6,maxWidth:160}}>
-                  {[
-                    'Market variance',
-                    inputs.expenseShockEnabled ? `$${Math.round(inputs.expenseShockAmount/1000)}K expense shocks` : null,
-                    hasLtcForMC ? 'Healthcare event' : null,
-                  ].filter(Boolean).join(' · ')}
-                </div>
+              <div style={{display:'flex',flexDirection:'row',alignItems:'flex-start',gap:16}}>
                 {fixedStreams && fixedStreams.some(s => s.yearOffset > 0) && (
                   <div style={{background:'rgba(74,155,122,.06)',border:'1px solid rgba(74,155,122,.18)',borderRadius:8,padding:'8px 12px',minWidth:170,maxWidth:210}}>
                     <div style={{fontSize:13,fontWeight:700,color:'#4A9B7A',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:6}}>
@@ -4419,6 +4410,16 @@ function App() {
                     </div>
                   </div>
                 )}
+                <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6}}>
+                  <ConfidenceRing score={confidence}/>
+                  <div style={{fontSize:11,color:'#5A7A8A',textAlign:'right',lineHeight:1.6,maxWidth:160}}>
+                    {[
+                      'Market variance',
+                      inputs.expenseShockEnabled ? `$${Math.round(inputs.expenseShockAmount/1000)}K expense shocks` : null,
+                      hasLtcForMC ? 'Healthcare event' : null,
+                    ].filter(Boolean).join(' · ')}
+                  </div>
+                </div>
               </div>
             </div>
 
