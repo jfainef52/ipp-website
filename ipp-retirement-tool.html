@@ -124,7 +124,8 @@ const COLORS = {
   eta:       { fill: '#A8C5D8', label: 'ETA Policy Loan (Layer 3)', tax: 'free'  },
   expense:   { fill: 'rgba(196,106,106,.25)', label: 'Expenses', tax: null      },
   qualAnnuity: { fill: '#D4873A', label: 'Qualified Annuity (L1)', tax: 'ordinary' },
-  fedtax:    { fill: '#7A4A4A', label: 'Federal Tax', tax: null },
+  fedtax:    { fill: '#7A4A4A', label: 'Federal Tax',  tax: null },
+  statetax:  { fill: '#5A3A5A', label: 'State Tax',    tax: null },
 };
 
 const TAX_BADGES = {
@@ -878,6 +879,7 @@ function projectArc(inputs) {
 
     // Expenses
     let expenses = (fixedExpenses + lifestyleExpenses) * 12 * inflFactor;
+    row.baseExpense = expenses; // living expenses only — before any care event is added
 
     // LTC event — net cost after any Layer 2 benefit coverage
     if (ltcEventAge > 0 && age >= ltcEventAge && age < ltcEventAge + ltcDuration) {
@@ -1273,6 +1275,11 @@ function projectArc(inputs) {
     row.stateTax   = stateTax + (row.rothConversionOverage || 0) * stateEffRate;
     row.estimatedTax = row.federalTax + row.stateTax;
 
+    // Add tax segments to sources so the chart bars show gross income (net + tax = full bar height)
+    // This makes total bar height equal to the gross draw, which matches the expense line basis
+    if (row.federalTax > 0) row.sources.fedtax = row.federalTax;
+    if (row.stateTax > 0)   row.sources.statetax = row.stateTax;
+
     // Capture gross income (pre-tax, excludes overage gross-up draw which is a tax-covering draw not spendable income)
     row.grossIncome = row.totalIncome - (row.rothConversionOverage || 0);
 
@@ -1477,24 +1484,62 @@ function ArcChart({ data, view, insuredData, sorrEnabled }) {
 
   if (!data || data.length === 0) return null;
 
-  const maxVal = Math.max(...data.map(d => Math.max(d.totalIncome, d.totalExpense))) * 1.1;
+  // Gross expense = net outlay + estimated tax — this is what must be earned gross to net the expense.
+  // Bars stack to gross income (net sources + fedtax + statetax segments), so both are on gross basis.
+  const grossExpense = d => (d.totalExpense || 0) + (d.estimatedTax || 0);
+
+  // Architecture mode: expense line stays flat at base living expenses + tax (no LTC spike).
+  // A separate care-line shows the healthcare delta above that.
+  const archMode = !!insuredData;
+
+  const maxVal = Math.max(
+    ...data.map(d => Math.max(
+      (d.totalIncome || 0) + (d.fedtax_seg || d.sources?.fedtax || 0) + (d.sources?.statetax || 0),
+      grossExpense(d)
+    ))
+  ) * 1.1;
   const barW = Math.max(4, Math.floor(chartW / data.length) - 2);
 
   const xScale = i => PAD.l + (i / (data.length - 1)) * chartW;
   const yScale = v => PAD.t + chartH - (v / maxVal) * chartH;
 
-  // Build expense line path
-  const expensePath = data.map((d, i) =>
-    `${i === 0 ? 'M' : 'L'} ${xScale(i).toFixed(1)} ${yScale(d.totalExpense).toFixed(1)}`
-  ).join(' ');
+  // Status quo: expense line on gross basis (net outlay + tax = what bars must cover)
+  // Architecture mode: flat at base living expense + tax only (no LTC spike on this line)
+  const expensePath = data.map((d, i) => {
+    const val = archMode
+      ? (d.baseExpense || d.totalExpense || 0) + (d.estimatedTax || 0)
+      : grossExpense(d);
+    return `${i === 0 ? 'M' : 'L'} ${xScale(i).toFixed(1)} ${yScale(val).toFixed(1)}`;
+  }).join(' ');
 
-  // Insured expense path (Layer 2 coverage applied)
-  const insuredExpensePath = insuredData ? insuredData.map((d, i) =>
-    `${i === 0 ? 'M' : 'L'} ${xScale(i).toFixed(1)} ${yScale(d.totalExpense).toFixed(1)}`
-  ).join(' ') : null;
+  // Architecture mode only: care event delta line (base+tax → full gross expense during LTC years)
+  // Drawn as a second colored line segment — only appears during health event years
+  const careEventPath = archMode ? (() => {
+    let path = '';
+    let inCare = false;
+    data.forEach((d, i) => {
+      const hasEvent = d.ltcEvent || d.spouseLtcEvent;
+      const baseVal = (d.baseExpense || d.totalExpense || 0) + (d.estimatedTax || 0);
+      const fullVal = grossExpense(d);
+      if (hasEvent && fullVal > baseVal) {
+        const cmd = !inCare ? 'M' : 'L';
+        path += `${cmd} ${xScale(i).toFixed(1)} ${yScale(fullVal).toFixed(1)} `;
+        inCare = true;
+      } else {
+        inCare = false;
+      }
+    });
+    return path.trim() || null;
+  })() : null;
+
+  // Insured expense path — architecture mode: flat base line (policy covers care, no spike)
+  const insuredExpensePath = insuredData ? insuredData.map((d, i) => {
+    const val = (d.baseExpense || d.totalExpense || 0) + (d.estimatedTax || 0);
+    return `${i === 0 ? 'M' : 'L'} ${xScale(i).toFixed(1)} ${yScale(val).toFixed(1)}`;
+  }).join(' ') : null;
 
   // Source keys in stack order
-  const sourceKeys = ['ss','pension','annuity','qualAnnuity','parttime','roth','eta','taxable','rmd','fedtax'];
+  const sourceKeys = ['ss','pension','annuity','qualAnnuity','parttime','roth','eta','taxable','rmd','fedtax','statetax'];
 
   const fmt = v => v >= 1000000 ? `$${(v/1000000).toFixed(1)}M` : v >= 1000 ? `$${Math.round(v/1000)}K` : `$${Math.round(v)}`;
 
@@ -1510,6 +1555,10 @@ function ArcChart({ data, view, insuredData, sorrEnabled }) {
         <linearGradient id="grad-expense" x1="0" y1="0" x2="1" y2="0">
           <stop offset="0%" stopColor="#C47A7A" stopOpacity="0.9"/>
           <stop offset="100%" stopColor="#C8A030" stopOpacity="0.9"/>
+        </linearGradient>
+        <linearGradient id="grad-care-event" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#C47A7A" stopOpacity="1"/>
+          <stop offset="100%" stopColor="#C47A7A" stopOpacity="0.8"/>
         </linearGradient>
         <filter id="glow">
           <feGaussianBlur stdDeviation="2" result="blur"/>
@@ -1625,10 +1674,17 @@ function ArcChart({ data, view, insuredData, sorrEnabled }) {
         strokeDasharray="2000" strokeDashoffset="0" filter="url(#glow)"
         style={{animation:'arcDraw 1.5s ease both'}}/>
 
-      {/* Expense line — Insured (Layer 2 benefit covers LTC costs) */}
+      {/* Expense line — Insured / Architecture base (flat — no LTC spike) */}
       {insuredExpensePath && (
         <path d={insuredExpensePath} fill="none" stroke="#4A9B7A" strokeWidth="1.5"
           strokeDasharray="5,3" opacity="0.85"
+          style={{animation:'arcDraw 1.5s ease both'}}/>
+      )}
+
+      {/* Care event delta line — architecture mode only: shows healthcare cost spike in distinct color */}
+      {careEventPath && (
+        <path d={careEventPath} fill="none" stroke="url(#grad-care-event)" strokeWidth="2.5"
+          filter="url(#glow)"
           style={{animation:'arcDraw 1.5s ease both'}}/>
       )}
 
