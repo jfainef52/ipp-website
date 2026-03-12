@@ -1321,6 +1321,17 @@ function projectArc(inputs) {
       row.totalIncome = Math.max(0, row.totalIncome - totalAllInTax);
     }
 
+    // chartSources = spendable income only — excludes one-time capital reallocation draws
+    // (ETA funding, Roth conversion, LTC premium funding) that inflate bars but aren't spendable income
+    const nonSpendableRmd = (row.etaFundingAmount || 0)
+      + (row.rothConversionAmount || 0) + (row.rothConversionOverage || 0)
+      + (row.ltcFundingAmount || 0) + (row.spouseLtcFundingAmount || 0);
+    row.chartSources = { ...row.sources };
+    if (nonSpendableRmd > 0 && row.chartSources.rmd) {
+      row.chartSources.rmd = Math.max(0, row.chartSources.rmd - nonSpendableRmd);
+      if (row.chartSources.rmd === 0) delete row.chartSources.rmd;
+    }
+
     years.push(row);
   }
 
@@ -1488,7 +1499,7 @@ function NumInput({ value, onChange, placeholder, prefix, suffix }) {
 }
 
 // ── Arc SVG Chart ──
-function ArcChart({ data, view, insuredData, sorrEnabled }) {
+function ArcChart({ data, view, insuredData, uninsuredData, sorrEnabled }) {
   const svgRef = useRef(null);
   const W = 720;
   const MAIN_H = 240, IRMAA_H = 48, IRMAA_GAP = 10, AGE_H = 20;
@@ -1504,47 +1515,45 @@ function ArcChart({ data, view, insuredData, sorrEnabled }) {
 
   // maxVal: both bars (totalIncome, net) and expense line (totalExpense, net) are on same basis
   const maxVal = Math.max(
-    ...data.map(d => Math.max(d.totalIncome || 0, d.totalExpense || 0)),
-    ...(insuredData ? insuredData.map(d => Math.max(d.totalIncome || 0, d.totalExpense || 0)) : [])
+    ...data.map(d => {
+      const src = d.chartSources || d.sources;
+      const chartTotal = Object.values(src).reduce((s,v) => s+(v||0), 0);
+      return Math.max(chartTotal, d.totalExpense || 0);
+    }),
+    ...(insuredData ? insuredData.map(d => {
+      const src = d.chartSources || d.sources;
+      const chartTotal = Object.values(src).reduce((s,v) => s+(v||0), 0);
+      return Math.max(chartTotal, d.totalExpense || 0);
+    }) : []),
+    ...(uninsuredData ? uninsuredData.map(d => d.totalExpense || 0) : [])
   ) * 1.1;
-  const barW = Math.max(4, Math.floor(chartW / data.length) - 2);
 
   const xScale = i => PAD.l + (i / (data.length - 1)) * chartW;
   const yScale = v => PAD.t + chartH - (v / maxVal) * chartH;
 
-  // STATUS QUO mode: single expense line = totalExpense (net outlay including LTC spike)
-  // ARCHITECTURE mode: expense line = baseExpense only (flat lifestyle line, no LTC spike)
-  const expensePath = data.map((d, i) => {
-    const val = archMode ? (d.baseExpense || d.totalExpense || 0) : (d.totalExpense || 0);
+  // STATUS QUO mode: single expense line = totalExpense (with LTC spike)
+  // ARCHITECTURE mode: use base data (non-arch) totalExpense for the uninsured spike line
+  const expenseSrcData = (archMode && uninsuredData) ? uninsuredData : data;
+  const expensePath = expenseSrcData.map((d, i) => {
+    const val = d.totalExpense || 0;
     return `${i === 0 ? 'M' : 'L'} ${xScale(i).toFixed(1)} ${yScale(val).toFixed(1)}`;
   }).join(' ');
 
-  // ARCHITECTURE mode only: care event line — shows healthcare cost delta above base expense line
-  // Only draws during actual LTC event years, in a distinct red/coral color
-  const careEventPath = archMode ? (() => {
-    const pts = [];
-    data.forEach((d, i) => {
-      if ((d.ltcEvent || d.spouseLtcEvent) && d.totalExpense > (d.baseExpense || 0)) {
-        pts.push(`${pts.length === 0 ? 'M' : 'L'} ${xScale(i).toFixed(1)} ${yScale(d.totalExpense).toFixed(1)}`);
-      }
-    });
-    return pts.length > 0 ? pts.join(' ') : null;
-  })() : null;
+  // (careEventPath removed — in arch mode, expensePath uses uninsuredData and shows spike directly)
 
-  // ARCHITECTURE mode: insured line = baseExpense (flat — policy absorbs care, no portfolio spike)
-  const insuredExpensePath = insuredData ? insuredData.map((d, i) =>
+  // ARCHITECTURE mode: insured/protected line uses arch-ON data baseExpense (flat — policy absorbs care)
+  const insuredExpensePath = archMode ? data.map((d, i) =>
     `${i === 0 ? 'M' : 'L'} ${xScale(i).toFixed(1)} ${yScale(d.baseExpense || d.totalExpense || 0).toFixed(1)}`
   ).join(' ') : null;
 
   // Pre-compute care event bands: one band per distinct event period
-  // Each band spans from the first to last year with that event flag
+  // In arch mode, use uninsuredData (which has the care events) for band detection
+  const careEventSrc = (archMode && uninsuredData) ? uninsuredData : data;
   const careEventBands = (() => {
     const bands = [];
-    // Primary LTC event
-    const ltcRows = data.reduce((acc, d, i) => { if (d.ltcEvent) acc.push(i); return acc; }, []);
+    const ltcRows = careEventSrc.reduce((acc, d, i) => { if (d.ltcEvent) acc.push(i); return acc; }, []);
     if (ltcRows.length > 0) bands.push({ indices: ltcRows, label: 'HC Event', color: 'rgba(196,106,106,' });
-    // Spouse LTC event
-    const spLtcRows = data.reduce((acc, d, i) => { if (d.spouseLtcEvent) acc.push(i); return acc; }, []);
+    const spLtcRows = careEventSrc.reduce((acc, d, i) => { if (d.spouseLtcEvent) acc.push(i); return acc; }, []);
     if (spLtcRows.length > 0) bands.push({ indices: spLtcRows, label: 'Spouse HC', color: 'rgba(196,120,180,' });
     return bands;
   })();
@@ -1553,7 +1562,7 @@ function ArcChart({ data, view, insuredData, sorrEnabled }) {
   const careExpensePath = !archMode ? (() => {
     const segs = [];
     let current = [];
-    data.forEach((d, i) => {
+    expenseSrcData.forEach((d, i) => {
       if (d.ltcEvent || d.spouseLtcEvent) {
         current.push(`${current.length === 0 ? 'M' : 'L'} ${xScale(i).toFixed(1)} ${yScale(d.totalExpense || 0).toFixed(1)}`);
       } else if (current.length > 0) {
@@ -1644,7 +1653,7 @@ function ArcChart({ data, view, insuredData, sorrEnabled }) {
         return (
           <g key={i}>
             {sourceKeys.map(k => {
-              const v = d.sources[k] || 0;
+              const v = (d.chartSources || d.sources)[k] || 0;
               if (v <= 0) return null;
               const barH = (v / maxVal) * chartH;
               const y = yBottom - barH;
@@ -1757,13 +1766,6 @@ function ArcChart({ data, view, insuredData, sorrEnabled }) {
       {insuredExpensePath && (
         <path d={insuredExpensePath} fill="none" stroke="#4A9B7A" strokeWidth="1.5"
           strokeDasharray="5,3" opacity="0.85"
-          style={{animation:'arcDraw 1.5s ease both'}}/>
-      )}
-
-      {/* Care event delta line — architecture mode only: shows healthcare cost spike in distinct color */}
-      {careEventPath && (
-        <path d={careEventPath} fill="none" stroke="url(#grad-care-event)" strokeWidth="2.5"
-          filter="url(#glow)"
           style={{animation:'arcDraw 1.5s ease both'}}/>
       )}
 
@@ -4745,7 +4747,12 @@ function App() {
             {view === 'visual' ? (
               <>
                 <Legend insuredData={inputs.architectureEnabled ? yearsInsured : null} data={yearsWithLtc}/>
-                <ArcChart data={yearsWithLtc} view={view} insuredData={inputs.architectureEnabled ? yearsInsured : null} sorrEnabled={inputs.sorrEnabled}/>
+                <ArcChart
+                  data={inputs.architectureEnabled ? (yearsUninsured || yearsWithLtc) : yearsWithLtc}
+                  uninsuredData={inputs.architectureEnabled ? yearsUninsured : null}
+                  view={view}
+                  insuredData={inputs.architectureEnabled ? yearsInsured : null}
+                  sorrEnabled={inputs.sorrEnabled}/>
                 {exhaustionYear && (
                   <div style={{
                     marginTop:8,
