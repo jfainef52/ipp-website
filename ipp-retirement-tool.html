@@ -2356,15 +2356,14 @@ function App() {
     ? projectArc({ ...primaryOnlyBase, ltcInsured: true })
     : { years: null };
 
-  // MC scores: use FULL plan (baseProjectionInputs), only differ by ltcInsured
-  // Uninsured = user's real plan + care shock hits portfolio (no policy)
-  // Insured   = user's real plan + care cost absorbed by policy
-  const primaryMcBase = { ...baseProjectionInputs, spouseLtcEventAge: 0 };
+  // MC scores: uninsured = full plan with BOTH events uninsured (= main ring score when arch OFF)
+  // insured = full plan with THIS event insured (other event still uninsured)
+  // This shows the marginal value of adding each policy
   const { confidence: confidenceUninsured } = showLtcComparison
-    ? projectArc({ ...primaryMcBase, ltcInsured: false, ltcNetAmount: 0 })
+    ? projectArc({ ...baseProjectionInputs, ltcInsured: false, spouseLtcInsured: false, ltcNetAmount: 0, spouseLtcNetAmount: 0 })
     : { confidence: null };
   const { confidence: confidenceInsured } = showLtcComparison
-    ? projectArc({ ...primaryMcBase, ltcInsured: true })
+    ? projectArc({ ...baseProjectionInputs, ltcInsured: true, spouseLtcInsured: false, spouseLtcNetAmount: 0 })
     : { confidence: null };
 
   // Spouse LTC comparison
@@ -2377,13 +2376,13 @@ function App() {
     ? projectArc({ ...spouseOnlyBase, spouseLtcInsured: true })
     : { years: null };
 
-  // Spouse MC scores: full plan, only differ by spouseLtcInsured
-  const spouseMcBase = { ...baseProjectionInputs, ltcEventAge: 0 };
+  // Spouse MC: uninsured = both events uninsured (same as primary uninsured = main ring)
+  // insured = spouse event insured, primary still uninsured (marginal value of spouse policy)
   const { confidence: confidenceSpouseUninsured } = showSpouseLtcComparison
-    ? projectArc({ ...spouseMcBase, spouseLtcInsured: false, spouseLtcNetAmount: 0 })
+    ? projectArc({ ...baseProjectionInputs, ltcInsured: false, spouseLtcInsured: false, ltcNetAmount: 0, spouseLtcNetAmount: 0 })
     : { confidence: null };
   const { confidence: confidenceSpouseInsured } = showSpouseLtcComparison
-    ? projectArc({ ...spouseMcBase, spouseLtcInsured: true })
+    ? projectArc({ ...baseProjectionInputs, ltcInsured: false, spouseLtcInsured: true, ltcNetAmount: 0 })
     : { confidence: null };
 
   const totalPortfolioAtRetire = years[0] ? years[0].totalPortfolio : (inputs.traditionalBalance + inputs.rothBalance + inputs.taxableBalance);
@@ -4765,16 +4764,21 @@ function App() {
                 <p style={{fontSize:13,color:'#DDD6C4',lineHeight:1.65}}>
                   The <strong style={{color:'#C47A7A'}}>solid red line</strong> shows expenses when the care event draws directly from your retirement portfolio — permanently reducing the compounding base. The <strong style={{color:'#4A9B7A'}}>dashed green line</strong> shows the same retirement with a Living Benefits IUL (Layer 2) covering the event: care costs draw from a dedicated pool, your income architecture remains intact, and the portfolio difference compounds for the remainder of retirement.
                 </p>
-                {(() => {
-                  const ltcYears = years.filter(y => y.ltcEvent && y.ltcGrossUpTax > 0);
+                {showLtcComparison && yearsUninsured && (() => {
+                  const ltcAge = inputs.ltcEventAge;
+                  const ltcEnd = ltcAge + inputs.ltcDuration;
+                  const ltcYears = yearsUninsured.filter(y => y.age >= ltcAge && y.age < ltcEnd);
                   if (ltcYears.length === 0) return null;
-                  const totalGrossUpTax = ltcYears.reduce((s,y) => s+(y.ltcGrossUpTax||0), 0);
+                  const careYearRows = ltcYears;
+                  const avgMargRate = careYearRows.reduce((s,r) => s+(r.allInMarginalRate||r.effectiveTaxRate||0.28),0) / careYearRows.length;
+                  const inflatedCareCost = ltcYears.reduce((s,y) => s+(y.ltcAnnualCost||0), 0);
+                  const trueGrossUp = inflatedCareCost * avgMargRate / (1 - avgMargRate);
                   const avgMAGI = ltcYears.reduce((s,y) => s+(y.magi||0), 0) / ltcYears.length;
                   return (
                     <div style={{marginTop:10,padding:'10px 12px',background:'rgba(155,126,200,.06)',border:'1px solid rgba(155,126,200,.18)',borderRadius:7}}>
                       <div style={{fontSize:14,fontWeight:700,color:'#9B7EC8',marginBottom:5,letterSpacing:'.06em',textTransform:'uppercase'}}>Tax Gross-Up Impact During Care Years</div>
                       <p style={{fontSize:13,color:'#DDD6C4',lineHeight:1.65}}>
-                        Drawing from a taxable or traditional account to cover care costs requires a <strong style={{color:'#F5F2EC'}}>gross-up</strong> — you must withdraw more than the care cost so the after-tax net covers the actual expense. During the LTC event years, this model grossed up withdrawals by an estimated <strong style={{color:'#C47A7A'}}>${Math.round(totalGrossUpTax/1000)}K additional tax</strong> across {ltcYears.length} year{ltcYears.length>1?'s':''}. Average MAGI in care years: <strong style={{color:'#9B7EC8'}}>${Math.round(avgMAGI/1000)}K</strong> — check Number Table for IRMAA bracket impact (⬆ flag). A Layer 2 benefit eliminates this entirely — care draws from a dedicated tax-free pool.
+                        Drawing from a taxable or traditional account to cover care costs requires a <strong style={{color:'#F5F2EC'}}>gross-up</strong> — you must withdraw more than the care cost so the after-tax net covers the actual expense. On {fmtD(inflatedCareCost)} of inflated care costs at an estimated {Math.round(avgMargRate*100)}% all-in marginal rate, the true gross-up tax burden is approximately <strong style={{color:'#C47A7A'}}>{fmtD(trueGrossUp)} in additional tax</strong> across {ltcYears.length} year{ltcYears.length>1?'s':''}. Average MAGI in care years: <strong style={{color:'#9B7EC8'}}>${Math.round(avgMAGI/1000)}K</strong> — check Number Table for IRMAA bracket impact (⬆ flag). A Layer 2 benefit eliminates this entirely — care draws from a dedicated tax-free pool.
                       </p>
                     </div>
                   );
