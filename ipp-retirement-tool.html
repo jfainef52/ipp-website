@@ -1527,6 +1527,7 @@ function ArcChart({ data, view, insuredData, uninsuredData, sorrEnabled }) {
     }) : []),
     ...(uninsuredData ? uninsuredData.map(d => d.totalExpense || 0) : [])
   ) * 1.1;
+  const barW = Math.max(4, Math.floor(chartW / data.length) - 2);
 
   const xScale = i => PAD.l + (i / (data.length - 1)) * chartW;
   const yScale = v => PAD.t + chartH - (v / maxVal) * chartH;
