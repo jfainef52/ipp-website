@@ -1321,14 +1321,14 @@ function projectArc(inputs) {
       row.totalIncome = Math.max(0, row.totalIncome - totalAllInTax);
     }
 
-    // chartSources strips only one-time capital reallocation draws that are NOT
-    // spendable income and shoot bars above expenses in a single year:
-    // ETA premium, Roth conversion amount+overage, LTC/spouse policy premium funding.
-    // Care-year gap-fill draws (ltcPortfolioDraw) stay in the bars -- those are real
-    // portfolio draws that cover care costs, so bars correctly meet the expense line.
+    // chartSources strips non-spendable amounts from bars:
+    // 1) One-time capital reallocation draws (ETA, Roth conversion, LTC/spouse premiums)
+    // 2) The gross-up TAX on forced LTC care draws — gross draw hits portfolio but only
+    //    the net covers expenses, so bars show net income that meets the expense line
     const nonSpendableRmd = (row.etaFundingAmount || 0)
       + (row.rothConversionAmount || 0) + (row.rothConversionOverage || 0)
-      + (row.ltcFundingAmount || 0) + (row.spouseLtcFundingAmount || 0);
+      + (row.ltcFundingAmount || 0) + (row.spouseLtcFundingAmount || 0)
+      + (row.ltcGrossUpTax || 0);
     row.chartSources = { ...row.sources };
     if (nonSpendableRmd > 0) {
       let _stripRem = nonSpendableRmd;
