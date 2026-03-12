@@ -4645,8 +4645,8 @@ function App() {
               : 0;
 
             // Compounding loss = portfolioDiff minus direct costs (care + grossup) = pure lost growth
-            const directCosts = totalLtcCost + grossUpTaxTotal;
-            const compoundingLoss = Math.max(0, portfolioDiff - directCosts);
+            const pDirectCosts = totalLtcCost + grossUpTaxTotal;
+            const compoundingLoss = Math.max(0, portfolioDiff - pDirectCosts);
 
             const todayDollarCost = inputs.ltcMonthlyCost * 12 * inputs.ltcDuration;
             const careInflRate = inputs.ltcCareInflationRate || 4;
@@ -4726,7 +4726,7 @@ function App() {
                           <div style={{height:8,background:'rgba(255,255,255,.06)',borderRadius:4,overflow:'hidden'}}>
                             <div style={{height:'100%',width:barW(confidenceUninsured),background:'#C47A7A',borderRadius:4,transition:'width .6s ease'}}/>
                           </div>
-                          <div style={{fontSize:11,color:'#8DAFC8',marginTop:4}}>Portfolio depleted by {fmtD(directCosts)} in care years</div>
+                          <div style={{fontSize:11,color:'#8DAFC8',marginTop:4}}>Portfolio depleted by {fmtD(pDirectCosts)} in care years</div>
                         </div>
                         {/* With Layer 2 — insured, no shock */}
                         <div>
@@ -4791,8 +4791,8 @@ function App() {
               ? (insuredFinal.totalPortfolio - uninsuredFinal.totalPortfolio)
               : 0;
 
-            const directCostsSp = totalLtcCost + grossUpTaxTotal;
-            const compoundingLoss = Math.max(0, portfolioDiff - directCostsSp);
+            const spDirectCosts = totalLtcCost + grossUpTaxTotal;
+            const compoundingLoss = Math.max(0, portfolioDiff - spDirectCosts);
 
             const todayDollarCostSp = inputs.spouseLtcMonthlyCost * 12 * inputs.spouseLtcDuration;
             const careInflRateSp = inputs.ltcCareInflationRate || 4;
@@ -4861,7 +4861,7 @@ function App() {
                           <div style={{height:8,background:'rgba(255,255,255,.06)',borderRadius:4,overflow:'hidden'}}>
                             <div style={{height:'100%',width:barW(confidenceSpouseUninsured),background:'#C47A7A',borderRadius:4}}/>
                           </div>
-                          <div style={{fontSize:11,color:'#8DAFC8',marginTop:4}}>Portfolio depleted by {fmtD(directCostsSp)} in care years</div>
+                          <div style={{fontSize:11,color:'#8DAFC8',marginTop:4}}>Portfolio depleted by {fmtD(spDirectCosts)} in care years</div>
                         </div>
                         <div>
                           <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:6}}>
