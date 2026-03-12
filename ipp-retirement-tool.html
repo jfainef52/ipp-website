@@ -4260,6 +4260,79 @@ function App() {
         {/* ── RIGHT: Results ── */}
         <div className="right-panel" style={{overflowY:'auto',maxHeight:'calc(100vh - 69px)',padding:'20px 24px'}}>
 
+          {/* ── SCENARIO CONTROLS BAR ── */}
+          <div style={{
+            display:'flex', alignItems:'center', gap:8, flexWrap:'wrap',
+            marginBottom:14, padding:'10px 14px',
+            background:'rgba(10,14,20,.6)', border:'1px solid rgba(255,255,255,.1)',
+            borderRadius:10, backdropFilter:'blur(4px)',
+          }}>
+            <div style={{fontSize:11,fontWeight:700,letterSpacing:'.14em',textTransform:'uppercase',color:'#5A7A8A',marginRight:4,whiteSpace:'nowrap'}}>
+              Scenario
+            </div>
+
+            {/* Architecture toggle */}
+            {[
+              {
+                label: inputs.architectureEnabled ? 'Architecture ON' : 'Architecture OFF',
+                active: inputs.architectureEnabled,
+                color: '#C8A96E',
+                onClick: () => set('architectureEnabled', !inputs.architectureEnabled),
+              },
+              {
+                label: inputs.ltcEventEnabled ? 'Health Events ON' : 'Health Events OFF',
+                active: inputs.ltcEventEnabled || inputs.spouseLtcEventEnabled,
+                color: '#C47A7A',
+                onClick: () => {
+                  const next = !(inputs.ltcEventEnabled || inputs.spouseLtcEventEnabled);
+                  set('ltcEventEnabled', inputs.ltcEventAge > 0 ? next : false);
+                  set('spouseLtcEventEnabled', inputs.spouseLtcEventAge > 0 ? next : false);
+                },
+              },
+              {
+                label: inputs.sorrEnabled ? 'SORR Active' : 'SORR Off',
+                active: inputs.sorrEnabled,
+                color: '#C47A7A',
+                onClick: () => set('sorrEnabled', !inputs.sorrEnabled),
+              },
+              {
+                label: inputs.expenseShockEnabled ? 'Expense Shocks ON' : 'Expense Shocks OFF',
+                active: inputs.expenseShockEnabled,
+                color: '#C8A030',
+                onClick: () => set('expenseShockEnabled', !inputs.expenseShockEnabled),
+              },
+            ].map(btn => (
+              <div
+                key={btn.label}
+                onClick={btn.onClick}
+                style={{
+                  display:'flex', alignItems:'center', gap:7,
+                  padding:'5px 11px', borderRadius:20, cursor:'pointer',
+                  background: btn.active ? `${btn.color}18` : 'rgba(255,255,255,.04)',
+                  border: `1px solid ${btn.active ? btn.color : 'rgba(255,255,255,.1)'}`,
+                  transition:'all .2s',
+                }}
+              >
+                <div style={{
+                  width:28, height:15, borderRadius:8,
+                  background: btn.active ? btn.color : 'rgba(255,255,255,.15)',
+                  position:'relative', transition:'background .2s', flexShrink:0,
+                }}>
+                  <div style={{
+                    position:'absolute', top:2,
+                    left: btn.active ? 14 : 2,
+                    width:11, height:11, borderRadius:6,
+                    background:'#F5F2EC', transition:'left .2s',
+                    boxShadow:'0 1px 2px rgba(0,0,0,.4)',
+                  }}/>
+                </div>
+                <span style={{fontSize:12, fontWeight: btn.active ? 700 : 400, color: btn.active ? btn.color : '#6A8A9A', whiteSpace:'nowrap'}}>
+                  {btn.label}
+                </span>
+              </div>
+            ))}
+          </div>
+
           {/* SORR active warning banner */}
           {inputs.sorrEnabled && (
             <div style={{padding:'12px 16px',background:'rgba(196,106,106,.07)',border:'1px solid rgba(196,106,106,.25)',borderRadius:8,marginBottom:14,display:'flex',alignItems:'flex-start',gap:12}}>
@@ -4711,52 +4784,51 @@ function App() {
                   <span style={{color:'#4A9B7A',fontWeight:700}}>{fmtD(portfolioDiff)}</span>
                   <span style={{color:'#4A9B7A'}}>Portfolio Preserved</span>
                 </div>
-                {/* Dual Monte Carlo Confidence Comparison */}
-                {confidenceInsured !== null && confidenceUninsured !== null && (() => {
-                  const delta = confidenceInsured - confidenceUninsured;
-                  const deltaColor = delta > 0 ? '#4A9B7A' : delta < 0 ? '#C47A7A' : '#8DAFC8';
-                  const barW = (pct) => `${Math.max(4, pct)}%`;
+                {/* Return on Protection — replaces MC score bars */}
+                {(() => {
+                  const policyNet = inputs.ltcNetAmount || 0;
+                  const careRows = yearsUninsured?.filter(r => r.age >= ltcAge && r.age < ltcEnd) || [];
+                  const avgRate = careRows.length > 0
+                    ? careRows.reduce((s,r) => s+(r.allInMarginalRate||r.effectiveTaxRate||0.28),0) / careRows.length
+                    : 0.28;
+                  // Gross-up the premium: IRA must be drawn down more to net the policy cost
+                  const policyGrossUp = policyNet * avgRate / (1 - avgRate);
+                  const policyTrueCost = policyNet + policyGrossUp;
+                  const leverage = portfolioDiff > 0 && policyTrueCost > 0 ? portfolioDiff / policyTrueCost : 0;
+                  const fmtR = v => v >= 1000000 ? `$${(v/1000000).toFixed(2)}M` : `$${Math.round(v/1000)}K`;
                   return (
-                    <div style={{background:'rgba(255,255,255,.02)',border:'1px solid rgba(255,255,255,.07)',borderRadius:10,padding:'14px 16px',marginBottom:14}}>
-                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:10}}>
-                        {/* Column headers aligned with data below */}
-                        <div style={{fontSize:12,fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'#C47A7A'}}>
-                          WITHOUT LAYER 2
-                          <span style={{fontWeight:400,marginLeft:6,color:'#5A7A8A',fontSize:11}}>· care event, no policy</span>
+                    <div style={{
+                      background:'linear-gradient(135deg, rgba(74,155,122,.06) 0%, rgba(200,169,110,.04) 100%)',
+                      border:'1px solid rgba(74,155,122,.25)', borderRadius:12,
+                      padding:'16px 20px', marginBottom:14,
+                    }}>
+                      <div style={{fontSize:11,fontWeight:700,letterSpacing:'.16em',textTransform:'uppercase',color:'#4A9B7A',marginBottom:12}}>
+                        Return on Protection — Primary
+                      </div>
+                      <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr auto 1fr',alignItems:'center',gap:8,marginBottom:12}}>
+                        {/* Policy Cost */}
+                        <div style={{textAlign:'center'}}>
+                          <div style={{fontSize:11,color:'#8DAFC8',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:4}}>Policy Investment</div>
+                          <div style={{fontSize:26,fontWeight:700,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif"}}>{fmtR(policyTrueCost)}</div>
+                          <div style={{fontSize:11,color:'#6A8A9A',marginTop:3}}>{fmtR(policyNet)} net · {fmtR(policyGrossUp)} gross-up</div>
                         </div>
-                        <div style={{fontSize:12,fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'#4A9B7A'}}>
-                          WITH LAYER 2
-                          <span style={{fontWeight:400,marginLeft:6,color:'#5A7A8A',fontSize:11}}>· care cost shock absorbed</span>
+                        <div style={{fontSize:20,color:'#4A9B7A',fontWeight:300}}>→</div>
+                        {/* Portfolio Preserved */}
+                        <div style={{textAlign:'center'}}>
+                          <div style={{fontSize:11,color:'#8DAFC8',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:4}}>Portfolio Preserved</div>
+                          <div style={{fontSize:26,fontWeight:700,color:'#4A9B7A',fontFamily:"'Cormorant Garamond',serif"}}>{fmtD(portfolioDiff)}</div>
+                          <div style={{fontSize:11,color:'#6A8A9A',marginTop:3}}>care + tax + compounding protected</div>
+                        </div>
+                        <div style={{fontSize:20,color:'#C8A96E',fontWeight:300}}>=</div>
+                        {/* Leverage ratio */}
+                        <div style={{textAlign:'center',background:'rgba(200,169,110,.08)',border:'1px solid rgba(200,169,110,.2)',borderRadius:10,padding:'10px 8px'}}>
+                          <div style={{fontSize:11,color:'#C8A96E',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:4}}>Protection Leverage</div>
+                          <div style={{fontSize:32,fontWeight:700,color:'#C8A96E',fontFamily:"'Cormorant Garamond',serif"}}>{leverage.toFixed(1)}×</div>
+                          <div style={{fontSize:11,color:'#8A7A50',marginTop:3}}>return on every dollar invested</div>
                         </div>
                       </div>
-                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:10}}>
-                        {/* Without Layer 2 — uninsured shock applied */}
-                        <div>
-                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:6}}>
-                            <span style={{fontSize:28,fontWeight:700,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif"}}>{confidenceUninsured}%</span>
-                          </div>
-                          <div style={{height:8,background:'rgba(255,255,255,.06)',borderRadius:4,overflow:'hidden'}}>
-                            <div style={{height:'100%',width:barW(confidenceUninsured),background:'#C47A7A',borderRadius:4,transition:'width .6s ease'}}/>
-                          </div>
-                          <div style={{fontSize:11,color:'#8DAFC8',marginTop:4}}>Portfolio depleted by {fmtD(pDirectCosts)} in care years</div>
-                        </div>
-                        {/* With Layer 2 — insured, no shock */}
-                        <div>
-                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:6}}>
-                            <span style={{fontSize:28,fontWeight:700,color:'#4A9B7A',fontFamily:"'Cormorant Garamond',serif"}}>{confidenceInsured}%</span>
-                          </div>
-                          <div style={{height:8,background:'rgba(255,255,255,.06)',borderRadius:4,overflow:'hidden'}}>
-                            <div style={{height:'100%',width:barW(confidenceInsured),background:'#4A9B7A',borderRadius:4,transition:'width .6s ease'}}/>
-                          </div>
-                          <div style={{fontSize:11,color:'#8DAFC8',marginTop:4}}>Care costs covered by dedicated benefit pool</div>
-                        </div>
-                      </div>
-                      <div style={{textAlign:'center',fontSize:13,color:deltaColor,fontWeight:700,borderTop:'1px solid rgba(255,255,255,.06)',paddingTop:10}}>
-                        {delta > 0
-                          ? `Layer 2 improves plan survival confidence by +${delta} percentage points`
-                          : delta < 0
-                          ? `Layer 2 reduces confidence by ${Math.abs(delta)} pts (review benefit sizing)`
-                          : 'No confidence difference — benefit fully offset by premium cost'}
+                      <div style={{fontSize:12,color:'#6A8A9A',lineHeight:1.6,borderTop:'1px solid rgba(255,255,255,.06)',paddingTop:10}}>
+                        Every dollar invested in the policy protects <strong style={{color:'#C8A96E'}}>{leverage.toFixed(1)} dollars</strong> of portfolio wealth from permanent destruction — care costs, forced tax draws, and decades of lost compounding.
                       </div>
                     </div>
                   );
@@ -4858,46 +4930,47 @@ function App() {
                   <span style={{color:'#4A9B7A',fontWeight:700}}>{fmtD(portfolioDiff)}</span>
                   <span style={{color:'#4A9B7A'}}>Portfolio Preserved</span>
                 </div>
-                {confidenceSpouseInsured !== null && confidenceSpouseUninsured !== null && (() => {
-                  const delta = confidenceSpouseInsured - confidenceSpouseUninsured;
-                  const deltaColor = delta > 0 ? '#4A9B7A' : delta < 0 ? '#C47A7A' : '#8DAFC8';
-                  const barW = (pct) => `${Math.max(4, pct)}%`;
+                {/* Return on Protection — Spouse */}
+                {(() => {
+                  const spouseNet = inputs.spouseLtcNetAmount || 0;
+                  const spCareRows = yearsSpouseUninsured?.filter(r => r.age >= ltcAge && r.age < ltcEnd) || [];
+                  const spAvgRate = spCareRows.length > 0
+                    ? spCareRows.reduce((s,r) => s+(r.allInMarginalRate||r.effectiveTaxRate||0.28),0) / spCareRows.length
+                    : 0.28;
+                  const spGrossUp = spouseNet * spAvgRate / (1 - spAvgRate);
+                  const spTrueCost = spouseNet + spGrossUp;
+                  const spLeverage = portfolioDiff > 0 && spTrueCost > 0 ? portfolioDiff / spTrueCost : 0;
+                  const fmtR = v => v >= 1000000 ? `$${(v/1000000).toFixed(2)}M` : `$${Math.round(v/1000)}K`;
                   return (
-                    <div style={{background:'rgba(255,255,255,.02)',border:'1px solid rgba(255,255,255,.07)',borderRadius:10,padding:'14px 16px',marginBottom:14}}>
-                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:10}}>
-                        <div style={{fontSize:12,fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'#C47A7A'}}>
-                          WITHOUT LAYER 2<span style={{fontWeight:400,marginLeft:6,color:'#5A7A8A',fontSize:11}}>· care event, no policy</span>
+                    <div style={{
+                      background:'linear-gradient(135deg, rgba(74,155,122,.06) 0%, rgba(200,169,110,.04) 100%)',
+                      border:'1px solid rgba(74,155,122,.25)', borderRadius:12,
+                      padding:'16px 20px', marginBottom:14,
+                    }}>
+                      <div style={{fontSize:11,fontWeight:700,letterSpacing:'.16em',textTransform:'uppercase',color:'#4A9B7A',marginBottom:12}}>
+                        Return on Protection — {inputs.spouseName || 'Spouse'}
+                      </div>
+                      <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr auto 1fr',alignItems:'center',gap:8,marginBottom:12}}>
+                        <div style={{textAlign:'center'}}>
+                          <div style={{fontSize:11,color:'#8DAFC8',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:4}}>Policy Investment</div>
+                          <div style={{fontSize:26,fontWeight:700,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif"}}>{fmtR(spTrueCost)}</div>
+                          <div style={{fontSize:11,color:'#6A8A9A',marginTop:3}}>{fmtR(spouseNet)} net · {fmtR(spGrossUp)} gross-up</div>
                         </div>
-                        <div style={{fontSize:12,fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'#4A9B7A'}}>
-                          WITH LAYER 2<span style={{fontWeight:400,marginLeft:6,color:'#5A7A8A',fontSize:11}}>· care cost shock absorbed</span>
+                        <div style={{fontSize:20,color:'#4A9B7A',fontWeight:300}}>→</div>
+                        <div style={{textAlign:'center'}}>
+                          <div style={{fontSize:11,color:'#8DAFC8',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:4}}>Portfolio Preserved</div>
+                          <div style={{fontSize:26,fontWeight:700,color:'#4A9B7A',fontFamily:"'Cormorant Garamond',serif"}}>{fmtD(portfolioDiff)}</div>
+                          <div style={{fontSize:11,color:'#6A8A9A',marginTop:3}}>care + tax + compounding protected</div>
+                        </div>
+                        <div style={{fontSize:20,color:'#C8A96E',fontWeight:300}}>=</div>
+                        <div style={{textAlign:'center',background:'rgba(200,169,110,.08)',border:'1px solid rgba(200,169,110,.2)',borderRadius:10,padding:'10px 8px'}}>
+                          <div style={{fontSize:11,color:'#C8A96E',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:4}}>Protection Leverage</div>
+                          <div style={{fontSize:32,fontWeight:700,color:'#C8A96E',fontFamily:"'Cormorant Garamond',serif"}}>{spLeverage.toFixed(1)}×</div>
+                          <div style={{fontSize:11,color:'#8A7A50',marginTop:3}}>return on every dollar invested</div>
                         </div>
                       </div>
-                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:10}}>
-                        <div>
-                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:6}}>
-                            <span style={{fontSize:28,fontWeight:700,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif"}}>{confidenceSpouseUninsured}%</span>
-                          </div>
-                          <div style={{height:8,background:'rgba(255,255,255,.06)',borderRadius:4,overflow:'hidden'}}>
-                            <div style={{height:'100%',width:barW(confidenceSpouseUninsured),background:'#C47A7A',borderRadius:4}}/>
-                          </div>
-                          <div style={{fontSize:11,color:'#8DAFC8',marginTop:4}}>Portfolio depleted by {fmtD(spDirectCosts)} in care years</div>
-                        </div>
-                        <div>
-                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:6}}>
-                            <span style={{fontSize:28,fontWeight:700,color:'#4A9B7A',fontFamily:"'Cormorant Garamond',serif"}}>{confidenceSpouseInsured}%</span>
-                          </div>
-                          <div style={{height:8,background:'rgba(255,255,255,.06)',borderRadius:4,overflow:'hidden'}}>
-                            <div style={{height:'100%',width:barW(confidenceSpouseInsured),background:'#4A9B7A',borderRadius:4}}/>
-                          </div>
-                          <div style={{fontSize:11,color:'#8DAFC8',marginTop:4}}>Care costs covered by dedicated benefit pool</div>
-                        </div>
-                      </div>
-                      <div style={{textAlign:'center',fontSize:13,color:deltaColor,fontWeight:700,borderTop:'1px solid rgba(255,255,255,.06)',paddingTop:10}}>
-                        {delta > 0
-                          ? `Layer 2 improves plan survival confidence by +${delta} percentage points`
-                          : delta < 0
-                          ? `Layer 2 reduces confidence by ${Math.abs(delta)} pts (review benefit sizing)`
-                          : 'No confidence difference — benefit fully offset by premium cost'}
+                      <div style={{fontSize:12,color:'#6A8A9A',lineHeight:1.6,borderTop:'1px solid rgba(255,255,255,.06)',paddingTop:10}}>
+                        Every dollar invested in the policy protects <strong style={{color:'#C8A96E'}}>{spLeverage.toFixed(1)} dollars</strong> of portfolio wealth from permanent destruction — care costs, forced tax draws, and decades of lost compounding.
                       </div>
                     </div>
                   );
@@ -4948,6 +5021,14 @@ function App() {
                                    + sDirectTotal * (Math.pow(1 + combRet, Math.max(0, inputs.planToAge - sMidAge)) - 1);
             const totalPreserved  = totalTrueCost + totalCompounding;
 
+            // Combined policy investment (grossed up)
+            const pPolicyNet = inputs.ltcNetAmount || 0;
+            const sPolicyNet = inputs.spouseLtcNetAmount || 0;
+            const pPolicyGrossUp = pPolicyNet * pMargRate / (1 - pMargRate);
+            const sPolicyGrossUp = sPolicyNet * sMargRate / (1 - sMargRate);
+            const totalPolicyInvestment = (pPolicyNet + pPolicyGrossUp) + (sPolicyNet + sPolicyGrossUp);
+            const combinedLeverage = totalPreserved > 0 && totalPolicyInvestment > 0 ? totalPreserved / totalPolicyInvestment : 0;
+
             return (
               <div style={{background:'rgba(200,169,110,.04)',border:'1px solid rgba(200,169,110,.25)',borderRadius:12,padding:'18px 20px',marginBottom:16}}>
                 <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14}}>
@@ -4958,6 +5039,42 @@ function App() {
                     Primary + {inputs.spouseName || 'Spouse'} · Total Portfolio Effect
                   </div>
                 </div>
+
+                {/* Hero Return on Protection */}
+                <div style={{
+                  background:'linear-gradient(135deg, rgba(200,169,110,.1) 0%, rgba(74,155,122,.06) 100%)',
+                  border:'1px solid rgba(200,169,110,.35)', borderRadius:12,
+                  padding:'20px 24px', marginBottom:14,
+                  display:'grid', gridTemplateColumns:'1fr auto 1fr auto 1fr',
+                  alignItems:'center', gap:12,
+                }}>
+                  <div style={{textAlign:'center'}}>
+                    <div style={{fontSize:11,color:'#8DAFC8',letterSpacing:'.1em',textTransform:'uppercase',marginBottom:6}}>Combined Policy Investment</div>
+                    <div style={{fontSize:38,fontWeight:700,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif",lineHeight:1}}>{fmtD(totalPolicyInvestment)}</div>
+                    <div style={{fontSize:12,color:'#6A8A9A',marginTop:6}}>
+                      Primary: {fmtD(pPolicyNet + pPolicyGrossUp)} · {inputs.spouseName||'Spouse'}: {fmtD(sPolicyNet + sPolicyGrossUp)}
+                    </div>
+                    <div style={{fontSize:11,color:'#5A6A7A',marginTop:2}}>net premium + gross-up tax cost</div>
+                  </div>
+                  <div style={{fontSize:28,color:'#4A9B7A',fontWeight:300,textAlign:'center'}}>→</div>
+                  <div style={{textAlign:'center'}}>
+                    <div style={{fontSize:11,color:'#8DAFC8',letterSpacing:'.1em',textTransform:'uppercase',marginBottom:6}}>Total Portfolio Preserved</div>
+                    <div style={{fontSize:38,fontWeight:700,color:'#4A9B7A',fontFamily:"'Cormorant Garamond',serif",lineHeight:1}}>{fmtD(totalPreserved)}</div>
+                    <div style={{fontSize:12,color:'#6A8A9A',marginTop:6}}>care costs + tax + lost compounding</div>
+                    <div style={{fontSize:11,color:'#5A6A7A',marginTop:2}}>permanently protected from portfolio</div>
+                  </div>
+                  <div style={{fontSize:28,color:'#C8A96E',fontWeight:300,textAlign:'center'}}>=</div>
+                  <div style={{
+                    textAlign:'center',
+                    background:'rgba(200,169,110,.12)', border:'2px solid rgba(200,169,110,.4)',
+                    borderRadius:12, padding:'16px 12px',
+                  }}>
+                    <div style={{fontSize:11,color:'#C8A96E',letterSpacing:'.1em',textTransform:'uppercase',marginBottom:6}}>Protection Leverage</div>
+                    <div style={{fontSize:48,fontWeight:700,color:'#C8A96E',fontFamily:"'Cormorant Garamond',serif",lineHeight:1}}>{combinedLeverage.toFixed(1)}×</div>
+                    <div style={{fontSize:12,color:'#8A7A50',marginTop:6}}>return on every dollar<br/>invested in protection</div>
+                  </div>
+                </div>
+
                 <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:10,marginBottom:14}}>
                   {[
                     { label:'Total Care Costs', value: fmtD(totalCareCost), sub:`Inflated · today's dollars: ${fmtD(pTodayDollar + sTodayDollar)}`, color:'#C47A7A' },
