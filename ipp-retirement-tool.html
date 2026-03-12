@@ -638,7 +638,7 @@ function projectArc(inputs) {
       trad = Math.max(0, trad - fundAmt);
       row.etaFundingEvent = true;
       row.etaFundingAmount = fundAmt;
-      row.sources.rmd = (row.sources.rmd || 0) + fundAmt;
+      // NOT added to sources.rmd — this is a capital reallocation, not spendable income
       row.totalIncome += fundAmt;
     }
 
@@ -651,8 +651,8 @@ function projectArc(inputs) {
       trad = Math.max(0, trad - convAmt);
       row.rothConversionEvent = true;
       row.rothConversionAmount = convAmt;
-      // Entire conversion is a taxable IRA distribution — elevates marginal rate this year.
-      row.sources.rmd = (row.sources.rmd || 0) + convAmt;
+      // Conversion is taxable income for tax calc but NOT a spendable bar source
+      // NOT added to sources.rmd to avoid bar spikes
       row.totalIncome += convAmt;
       // Flag for post-tax overage gross-up. financed covers as much of the tax as specified.
       row._conversionOveragePending = { convAmt, financed: Math.min(rothConversionFinanced || 0, convAmt) };
@@ -677,7 +677,7 @@ function projectArc(inputs) {
       row.ltcFundingNet = archLtcNetAmount;
       row.ltcFundingTax = ltcTax;
       row.ltcEarlyPenalty = earlyPenalty;
-      row.sources.rmd = (row.sources.rmd || 0) + ltcFund;
+      // NOT added to sources.rmd — capital reallocation, not spendable income for bars
       row.totalIncome += ltcFund;
     }
 
@@ -696,7 +696,7 @@ function projectArc(inputs) {
       row.spouseLtcFundingNet = archSpouseLtcNetAmount;
       row.spouseLtcFundingTax = spLtcTax;
       row.spouseLtcEarlyPenalty = spEarlyPenalty;
-      row.sources.rmd = (row.sources.rmd || 0) + spLtcFund;
+      // NOT added to sources.rmd — capital reallocation, not spendable income for bars
       row.totalIncome += spLtcFund;
     }
 
@@ -1276,7 +1276,7 @@ function projectArc(inputs) {
       if (overageTax > 0 && trad > 0) {
         const grossUp = Math.min(trad, overageTax / (1 - allInRate));  // gross-up so net covers the overage
         trad = Math.max(0, trad - grossUp);
-        row.sources.rmd = (row.sources.rmd || 0) + grossUp;
+        // NOT added to sources.rmd — tax-covering draw, not spendable income
         row.totalIncome += grossUp;
         row.rothConversionOverage = grossUp;
         row.rothConversionOverageTax = overageTax;
@@ -4750,7 +4750,7 @@ function App() {
                 <Legend insuredData={inputs.architectureEnabled ? yearsInsured : null} data={yearsWithLtc}/>
                 <ArcChart
                   data={inputs.architectureEnabled ? (yearsUninsured || yearsWithLtc) : yearsWithLtc}
-                  uninsuredData={inputs.architectureEnabled ? yearsUninsured : null}
+                  uninsuredData={inputs.architectureEnabled ? yearsWithLtc : null}
                   view={view}
                   insuredData={inputs.architectureEnabled ? yearsInsured : null}
                   sorrEnabled={inputs.sorrEnabled}/>
