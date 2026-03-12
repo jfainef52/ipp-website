@@ -2347,7 +2347,7 @@ function App() {
   // Show HC comparison scores whenever health event is ON
   const showLtcComparison = inputs.ltcEventEnabled && inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
 
-  // PRIMARY event isolation: zero out spouse event so we measure ONLY primary care shock
+  // For portfolio draw calculations: arch=false, isolate one event at a time
   const primaryOnlyBase = { ...ltcPortfolioBase, spouseLtcEventAge: 0 };
   const { years: yearsUninsured } = showLtcComparison
     ? projectArc({ ...primaryOnlyBase, ltcInsured: false })
@@ -2355,16 +2355,19 @@ function App() {
   const { years: yearsInsured } = showLtcComparison
     ? projectArc({ ...primaryOnlyBase, ltcInsured: true })
     : { years: null };
-  // MC scores: arch=false for uninsured (shows true damage), arch=ON for insured (shows protection value)
-  // Both isolate only the primary event
+
+  // MC scores: use FULL plan (baseProjectionInputs), only differ by ltcInsured
+  // Uninsured = user's real plan + care shock hits portfolio (no policy)
+  // Insured   = user's real plan + care cost absorbed by policy
+  const primaryMcBase = { ...baseProjectionInputs, spouseLtcEventAge: 0 };
   const { confidence: confidenceUninsured } = showLtcComparison
-    ? projectArc({ ...primaryOnlyBase, ltcInsured: false })
+    ? projectArc({ ...primaryMcBase, ltcInsured: false, ltcNetAmount: 0 })
     : { confidence: null };
   const { confidence: confidenceInsured } = showLtcComparison
-    ? projectArc({ ...primaryOnlyBase, ltcInsured: true, architectureEnabled: inputs.architectureEnabled, ltcNetAmount: inputs.ltcNetAmount })
+    ? projectArc({ ...primaryMcBase, ltcInsured: true })
     : { confidence: null };
 
-  // Spouse LTC comparison — isolate ONLY spouse event, zero out primary event
+  // Spouse LTC comparison
   const showSpouseLtcComparison = isMarried && inputs.spouseLtcEventEnabled && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
   const spouseOnlyBase = { ...ltcPortfolioBase, ltcEventAge: 0 };
   const { years: yearsSpouseUninsured } = showSpouseLtcComparison
@@ -2373,11 +2376,14 @@ function App() {
   const { years: yearsSpouseInsured } = showSpouseLtcComparison
     ? projectArc({ ...spouseOnlyBase, spouseLtcInsured: true })
     : { years: null };
+
+  // Spouse MC scores: full plan, only differ by spouseLtcInsured
+  const spouseMcBase = { ...baseProjectionInputs, ltcEventAge: 0 };
   const { confidence: confidenceSpouseUninsured } = showSpouseLtcComparison
-    ? projectArc({ ...spouseOnlyBase, spouseLtcInsured: false })
+    ? projectArc({ ...spouseMcBase, spouseLtcInsured: false, spouseLtcNetAmount: 0 })
     : { confidence: null };
   const { confidence: confidenceSpouseInsured } = showSpouseLtcComparison
-    ? projectArc({ ...spouseOnlyBase, spouseLtcInsured: true, architectureEnabled: inputs.architectureEnabled, spouseLtcNetAmount: inputs.spouseLtcNetAmount })
+    ? projectArc({ ...spouseMcBase, spouseLtcInsured: true })
     : { confidence: null };
 
   const totalPortfolioAtRetire = years[0] ? years[0].totalPortfolio : (inputs.traditionalBalance + inputs.rothBalance + inputs.taxableBalance);
@@ -4644,16 +4650,15 @@ function App() {
               : 0.28;
             const grossUpTaxTotal = totalLtcCost * avgMarginalRate / (1 - avgMarginalRate);
 
-            // Portfolio Preserved = authoritative ending balance difference (engine ran full compounding)
-            // insured: no care draw, portfolio compounds uninhibited through plan end
-            // uninsured: care draws reduce base, compounding diminished for remaining years
-            // Direct costs = what the uninsured portfolio had to absorb
+            // Direct costs = care draws + gross-up tax that hit the portfolio
             const pDirectCosts = totalLtcCost + grossUpTaxTotal;
-            // Compounding bonus: if insured ending balance exceeds uninsured by more than direct costs
-            const endingDiff = insuredFinal && uninsuredFinal
-              ? (insuredFinal.totalPortfolio - uninsuredFinal.totalPortfolio) : 0;
-            const compoundingLoss = Math.max(0, endingDiff - pDirectCosts);
-            // Portfolio Preserved = direct costs saved + compounding bonus (floor is always direct costs)
+            // Compounding lost = growth those dollars WOULD HAVE earned from mid-event to plan end
+            // Use midpoint of care event as the draw date, compound forward to planToAge
+            const midEventAge = ltcAge + (inputs.ltcDuration / 2);
+            const yearsCompounding = Math.max(0, inputs.planToAge - midEventAge);
+            const ret = inputs.portfolioReturn / 100;
+            const compoundingLoss = pDirectCosts * (Math.pow(1 + ret, yearsCompounding) - 1);
+            // Portfolio Preserved = direct costs + growth lost on those dollars
             const portfolioDiff = pDirectCosts + compoundingLoss;
 
             const todayDollarCost = inputs.ltcMonthlyCost * 12 * inputs.ltcDuration;
@@ -4798,9 +4803,10 @@ function App() {
             const grossUpTaxTotal = totalLtcCost * spAvgMarginalRate / (1 - spAvgMarginalRate);
 
             const spDirectCosts = totalLtcCost + grossUpTaxTotal;
-            const spEndingDiff = insuredFinal && uninsuredFinal
-              ? (insuredFinal.totalPortfolio - uninsuredFinal.totalPortfolio) : 0;
-            const compoundingLoss = Math.max(0, spEndingDiff - spDirectCosts);
+            const spMidEventAge = ltcAge + (inputs.spouseLtcDuration / 2);
+            const spYearsCompounding = Math.max(0, inputs.planToAge - spMidEventAge);
+            const spRet = inputs.portfolioReturn / 100;
+            const compoundingLoss = spDirectCosts * (Math.pow(1 + spRet, spYearsCompounding) - 1);
             const portfolioDiff = spDirectCosts + compoundingLoss;
 
             const todayDollarCostSp = inputs.spouseLtcMonthlyCost * 12 * inputs.spouseLtcDuration;
@@ -4928,9 +4934,14 @@ function App() {
             const totalDraws      = pDraws + sDraws;
             const totalGrossUpTax = pGrossUpTax + sGrossUpTax;
             const totalTrueCost   = totalCareCost + totalGrossUpTax;
-            // Use same floor logic: direct costs + any compounding bonus
-            const totalEndingDiff = pPortfolioDiff + sPortfolioDiff;
-            const totalCompounding = Math.max(0, totalEndingDiff - totalTrueCost);
+            const combRet = inputs.portfolioReturn / 100;
+            // Compounding lost: each event's direct costs compound forward from their mid-event age
+            const pMidAge = inputs.ltcEventAge + (inputs.ltcDuration / 2);
+            const sMidAge = inputs.spouseLtcEventAge + (inputs.spouseLtcDuration / 2);
+            const pDirectTotal = pTotalLtcCost + pGrossUpTax;
+            const sDirectTotal = sTotalLtcCost + sGrossUpTax;
+            const totalCompounding = pDirectTotal * (Math.pow(1 + combRet, Math.max(0, inputs.planToAge - pMidAge)) - 1)
+                                   + sDirectTotal * (Math.pow(1 + combRet, Math.max(0, inputs.planToAge - sMidAge)) - 1);
             const totalPreserved  = totalTrueCost + totalCompounding;
 
             return (
