@@ -1321,34 +1321,37 @@ function projectArc(inputs) {
       row.totalIncome = Math.max(0, row.totalIncome - totalAllInTax);
     }
 
-    // chartSources strips non-spendable amounts from bars:
-    // 1) One-time capital reallocation draws (ETA, Roth conversion, LTC/spouse premiums)
-    // 2) The gross-up TAX on forced LTC care draws — gross draw hits portfolio but only
-    //    the net covers expenses, so bars show net income that meets the expense line
-    const nonSpendableRmd = (row.etaFundingAmount || 0)
+    // chartSources: bars display baseline income, capped at totalExpense.
+    // Strip one-time capital reallocation draws, then cap total at totalExpense
+    // so bars always meet but never exceed the expense line.
+    const _capNonSpendable = (row.etaFundingAmount || 0)
       + (row.rothConversionAmount || 0) + (row.rothConversionOverage || 0)
-      + (row.ltcFundingAmount || 0) + (row.spouseLtcFundingAmount || 0)
-      + (row.ltcGrossUpTax || 0);
+      + (row.ltcFundingAmount || 0) + (row.spouseLtcFundingAmount || 0);
     row.chartSources = { ...row.sources };
-    if (nonSpendableRmd > 0) {
-      let _stripRem = nonSpendableRmd;
+    // Step 1: strip capital reallocation draws from rmd
+    if (_capNonSpendable > 0) {
+      let _rem = _capNonSpendable;
       if (row.chartSources.rmd) {
-        const _s = Math.min(row.chartSources.rmd, _stripRem);
-        row.chartSources.rmd -= _s; _stripRem -= _s;
+        const _s = Math.min(row.chartSources.rmd, _rem);
+        row.chartSources.rmd -= _s; _rem -= _s;
         if (row.chartSources.rmd === 0) delete row.chartSources.rmd;
       }
-      if (_stripRem > 0 && row.chartSources.taxable) {
-        const _s = Math.min(row.chartSources.taxable, _stripRem);
-        row.chartSources.taxable -= _s; _stripRem -= _s;
-        if (row.chartSources.taxable === 0) delete row.chartSources.taxable;
-      }
-      if (_stripRem > 0 && row.chartSources.roth) {
-        const _s = Math.min(row.chartSources.roth, _stripRem);
-        row.chartSources.roth -= _s;
-        if (row.chartSources.roth === 0) delete row.chartSources.roth;
+    }
+    // Step 2: cap total bar at totalExpense so bars never exceed expense line
+    if (row.totalExpense > 0) {
+      const _barTotal = Object.values(row.chartSources).reduce((a,b) => a+(b||0), 0);
+      if (_barTotal > row.totalExpense) {
+        let _excess = _barTotal - row.totalExpense;
+        for (const _k of ['rmd','taxable','roth','ss','pension','annuity','eta','parttime']) {
+          if (_excess <= 0) break;
+          if ((row.chartSources[_k] || 0) > 0) {
+            const _s = Math.min(row.chartSources[_k], _excess);
+            row.chartSources[_k] -= _s; _excess -= _s;
+            if (row.chartSources[_k] === 0) delete row.chartSources[_k];
+          }
+        }
       }
     }
-
     years.push(row);
   }
 
