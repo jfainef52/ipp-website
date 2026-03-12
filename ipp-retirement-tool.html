@@ -2991,39 +2991,70 @@ function App() {
             <button className={`tab-btn ${view==='debits'?'active':''}`} onClick={()=>setView('debits')}>Debits</button>
           </div>
 
-          {/* ── Architecture Toggle ── */}
-          <div
-            onClick={()=>set('architectureEnabled', !inputs.architectureEnabled)}
-            style={{
-              display:'flex',alignItems:'center',gap:8,
-              padding:'7px 13px',borderRadius:7,cursor:'pointer',
-              background: inputs.architectureEnabled ? 'rgba(200,169,110,.12)' : 'rgba(255,255,255,.04)',
-              border: inputs.architectureEnabled ? '1px solid rgba(200,169,110,.4)' : '1px solid rgba(255,255,255,.12)',
-              transition:'all .25s',userSelect:'none',
-            }}>
-            {/* Toggle pill */}
-            <div style={{
-              width:34,height:18,borderRadius:9,position:'relative',
-              background: inputs.architectureEnabled ? '#C8A96E' : 'rgba(255,255,255,.15)',
-              transition:'background .25s',flexShrink:0,
-            }}>
+          {/* ── Scenario Toggles ── */}
+          {[
+            {
+              key: 'arch',
+              label: inputs.architectureEnabled ? 'Architecture ON' : 'Architecture OFF',
+              active: inputs.architectureEnabled,
+              color: '#C8A96E',
+              onClick: () => set('architectureEnabled', !inputs.architectureEnabled),
+            },
+            {
+              key: 'hc',
+              label: inputs.ltcEventEnabled || inputs.spouseLtcEventEnabled ? 'Health Events ON' : 'Health Events OFF',
+              active: inputs.ltcEventEnabled || inputs.spouseLtcEventEnabled,
+              color: '#C47A7A',
+              onClick: () => {
+                const next = !(inputs.ltcEventEnabled || inputs.spouseLtcEventEnabled);
+                set('ltcEventEnabled', inputs.ltcEventAge > 0 ? next : false);
+                set('spouseLtcEventEnabled', inputs.spouseLtcEventAge > 0 ? next : false);
+              },
+            },
+            {
+              key: 'sorr',
+              label: inputs.sorrEnabled ? 'SORR ON' : 'SORR OFF',
+              active: inputs.sorrEnabled,
+              color: '#C47A7A',
+              onClick: () => set('sorrEnabled', !inputs.sorrEnabled),
+            },
+            {
+              key: 'shock',
+              label: inputs.expenseShockEnabled ? 'Exp. Shocks ON' : 'Exp. Shocks OFF',
+              active: inputs.expenseShockEnabled,
+              color: '#C8A030',
+              onClick: () => set('expenseShockEnabled', !inputs.expenseShockEnabled),
+            },
+          ].map(btn => (
+            <div
+              key={btn.key}
+              onClick={btn.onClick}
+              style={{
+                display:'flex', alignItems:'center', gap:6,
+                padding:'5px 10px', borderRadius:20, cursor:'pointer',
+                background: btn.active ? `${btn.color}1A` : 'rgba(255,255,255,.04)',
+                border: `1px solid ${btn.active ? btn.color : 'rgba(255,255,255,.1)'}`,
+                transition:'all .2s', userSelect:'none',
+              }}
+            >
               <div style={{
-                position:'absolute',top:2,
-                left: inputs.architectureEnabled ? 18 : 2,
-                width:14,height:14,borderRadius:'50%',background:'#fff',
-                transition:'left .2s',boxShadow:'0 1px 3px rgba(0,0,0,.3)',
-              }}/>
-            </div>
-            <div>
-              <div style={{fontSize:12,fontWeight:700,letterSpacing:'.06em',textTransform:'uppercase',
-                color: inputs.architectureEnabled ? '#C8A96E' : '#8DAFC8',lineHeight:1.1}}>
-                {inputs.architectureEnabled ? 'Architecture On' : 'Status Quo'}
+                width:26, height:14, borderRadius:7,
+                background: btn.active ? btn.color : 'rgba(255,255,255,.2)',
+                position:'relative', transition:'background .2s', flexShrink:0,
+              }}>
+                <div style={{
+                  position:'absolute', top:2,
+                  left: btn.active ? 13 : 2,
+                  width:10, height:10, borderRadius:5,
+                  background:'#F5F2EC', transition:'left .2s',
+                  boxShadow:'0 1px 2px rgba(0,0,0,.4)',
+                }}/>
               </div>
-              <div style={{fontSize:10,color:'#8DAFC8',lineHeight:1.1,marginTop:1}}>
-                {inputs.architectureEnabled ? 'All layers active' : 'Layers disabled'}
-              </div>
+              <span style={{fontSize:11, fontWeight: btn.active ? 700 : 400, color: btn.active ? btn.color : '#6A8A9A', whiteSpace:'nowrap'}}>
+                {btn.label}
+              </span>
             </div>
-          </div>
+          ))}
 
           <button
             onClick={()=>{ setReportSent(false); setReportError(false); setReportModal(true); }}
@@ -4259,79 +4290,6 @@ function App() {
 
         {/* ── RIGHT: Results ── */}
         <div className="right-panel" style={{overflowY:'auto',maxHeight:'calc(100vh - 69px)',padding:'20px 24px'}}>
-
-          {/* ── SCENARIO CONTROLS BAR ── */}
-          <div style={{
-            display:'flex', alignItems:'center', gap:8, flexWrap:'wrap',
-            marginBottom:14, padding:'10px 14px',
-            background:'rgba(10,14,20,.6)', border:'1px solid rgba(255,255,255,.1)',
-            borderRadius:10, backdropFilter:'blur(4px)',
-          }}>
-            <div style={{fontSize:11,fontWeight:700,letterSpacing:'.14em',textTransform:'uppercase',color:'#5A7A8A',marginRight:4,whiteSpace:'nowrap'}}>
-              Scenario
-            </div>
-
-            {/* Architecture toggle */}
-            {[
-              {
-                label: inputs.architectureEnabled ? 'Architecture ON' : 'Architecture OFF',
-                active: inputs.architectureEnabled,
-                color: '#C8A96E',
-                onClick: () => set('architectureEnabled', !inputs.architectureEnabled),
-              },
-              {
-                label: inputs.ltcEventEnabled ? 'Health Events ON' : 'Health Events OFF',
-                active: inputs.ltcEventEnabled || inputs.spouseLtcEventEnabled,
-                color: '#C47A7A',
-                onClick: () => {
-                  const next = !(inputs.ltcEventEnabled || inputs.spouseLtcEventEnabled);
-                  set('ltcEventEnabled', inputs.ltcEventAge > 0 ? next : false);
-                  set('spouseLtcEventEnabled', inputs.spouseLtcEventAge > 0 ? next : false);
-                },
-              },
-              {
-                label: inputs.sorrEnabled ? 'SORR Active' : 'SORR Off',
-                active: inputs.sorrEnabled,
-                color: '#C47A7A',
-                onClick: () => set('sorrEnabled', !inputs.sorrEnabled),
-              },
-              {
-                label: inputs.expenseShockEnabled ? 'Expense Shocks ON' : 'Expense Shocks OFF',
-                active: inputs.expenseShockEnabled,
-                color: '#C8A030',
-                onClick: () => set('expenseShockEnabled', !inputs.expenseShockEnabled),
-              },
-            ].map(btn => (
-              <div
-                key={btn.label}
-                onClick={btn.onClick}
-                style={{
-                  display:'flex', alignItems:'center', gap:7,
-                  padding:'5px 11px', borderRadius:20, cursor:'pointer',
-                  background: btn.active ? `${btn.color}18` : 'rgba(255,255,255,.04)',
-                  border: `1px solid ${btn.active ? btn.color : 'rgba(255,255,255,.1)'}`,
-                  transition:'all .2s',
-                }}
-              >
-                <div style={{
-                  width:28, height:15, borderRadius:8,
-                  background: btn.active ? btn.color : 'rgba(255,255,255,.15)',
-                  position:'relative', transition:'background .2s', flexShrink:0,
-                }}>
-                  <div style={{
-                    position:'absolute', top:2,
-                    left: btn.active ? 14 : 2,
-                    width:11, height:11, borderRadius:6,
-                    background:'#F5F2EC', transition:'left .2s',
-                    boxShadow:'0 1px 2px rgba(0,0,0,.4)',
-                  }}/>
-                </div>
-                <span style={{fontSize:12, fontWeight: btn.active ? 700 : 400, color: btn.active ? btn.color : '#6A8A9A', whiteSpace:'nowrap'}}>
-                  {btn.label}
-                </span>
-              </div>
-            ))}
-          </div>
 
           {/* SORR active warning banner */}
           {inputs.sorrEnabled && (
