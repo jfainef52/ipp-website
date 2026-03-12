@@ -1321,15 +1321,32 @@ function projectArc(inputs) {
       row.totalIncome = Math.max(0, row.totalIncome - totalAllInTax);
     }
 
-    // chartSources = spendable income only — excludes one-time capital reallocation draws
-    // (ETA funding, Roth conversion, LTC premium funding) that inflate bars but aren't spendable income
+    // chartSources strips only one-time capital reallocation draws that are NOT
+    // spendable income and shoot bars above expenses in a single year:
+    // ETA premium, Roth conversion amount+overage, LTC/spouse policy premium funding.
+    // Care-year gap-fill draws (ltcPortfolioDraw) stay in the bars -- those are real
+    // portfolio draws that cover care costs, so bars correctly meet the expense line.
     const nonSpendableRmd = (row.etaFundingAmount || 0)
       + (row.rothConversionAmount || 0) + (row.rothConversionOverage || 0)
       + (row.ltcFundingAmount || 0) + (row.spouseLtcFundingAmount || 0);
     row.chartSources = { ...row.sources };
-    if (nonSpendableRmd > 0 && row.chartSources.rmd) {
-      row.chartSources.rmd = Math.max(0, row.chartSources.rmd - nonSpendableRmd);
-      if (row.chartSources.rmd === 0) delete row.chartSources.rmd;
+    if (nonSpendableRmd > 0) {
+      let _stripRem = nonSpendableRmd;
+      if (row.chartSources.rmd) {
+        const _s = Math.min(row.chartSources.rmd, _stripRem);
+        row.chartSources.rmd -= _s; _stripRem -= _s;
+        if (row.chartSources.rmd === 0) delete row.chartSources.rmd;
+      }
+      if (_stripRem > 0 && row.chartSources.taxable) {
+        const _s = Math.min(row.chartSources.taxable, _stripRem);
+        row.chartSources.taxable -= _s; _stripRem -= _s;
+        if (row.chartSources.taxable === 0) delete row.chartSources.taxable;
+      }
+      if (_stripRem > 0 && row.chartSources.roth) {
+        const _s = Math.min(row.chartSources.roth, _stripRem);
+        row.chartSources.roth -= _s;
+        if (row.chartSources.roth === 0) delete row.chartSources.roth;
+      }
     }
 
     years.push(row);
