@@ -206,7 +206,7 @@ function seededRandom(seed) {
   };
 }
 
-function runMonteCarlo(startBalance, annualWithdraw, years, trials=1000, mean=0.065, inflation=0.028, ssIncome=0, fixedStreams=[], totalExpensesY1=0, ltcShockYear=-1, ltcShockAnnual=0, ltcShockDuration=0, spouseLtcShockYear=-1, spouseLtcShockAnnual=0, spouseLtcShockDuration=0, ltcCareInflation=0.04) {
+function runMonteCarlo(startBalance, annualWithdraw, years, trials=1000, mean=0.065, inflation=0.028, ssIncome=0, fixedStreams=[], totalExpensesY1=0, ltcShockYear=-1, ltcShockAnnual=0, ltcShockDuration=0, spouseLtcShockYear=-1, spouseLtcShockAnnual=0, spouseLtcShockDuration=0, ltcCareInflation=0.04, expenseShockAmount=0, expenseShockFrequency=8) {
   // ltcShockAnnual / spouseLtcShockAnnual: today's-dollar NET care costs.
   // MC grosses up by 1/(1-MC_TAX_RATE) and inflates to care-year dollars.
   // netDraw also grossed up — withdrawing $X net from IRA requires ~$X/(1-0.28) gross.
@@ -229,6 +229,8 @@ function runMonteCarlo(startBalance, annualWithdraw, years, trials=1000, mean=0.
     + (ltcShockYear * 333)
     + (spouseLtcShockAnnual * 0.0009)
     + (spouseLtcShockYear * 211)
+    + (expenseShockAmount * 0.0017)
+    + (expenseShockFrequency * 53)
     + streams.reduce((a, s) => a + s.annual * 0.003 + s.yearOffset * 17, 0)
   ) ^ 0xDEADBEEF;
   const rand = seededRandom(seedVal);
@@ -252,7 +254,10 @@ function runMonteCarlo(startBalance, annualWithdraw, years, trials=1000, mean=0.
       // Spouse care cost: independent event, same care inflation rate
       const spouseLtcShock = (spouseLtcShockYear >= 0 && y >= spouseLtcShockYear && y < spouseLtcShockYear + spouseLtcShockDuration)
         ? (spouseLtcShockAnnual * ltcCareInflFactor) / (1 - MC_TAX_RATE) : 0;
-      bal = bal * (1 + r) - grossDraw - ltcShock - spouseLtcShock;
+      // Expense shock — recurring unplanned expense every N years, inflation-adjusted, grossed up
+      const expShock = (expenseShockAmount > 0 && expenseShockFrequency > 0 && y % expenseShockFrequency === 0)
+        ? (expenseShockAmount * inflFactor) / (1 - MC_TAX_RATE) : 0;
+      bal = bal * (1 + r) - grossDraw - ltcShock - spouseLtcShock - expShock;
       if (bal <= 0) { failed = true; break; }
     }
     if (!failed) successes++;
@@ -1397,7 +1402,9 @@ function projectArc(inputs) {
     spouseLtcShockYear,
     spouseLtcShockAnnual,
     spouseLtcDuration,
-    ltcCareInflationRate
+    ltcCareInflationRate,
+    expenseShockEnabled ? (expenseShockAmount || 50000) : 0,
+    expenseShockEnabled ? (expenseShockFrequency || 8) : 0
   );
 
   return { years, confidence, fixedStreams, mcStartAge };
