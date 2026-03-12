@@ -1599,11 +1599,38 @@ function ArcChart({ data, view, insuredData, sorrEnabled }) {
                 />
               );
             })}
-            {/* LTC indicator */}
-            {d.ltcEvent && (
-              <line x1={xScale(i)} x2={xScale(i)} y1={PAD.t} y2={PAD.t+chartH}
-                stroke="rgba(196,106,106,.4)" strokeWidth="1.5" strokeDasharray="3,3"/>
-            )}
+            {/* Care event column highlight — primary */}
+            {d.ltcEvent && (() => {
+              const careH = (d.ltcAnnualCost || 0) / maxVal * chartH;
+              return (
+                <g>
+                  <rect x={xScale(i)-barW/2-1} y={PAD.t} width={barW+2} height={chartH}
+                    fill="rgba(196,106,106,.18)" rx="1"/>
+                  <rect x={xScale(i)-barW/2-1} y={Math.max(PAD.t, PAD.t+chartH-careH)} width={barW+2} height={Math.min(careH, chartH)}
+                    fill="rgba(196,106,106,.28)" rx="1"/>
+                  <text x={xScale(i)} y={PAD.t+14} textAnchor="middle"
+                    fill="#C47A7A" fontSize="9" fontFamily="DM Sans" fontWeight="700">
+                    🏥 CARE
+                  </text>
+                </g>
+              );
+            })()}
+            {/* Spouse care event column highlight */}
+            {d.spouseLtcEvent && (() => {
+              const spCareH = (d.spouseLtcAnnualCost || 0) / maxVal * chartH;
+              return (
+                <g>
+                  <rect x={xScale(i)-barW/2-1} y={PAD.t} width={barW+2} height={chartH}
+                    fill="rgba(196,106,106,.18)" rx="1"/>
+                  <rect x={xScale(i)-barW/2-1} y={Math.max(PAD.t, PAD.t+chartH-spCareH)} width={barW+2} height={Math.min(spCareH, chartH)}
+                    fill="rgba(196,106,106,.22)" rx="1"/>
+                  <text x={xScale(i)} y={PAD.t+14} textAnchor="middle"
+                    fill="#C47A7A" fontSize="9" fontFamily="DM Sans" fontWeight="700">
+                    🏥 CARE
+                  </text>
+                </g>
+              );
+            })()}
             {/* ETA Funding Event marker */}
             {d.etaFundingEvent && (
               <g>
@@ -4682,8 +4709,8 @@ function App() {
 
             {view === 'visual' ? (
               <>
-                <Legend insuredData={yearsInsured} data={yearsUninsured || yearsWithLtc}/>
-                <ArcChart data={yearsUninsured || yearsWithLtc} view={view} insuredData={yearsInsured} sorrEnabled={inputs.sorrEnabled}/>
+                <Legend insuredData={inputs.architectureEnabled ? yearsInsured : null} data={yearsWithLtc}/>
+                <ArcChart data={yearsWithLtc} view={view} insuredData={inputs.architectureEnabled ? yearsInsured : null} sorrEnabled={inputs.sorrEnabled}/>
                 {exhaustionYear && (
                   <div style={{
                     marginTop:8,
@@ -5096,9 +5123,9 @@ function App() {
                   {[
                     { label:'Total Care Costs', value: fmtD(totalCareCost), sub:`Inflated · today's dollars: ${fmtD(pTodayDollar + sTodayDollar)}`, color:'#C47A7A' },
                     { label:'Combined L2 Benefit', value: fmtD(totalBenefit), sub:'Total care cost covered by policy', color:'#4A9B7A' },
-                    { label:'Forced Portfolio Draws', value: totalDraws > 0 ? fmtD(totalDraws) : '—', sub: totalDraws === 0 ? 'None — policies absorb all' : 'Gross IRA/taxable drawn above income', color: totalDraws > 0 ? '#C47A7A' : '#4A9B7A' },
                     { label:'Gross-Up Tax Cost', value: totalGrossUpTax > 0 ? fmtD(totalGrossUpTax) : '—', sub: totalGrossUpTax > 0 ? 'Extra tax on forced IRA draws' : 'None — no forced IRA draws', color: totalGrossUpTax > 0 ? '#C47A7A' : '#4A9B7A' },
-                    { label:'Total Portfolio Preserved', value: fmtD(totalPreserved), sub:'Combined draws + tax + compounding', color: totalPreserved > 0 ? '#4A9B7A' : '#C47A7A' },
+                    { label:'Compounding Lost', value: fmtD(totalCompounding), sub:`${Math.round(inputs.portfolioReturn)}% return on depleted base`, color:'#C47A7A' },
+                    { label:'Total Portfolio Preserved', value: fmtD(totalPreserved), sub:'Care + tax + compounding', color: totalPreserved > 0 ? '#4A9B7A' : '#C47A7A' },
                   ].map(s => (
                     <div key={s.label} style={{background:'rgba(255,255,255,.03)',borderRadius:8,padding:'10px 12px',border:'1px solid rgba(200,169,110,.1)'}}>
                       <div style={{fontSize:12,color:'#8DAFC8',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:4}}>{s.label}</div>
