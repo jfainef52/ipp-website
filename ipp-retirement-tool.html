@@ -1514,20 +1514,27 @@ function ArcChart({ data, view, insuredData, uninsuredData, sorrEnabled }) {
   // Architecture mode = insuredData present (Architecture ON with LTC comparison)
   const archMode = !!insuredData;
 
-  // maxVal: both bars (totalIncome, net) and expense line (totalExpense, net) are on same basis
-  const maxVal = Math.max(
+  // maxVal: scale chart to the expense line with headroom.
+  // We use max totalExpense * 1.25 so bars that slightly exceed expenses still fit,
+  // but we don't let large RMD surplus years (where income >> expenses) blow out the scale.
+  // Also ensure the expense line itself always fits with 25% room.
+  const maxExpense = Math.max(
+    ...data.map(d => d.totalExpense || 0),
+    ...(insuredData ? insuredData.map(d => d.totalExpense || 0) : []),
+    ...(uninsuredData ? uninsuredData.map(d => d.totalExpense || 0) : [])
+  );
+  const maxBarNatural = Math.max(
     ...data.map(d => {
       const src = d.chartSources || d.sources;
-      const chartTotal = Object.values(src).reduce((s,v) => s+(v||0), 0);
-      return Math.max(chartTotal, d.totalExpense || 0);
+      return Object.values(src).reduce((s,v) => s+(v||0), 0);
     }),
     ...(insuredData ? insuredData.map(d => {
       const src = d.chartSources || d.sources;
-      const chartTotal = Object.values(src).reduce((s,v) => s+(v||0), 0);
-      return Math.max(chartTotal, d.totalExpense || 0);
-    }) : []),
-    ...(uninsuredData ? uninsuredData.map(d => d.totalExpense || 0) : [])
-  ) * 1.1;
+      return Object.values(src).reduce((s,v) => s+(v||0), 0);
+    }) : [])
+  );
+  // Cap bar-driven scale at 1.5x max expense; always show at least max expense * 1.25
+  const maxVal = Math.max(maxExpense * 1.25, Math.min(maxBarNatural, maxExpense * 1.5)) * 1.05;
   const barW = Math.max(4, Math.floor(chartW / data.length) - 2);
 
   const xScale = i => PAD.l + (i / (data.length - 1)) * chartW;
