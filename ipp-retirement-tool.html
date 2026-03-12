@@ -1321,36 +1321,17 @@ function projectArc(inputs) {
       row.totalIncome = Math.max(0, row.totalIncome - totalAllInTax);
     }
 
-    // chartSources: bars display baseline income, capped at totalExpense.
-    // Strip one-time capital reallocation draws, then cap total at totalExpense
-    // so bars always meet but never exceed the expense line.
+    // chartSources: strip only one-time capital reallocation draws that are not
+    // spendable income (ETA premium, Roth conversion, LTC/spouse policy premiums).
+    // All other draws — including care-year gap fills — stay in the bars so they
+    // correctly meet the expense line. No cap applied.
     const _capNonSpendable = (row.etaFundingAmount || 0)
       + (row.rothConversionAmount || 0) + (row.rothConversionOverage || 0)
       + (row.ltcFundingAmount || 0) + (row.spouseLtcFundingAmount || 0);
     row.chartSources = { ...row.sources };
-    // Step 1: strip capital reallocation draws from rmd
-    if (_capNonSpendable > 0) {
-      let _rem = _capNonSpendable;
-      if (row.chartSources.rmd) {
-        const _s = Math.min(row.chartSources.rmd, _rem);
-        row.chartSources.rmd -= _s; _rem -= _s;
-        if (row.chartSources.rmd === 0) delete row.chartSources.rmd;
-      }
-    }
-    // Step 2: cap total bar at totalExpense so bars never exceed expense line
-    if (row.totalExpense > 0) {
-      const _barTotal = Object.values(row.chartSources).reduce((a,b) => a+(b||0), 0);
-      if (_barTotal > row.totalExpense) {
-        let _excess = _barTotal - row.totalExpense;
-        for (const _k of ['rmd','taxable','roth','ss','pension','annuity','eta','parttime']) {
-          if (_excess <= 0) break;
-          if ((row.chartSources[_k] || 0) > 0) {
-            const _s = Math.min(row.chartSources[_k], _excess);
-            row.chartSources[_k] -= _s; _excess -= _s;
-            if (row.chartSources[_k] === 0) delete row.chartSources[_k];
-          }
-        }
-      }
+    if (_capNonSpendable > 0 && row.chartSources.rmd) {
+      row.chartSources.rmd = Math.max(0, row.chartSources.rmd - _capNonSpendable);
+      if (row.chartSources.rmd === 0) delete row.chartSources.rmd;
     }
     years.push(row);
   }
