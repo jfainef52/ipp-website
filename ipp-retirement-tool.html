@@ -2282,7 +2282,7 @@ function App() {
   const [reportSent, setReportSent] = useState(false);
   const [reportError, setReportError] = useState(false);
   const [clientInfo, setClientInfo] = useState({
-    primaryName: '', spouseName: '', advisorEmail: '',
+    primaryName: '', spouseName: '', advisorEmail: '', advisorName: '',
   });
   const [sections, setSections] = useState({
     basic: true, ss: true, spouseSs: true, widower: true, pension: true, portfolio: true, income: true,
@@ -2919,7 +2919,7 @@ function App() {
   <div style="background:#1A2B3C;padding:16px 36px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
     <div>
       <div style="font-size:12px;color:#C8A96E;font-weight:600;margin-bottom:2px;">Integrated Planning Partners</div>
-      <div style="font-size:11px;color:#7A9AB8;">Jeffrey Faine, CLU, RICP® &nbsp;·&nbsp; support@integratedplanningpartners.com</div>
+      <div style="font-size:11px;color:#7A9AB8;">${clientInfo.advisorName || 'Jeffrey Faine, CLU, RICP®'} &nbsp;·&nbsp; ${clientInfo.advisorEmail || 'support@integratedplanningpartners.com'}</div>
     </div>
     <div style="text-align:right;">
       <div style="font-size:11px;color:#7A9AB8;">IncomeArc™ is a proprietary methodology</div>
@@ -3160,6 +3160,15 @@ function App() {
                   />
                 </div>
               )}
+              <div>
+                <div style={{fontSize:12,color:'#8DAFC8',marginBottom:3,letterSpacing:'.04em'}}>ADVISOR NAME</div>
+                <input
+                  value={clientInfo.advisorName}
+                  onChange={e=>setClientInfo(p=>({...p,advisorName:e.target.value}))}
+                  placeholder="e.g. Jeffrey Faine, CLU, RICP®"
+                  style={{width:'100%',background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.1)',borderRadius:6,padding:'7px 10px',fontSize:13,color:'#F5F2EC',outline:'none',fontFamily:"'DM Sans',sans-serif"}}
+                />
+              </div>
               <div>
                 <div style={{fontSize:12,color:'#8DAFC8',marginBottom:3,letterSpacing:'.04em'}}>ADVISOR EMAIL (SEND REPORT TO)</div>
                 <input
