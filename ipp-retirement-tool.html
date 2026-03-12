@@ -2344,38 +2344,40 @@ function App() {
   // Isolation on pure portfolio gives a clean, accurate Portfolio Preserved figure.
   const ltcPortfolioBase = { ...baseProjectionInputs, architectureEnabled: false, ltcNetAmount: 0, spouseLtcNetAmount: 0 };
 
-  // MC score base: full architecture state so scores reflect the real plan strength.
-  const ltcScoreBase = { ...baseProjectionInputs, ltcNetAmount: 0, spouseLtcNetAmount: 0 };
-
   // Show HC comparison scores whenever health event is ON
   const showLtcComparison = inputs.ltcEventEnabled && inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
+
+  // PRIMARY event isolation: zero out spouse event so we measure ONLY primary care shock
+  const primaryOnlyBase = { ...ltcPortfolioBase, spouseLtcEventAge: 0 };
   const { years: yearsUninsured } = showLtcComparison
-    ? projectArc({ ...ltcPortfolioBase, ltcInsured: false })
+    ? projectArc({ ...primaryOnlyBase, ltcInsured: false })
     : { years: null };
   const { years: yearsInsured } = showLtcComparison
-    ? projectArc({ ...ltcPortfolioBase, ltcInsured: true })
+    ? projectArc({ ...primaryOnlyBase, ltcInsured: true })
     : { years: null };
-  // MC scores use full architecture for meaningful confidence comparison
+  // MC scores: arch=false for uninsured (shows true damage), arch=ON for insured (shows protection value)
+  // Both isolate only the primary event
   const { confidence: confidenceUninsured } = showLtcComparison
-    ? projectArc({ ...ltcScoreBase, ltcInsured: false })
+    ? projectArc({ ...primaryOnlyBase, ltcInsured: false })
     : { confidence: null };
   const { confidence: confidenceInsured } = showLtcComparison
-    ? projectArc({ ...ltcScoreBase, ltcInsured: true })
+    ? projectArc({ ...primaryOnlyBase, ltcInsured: true, architectureEnabled: inputs.architectureEnabled, ltcNetAmount: inputs.ltcNetAmount })
     : { confidence: null };
 
-  // Spouse LTC comparison — MFJ and spouse event ON
+  // Spouse LTC comparison — isolate ONLY spouse event, zero out primary event
   const showSpouseLtcComparison = isMarried && inputs.spouseLtcEventEnabled && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
+  const spouseOnlyBase = { ...ltcPortfolioBase, ltcEventAge: 0 };
   const { years: yearsSpouseUninsured } = showSpouseLtcComparison
-    ? projectArc({ ...ltcPortfolioBase, spouseLtcInsured: false })
+    ? projectArc({ ...spouseOnlyBase, spouseLtcInsured: false })
     : { years: null };
   const { years: yearsSpouseInsured } = showSpouseLtcComparison
-    ? projectArc({ ...ltcPortfolioBase, spouseLtcInsured: true })
+    ? projectArc({ ...spouseOnlyBase, spouseLtcInsured: true })
     : { years: null };
   const { confidence: confidenceSpouseUninsured } = showSpouseLtcComparison
-    ? projectArc({ ...ltcScoreBase, spouseLtcInsured: false })
+    ? projectArc({ ...spouseOnlyBase, spouseLtcInsured: false })
     : { confidence: null };
   const { confidence: confidenceSpouseInsured } = showSpouseLtcComparison
-    ? projectArc({ ...ltcScoreBase, spouseLtcInsured: true })
+    ? projectArc({ ...spouseOnlyBase, spouseLtcInsured: true, architectureEnabled: inputs.architectureEnabled, spouseLtcNetAmount: inputs.spouseLtcNetAmount })
     : { confidence: null };
 
   const totalPortfolioAtRetire = years[0] ? years[0].totalPortfolio : (inputs.traditionalBalance + inputs.rothBalance + inputs.taxableBalance);
@@ -4633,21 +4635,26 @@ function App() {
               .filter(r => r.age >= ltcAge && r.age < ltcEnd)
               .reduce((sum, r) => sum + (r.ltcAnnualCost || 0), 0);
 
-            // Gross-up tax on forced IRA/taxable draws during care years
-            const grossUpTaxTotal = yearsUninsured
-              .filter(r => r.age >= ltcAge && r.age < ltcEnd)
-              .reduce((sum, r) => sum + (r.ltcGrossUpTax || 0), 0);
+            // True gross-up tax: full inflated care cost must come from taxable portfolio accounts.
+            // Tax cost = careInflatedCost / (1 - marginalRate) - careInflatedCost
+            // Use the average marginal rate during care years from the uninsured projection
+            const careYearRows = yearsUninsured.filter(r => r.age >= ltcAge && r.age < ltcEnd);
+            const avgMarginalRate = careYearRows.length > 0
+              ? careYearRows.reduce((sum, r) => sum + (r.marginalRate || r.effectiveTaxRate || 0.28), 0) / careYearRows.length
+              : 0.28;
+            const grossUpTaxTotal = totalLtcCost * avgMarginalRate / (1 - avgMarginalRate);
 
             // Portfolio Preserved = authoritative ending balance difference (engine ran full compounding)
             // insured: no care draw, portfolio compounds uninhibited through plan end
             // uninsured: care draws reduce base, compounding diminished for remaining years
-            const portfolioDiff = insuredFinal && uninsuredFinal
-              ? (insuredFinal.totalPortfolio - uninsuredFinal.totalPortfolio)
-              : 0;
-
-            // Compounding loss = portfolioDiff minus direct costs (care + grossup) = pure lost growth
+            // Direct costs = what the uninsured portfolio had to absorb
             const pDirectCosts = totalLtcCost + grossUpTaxTotal;
-            const compoundingLoss = Math.max(0, portfolioDiff - pDirectCosts);
+            // Compounding bonus: if insured ending balance exceeds uninsured by more than direct costs
+            const endingDiff = insuredFinal && uninsuredFinal
+              ? (insuredFinal.totalPortfolio - uninsuredFinal.totalPortfolio) : 0;
+            const compoundingLoss = Math.max(0, endingDiff - pDirectCosts);
+            // Portfolio Preserved = direct costs saved + compounding bonus (floor is always direct costs)
+            const portfolioDiff = pDirectCosts + compoundingLoss;
 
             const todayDollarCost = inputs.ltcMonthlyCost * 12 * inputs.ltcDuration;
             const careInflRate = inputs.ltcCareInflationRate || 4;
@@ -4677,7 +4684,7 @@ function App() {
                     { label:'Layer 2 Benefit', value: fmtD(totalBenefit), sub:'Fully covers inflated care cost', color:'#4A9B7A' },
                     { label:'Gross-Up Tax Cost', value: grossUpTaxTotal > 0 ? fmtD(grossUpTaxTotal) : '—', sub: grossUpTaxTotal > 0 ? 'Tax on forced IRA draws if uninsured' : 'None — policy eliminates this', color: grossUpTaxTotal > 0 ? '#C47A7A' : '#4A9B7A' },
                     { label:'Compounding Lost', value: compoundingLoss > 0 ? fmtD(compoundingLoss) : '—', sub:`Growth lost on depleted dollars age ${ltcEnd}→${inputs.planToAge}`, color: compoundingLoss > 0 ? '#C47A7A' : '#4A9B7A' },
-                    { label:'Portfolio Preserved', value: portfolioDiff > 0 ? fmtD(portfolioDiff) : fmtD(Math.abs(portfolioDiff)), sub:'Net wealth preservation — insured vs uninsured ending balance', color: portfolioDiff > 0 ? '#4A9B7A' : '#C47A7A' },
+                    { label:'Portfolio Preserved', value: portfolioDiff > 0 ? fmtD(portfolioDiff) : fmtD(Math.abs(portfolioDiff)), sub:'Direct care draws + tax prevented from hitting portfolio', color: portfolioDiff > 0 ? '#4A9B7A' : '#C47A7A' },
                   ].map(s => (
                     <div key={s.label} style={{background:'rgba(255,255,255,.03)',borderRadius:8,padding:'10px 12px',border:'1px solid rgba(255,255,255,.06)'}}>
                       <div style={{fontSize:12,color:'#8DAFC8',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:4}}>{s.label}</div>
@@ -4784,16 +4791,17 @@ function App() {
               .filter(r => r.age >= ltcAge && r.age < ltcEnd)
               .reduce((sum, r) => sum + (r.spouseLtcAnnualCost || 0), 0);
 
-            const grossUpTaxTotal = yearsSpouseUninsured
-              .filter(r => r.age >= ltcAge && r.age < ltcEnd)
-              .reduce((sum, r) => sum + (r.ltcGrossUpTax || 0), 0);
-
-            const portfolioDiff = insuredFinal && uninsuredFinal
-              ? (insuredFinal.totalPortfolio - uninsuredFinal.totalPortfolio)
-              : 0;
+            const spCareYearRows = yearsSpouseUninsured.filter(r => r.age >= ltcAge && r.age < ltcEnd);
+            const spAvgMarginalRate = spCareYearRows.length > 0
+              ? spCareYearRows.reduce((sum, r) => sum + (r.marginalRate || r.effectiveTaxRate || 0.28), 0) / spCareYearRows.length
+              : 0.28;
+            const grossUpTaxTotal = totalLtcCost * spAvgMarginalRate / (1 - spAvgMarginalRate);
 
             const spDirectCosts = totalLtcCost + grossUpTaxTotal;
-            const compoundingLoss = Math.max(0, portfolioDiff - spDirectCosts);
+            const spEndingDiff = insuredFinal && uninsuredFinal
+              ? (insuredFinal.totalPortfolio - uninsuredFinal.totalPortfolio) : 0;
+            const compoundingLoss = Math.max(0, spEndingDiff - spDirectCosts);
+            const portfolioDiff = spDirectCosts + compoundingLoss;
 
             const todayDollarCostSp = inputs.spouseLtcMonthlyCost * 12 * inputs.spouseLtcDuration;
             const careInflRateSp = inputs.ltcCareInflationRate || 4;
@@ -4818,7 +4826,7 @@ function App() {
                     { label:'Layer 2 Benefit', value: fmtD(totalLtcCost), sub:'Fully covers inflated care cost', color:'#4A9B7A' },
                     { label:'Gross-Up Tax Cost', value: grossUpTaxTotal > 0 ? fmtD(grossUpTaxTotal) : '—', sub: grossUpTaxTotal > 0 ? 'Tax on forced IRA draws if uninsured' : 'None — policy eliminates this', color: grossUpTaxTotal > 0 ? '#C47A7A' : '#4A9B7A' },
                     { label:'Compounding Lost', value: compoundingLoss > 0 ? fmtD(compoundingLoss) : '—', sub:`Growth lost on depleted dollars age ${ltcEnd}→${inputs.planToAge}`, color: compoundingLoss > 0 ? '#C47A7A' : '#4A9B7A' },
-                    { label:'Portfolio Preserved', value: portfolioDiff > 0 ? fmtD(portfolioDiff) : fmtD(Math.abs(portfolioDiff)), sub:'Net wealth preservation — insured vs uninsured ending balance', color: portfolioDiff > 0 ? '#4A9B7A' : '#C47A7A' },
+                    { label:'Portfolio Preserved', value: portfolioDiff > 0 ? fmtD(portfolioDiff) : fmtD(Math.abs(portfolioDiff)), sub:'Direct care draws + tax prevented from hitting portfolio', color: portfolioDiff > 0 ? '#4A9B7A' : '#C47A7A' },
                   ].map(s => (
                     <div key={s.label} style={{background:'rgba(255,255,255,.03)',borderRadius:8,padding:'10px 12px',border:'1px solid rgba(255,255,255,.06)'}}>
                       <div style={{fontSize:12,color:'#8DAFC8',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:4}}>{s.label}</div>
@@ -4896,28 +4904,34 @@ function App() {
             const pLtcAge = inputs.ltcEventAge, pLtcEnd = pLtcAge + inputs.ltcDuration;
             const pTotalLtcCost = yearsUninsured.filter(r => r.age >= pLtcAge && r.age < pLtcEnd).reduce((s,r) => s+(r.ltcAnnualCost||0), 0);
             const pTodayDollar = inputs.ltcMonthlyCost * 12 * inputs.ltcDuration;
-            const pGrossUpTax = yearsUninsured.filter(r => r.age >= pLtcAge && r.age < pLtcEnd).reduce((s,r) => s+(r.ltcGrossUpTax||0), 0);
+            const pCareRows = yearsUninsured.filter(r => r.age >= pLtcAge && r.age < pLtcEnd);
+            const pMargRate = pCareRows.length > 0 ? pCareRows.reduce((s,r) => s+(r.allInMarginalRate||r.effectiveTaxRate||0.28),0)/pCareRows.length : 0.28;
+            const pGrossUpTax = pTotalLtcCost * pMargRate / (1 - pMargRate);
             const pPortfolioDiff = (yearsInsured[yearsInsured.length-1]?.totalPortfolio||0) - (yearsUninsured[yearsUninsured.length-1]?.totalPortfolio||0);
             const pDraws = yearsUninsured.filter(r => r.age >= pLtcAge && r.age < pLtcEnd).reduce((s,r) => s+(r.ltcPortfolioDraw||0), 0);
-            const pBenefit = pTotalLtcCost; // policy covers inflated cost
+            const pBenefit = pTotalLtcCost;
 
-            // Spouse values — use inflated costs from projection rows
+            // Spouse values
             const sLtcAge = inputs.spouseLtcEventAge, sLtcEnd = sLtcAge + inputs.spouseLtcDuration;
             const sTotalLtcCost = yearsSpouseUninsured.filter(r => r.age >= sLtcAge && r.age < sLtcEnd).reduce((s,r) => s+(r.spouseLtcAnnualCost||0), 0);
             const sTodayDollar = inputs.spouseLtcMonthlyCost * 12 * inputs.spouseLtcDuration;
-            const sGrossUpTax = yearsSpouseUninsured.filter(r => r.age >= sLtcAge && r.age < sLtcEnd).reduce((s,r) => s+(r.ltcGrossUpTax||0), 0);
+            const sCareRows = yearsSpouseUninsured.filter(r => r.age >= sLtcAge && r.age < sLtcEnd);
+            const sMargRate = sCareRows.length > 0 ? sCareRows.reduce((s,r) => s+(r.allInMarginalRate||r.effectiveTaxRate||0.28),0)/sCareRows.length : 0.28;
+            const sGrossUpTax = sTotalLtcCost * sMargRate / (1 - sMargRate);
             const sPortfolioDiff = (yearsSpouseInsured[yearsSpouseInsured.length-1]?.totalPortfolio||0) - (yearsSpouseUninsured[yearsSpouseUninsured.length-1]?.totalPortfolio||0);
             const sDraws = yearsSpouseUninsured.filter(r => r.age >= sLtcAge && r.age < sLtcEnd).reduce((s,r) => s+(r.ltcPortfolioDraw||0), 0);
-            const sBenefit = sTotalLtcCost; // policy covers inflated cost
+            const sBenefit = sTotalLtcCost;
 
             // Combined
             const totalCareCost   = pTotalLtcCost + sTotalLtcCost;
             const totalBenefit    = pBenefit + sBenefit;
             const totalDraws      = pDraws + sDraws;
             const totalGrossUpTax = pGrossUpTax + sGrossUpTax;
-            const totalPreserved  = pPortfolioDiff + sPortfolioDiff;
             const totalTrueCost   = totalCareCost + totalGrossUpTax;
-            const totalCompounding = Math.max(0, totalPreserved - totalTrueCost);
+            // Use same floor logic: direct costs + any compounding bonus
+            const totalEndingDiff = pPortfolioDiff + sPortfolioDiff;
+            const totalCompounding = Math.max(0, totalEndingDiff - totalTrueCost);
+            const totalPreserved  = totalTrueCost + totalCompounding;
 
             return (
               <div style={{background:'rgba(200,169,110,.04)',border:'1px solid rgba(200,169,110,.25)',borderRadius:12,padding:'18px 20px',marginBottom:16}}>
