@@ -512,6 +512,9 @@ function projectArc(inputs) {
     portfolioReturn = 0.065,
     inflation = 0.028,
     sorrEnabled = false,
+    expenseShockEnabled = false,
+    expenseShockAmount = 50000,
+    expenseShockFrequency = 8,
     annualTradContribution = 0,
     tradContributionEndAge = 0,
     annualTaxableContribution = 0,
@@ -910,6 +913,16 @@ function projectArc(inputs) {
       row.spouseLtcCoverage = spBenefitCoverage;
       row.spouseLtcUncovered = spUncoveredLtcCost;
       row.spouseLtcInflFactor = spLtcInflFactor;
+    }
+
+    // Expense shock — recurring unplanned expense every N years (e.g. $50K every 8 years)
+    if (expenseShockEnabled && expenseShockAmount > 0 && expenseShockFrequency > 0) {
+      const yearsIntoRetirement = age - retireAge;
+      if (yearsIntoRetirement >= 0 && yearsIntoRetirement % expenseShockFrequency === 0) {
+        const shockInflated = expenseShockAmount * inflFactor;
+        expenses += shockInflated;
+        row.expenseShockAmount = shockInflated;
+      }
     }
 
     row.totalExpense = expenses;
@@ -1643,6 +1656,25 @@ function ArcChart({ data, view, insuredData, sorrEnabled }) {
                 </text>
               </g>
             )}
+            {/* Expense shock marker */}
+            {d.expenseShockAmount > 0 && (() => {
+              const cx = xScale(i);
+              const labelY = PAD.t + 52;
+              return (
+                <g>
+                  <line x1={cx} x2={cx} y1={PAD.t} y2={PAD.t + chartH}
+                    stroke="rgba(200,160,48,.5)" strokeWidth="1.5" strokeDasharray="3,3"/>
+                  <text x={cx} y={labelY} textAnchor="middle"
+                    fill="#C8A030" fontSize="13" fontFamily="DM Sans" fontWeight="700">
+                    ⚡
+                  </text>
+                  <text x={cx} y={labelY + 12} textAnchor="middle"
+                    fill="#C8A030" fontSize="8" fontFamily="DM Sans" fontWeight="700" letterSpacing="0.06em">
+                    SHOCK
+                  </text>
+                </g>
+              );
+            })()}
           </g>
         );
       })}
@@ -2086,10 +2118,22 @@ function DebitsTable({ data, inputs }) {
 
 
 // ── Legend ──
-function Legend({ insuredData }) {
+function Legend({ insuredData, data }) {
+  // Only show sources that have non-zero values in the data
+  const activeSources = new Set();
+  if (data) {
+    data.forEach(d => {
+      Object.entries(d.sources || {}).forEach(([k, v]) => {
+        if (v > 0) activeSources.add(k);
+      });
+    });
+  }
+  const hasShocks = data && data.some(d => (d.expenseShockAmount || 0) > 0);
+  const hasIrmaa = data && data.some(d => (d.irmaa || 0) > 0);
+
   return (
     <div style={{display:'flex',flexWrap:'wrap',gap:'8px 16px',marginBottom:16}}>
-      {Object.entries(COLORS).filter(([k])=>k!=='expense').map(([k,v])=>(
+      {Object.entries(COLORS).filter(([k]) => k !== 'expense' && k !== 'fedtax' && k !== 'statetax' && activeSources.has(k)).map(([k,v])=>(
         <div key={k} style={{display:'flex',alignItems:'center',gap:5}}>
           <div style={{width:10,height:10,borderRadius:2,background:v.fill,flexShrink:0}}/>
           <span style={{fontSize:13,color:'#9EB8CC'}}>{v.label}</span>
@@ -2110,11 +2154,19 @@ function Legend({ insuredData }) {
           <span style={{fontSize:13,color:'#4A9B7A'}}>Expenses — Layer 2 Insured</span>
         </div>
       )}
-      <div style={{display:'flex',alignItems:'center',gap:5}}>
-        <div style={{width:10,height:10,borderRadius:2,background:'#E8943A',opacity:.7,flexShrink:0}}/>
-        <span style={{fontSize:13,color:'#9EB8CC'}}>IRMAA Surcharge</span>
-        <span style={{fontSize:13,color:'#E8943A',background:'rgba(255,255,255,.04)',padding:'1px 5px',borderRadius:3}}>Sub-panel below</span>
-      </div>
+      {hasShocks && (
+        <div style={{display:'flex',alignItems:'center',gap:5}}>
+          <span style={{fontSize:13}}>⚡</span>
+          <span style={{fontSize:13,color:'#C8A030'}}>Expense Shock</span>
+        </div>
+      )}
+      {hasIrmaa && (
+        <div style={{display:'flex',alignItems:'center',gap:5}}>
+          <div style={{width:10,height:10,borderRadius:2,background:'#E8943A',opacity:.7,flexShrink:0}}/>
+          <span style={{fontSize:13,color:'#9EB8CC'}}>IRMAA Surcharge</span>
+          <span style={{fontSize:13,color:'#E8943A',background:'rgba(255,255,255,.04)',padding:'1px 5px',borderRadius:3}}>Sub-panel below</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -4623,7 +4675,7 @@ function App() {
 
             {view === 'visual' ? (
               <>
-                <Legend insuredData={yearsInsured}/>
+                <Legend insuredData={yearsInsured} data={yearsUninsured || yearsWithLtc}/>
                 <ArcChart data={yearsUninsured || yearsWithLtc} view={view} insuredData={yearsInsured} sorrEnabled={inputs.sorrEnabled}/>
                 {exhaustionYear && (
                   <div style={{
