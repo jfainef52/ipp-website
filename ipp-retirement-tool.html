@@ -1536,7 +1536,35 @@ function ArcChart({ data, view, insuredData, sorrEnabled }) {
     `${i === 0 ? 'M' : 'L'} ${xScale(i).toFixed(1)} ${yScale(d.baseExpense || d.totalExpense || 0).toFixed(1)}`
   ).join(' ') : null;
 
-  // Source keys in stack order
+  // Pre-compute care event bands: one band per distinct event period
+  // Each band spans from the first to last year with that event flag
+  const careEventBands = (() => {
+    const bands = [];
+    // Primary LTC event
+    const ltcRows = data.reduce((acc, d, i) => { if (d.ltcEvent) acc.push(i); return acc; }, []);
+    if (ltcRows.length > 0) bands.push({ indices: ltcRows, label: 'HC Event', color: 'rgba(196,106,106,' });
+    // Spouse LTC event
+    const spLtcRows = data.reduce((acc, d, i) => { if (d.spouseLtcEvent) acc.push(i); return acc; }, []);
+    if (spLtcRows.length > 0) bands.push({ indices: spLtcRows, label: 'Spouse HC', color: 'rgba(196,120,180,' });
+    return bands;
+  })();
+
+  // Care-event-only expense path — rendered thicker on top of main line to highlight spike
+  const careExpensePath = !archMode ? (() => {
+    const segs = [];
+    let current = [];
+    data.forEach((d, i) => {
+      if (d.ltcEvent || d.spouseLtcEvent) {
+        current.push(`${current.length === 0 ? 'M' : 'L'} ${xScale(i).toFixed(1)} ${yScale(d.totalExpense || 0).toFixed(1)}`);
+      } else if (current.length > 0) {
+        segs.push(current.join(' '));
+        current = [];
+      }
+    });
+    if (current.length > 0) segs.push(current.join(' '));
+    return segs.length > 0 ? segs.join(' M ') : null;
+  })() : null;
+
   const sourceKeys = ['ss','pension','annuity','qualAnnuity','parttime','roth','eta','taxable','rmd'];
 
   const fmt = v => v >= 1000000 ? `$${(v/1000000).toFixed(1)}M` : v >= 1000 ? `$${Math.round(v/1000)}K` : `$${Math.round(v)}`;
@@ -1577,6 +1605,38 @@ function ArcChart({ data, view, insuredData, sorrEnabled }) {
         );
       })}
 
+      {/* Care event bands — rendered behind bars, one clean span per event period */}
+      {careEventBands.map((band, bi) => {
+        const x0 = xScale(band.indices[0]) - barW/2 - 2;
+        const x1 = xScale(band.indices[band.indices.length-1]) + barW/2 + 2;
+        const bandW = x1 - x0;
+        const midX = (x0 + x1) / 2;
+        const startAge = data[band.indices[0]]?.age;
+        const endAge = data[band.indices[band.indices.length-1]]?.age;
+        const labelY = PAD.t - 6;
+        return (
+          <g key={bi}>
+            {/* Shaded band behind bars */}
+            <rect x={x0} y={PAD.t} width={bandW} height={chartH}
+              fill={`${band.color}0.09)`} rx="2"/>
+            {/* Left dotted boundary */}
+            <line x1={x0} x2={x0} y1={PAD.t} y2={PAD.t + chartH}
+              stroke={`${band.color}0.7)`} strokeWidth="1.5" strokeDasharray="4,3"/>
+            {/* Right dotted boundary */}
+            <line x1={x1} x2={x1} y1={PAD.t} y2={PAD.t + chartH}
+              stroke={`${band.color}0.7)`} strokeWidth="1.5" strokeDasharray="4,3"/>
+            {/* Top bracket line */}
+            <line x1={x0} x2={x1} y1={PAD.t} y2={PAD.t}
+              stroke={`${band.color}0.5)`} strokeWidth="1"/>
+            {/* Label above chart */}
+            <text x={midX} y={labelY} textAnchor="middle"
+              fill={`${band.color}0.85)`} fontSize="9" fontFamily="DM Sans" fontWeight="600" letterSpacing="0.04em">
+              {band.label} {startAge}–{endAge}
+            </text>
+          </g>
+        );
+      })}
+
       {/* Stacked bars */}
       {data.map((d, i) => {
         let yBottom = PAD.t + chartH;
@@ -1599,38 +1659,6 @@ function ArcChart({ data, view, insuredData, sorrEnabled }) {
                 />
               );
             })}
-            {/* Care event column highlight — primary */}
-            {d.ltcEvent && (() => {
-              const careH = (d.ltcAnnualCost || 0) / maxVal * chartH;
-              return (
-                <g>
-                  <rect x={xScale(i)-barW/2-1} y={PAD.t} width={barW+2} height={chartH}
-                    fill="rgba(196,106,106,.18)" rx="1"/>
-                  <rect x={xScale(i)-barW/2-1} y={Math.max(PAD.t, PAD.t+chartH-careH)} width={barW+2} height={Math.min(careH, chartH)}
-                    fill="rgba(196,106,106,.28)" rx="1"/>
-                  <text x={xScale(i)} y={PAD.t+14} textAnchor="middle"
-                    fill="#C47A7A" fontSize="9" fontFamily="DM Sans" fontWeight="700">
-                    🏥 CARE
-                  </text>
-                </g>
-              );
-            })()}
-            {/* Spouse care event column highlight */}
-            {d.spouseLtcEvent && (() => {
-              const spCareH = (d.spouseLtcAnnualCost || 0) / maxVal * chartH;
-              return (
-                <g>
-                  <rect x={xScale(i)-barW/2-1} y={PAD.t} width={barW+2} height={chartH}
-                    fill="rgba(196,106,106,.18)" rx="1"/>
-                  <rect x={xScale(i)-barW/2-1} y={Math.max(PAD.t, PAD.t+chartH-spCareH)} width={barW+2} height={Math.min(spCareH, chartH)}
-                    fill="rgba(196,106,106,.22)" rx="1"/>
-                  <text x={xScale(i)} y={PAD.t+14} textAnchor="middle"
-                    fill="#C47A7A" fontSize="9" fontFamily="DM Sans" fontWeight="700">
-                    🏥 CARE
-                  </text>
-                </g>
-              );
-            })()}
             {/* ETA Funding Event marker */}
             {d.etaFundingEvent && (
               <g>
@@ -1717,6 +1745,13 @@ function ArcChart({ data, view, insuredData, sorrEnabled }) {
       <path d={expensePath} fill="none" stroke="url(#grad-expense)" strokeWidth="2"
         strokeDasharray="2000" strokeDashoffset="0" filter="url(#glow)"
         style={{animation:'arcDraw 1.5s ease both'}}/>
+
+      {/* Care event expense highlight — thicker segment during care years to show spike clearly */}
+      {careExpensePath && (
+        <path d={careExpensePath} fill="none" stroke="#C47A7A" strokeWidth="4"
+          strokeLinecap="round" opacity="0.85" filter="url(#glow)"
+          style={{animation:'arcDraw 1.5s ease both'}}/>
+      )}
 
       {/* Expense line — Insured / Architecture base (flat — no LTC spike) */}
       {insuredExpensePath && (
@@ -2392,7 +2427,7 @@ function App() {
   const { years: yearsClean, confidence: confidenceClean, fixedStreams, mcStartAge } = projectArc({ ...baseProjectionInputs, ltcInsured: false, ltcEventAge: 0, spouseLtcEventAge: 0 });
 
   const hasLtcEvent = inputs.ltcEventEnabled && inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
-  const hasSpouseLtcEvent = inputs.spouseLtcEventEnabled && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
+  const hasSpouseLtcEvent = (inputs.filingStatus === 'mfj') && inputs.spouseLtcEventEnabled && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
 
   // When health events are ON and architecture is OFF: yearsWithLtc drives the chart AND the main MC score
   // This lets the advisor stack SORR + expense shock + healthcare to show the "perfect storm"
