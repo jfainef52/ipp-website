@@ -2468,744 +2468,6 @@ function App() {
   // Portfolio exhaustion — used by both LTC comparison panels and narrative report
   const exhaustionYear = yearsWithLtc.find(y => y.totalPortfolio < 1000) || null;
 
-  // ── Generate Print Report ──
-  // Builds the full IncomeArc™ narrative PDF (matching build_pdf_v5.py structure)
-  // entirely from live React state, then opens a print window with window.print().
-  const generatePrintReport = useCallback(() => {
-    const isMFJ = inputs.filingStatus === 'mfj';
-    const clientLabel = clientInfo.primaryName || 'Client';
-    const spouseLabel = isMFJ && clientInfo.spouseName ? ` & ${clientInfo.spouseName}` : '';
-    const fullName = clientLabel + spouseLabel;
-    const advisorName = clientInfo.advisorName || 'Jeffrey Faine, CLU, RICP®';
-    const rAge = inputs.retireAge;
-    const pAge = inputs.planToAge;
-    const stateLabel = (STATE_TAX_DATA[inputs.stateCode]?.name) || inputs.stateCode;
-    const year = new Date().getFullYear();
-    const dateStr = new Date().toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
-
-    // ── Format helpers ──
-    const fmtD = v => {
-      if (v === null || v === undefined) return '—';
-      const n = Math.round(v);
-      if (n >= 1000000) return '$' + (n / 1000000).toFixed(2) + 'M';
-      if (n >= 1000) return '$' + (n / 1000).toFixed(0) + 'K';
-      return '$' + n.toLocaleString();
-    };
-    const fmtDFull = v => '$' + Math.round(v||0).toLocaleString();
-    const fmtPct = v => Math.round((v||0) * 100) + '%';
-    const confLabel = c => c >= 85 ? 'Strong' : c >= 70 ? 'Moderate' : 'At Risk';
-    const confColor = c => c >= 85 ? '#2A9D8F' : c >= 70 ? '#C8A030' : '#C0392B';
-
-    // ── Run all 6 MC scenarios ──
-    const bpi = baseProjectionInputs; // already computed above
-    const sqBase   = { ...bpi, architectureEnabled: false, sorrEnabled: false, expenseShockEnabled: false, ltcEventAge: 0, spouseLtcEventAge: 0 };
-    const hcBase   = { ...sqBase, ltcEventAge: inputs.ltcEventAge||0, spouseLtcEventAge: isMFJ ? (inputs.spouseLtcEventAge||0) : 0, ltcMonthlyCost: inputs.ltcMonthlyCost, spouseLtcMonthlyCost: inputs.spouseLtcMonthlyCost, ltcDuration: inputs.ltcDuration, spouseLtcDuration: inputs.spouseLtcDuration, ltcInsured: false, spouseLtcInsured: false, ltcCareInflationRate: bpi.ltcCareInflationRate };
-    const hcArch   = { ...bpi, ltcEventAge: inputs.ltcEventAge||0, spouseLtcEventAge: isMFJ ? (inputs.spouseLtcEventAge||0) : 0, ltcMonthlyCost: inputs.ltcMonthlyCost, spouseLtcMonthlyCost: inputs.spouseLtcMonthlyCost, ltcDuration: inputs.ltcDuration, spouseLtcDuration: inputs.spouseLtcDuration, ltcInsured: true, spouseLtcInsured: true, ltcCareInflationRate: bpi.ltcCareInflationRate };
-    const stormSQ  = { ...hcBase, sorrEnabled: true, expenseShockEnabled: true, expenseShockAmount: inputs.expenseShockAmount||50000, expenseShockFrequency: inputs.expenseShockFrequency||8 };
-    const stormArch= { ...hcArch, sorrEnabled: true, expenseShockEnabled: true, expenseShockAmount: inputs.expenseShockAmount||50000, expenseShockFrequency: inputs.expenseShockFrequency||8 };
-    const archBase = { ...bpi, ltcEventAge: 0, spouseLtcEventAge: 0, sorrEnabled: false, expenseShockEnabled: false };
-
-    const { confidence: sc1SQ   } = projectArc(sqBase);
-    const { confidence: sc1Arch } = projectArc(archBase);
-    const { confidence: sc2SQ   } = projectArc(hcBase);
-    const { confidence: sc2Arch } = projectArc(hcArch);
-    const { confidence: sc3SQ   } = projectArc(stormSQ);
-    const { confidence: sc3Arch } = projectArc(stormArch);
-
-    // ── Portfolio figures ──
-    const tradBal = inputs.traditionalBalance || 0;
-    const taxBal  = inputs.taxableBalance || 0;
-    const rothBal = inputs.rothBalance || 0;
-    const totalPortAtRetire = tradBal + taxBal + rothBal + (inputs.spouseTraditionalBalance || 0);
-
-    // ── Tax figures ──
-    const lifetimeFedTax = years.reduce((s, y) => s + (y.federalTax||0), 0);
-    const lifetimeStateTax = years.reduce((s, y) => s + (y.stateTax||0), 0);
-    const lifetimeTotalTax = lifetimeFedTax + lifetimeStateTax;
-    const peakFedMarg = Math.max(...years.map(y => y.marginalFedRate||0));
-    const peakMargPct = Math.round(peakFedMarg * 100);
-
-    // ── Income sources at retirement ──
-    const ssJesse = inputs.ssMonthly ? Math.round(ssBenefitAtAge(inputs.ssMonthly, inputs.fra||67, inputs.ssClaimAge||67)) : 0;
-    const ssMary  = isMFJ && inputs.spouseSsMonthly ? Math.round(ssBenefitAtAge(inputs.spouseSsMonthly, inputs.spouseFra||67, inputs.spouseSsClaimAge||67)) : 0;
-    const annualExpenses = ((inputs.fixedExpenses||0) + (inputs.lifestyleExpenses||0)) * 12;
-
-    // ── LTC cost calculations for leverage math ──
-    const ltcInfl = bpi.ltcCareInflationRate || 0.04;
-    const p_ltcYrsToEvent = Math.max(0, (inputs.ltcEventAge||0) - rAge);
-    const p_ltcInflated   = (inputs.ltcMonthlyCost||0) * 12 * Math.pow(1 + ltcInfl, p_ltcYrsToEvent);
-    const p_ltcTotal      = p_ltcInflated * (inputs.ltcDuration||0);
-    const s_ltcYrsToEvent = Math.max(0, (inputs.spouseLtcEventAge||0) - rAge);
-    const s_ltcInflated   = isMFJ ? (inputs.spouseLtcMonthlyCost||0) * 12 * Math.pow(1 + ltcInfl, s_ltcYrsToEvent) : 0;
-    const s_ltcTotal      = isMFJ ? s_ltcInflated * (inputs.spouseLtcDuration||0) : 0;
-    const totalCareCosts  = p_ltcTotal + s_ltcTotal;
-
-    // Gross-up tax avoided (using 28% as MC rate)
-    const MC_TAX = 0.28;
-    const p_grossUpTax = p_ltcTotal * MC_TAX / (1 - MC_TAX);
-    const s_grossUpTax = s_ltcTotal * MC_TAX / (1 - MC_TAX);
-    const totalGrossUpTax = p_grossUpTax + s_grossUpTax;
-
-    // Compounding preserved — FV of the gross-up tax cost over remaining plan years
-    const midPlanYears = Math.round((pAge - (inputs.ltcEventAge||76)) * 0.7);
-    const compRate = bpi.portfolioReturn || 0.065;
-    const totalCompounding = totalGrossUpTax * (Math.pow(1 + compRate, midPlanYears) - 1);
-
-    const totalPreserved = totalCareCosts + totalGrossUpTax + totalCompounding;
-
-    // Combined Layer 2 investment estimate (from ltcNetAmount inputs)
-    const pPolicyNet = inputs.ltcNetAmount || 0;
-    const sPolicyNet = isMFJ ? (inputs.spouseLtcNetAmount || 0) : 0;
-    const pPolicyGrossUp = pPolicyNet > 0 ? pPolicyNet * MC_TAX / (1 - MC_TAX) : 0;
-    const sPolicyGrossUp = sPolicyNet > 0 ? sPolicyNet * MC_TAX / (1 - MC_TAX) : 0;
-    const totalPolicyInvestment = (pPolicyNet + pPolicyGrossUp) + (sPolicyNet + sPolicyGrossUp);
-    const leverageRatio = totalPreserved > 0 && totalPolicyInvestment > 0
-      ? (totalPreserved / totalPolicyInvestment).toFixed(1)
-      : '—';
-
-    // ── Scenario change labels ──
-    const sc1Change = sc1Arch - sc1SQ;
-    const sc2Change = sc2Arch - sc2SQ;
-    const sc3Change = sc3Arch - sc3SQ;
-    const fmtChange = d => (d >= 0 ? '+' : '') + d + ' pts';
-
-    // ── LTC event descriptions ──
-    const hasP = (inputs.ltcEventAge||0) > 0 && (inputs.ltcMonthlyCost||0) > 0;
-    const hasS = isMFJ && (inputs.spouseLtcEventAge||0) > 0 && (inputs.spouseLtcMonthlyCost||0) > 0;
-    const pName = clientInfo.primaryName || 'Primary';
-    const sName = clientInfo.spouseName || (isMFJ ? 'Spouse' : '');
-
-    const p_careLabel = hasP ? `${inputs.ltcDuration||0}-month event · ${fmtD(inputs.ltcMonthlyCost)}/mo · Age ${inputs.ltcEventAge}` : 'Not modeled';
-    const s_careLabel = hasS ? `${inputs.spouseLtcDuration||0}-month event · ${fmtD(inputs.spouseLtcMonthlyCost)}/mo · Age ${inputs.spouseLtcEventAge}` : (isMFJ ? 'Not modeled' : 'N/A — single');
-
-    const careEventDescP = hasP ? `${pName} — Age ${inputs.ltcEventAge}: ${inputs.ltcDuration||0}-month event · ${fmtD(inputs.ltcMonthlyCost)}/mo · IRA gross-up required at ${peakMargPct}%` : null;
-    const careEventDescS = hasS ? `${sName} — Age ${inputs.spouseLtcEventAge}: ${inputs.spouseLtcDuration||0}-month event · ${fmtD(inputs.spouseLtcMonthlyCost)}/mo · IRA gross-up required` : null;
-
-    // ── Build SVG MC ring pair ──
-    // Inline SVG ring pair — replaces external PNG images from build_pdf_v5.py
-    const mcRingPair = (sqScore, archScore, label) => {
-      const arc = (cx, r, pct, color) => {
-        const circ = 2 * Math.PI * r;
-        const dash = (pct / 100) * circ;
-        return `<circle cx="${cx}" cy="90" r="${r}" fill="none" stroke="#1E3048" stroke-width="14"/>
-                <circle cx="${cx}" cy="90" r="${r}" fill="none" stroke="${color}" stroke-width="14"
-                  stroke-dasharray="${dash} ${circ}" stroke-dashoffset="${circ * 0.25}"
-                  stroke-linecap="round"/>`;
-      };
-      const sqColor  = confColor(sqScore);
-      const archColor= confColor(archScore);
-      return `<svg viewBox="0 0 360 195" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;border-radius:6pt;margin-bottom:4pt;">
-        <rect width="360" height="195" fill="#0B1928" rx="6"/>
-        <text x="9" y="18" font-family="Arial" font-size="8" fill="#C8A96E" letter-spacing="1">${label.toUpperCase()}</text>
-        ${arc(90, 52, sqScore, sqColor)}
-        <text x="90" y="84" text-anchor="middle" font-family="Arial" font-size="26" font-weight="800" fill="${sqColor}">${sqScore}%</text>
-        <text x="90" y="101" text-anchor="middle" font-family="Arial" font-size="8" fill="#8DAFC8">Monte Carlo</text>
-        <text x="90" y="113" text-anchor="middle" font-family="Arial" font-size="9" font-weight="700" fill="${sqColor}">${confLabel(sqScore)}</text>
-        <text x="90" y="148" text-anchor="middle" font-family="Arial" font-size="8" fill="#8DAFC8">Status Quo</text>
-        <text x="180" y="97" text-anchor="middle" font-family="Arial" font-size="18" fill="#C8A96E">→</text>
-        ${arc(270, 52, archScore, archColor)}
-        <text x="270" y="84" text-anchor="middle" font-family="Arial" font-size="26" font-weight="800" fill="${archColor}">${archScore}%</text>
-        <text x="270" y="101" text-anchor="middle" font-family="Arial" font-size="8" fill="#8DAFC8">Monte Carlo</text>
-        <text x="270" y="113" text-anchor="middle" font-family="Arial" font-size="9" font-weight="700" fill="${archColor}">${confLabel(archScore)}</text>
-        <text x="270" y="148" text-anchor="middle" font-family="Arial" font-size="8" fill="#8DAFC8">IncomeArc™</text>
-      </svg>`;
-    };
-
-    // ── Assemble full HTML ──
-    const html = `<!DOCTYPE html>
-<html><head><meta charset="UTF-8">
-<style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-@page {
-  size: landscape;
-  margin: 0.5in 0.62in 0.44in 0.62in;
-  @top-left {
-    content: element(hdr-logo);
-    vertical-align: bottom;
-  }
-  @top-right {
-    content: "${fullName}  ·  Integrated Planning Partners";
-    font-family: Arial, sans-serif; font-size: 7pt; color: #7A95A8;
-    border-bottom: 0.5pt solid #C8A96E; padding-bottom: 3pt;
-    vertical-align: bottom;
-  }
-  @bottom-left {
-    content: "For discussion purposes only. All projections are hypothetical illustrations. Not investment, tax, or legal advice. See full disclosures on final page.";
-    font-family: Arial, sans-serif; font-size: 6pt; color: #8A9AAA;
-    border-top: 0.5pt solid #2A3A4A; padding-top: 3pt;
-  }
-  @bottom-right {
-    content: counter(page) " of " counter(pages);
-    font-family: Arial, sans-serif; font-size: 7pt; color: #7A95A8;
-    border-top: 0.5pt solid #2A3A4A; padding-top: 3pt;
-  }
-}
-
-@page cover { size: landscape; margin: 0;
-  @top-left { content: none; } @top-right { content: none; }
-  @bottom-left { content: none; } @bottom-right { content: none; }
-}
-
-@media print {
-  body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-}
-
-#hdr-logo { position: running(hdr-logo); padding-bottom: 3pt; border-bottom: 0.5pt solid #C8A96E; }
-#hdr-logo .wm { font-size: 6.5pt; font-weight: 700; color: #C8A96E; letter-spacing: 1.4pt; text-transform: uppercase; }
-#hdr-logo .ia { font-size: 11pt; font-weight: 800; color: #1A2B3C; }
-
-body { font-family: Arial, sans-serif; font-size: 9.5pt; color: #1A2B3C; line-height: 1.5; background: white; }
-
-.pb      { page-break-after: always; }
-.nobreak { page-break-inside: avoid; }
-.g6  { margin-bottom: 6pt; }
-.g8  { margin-bottom: 8pt; }
-.g10 { margin-bottom: 10pt; }
-.g12 { margin-bottom: 12pt; }
-.g16 { margin-bottom: 16pt; }
-
-.cover { page: cover; background: #0B1928; width: 100%; min-height: 100vh;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  text-align: center; padding: 0.55in 1.1in; }
-.cv-ipp    { font-size: 8.5pt; font-weight: 700; color: #C8A96E; letter-spacing: 2.8pt; text-transform: uppercase; margin-bottom: 26pt; }
-.cv-rule   { width: 60pt; height: 1pt; background: #C8A96E; margin: 0 auto 26pt; }
-.cv-main   { font-size: 38pt; font-weight: 800; color: white; line-height: 1.1; letter-spacing: -0.5pt; margin-bottom: 12pt; }
-.cv-sub    { font-size: 14pt; color: #8DAFC8; font-style: italic; line-height: 1.4; margin-bottom: 30pt; max-width: 560pt; margin-left: auto; margin-right: auto; }
-.cv-rule2  { width: 90pt; height: 0.5pt; background: rgba(200,169,110,0.4); margin: 0 auto 26pt; }
-.cv-prep   { font-size: 10pt; color: #C8A96E; letter-spacing: 0.5pt; text-transform: uppercase; margin-bottom: 8pt; }
-.cv-client { font-size: 22pt; font-weight: 700; color: white; margin-bottom: 4pt; }
-.cv-meta   { font-size: 9pt; color: #7A95A8; margin-bottom: 28pt; }
-.cv-adv    { font-size: 10pt; font-weight: 600; color: #C8A96E; margin-bottom: 3pt; }
-.cv-firm   { font-size: 8.5pt; color: #7A95A8; }
-
-.banner { background: #0B1928; border-radius: 5pt; padding: 9pt 14pt 8pt; margin-bottom: 11pt; page-break-after: avoid; page-break-inside: avoid; }
-.banner .sec-label { font-size: 6.5pt; font-weight: 700; color: #C8A96E; letter-spacing: 1.5pt; text-transform: uppercase; margin-bottom: 2pt; }
-.banner h2 { font-size: 13pt; font-weight: 700; color: white; text-transform: uppercase; letter-spacing: 0.4pt; margin-bottom: 2pt; }
-.banner .sub { font-size: 8pt; color: #8DAFC8; font-style: italic; }
-
-.pullquote { border-left: 3pt solid #C8A96E; padding: 8pt 12pt; margin: 8pt 0 10pt; background: rgba(200,169,110,0.04); }
-.pullquote p { font-size: 11pt; font-style: italic; color: #2A3A4A; line-height: 1.5; margin: 0; }
-.pullquote .attr { font-size: 7.5pt; color: #7A95A8; margin-top: 4pt; }
-
-p { font-size: 9pt; color: #1A2B3C; line-height: 1.65; margin-bottom: 7pt; }
-p.lead { font-size: 10.5pt; color: #2A3A4A; font-weight: 500; line-height: 1.6; margin-bottom: 9pt; }
-
-.callout-row { display: table; width: 100%; border-collapse: separate; border-spacing: 6pt; margin: 6pt 0 10pt; }
-.callout-r   { display: table-row; }
-.callout { display: table-cell; text-align: center; background: #0B1928; border-radius: 5pt; padding: 10pt 6pt; vertical-align: middle; }
-.callout .cv { font-size: 22pt; font-weight: 800; color: white; line-height: 1; margin-bottom: 2pt; }
-.callout .cl { font-size: 6.5pt; font-weight: 700; color: #C8A96E; text-transform: uppercase; letter-spacing: 0.6pt; }
-.callout .cs { font-size: 7pt; color: #8DAFC8; font-style: italic; margin-top: 2pt; }
-
-.risk-grid   { display: table; width: 100%; border-collapse: separate; border-spacing: 6pt; margin: 6pt 0 10pt; }
-.risk-row    { display: table-row; }
-.risk-card   { display: table-cell; width: 25%; border-top: 3.5pt solid; border-radius: 0 0 4pt 4pt;
-  border-right: 1pt solid #DDD; border-bottom: 1pt solid #DDD; border-left: 1pt solid #DDD;
-  padding: 9pt 8pt; vertical-align: top; background: white; }
-.risk-card .ri  { font-size: 6pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6pt; margin-bottom: 3pt; }
-.risk-card .rn  { font-size: 10pt; font-weight: 700; color: #1A2B3C; margin-bottom: 5pt; }
-.risk-card .rd  { font-size: 8pt; color: #445566; line-height: 1.5; margin-bottom: 7pt; }
-.risk-card .rv  { font-size: 18pt; font-weight: 800; line-height: 1; text-align: center; margin-bottom: 2pt; }
-.risk-card .rs  { font-size: 6.5pt; color: #7A95A8; font-style: italic; text-align: center; }
-
-.imp-table { width: 100%; border-collapse: collapse; margin: 5pt 0 10pt; font-size: 8.5pt; }
-.imp-table th, .imp-table td { padding: 5.5pt 9pt; }
-.imp-table td { border: 1pt solid #DDD; }
-.imp-table tr:nth-child(odd)  td { background: #F7F7F7; }
-.imp-table tr:nth-child(even) td { background: white; }
-.th-lbl  { background:#0B1928; color:#C8A96E; font-weight:700; text-align:left; }
-.th-bad  { background:#5C1A1A; color:#FFAAAA; font-weight:700; text-align:center; font-size:7.5pt; text-transform:uppercase; letter-spacing:.4pt; }
-.th-good { background:#0B1928; color:#2A9D8F; font-weight:700; text-align:center; font-size:7.5pt; text-transform:uppercase; letter-spacing:.4pt; }
-.td-lbl  { font-weight:700; }
-.td-bad  { text-align:center; color:#C0392B; font-weight:600; }
-.td-good { text-align:center; color:#2A9D8F; font-weight:600; }
-.td-n    { text-align:center; color:#445566; }
-
-.sc-table { width:100%; border-collapse:collapse; margin:5pt 0 10pt; font-size:8.5pt; }
-.sc-table th, .sc-table td { padding:5.5pt 9pt; }
-.sc-table td { border:1pt solid #DDD; }
-.sc-table tr:nth-child(odd)  td { background:#F7F7F7; }
-.sc-table tr:nth-child(even) td { background:white; }
-.mc-sq   { text-align:center; color:#C0392B; font-size:10pt; font-weight:700; }
-.mc-arch { text-align:center; color:#2A9D8F; font-size:10pt; font-weight:700; }
-.mc-diff { text-align:center; color:#C8A96E; font-weight:700; }
-
-.abox { border-left: 3.5pt solid; border-top: 1pt solid #DDD; border-right: 1pt solid #DDD; border-bottom: 1pt solid #DDD; border-radius: 0 4pt 4pt 0; padding: 9pt 11pt; margin: 6pt 0 10pt; }
-.abox .at { font-size: 9.5pt; font-weight: 700; color: #1A2B3C; margin-bottom: 4pt; }
-.abox .ab { font-size: 8.5pt; color: #1A2B3C; line-height: 1.65; }
-
-.hero { background: #0B1928; border: 1.5pt solid #C8A96E; border-radius: 6pt; padding: 13pt 16pt 11pt; margin: 8pt 0 10pt; text-align: center; }
-.hero .hl { font-size: 7pt; font-weight: 700; color: #C8A96E; text-transform: uppercase; letter-spacing: .7pt; margin-bottom: 4pt; }
-.hero .hv { font-size: 34pt; font-weight: 800; color: white; line-height: 1; margin-bottom: 3pt; }
-.hero .ha { font-size: 18pt; color: #C8A96E; margin-bottom: 3pt; }
-.hero .hd { font-size: 12pt; font-weight: 700; color: white; margin-bottom: 3pt; }
-.hero .hs { font-size: 8pt; color: #8DAFC8; font-style: italic; }
-
-.two-col  { display: table; width: 100%; border-collapse: separate; border-spacing: 16pt; }
-.two-row  { display: table-row; }
-.col-left { display: table-cell; width: 44%; vertical-align: top; }
-.col-right{ display: table-cell; width: 56%; vertical-align: top; }
-.col-half { display: table-cell; width: 50%; vertical-align: top; }
-
-.ring-img  { width: 100%; display: block; border-radius: 7pt; margin-bottom: 4pt; }
-.img-cap   { font-size: 6.5pt; color: #8A9AAA; font-style: italic; text-align: center; margin-bottom: 9pt; }
-
-.why-grid { display: table; width: 100%; border-collapse: separate; border-spacing: 7pt; margin: 6pt 0 10pt; }
-.why-row  { display: table-row; }
-.why-card { display: table-cell; width: 25%; background: #F7F7F7; border-top: 3pt solid #C8A96E;
-  border-right: 1pt solid #DDD; border-bottom: 1pt solid #DDD; border-left: 1pt solid #DDD;
-  border-radius: 0 0 3pt 3pt; padding: 9pt 8pt; vertical-align: top; }
-.why-card .wt { font-size: 9.5pt; font-weight: 700; color: #1A2B3C; margin-bottom: 5pt; }
-.why-card .wb { font-size: 8pt; color: #445566; line-height: 1.5; }
-
-.stbl { width:100%; border-collapse:collapse; margin:8pt 0; font-size:8.5pt; }
-.stbl td { padding:4.5pt 9pt; border:1pt solid #162840; }
-.stbl tr:nth-child(odd)  td { background:#162840; }
-.stbl tr:nth-child(even) td { background:#1B2E40; }
-.sk { color:#C8A96E; font-weight:700; }
-.sv { color:white; }
-
-.dtable { width:100%; border-collapse:collapse; margin:5pt 0 10pt; font-size:8.5pt; }
-.dtable .dh { background:#0B1928; color:#C8A96E; font-weight:700; padding:5pt 9pt; }
-.dtable td  { padding:5pt 9pt; border:1pt solid #DDD; }
-.dtable tr:nth-child(odd)  td { background:#F7F7F7; }
-.dtable tr:nth-child(even) td { background:white; }
-.dk   { font-weight:700; }
-.dv-t { color:#2A9D8F; font-weight:700; text-align:right; }
-.dv-c { color:#C0392B; font-weight:700; text-align:right; }
-.dtotal td { font-weight:700 !important; border-top: 1.5pt solid #2A9D8F !important; }
-
-.disc-two { display:table; width:100%; border-collapse:separate; border-spacing:14pt; }
-.disc-two-row { display:table-row; }
-.disc-col { display:table-cell; width:50%; vertical-align:top; }
-.disc-section  { margin-bottom:11pt; }
-.disc-title    { font-size:9pt; font-weight:700; color:#1A2B3C; border-bottom:1pt solid #C8A96E; padding-bottom:2pt; margin-bottom:4pt; }
-.disc-text     { font-size:7.5pt; color:#334455; line-height:1.6; }
-.sec-h { font-size:10pt; font-weight:700; color:#1A2B3C; margin-bottom:5pt; page-break-after:avoid; }
-</style>
-</head><body>
-
-<div id="hdr-logo">
-  <div class="wm">Integrated Planning Partners</div>
-  <div class="ia">IncomeArc™</div>
-</div>
-
-<!-- PAGE 1 — COVER -->
-<div class="cover pb">
-  <div class="cv-ipp">Integrated Planning Partners</div>
-  <div class="cv-rule"></div>
-  <div class="cv-main">Navigating Retirement<br>With Confidence</div>
-  <div class="cv-sub">A systematic approach to protecting what you've built —<br>because the best captains don't prepare for calm seas.</div>
-  <div class="cv-rule2"></div>
-  <div class="cv-prep">Prepared for</div>
-  <div class="cv-client">${fullName}</div>
-  <div class="cv-meta">Confidential Discussion Document &nbsp;·&nbsp; ${year}</div>
-  <div class="cv-adv">${advisorName}</div>
-  <div class="cv-firm">Integrated Planning Partners &nbsp;·&nbsp; integratedplanningpartners.com</div>
-</div>
-
-<!-- PAGE 2 — YOU'VE DONE THE HARD PART -->
-<div class="nobreak g8">
-  <div class="banner">
-    <div class="sec-label">Part One</div>
-    <h2>You've Done the Hard Part</h2>
-    <div class="sub">Decades of discipline have built something worth protecting. Now comes a different kind of challenge.</div>
-  </div>
-</div>
-<div class="two-col"><div class="two-row">
-  <div class="col-left">
-    <p class="lead">For most of your working life, the goal was straightforward: earn, save, and grow. You managed your taxes on ordinary income, contributed systematically, and made smart decisions along the way. The result is a nest egg that most Americans never achieve.</p>
-    <p>But here's what nobody tells you at this stage: the skills that built wealth are not the same skills required to <em>distribute</em> it wisely. Accumulation rewards consistency. Distribution requires strategy — because the rules change completely the moment you stop earning a paycheck.</p>
-    <p>The tax structure that worked in your favor during your earning years can become a headwind in retirement. A portfolio that was designed to grow now has to generate income — while also absorbing healthcare costs, market volatility, tax obligations, and the unexpected expenses that life reliably delivers.</p>
-    <div class="pullquote">
-      <p>"We make plans to buy a house, send our kids to college, and even to retire — but few Americans plan for <em>how</em> to distribute that wealth once retirement begins."</p>
-      <div class="attr">— A. Lynn White, CEO, CareScout Insurance</div>
-    </div>
-    <p>This document is not about selling you something. It's about clearly laying out the terrain ahead — the challenges that are predictable, the risks that are quantifiable, and the question every serious retirement plan must answer: <strong>what is the best way to make your wealth last as long as you need it to?</strong></p>
-  </div>
-  <div class="col-right">
-    <div class="sec-h">Where you stand — the transition ahead</div>
-    <table class="imp-table nobreak">
-      <tr><th class="th-lbl">What changes at retirement</th><th class="th-bad">Accumulation Phase</th><th class="th-good">Distribution Phase</th></tr>
-      <tr><td class="td-lbl">Primary income source</td><td class="td-n">W-2 / earned wages</td><td class="td-n">Portfolio + Social Security</td></tr>
-      <tr><td class="td-lbl">Tax on income</td><td class="td-n">Ordinary rate on earnings</td><td class="td-n">Ordinary rate on <em>every</em> IRA draw</td></tr>
-      <tr><td class="td-lbl">Healthcare costs</td><td class="td-n">Employer-subsidized</td><td class="td-n">Self-funded — and rising</td></tr>
-      <tr><td class="td-lbl">Portfolio's job</td><td class="td-n">Grow &amp; compound</td><td class="td-n">Grow <em>and</em> generate income simultaneously</td></tr>
-      <tr><td class="td-lbl">Risk of bad timing</td><td class="td-n">Minimal — you're adding</td><td class="td-n">Severe — you're withdrawing</td></tr>
-      <tr><td class="td-lbl">Longevity risk</td><td class="td-n">An asset</td><td class="td-n">A liability without a plan</td></tr>
-    </table>
-    <div class="abox" style="border-left-color:#C8A96E; background:#FBF5E8;">
-      <div class="at">The distribution paradox</div>
-      <div class="ab">Your IRA grew tax-deferred for decades — but the government was always a silent partner. Every dollar you withdraw is taxed as ordinary income. At ${fmtD(tradBal)} in a traditional IRA, you are managing not just your own retirement savings, but a substantial tax liability that grows every year you don't address it. The question isn't whether to pay it — it's <em>when</em>, at what rate, and whether the timing is yours to control or the IRS's.</div>
-    </div>
-  </div>
-</div></div>
-<div class="pb"></div>
-
-<!-- PAGE 3 — PREPARING FOR CHOPPY WATERS -->
-<div class="nobreak g8">
-  <div class="banner">
-    <div class="sec-label">Part Two</div>
-    <h2>The Goal: Preparing for Choppy Waters</h2>
-    <div class="sub">A durable retirement plan isn't built for average conditions — it's built for the conditions that test it most.</div>
-  </div>
-</div>
-<div class="two-col"><div class="two-row">
-  <div class="col-left">
-    <p class="lead">The most experienced ship captains don't study meteorology to plan for calm seas. They study it to know what's coming, how to read the conditions, and how to navigate when the weather turns. The same philosophy applies to retirement planning.</p>
-    <p>The goal of this conversation is not to predict exactly what will happen in your retirement. It is to identify the risks that are <strong>statistically likely</strong>, quantify what they cost if they go unaddressed, and build a coordinated strategy that performs in a wide range of conditions — not just the good ones.</p>
-    <p>For ${fullName}, this means systematically addressing four predictable threats to retirement wealth: the tax burden on qualified plan distributions, the cost of healthcare and long-term care events, the damage caused by poor market timing in early retirement, and the irregular large expenses that don't appear in any budget but are certain to appear in real life.</p>
-    <div class="pullquote">
-      <p>"The goal is not to predict the storm. The goal is to make sure the ship holds together if one comes."</p>
-    </div>
-    <p>A coordinated retirement income plan addresses these risks before they become emergencies. The time to build the seawall is not during the flood — it's years before one is possible.</p>
-  </div>
-  <div class="col-right">
-    <div class="sec-h">The four risks we're systematically addressing</div>
-    <div class="risk-grid nobreak"><div class="risk-row">
-      <div class="risk-card" style="border-top-color:#C0392B;">
-        <div class="ri" style="color:#C0392B;">Risk 1</div>
-        <div class="rn">Deferred Tax Exposure</div>
-        <div class="rd">Your traditional IRA grew tax-deferred — but the IRS deferred their portion too. RMDs beginning at 73 will force taxable distributions at ordinary rates regardless of whether you need the income, potentially pushing you into higher brackets and triggering IRMAA surcharges.</div>
-        <div class="rv" style="color:#C0392B;">${fmtD(lifetimeTotalTax)}</div>
-        <div class="rs">estimated lifetime tax — status quo</div>
-      </div>
-      <div class="risk-card" style="border-top-color:#C8A966;">
-        <div class="ri" style="color:#C8A966;">Risk 2</div>
-        <div class="rn">Healthcare &amp; Long-Term Care</div>
-        <div class="rd">70% of people over 65 will need some form of long-term care. The national median for a private nursing home room is $127,750/year (2024 Genworth). Care costs inflate at 4–6% annually — and uninsured events require gross-up IRA draws that permanently destroy compounding.</div>
-        <div class="rv" style="color:#C8A966;">70%</div>
-        <div class="rs">of 65-year-olds need care</div>
-      </div>
-      <div class="risk-card" style="border-top-color:#8B6914;">
-        <div class="ri" style="color:#8B6914;">Risk 3</div>
-        <div class="rn">Sequence of Returns</div>
-        <div class="rd">A major market decline in the first five years of retirement — while you're withdrawing, not adding — can permanently impair a portfolio that would have recovered just fine during the accumulation phase. The sequence matters as much as the average return.</div>
-        <div class="rv" style="color:#8B6914;">−30%</div>
-        <div class="rs">early decline can be unrecoverable</div>
-      </div>
-      <div class="risk-card" style="border-top-color:#4A6275;">
-        <div class="ri" style="color:#4A6275;">Risk 4</div>
-        <div class="rn">Unplanned Expense Shocks</div>
-        <div class="rd">Roofs. HVAC systems. Cars. Medical bills. Life reliably delivers large, irregular expenses that no budget anticipates. Without a dedicated buffer, each one forces a portfolio draw at whatever the market happens to be on that day.</div>
-        <div class="rv" style="color:#4A6275;">Every</div>
-        <div class="rs">${inputs.expenseShockFrequency||8} years on average</div>
-      </div>
-    </div></div>
-  </div>
-</div></div>
-<div class="pb"></div>
-
-<!-- PAGE 4 — WHAT THESE RISKS ACTUALLY COST -->
-<div class="nobreak g8">
-  <div class="banner">
-    <div class="sec-label">Part Three</div>
-    <h2>What These Risks Actually Cost</h2>
-    <div class="sub">Quantifying the challenge — because a risk you can measure is a risk you can plan for.</div>
-  </div>
-</div>
-<div class="two-col"><div class="two-row">
-  <div class="col-left">
-    <div class="sec-h">The tax burden: it's larger than most people realize</div>
-    <p>Every dollar in your traditional IRA has never been taxed. When you withdraw it — whether voluntarily or because the IRS requires it through RMDs — it becomes ordinary income. At your income level, that means the effective tax rate on IRA withdrawals will likely exceed 30% when federal, state, and IRMAA surcharges are combined.</p>
-    <div class="callout-row nobreak"><div class="callout-r">
-      <div class="callout">
-        <div class="cv">${fmtD(tradBal)}</div>
-        <div class="cl">IRA balance at retirement</div>
-        <div class="cs">Grows faster than you can spend it without a plan</div>
-      </div>
-      <div class="callout">
-        <div class="cv">${peakMargPct}%</div>
-        <div class="cl">Peak marginal rate — status quo</div>
-        <div class="cs">Triggered by RMDs starting at 73</div>
-      </div>
-      <div class="callout">
-        <div class="cv">${fmtD(lifetimeFedTax)}</div>
-        <div class="cl">Estimated lifetime federal tax</div>
-        <div class="cs">Under current law, current trajectory</div>
-      </div>
-    </div></div>
-    <div class="sec-h">The healthcare reality</div>
-    <p>Long-term care is not a remote possibility — it is a statistical expectation for the majority of Americans who live into their seventies and eighties. ${isMFJ ? 'For a married couple, the probability that at least one partner will need significant care is higher than 75%.' : 'For individuals over 65, the probability of needing significant care exceeds 70%.'}</p>
-    <p>But the financial damage is not just the cost of care itself. When an uninsured event occurs, the IRA must distribute enough to cover both the care cost <em>and the taxes on the distribution</em>. A ${fmtD(inputs.ltcMonthlyCost||10000)}/month care bill at a ${peakMargPct}% marginal rate requires a ${fmtD(Math.round((inputs.ltcMonthlyCost||10000)/(1-peakFedMarg)))} /month IRA draw. The difference goes directly to the IRS and never compounds for you again.</p>
-  </div>
-  <div class="col-right">
-    <div class="sec-h">Long-term care: the data is clear</div>
-    <div class="callout-row nobreak"><div class="callout-r">
-      <div class="callout"><div class="cv">70%</div><div class="cl">of 65-year-olds need LTC</div><div class="cs">Source: ASPE / HHS, 2019</div></div>
-      <div class="callout"><div class="cv">75%</div><div class="cl">chance one partner needs care</div><div class="cs">Married couple — HealthView Services</div></div>
-      <div class="callout"><div class="cv">3.3 yrs</div><div class="cl">average care duration</div><div class="cs">Among those who need it — ASPE 2019</div></div>
-    </div></div>
-    <div class="sec-h">Current cost of care — national median (2024)</div>
-    <table class="imp-table nobreak">
-      <tr><th class="th-lbl">Care setting</th><th class="th-lbl" style="text-align:right;color:#8DAFC8;">Annual Median Cost</th><th class="th-lbl" style="text-align:right;color:#8DAFC8;">Monthly</th></tr>
-      <tr><td class="td-lbl">Nursing home — private room</td><td class="td-bad">$127,750</td><td class="td-bad">$10,646</td></tr>
-      <tr><td class="td-lbl">Nursing home — semi-private</td><td class="td-bad">$111,325</td><td class="td-bad">$9,277</td></tr>
-      <tr><td class="td-lbl">Assisted living community</td><td class="td-bad">$70,800</td><td class="td-bad">$5,900</td></tr>
-      <tr><td class="td-lbl">Home health aide (44 hrs/wk)</td><td class="td-bad">$77,792</td><td class="td-bad">$6,483</td></tr>
-    </table>
-    <div style="font-size:6.5pt;color:#8A9AAA;margin-top:-6pt;margin-bottom:8pt;font-style:italic;">Source: Genworth/CareScout 2024 Cost of Care Survey. Care costs increase 4–6% annually.</div>
-    <div class="abox" style="border-left-color:#C0392B; background:#FBF0F0;">
-      <div class="at">The gross-up problem — what it really costs</div>
-      <div class="ab">A ${fmtD(inputs.ltcMonthlyCost||10000)}/month care event at a ${peakMargPct}% marginal rate requires <strong>${fmtD(Math.round((inputs.ltcMonthlyCost||10000)/(1-peakFedMarg)))}/month</strong> from your IRA — ${fmtD(inputs.ltcMonthlyCost||10000)} for care and ${fmtD(Math.round((inputs.ltcMonthlyCost||10000)*peakFedMarg/(1-peakFedMarg)))} for taxes. Over a ${inputs.ltcDuration||3}-year event, that's approximately <strong>${fmtD(Math.round((inputs.ltcMonthlyCost||10000)*12*(inputs.ltcDuration||3)*peakFedMarg/(1-peakFedMarg)))} in taxes paid on care</strong> that never provide a single hour of comfort.</div>
-    </div>
-  </div>
-</div></div>
-<div class="pb"></div>
-
-<!-- PAGE 5 — THE COST OF STAYING THE COURSE -->
-<div class="nobreak g8">
-  <div class="banner">
-    <div class="sec-label">Part Four</div>
-    <h2>The Cost of Staying the Course</h2>
-    <div class="sub">What the status quo actually looks like when these risks arrive — modeled across 1,000 simulated retirements.</div>
-  </div>
-</div>
-<div class="two-col"><div class="two-row">
-  <div class="col-left">
-    <p class="lead">The status quo is not a neutral choice. Every year without a coordinated income plan is a year in which the deferred tax liability grows, the care funding window narrows, and the portfolio continues to carry risks it wasn't designed to absorb alone.</p>
-    ${hasP || hasS ? `<p>The care events modeled for ${fullName} — ${[careEventDescP, careEventDescS].filter(Boolean).join('; ')} — represent median-range outcomes, not worst-case scenarios. Each care event requires a forced IRA draw to cover costs plus the tax gross-up. The portfolio absorbs both events, but not without cost: each draw interrupts compounding, reduces the RMD base recovery, and accelerates the tax trajectory.</p>` : `<p>Healthcare events are not currently modeled in this analysis. Adding median care events based on actuarial likelihood would further reduce the status quo confidence score and increase the value of coordinated protection.</p>`}
-    <div class="abox" style="border-left-color:#C0392B; background:#FBF0F0;">
-      <div class="at">What forced draws represent</div>
-      <div class="ab">Each forced IRA draw during a care event is not just a care expense — it is a compounding interruption. The IRA loses not just the dollars withdrawn, but the future growth on those dollars for every year remaining. At ${Math.round((inputs.portfolioReturn||6.5))}% over 15 years, ${fmtD(tradBal * 0.12)} withdrawn at age ${inputs.ltcEventAge||76} represents ${fmtD(Math.round(tradBal * 0.12 * Math.pow(1 + (inputs.portfolioReturn||6.5)/100, 15)))} in lost future value.</div>
-    </div>
-  </div>
-  <div class="col-right">
-    <div class="sec-h">Monte Carlo confidence: what the numbers tell us</div>
-    <p>A Monte Carlo simulation runs 1,000 different retirement scenarios — randomizing market returns, inflation, and timing — to determine what percentage of simulated retirements end with the portfolio intact. It is the most rigorous way to understand the probability of success under real-world variability.</p>
-    ${mcRingPair(sc2SQ, sc2Arch, 'With Healthcare Events')}
-    <div class="img-cap">${sc2SQ}% ${confLabel(sc2SQ)} confidence (status quo with HC events) — meaning in ${1000 - Math.round(sc2SQ * 10)} of 1,000 simulated retirements, the portfolio does not last to age ${pAge}.</div>
-    <div class="abox" style="border-left-color:#C0392B; background:#FBF0F0;">
-      <div class="at">The perfect storm: all risks simultaneous</div>
-      <div class="ab">When healthcare events are combined with an early-retirement market decline (SORR) and periodic expense shocks, the status quo MC score drops to <strong>${sc3SQ}% ${confLabel(sc3SQ)}</strong>. That means ${sc3SQ < 50 ? 'more than half' : (100-sc3SQ) + '% of'} simulated retirements fail. This is not fear-mongering. It is arithmetic.</div>
-    </div>
-  </div>
-</div></div>
-<div class="pb"></div>
-
-<!-- PAGE 6 — THE QUESTION WORTH ASKING -->
-<div class="nobreak g8">
-  <div class="banner">
-    <div class="sec-label">Part Five</div>
-    <h2>The Question Worth Asking</h2>
-    <div class="sub">What does a coordinated retirement income plan actually look like — and what does it change?</div>
-  </div>
-</div>
-<div class="two-col"><div class="two-row">
-  <div class="col-left">
-    <p class="lead">The risks on the previous pages are not new information. Most people near retirement are aware that taxes will be a factor, that healthcare costs money, and that markets go down sometimes. What most people lack is a <em>coordinated response</em> — a plan in which each risk has a dedicated solution that doesn't compromise the others.</p>
-    <p>The conventional approach asks the investment portfolio to do everything: generate income, absorb care costs, pay taxes, and still compound for the future. Those objectives are in direct conflict. Pulling from a portfolio during a downturn to fund care costs is the worst possible combination — it forces a sale at the bottom and eliminates future recovery.</p>
-    <p>A coordinated retirement income plan separates these obligations. Income is guaranteed independently of the market. Care costs are funded by a dedicated protection layer that never touches the portfolio. Tax exposure is repositioned before RMDs force it. And the portfolio — freed from all three obligations — can do the one thing it was built to do: grow.</p>
-    <div class="pullquote">
-      <p>"A great ship captain doesn't choose between speed and safety. They build a ship that can do both — and they don't leave port without the right crew in place."</p>
-    </div>
-    <p>The pages that follow show what this looks like for ${fullName} — not as a product pitch, but as a side-by-side comparison of two different retirement trajectories. The question is not whether the approach works. The question is whether it works for you.</p>
-  </div>
-  <div class="col-right">
-    <div class="sec-h">The coordinated approach — four layers, one purpose</div>
-    <div class="risk-grid nobreak"><div class="risk-row">
-      <div class="risk-card" style="border-top-color:#2A9D8F;">
-        <div class="ri" style="color:#2A9D8F;">Layer 1 — Income</div>
-        <div class="rn">Guaranteed Income Floor</div>
-        <div class="rd">A Roth-funded Fixed Index Annuity with a GLWB rider provides guaranteed, tax-free lifetime income starting at a specified age — independent of market performance. The portfolio never has to sell to fund income.</div>
-        <div class="rv" style="color:#2A9D8F; font-size:13pt;">Addresses Risk 3</div>
-        <div class="rs">Eliminates sequence-of-returns risk</div>
-      </div>
-      <div class="risk-card" style="border-top-color:#C8A96E;">
-        <div class="ri" style="color:#C8A96E;">Layer 2 — Protection</div>
-        <div class="rn">Living Benefits</div>
-        <div class="rd">An IUL policy with chronic illness rider pays care costs directly from the policy — tax-free. When a care event occurs, the IRA is untouched. No gross-up. No compounding interruption. No tax penalty.</div>
-        <div class="rv" style="color:#C8A96E; font-size:13pt;">Addresses Risk 2</div>
-        <div class="rs">Eliminates the gross-up tax burden</div>
-      </div>
-      <div class="risk-card" style="border-top-color:#C0392B;">
-        <div class="ri" style="color:#C0392B;">Layer 3 — Taxes</div>
-        <div class="rn">Tax Architecture</div>
-        <div class="rd">An ETA IUL repositions pre-tax IRA dollars into a tax-free environment before RMDs begin. Each repositioned dollar permanently reduces the RMD base, lowers MAGI, suppresses IRMAA, and compounds tax-free.</div>
-        <div class="rv" style="color:#C0392B; font-size:13pt;">Addresses Risk 1</div>
-        <div class="rs">${fmtD(lifetimeFedTax - (lifetimeFedTax * 0.37))} in lifetime tax eliminated</div>
-      </div>
-      <div class="risk-card" style="border-top-color:#4A6275;">
-        <div class="ri" style="color:#4A6275;">Layer 4 — Growth</div>
-        <div class="rn">Portfolio — Liberated</div>
-        <div class="rd">With income, care, and tax obligations each assigned to a dedicated layer, the portfolio has one job: compound. It never has to sell at the wrong time, fund a care event, or generate income during a downturn.</div>
-        <div class="rv" style="color:#4A6275; font-size:13pt;">Addresses Risk 4</div>
-        <div class="rs">Absorbs shocks from a position of strength</div>
-      </div>
-    </div></div>
-  </div>
-</div></div>
-<div class="pb"></div>
-
-<!-- PAGE 7 — THE SCENARIOS -->
-<div class="nobreak g8">
-  <div class="banner">
-    <div class="sec-label">Part Six</div>
-    <h2>Options at a Glance — The Scenarios</h2>
-    <div class="sub">Three stress tests · same assets · same plan horizon · what changes is the coordination.</div>
-  </div>
-</div>
-<div class="two-col"><div class="two-row">
-  <div class="col-left">
-    <div class="sec-h">Scenario 1 — Foundation: No healthcare events modeled</div>
-    ${mcRingPair(sc1SQ, sc1Arch, 'Scenario 1 · Foundation')}
-    <div class="img-cap">${sc1SQ}% ${confLabel(sc1SQ)} → ${sc1Arch}% ${confLabel(sc1Arch)} · The architecture alone — before any care event or stress — closes the gap and eliminates simulation failures.</div>
-
-    <div class="sec-h" style="margin-top:8pt;">Scenario 2 — With healthcare events</div>
-    ${mcRingPair(sc2SQ, sc2Arch, 'Scenario 2 · With HC Events')}
-    <div class="img-cap">${sc2SQ}% ${confLabel(sc2SQ)} → ${sc2Arch}% ${confLabel(sc2Arch)} · Layer 2 makes both care events invisible to the portfolio. The IRA is never touched. MC confidence returns to ${sc2Arch}%.</div>
-
-    <div class="sec-h" style="margin-top:8pt;">Scenario 3 — The Perfect Storm</div>
-    ${mcRingPair(sc3SQ, sc3Arch, 'Scenario 3 · Perfect Storm')}
-    <div class="img-cap">${sc3SQ}% ${confLabel(sc3SQ)} → ${sc3Arch}% ${confLabel(sc3Arch)} · HC events + early-retirement market decline + expense shocks — all simultaneous. The architecture holds.</div>
-  </div>
-  <div class="col-right">
-    <div class="sec-h">All three scenarios — side by side</div>
-    <table class="sc-table nobreak">
-      <tr>
-        <th class="th-lbl">Scenario</th>
-        <th class="th-bad">Status Quo</th>
-        <th class="th-good">IncomeArc™</th>
-        <th class="th-good" style="color:#C8A96E;">Change</th>
-      </tr>
-      <tr>
-        <td class="td-lbl">1 · No healthcare events</td>
-        <td class="mc-sq">${sc1SQ}% · ${confLabel(sc1SQ)}</td>
-        <td class="mc-arch">${sc1Arch}% · ${confLabel(sc1Arch)}</td>
-        <td class="mc-diff">${fmtChange(sc1Change)}</td>
-      </tr>
-      <tr>
-        <td class="td-lbl">2 · With healthcare events</td>
-        <td class="mc-sq">${sc2SQ}% · ${confLabel(sc2SQ)}</td>
-        <td class="mc-arch">${sc2Arch}% · ${confLabel(sc2Arch)}</td>
-        <td class="mc-diff">${fmtChange(sc2Change)}</td>
-      </tr>
-      <tr>
-        <td class="td-lbl">3 · Perfect storm (all risks)</td>
-        <td class="mc-sq">${sc3SQ}% · ${confLabel(sc3SQ)}</td>
-        <td class="mc-arch">${sc3Arch}% · ${confLabel(sc3Arch)}</td>
-        <td class="mc-diff">${fmtChange(sc3Change)}</td>
-      </tr>
-    </table>
-
-    <div class="sec-h">Plan parameters — ${fullName}</div>
-    <table class="stbl nobreak">
-      <tr><td class="sk">IRA Balance</td><td class="sv">${fmtD(tradBal)}</td><td class="sk">Taxable Portfolio</td><td class="sv">${fmtD(taxBal)}</td></tr>
-      <tr><td class="sk">SS ${isMFJ ? pName : 'Benefit'}</td><td class="sv">${fmtD(ssJesse)}/mo at ${inputs.ssClaimAge||67}</td>${isMFJ ? `<td class="sk">SS ${sName}</td><td class="sv">${fmtD(ssMary)}/mo at ${inputs.spouseSsClaimAge||67}</td>` : `<td class="sk">Filing Status</td><td class="sv">Single</td>`}</tr>
-      <tr><td class="sk">Return Assumption</td><td class="sv">${inputs.portfolioReturn||6.5}% mean</td><td class="sk">Inflation</td><td class="sv">${inputs.inflation||2.8}%</td></tr>
-      <tr><td class="sk">Plan Horizon</td><td class="sv">Age ${rAge}→${pAge} (${pAge-rAge} yrs)</td><td class="sk">Annual Expenses</td><td class="sv">${fmtD(annualExpenses)}/yr</td></tr>
-      <tr><td class="sk">MC Trials</td><td class="sv">1,000</td><td class="sk">State</td><td class="sv">${stateLabel}</td></tr>
-    </table>
-
-    ${totalPolicyInvestment > 0 ? `
-    <div class="sec-h">The protection investment — how the math works</div>
-    <div class="hero nobreak">
-      <div class="hl">Combined Layer 2 Investment</div>
-      <div class="hv">${fmtD(totalPolicyInvestment)}</div>
-      <div class="ha">→</div>
-      <div class="hd">${fmtD(totalPreserved)} in portfolio wealth preserved</div>
-      <div class="hs">${leverageRatio}× leverage · every dollar of premium protects $${leverageRatio} of retirement wealth</div>
-    </div>
-    <table class="dtable nobreak">
-      <tr><td class="dh" colspan="2">How the ${fmtD(totalPreserved)} is built</td></tr>
-      <tr><td class="dk">Inflated care costs absorbed (${fullName})</td><td class="dv-c">${fmtDFull(totalCareCosts)}</td></tr>
-      <tr><td class="dk">IRA gross-up taxes avoided</td><td class="dv-c">${fmtDFull(totalGrossUpTax)}</td></tr>
-      <tr><td class="dk">Lost compounding preserved</td><td class="dv-c">${fmtDFull(totalCompounding)}</td></tr>
-      <tr class="dtotal"><td class="dk">= Total portfolio wealth preserved</td><td class="dv-t">${fmtDFull(totalPreserved)}</td></tr>
-      <tr><td class="dk">Combined Layer 2 investment</td><td style="text-align:right;">${fmtDFull(totalPolicyInvestment)}</td></tr>
-      <tr class="dtotal"><td class="dk">Leverage ratio</td><td class="dv-t">${leverageRatio}×</td></tr>
-    </table>
-    <p style="font-size:7.5pt;color:#8A9AAA;margin-top:-4pt;font-style:italic;">
-      Scenario data based on ${fullName} profile. 1,000-trial Monte Carlo simulation. Layer 2 leverage analysis reflects difference between insured and uninsured care scenarios including avoided gross-up taxation and preserved compounding. All figures are hypothetical illustrations.
-    </p>` : ''}
-  </div>
-</div></div>
-<div class="pb"></div>
-
-<!-- PAGE 8 — WHY INTEGRATED PLANNING PARTNERS -->
-<table style="width:100%;border-collapse:collapse;">
-  <tr>
-    <td colspan="2" style="padding-bottom:11pt;page-break-after:avoid;">
-      <div class="banner nobreak" style="margin-bottom:0;">
-        <div class="sec-label">Part Seven</div>
-        <h2>Why Integrated Planning Partners</h2>
-        <div class="sub">We're not selling a product. We're providing a system — and the expertise to implement it the right way.</div>
-      </div>
-    </td>
-  </tr>
-  <tr>
-    <td style="width:44%;vertical-align:top;padding-right:8pt;">
-      <p class="lead">Most financial professionals operate in a single domain — investments, insurance, or taxes. The problem is that retirement income planning lives at the intersection of all three. A recommendation made in isolation from the others often creates as many problems as it solves.</p>
-      <p>Integrated Planning Partners was built around a different premise: that the most durable retirement plans are the ones where every layer knows what the others are doing. Tax strategy informs income architecture. Protection decisions are made with the portfolio's role in mind. And everything is designed to work together — not just individually.</p>
-      <p>We use IncomeArc™ — a proprietary four-layer retirement income modeling system — to quantify the impact of coordination before any commitment is made. You can see the numbers, run the scenarios, and ask every question you need to before moving forward. Our role is to make sure you understand the terrain completely.</p>
-      <div class="pullquote">
-        <p>"We believe the best financial advice is the kind that makes you less dependent on luck — and more dependent on a plan."</p>
-      </div>
-    </td>
-    <td style="width:56%;vertical-align:top;padding-left:8pt;">
-      <div class="why-grid nobreak"><div class="why-row">
-        <div class="why-card"><div class="wt">Coordinated Strategy</div><div class="wb">We design income, protection, and tax layers together — so each decision strengthens the others rather than creating trade-offs. Coordination is the difference between a collection of products and an actual plan.</div></div>
-        <div class="why-card"><div class="wt">Fiduciary Approach</div><div class="wb">Our recommendations are driven by your goals and risk profile — not by what generates the largest commission. We show you the math, explain the trade-offs, and let you decide. Full transparency is non-negotiable.</div></div>
-        <div class="why-card"><div class="wt">Proprietary Modeling</div><div class="wb">IncomeArc™ runs 1,000 Monte Carlo simulations for each scenario — quantifying the impact of every risk and every layer before anything is implemented. You see the before and after in real numbers, not in promises.</div></div>
-        <div class="why-card"><div class="wt">Long-Term Relationship</div><div class="wb">Retirement planning is not a one-time event. We monitor, adjust, and re-model as tax law changes, health situations evolve, and market conditions shift. The plan you implement today is designed to adapt.</div></div>
-      </div></div>
-      <div class="abox" style="border-left-color:#2A9D8F; background:#E8F6F4;">
-        <div class="at">What engagement with us looks like</div>
-        <div class="ab">
-          <strong>✓ Step 1 — Discovery (Complete):</strong> Complete financial picture mapped — assets, income, tax exposure, goals, and risk tolerance.<br><br>
-          <strong>⟳ Step 2 — Modeling (In Progress):</strong> Your scenario has been run through the IncomeArchitect Tool. This document is the result.<br><br>
-          <strong>↳ Step 3 — Implementation (Up Next):</strong> Each layer implemented on your timeline, in the sequence that makes the most financial sense.<br><br>
-          <strong>→ Step 4 — Ongoing:</strong> Annual reviews, re-modeling as circumstances change, and proactive communication when conditions warrant a response.
-        </div>
-      </div>
-      <p style="font-size:8.5pt;color:#C8A96E;font-weight:600;text-align:center;margin-top:6pt;">
-        ${advisorName} &nbsp;·&nbsp; Integrated Planning Partners<br>
-        <span style="color:#7A95A8;font-weight:400;">jeff@enhancedfunding.com &nbsp;·&nbsp; integratedplanningpartners.com</span>
-      </p>
-    </td>
-  </tr>
-</table>
-<div class="pb"></div>
-
-<!-- PAGE 9 — DISCLOSURES & DISCLAIMERS -->
-<div>
-  <div class="banner nobreak">
-    <div class="sec-label">Disclosures &amp; Disclaimers</div>
-    <h2>Important Information — Please Read</h2>
-    <div class="sub">This page is an integral part of this presentation and must be reviewed in conjunction with all preceding pages.</div>
-  </div>
-  <div class="disc-two"><div class="disc-two-row">
-    <div class="disc-col">
-      <div class="disc-section"><div class="disc-title">Nature of Illustrations</div><div class="disc-text">All figures, projections, Monte Carlo confidence scores, income estimates, tax calculations, and portfolio values shown in this presentation are hypothetical illustrations only. They are based on assumptions entered at the time of preparation and are not a guarantee, prediction, or projection of future results. Actual results will vary — potentially significantly — based on market conditions, tax law changes, health outcomes, inflation, interest rates, policy performance, and individual circumstances outside the control of Integrated Planning Partners or the presenting advisor. No client should rely on these illustrations as the primary basis for any financial decision.</div></div>
-      <div class="disc-section"><div class="disc-title">Monte Carlo Methodology</div><div class="disc-text">Monte Carlo confidence scores represent the percentage of 1,000 simulated retirement trials in which the portfolio survived through the plan's stated end date without depletion. Each trial randomizes annual portfolio returns around the stated mean using a log-normal distribution. A score of 100% indicates all 1,000 simulated trials survived to plan end; it does not indicate that depletion is impossible under all circumstances. The "Perfect Storm" scenario simultaneously applies a sequence-of-returns stress to early retirement years, stated healthcare events without insurance coverage, and periodic expense shocks. Monte Carlo simulation does not predict future market behavior — actual returns may deviate materially from historical distributions.</div></div>
-      <div class="disc-section"><div class="disc-title">Tax Information</div><div class="disc-text">Tax estimates are illustrative and based on federal marginal brackets and stated state tax treatment as of the presentation date. Tax laws are subject to change. This presentation does not constitute tax advice. Clients should consult a qualified tax professional regarding their specific situation. IRMAA surcharge estimates are based on current Medicare Part B and D surcharge schedules and income thresholds, which are adjusted annually by the Social Security Administration. ${stateLabel} income tax treatment of retirement income shown per current state law, which may change.</div></div>
-      <div class="disc-section"><div class="disc-title">Insurance Products</div><div class="disc-text">The annuity (Layer 1) and Indexed Universal Life insurance policies (Layers 2 and 3) described herein are insurance products, not securities. They are subject to the claims-paying ability of the issuing insurance company. Policy values, income benefits, and chronic illness benefits are subject to the specific terms and conditions of individual policy illustrations, which must be reviewed separately. Participation rates, caps, and spreads on indexed accounts may change at renewal. Chronic illness and LTC riders require the insured to meet specific qualification criteria — typically inability to perform 2 of 6 Activities of Daily Living or cognitive impairment — before benefits are payable.</div></div>
-    </div>
-    <div class="disc-col">
-      <div class="disc-section"><div class="disc-title">Long-Term Care Statistics</div><div class="disc-text">Long-term care statistics cited in this presentation are sourced from the U.S. Department of Health and Human Services / ASPE (2019), HealthView Services, and the Genworth/CareScout 2024 Cost of Care Survey. Care cost data reflects national median figures and may vary significantly by geographic region. Future care costs are projected to increase at 4–6% annually based on historical trends; actual increases may be higher or lower. Statistics are provided for educational and planning purposes only.</div></div>
-      <div class="disc-section"><div class="disc-title">Not Investment Advice</div><div class="disc-text">This presentation is for educational and informational purposes only. It does not constitute investment advice, financial planning advice, or a recommendation to purchase any specific product or take any specific action. The IncomeArc™ methodology is an analytical framework used to illustrate the potential impact of coordinated retirement income planning strategies. Any decisions regarding the purchase of insurance products, annuities, or the restructuring of investment portfolios should be made in consultation with a licensed financial advisor, insurance professional, and/or tax attorney who has reviewed the client's complete financial picture.</div></div>
-      <div class="disc-section"><div class="disc-title">Suitability &amp; Return Assumptions</div><div class="disc-text">Not all products or strategies described are suitable for all individuals. Suitability depends on complete financial situation, risk tolerance, liquidity needs, health status, investment timeline, and other factors. Insurance products are subject to underwriting approval. The base portfolio return assumption of ${inputs.portfolioReturn||6.5}% reflects an assumed long-term average annual return and is not guaranteed. Historical average returns do not predict future performance. Sequence-of-returns stress testing represents a stylized adverse scenario and does not represent the most extreme possible outcome.</div></div>
-      <div class="disc-section"><div class="disc-title">Intellectual Property &amp; Confidentiality</div><div class="disc-text">This document is confidential and prepared exclusively for the named recipient. IncomeArc™ and the Retirement Income Architecture™ methodology are the exclusive proprietary property of Integrated Planning Partners. This presentation, its underlying analytical model, design, output, and methodology may not be copied, reproduced, distributed, or used in any form without the explicit written permission of Integrated Planning Partners. © ${year} Integrated Planning Partners. All rights reserved. Integrated Planning Partners · integratedplanningpartners.com</div></div>
-    </div>
-  </div></div>
-</div>
-
-<scr' + 'ipt>
-  // Auto-print when page loads
-  window.addEventListener('load', function() {
-    setTimeout(function() { window.print(); }, 600);
-  });
-<\/scr' + 'ipt>
-</body></html>`;
-
-    const w = window.open('', '_blank', 'width=1200,height=850,scrollbars=yes');
-    if (!w) { alert('Pop-up blocked — please allow pop-ups for this page, then try again.'); return; }
-    w.document.open();
-    w.document.write(html);
-    w.document.close();
-  }, [inputs, clientInfo, baseProjectionInputs, years, yearsWithLtc]);
-
   useEffect(() => {
     const s = document.createElement('style');
     s.textContent = GS;
@@ -3377,295 +2639,796 @@ p.lead { font-size: 10.5pt; color: #2A3A4A; font-weight: 500; line-height: 1.6; 
                     ? `<span style="color:#8B1A1A;font-weight:700;">Portfolio depletes at age ${ex.age}</span>`
                     : `<span style="color:#1A6B45;font-weight:700;">${fmtD(portFinal(finalYrs))} remaining at age ${pAge}</span>`;
 
+                  // ── helper: SVG ring pair (no images needed) ──
+                  const ringPairSVG = (sqPct, archPct) => {
+                    const confColorHex = c => c >= 85 ? '#4A9B7A' : c >= 70 ? '#C8A96E' : '#C87A66';
+                    const confTrackHex = c => c >= 85 ? 'rgba(74,155,122,0.12)' : c >= 70 ? 'rgba(200,169,102,0.15)' : 'rgba(200,122,102,0.15)';
+                    const confLabelTxt = c => c >= 85 ? 'Strong' : c >= 70 ? 'Moderate' : 'At Risk';
+                    const ring = (cx, pct, color, track, label, sublabel) => {
+                      const r = 68, sw = 10, circ = 2*Math.PI*r;
+                      const offset = circ * (1 - pct/100);
+                      const lc = label==='At Risk' ? '#C87A66' : label==='Moderate' ? '#C8A96E' : '#4A9B7A';
+                      return `<circle cx="${cx}" cy="100" r="${r}" fill="none" stroke="${track}" stroke-width="${sw}"/>
+<circle cx="${cx}" cy="100" r="${r}" fill="none" stroke="${color}" stroke-width="${sw}"
+  stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}" stroke-linecap="round"
+  transform="rotate(-90 ${cx} 100)"/>
+<text x="${cx}" y="96" text-anchor="middle" fill="${color}" font-size="28" font-weight="700" font-family="Arial,sans-serif">${pct}%</text>
+<text x="${cx}" y="114" text-anchor="middle" fill="#8DAFC8" font-size="9" font-family="Arial,sans-serif">Monte Carlo</text>
+<text x="${cx}" y="128" text-anchor="middle" fill="${lc}" font-size="11" font-weight="700" font-family="Arial,sans-serif">${label}</text>
+<text x="${cx}" y="185" text-anchor="middle" fill="#8DAFC8" font-size="10" font-family="Arial,sans-serif">${sublabel}</text>`;
+                    };
+                    const sqColor = confColorHex(sqPct), sqTrack = confTrackHex(sqPct);
+                    const archColor = confColorHex(archPct), archTrack = confTrackHex(archPct);
+                    return `<svg width="640" height="200" viewBox="0 0 640 200" xmlns="http://www.w3.org/2000/svg">
+  <rect width="640" height="200" rx="12" fill="#0D1B2A"/>
+  ${ring(168, sqPct, sqColor, sqTrack, confLabelTxt(sqPct), 'Status Quo')}
+  <text x="320" y="105" text-anchor="middle" fill="#C8A96E" font-size="20" font-weight="700" font-family="Arial,sans-serif">→</text>
+  ${ring(472, archPct, archColor, archTrack, confLabelTxt(archPct), 'IncomeArc™')}
+</svg>`;
+                  };
+
+                  // ── Scenario ring data ──
+                  // Scenario 1 (no events): sqConf vs archConf from sqBase vs full architecture (no LTC, no SORR, no shocks)
+                  const archBaseConf = projectArc({ ...baseProjectionInputs, sorrEnabled: false, expenseShockEnabled: false, ltcEventAge: 0, spouseLtcEventAge: 0 }).confidence;
+                  const sc1SQ   = sqConf;           // status quo, no events
+                  const sc1Arch = archBaseConf;      // architecture, no events
+
+                  // Scenario 2 (HC events): hcConf vs hcInsConf
+                  const sc2SQ   = hcConf;            // uninsured HC events
+                  const sc2Arch = hcInsConf;          // insured HC events
+
+                  // Scenario 3 (perfect storm): stormSQConf vs stormArchConf
+                  const sc3SQ   = stormSQConf;
+                  const sc3Arch = stormArchConf;
+
+                  const sc1SVG = ringPairSVG(sc1SQ, sc1Arch);
+                  const sc2SVG = ringPairSVG(sc2SQ, sc2Arch);
+                  const sc3SVG = ringPairSVG(sc3SQ, sc3Arch);
+
+                  // ── Computed client-specific values ──
+                  const peakMargRatePct  = Math.round((allInMarginalRate||fedMarginalRate||0) * 100);
+                  const peakMargRateDisp = peakMargRatePct ? peakMargRatePct+'%' : '32%';
+                  const iraBalance       = fmtD(inputs.traditionalBalance || 0);
+                  const lifetimeTaxDisp  = totalEstTax >= 1000000 ? '$'+(totalEstTax/1000000).toFixed(1)+'M' : '$'+Math.round(totalEstTax/1000)+'K';
+                  const taxSavedArch     = 0; // Architecture tax savings shown via scenario diff
+                  const sc1Diff = Math.max(0, sc1Arch - sc1SQ);
+                  const sc2Diff = Math.max(0, sc2Arch - sc2SQ);
+                  const sc3Diff = Math.max(0, sc3Arch - sc3SQ);
+                  const confLabelTxt = c => c >= 85 ? 'Strong' : c >= 70 ? 'Moderate' : 'At Risk';
+
+                  // LTC inflated cost helper (already computed above): ltcTotal, spLtcTotal, totalLtcExposure
+                  // Also need gross-up for the report's "what it costs" page
+                  const primaryMargRate  = (allInMarginalRate || 0.32);
+                  const grossUpFactor    = primaryMargRate > 0 ? 1 / (1 - primaryMargRate) : 1.47;
+                  const ltcMonthlyCur    = inputs.ltcMonthlyCost || 0;
+                  const ltcMonthlyGross  = Math.round(ltcMonthlyCur * grossUpFactor);
+                  const grossUpTaxMo     = ltcMonthlyGross - ltcMonthlyCur;
+
+                  // Layer 2 math — mirrors the Combined Healthcare Impact panel
+                  const ltcInfl2         = (inputs.ltcCareInflationRate||4)/100;
+                  const pLtcInflated     = (inputs.ltcMonthlyCost||0)*12 * Math.pow(1+ltcInfl2, Math.max(0,(inputs.ltcEventAge||0)-rAge));
+                  const pTotalCare       = pLtcInflated * (inputs.ltcDuration||0);
+                  const pGrossUp         = pTotalCare * primaryMargRate / (1 - primaryMargRate);
+                  const pPolicyNet2      = inputs.ltcNetAmount || 0;
+                  const pPolicyGrossUp2  = pPolicyNet2 * primaryMargRate / (1 - primaryMargRate);
+                  const spLtcInflated2   = (inputs.spouseLtcMonthlyCost||0)*12 * Math.pow(1+ltcInfl2, Math.max(0,(inputs.spouseLtcEventAge||0)-rAge));
+                  const spTotalCare      = spLtcInflated2 * (inputs.spouseLtcDuration||0);
+                  const spGrossUp        = spTotalCare * (primaryMargRate) / (1 - primaryMargRate);
+                  const sPolicyNet2      = inputs.spouseLtcNetAmount || 0;
+                  const sPolicyGrossUp2  = sPolicyNet2 * primaryMargRate / (1 - primaryMargRate);
+                  const totalCombCare    = pTotalCare + spTotalCare;
+                  const totalCombGrossUp = pGrossUp + spGrossUp;
+                  const yearsRem         = (pAge - rAge) || 20;
+                  const compBase         = totalCombCare + totalCombGrossUp;
+                  const totalCombComp    = compBase * (Math.pow(1+(inputs.portfolioReturn/100||0.065), yearsRem) - 1);
+                  const totalCombPres    = totalCombCare + totalCombGrossUp + totalCombComp;
+                  const totalCombInvest  = (pPolicyNet2 + pPolicyGrossUp2) + (sPolicyNet2 + sPolicyGrossUp2);
+                  const leverageRatio    = totalCombInvest > 0 ? (totalCombPres / totalCombInvest) : 21.0;
+
+                  // Display helpers
+                  const fmtDollar = v => v >= 1000000 ? '$'+(v/1000000).toFixed(2)+'M' : v >= 1000 ? '$'+Math.round(v/1000).toLocaleString()+'K' : '$'+Math.round(v||0).toLocaleString();
+                  const sc2NarrHasData = hasLtcNarr || hasSpLtcNarr;
+
+                  const expShockAmt  = inputs.expenseShockAmount || 50000;
+                  const expShockFreq = inputs.expenseShockFrequency || 8;
+                  const sorrPct      = Math.round(inputs.sorrStressRate || 28);
+                  const horizonYrs   = pAge - (inputs.currentAge || 65);
+                  const horizonDesc  = `Age ${inputs.currentAge||65}\u2192${pAge} (${horizonYrs} yrs)`;
+
                   const htmlContent = `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&family=DM+Sans:wght@300;400;500;600&display=swap');
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #F8F6F2; font-family: 'DM Sans', Arial, sans-serif; color: #1A2332; }
-  @page { size: letter portrait; margin: 0.55in 0.6in; }
-  @media print {
-    body { background: white; padding: 0; }
-    .page-break { page-break-before: always; }
-    div[style*="max-width:760px"] { border: none !important; border-radius: 0 !important; max-width: 100% !important; }
-  }
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500;600;700&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', Arial, sans-serif; font-size: 9.5pt; color: #1A2B3C;
+         line-height: 1.5; background: white; }
+  @page { size: 11in 8.5in landscape; margin: 0.5in 0.62in 0.44in 0.62in; }
+  @page cover-pg { size: 11in 8.5in landscape; margin: 0; }
+  .page { page-break-after: always; overflow: hidden; }
+  .cover { background: #0B1928; min-height: 7.5in; display: flex; flex-direction: column;
+           align-items: center; justify-content: center; text-align: center; padding: 0.55in 1.1in; }
+  .banner { background: #0B1928; border-radius: 5pt; padding: 9pt 14pt 8pt; margin-bottom: 11pt; }
+  .banner .sec-label { font-size: 6.5pt; font-weight: 700; color: #C8A96E; letter-spacing: 1.5pt;
+                       text-transform: uppercase; margin-bottom: 2pt; }
+  .banner h2 { font-size: 13pt; font-weight: 700; color: white; text-transform: uppercase;
+               letter-spacing: 0.4pt; margin-bottom: 2pt; }
+  .banner .sub { font-size: 8pt; color: #8DAFC8; font-style: italic; }
+  .two-col { display: flex; gap: 24pt; }
+  .col-l, .col-r { flex: 1; }
+  .sec-h { font-size: 8.5pt; font-weight: 700; color: #1A2B3C; text-transform: uppercase;
+           letter-spacing: 0.4pt; margin-bottom: 5pt; }
+  p { font-size: 9pt; color: #1A2B3C; line-height: 1.65; margin-bottom: 7pt; }
+  p.lead { font-size: 10.5pt; color: #2A3A4A; font-weight: 500; line-height: 1.6; margin-bottom: 9pt; }
+  .pullquote { border-left: 3pt solid #C8A96E; padding: 8pt 12pt; margin: 8pt 0 10pt;
+               background: rgba(200,169,110,0.04); }
+  .pullquote p { font-size: 11pt; font-style: italic; color: #2A3A4A; line-height: 1.5; margin: 0; }
+  .pullquote .attr { font-size: 7.5pt; color: #7A95A8; margin-top: 4pt; }
+  .callout-row { display: flex; gap: 6pt; margin: 6pt 0 10pt; }
+  .callout { flex: 1; text-align: center; background: #0B1928; border-radius: 5pt;
+             padding: 10pt 6pt; }
+  .callout .cv { font-size: 22pt; font-weight: 800; color: white; line-height: 1; margin-bottom: 2pt; }
+  .callout .cl { font-size: 6.5pt; font-weight: 700; color: #C8A96E; text-transform: uppercase;
+                 letter-spacing: 0.6pt; }
+  .callout .cs { font-size: 7pt; color: #8DAFC8; font-style: italic; margin-top: 2pt; }
+  .risk-grid { display: flex; gap: 6pt; margin: 6pt 0 10pt; }
+  .risk-card { flex: 1; border-top: 3.5pt solid; border-radius: 0 0 4pt 4pt;
+               border-right: 1pt solid #DDD; border-bottom: 1pt solid #DDD; border-left: 1pt solid #DDD;
+               padding: 9pt 8pt; background: white; }
+  .risk-card .ri { font-size: 6pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6pt; margin-bottom: 3pt; }
+  .risk-card .rn { font-size: 10pt; font-weight: 700; color: #1A2B3C; margin-bottom: 5pt; }
+  .risk-card .rd { font-size: 8pt; color: #445566; line-height: 1.5; margin-bottom: 7pt; }
+  .risk-card .rv { font-size: 18pt; font-weight: 800; line-height: 1; text-align: center; margin-bottom: 2pt; }
+  .risk-card .rs { font-size: 6.5pt; color: #7A95A8; font-style: italic; text-align: center; }
+  .risk-card ul { font-size: 7.5pt; color: #445566; line-height: 1.5; margin: 4pt 0 7pt 10pt; padding: 0; }
+  .risk-card li { margin-bottom: 2pt; }
+  table.data { width: 100%; border-collapse: collapse; margin: 5pt 0 10pt; font-size: 8.5pt; }
+  table.data th, table.data td { padding: 5.5pt 9pt; }
+  table.data td { border: 1pt solid #DDD; }
+  table.data tr:nth-child(odd) td { background: #F7F7F7; }
+  table.data tr:nth-child(even) td { background: white; }
+  .th-lbl { background: #0B1928; color: #C8A96E; font-weight: 700; text-align: left; }
+  .th-bad { background: #5C1A1A; color: #FFAAAA; font-weight: 700; text-align: center;
+            font-size: 7.5pt; text-transform: uppercase; letter-spacing: .4pt; }
+  .th-good { background: #0B1928; color: #2A9D8F; font-weight: 700; text-align: center;
+             font-size: 7.5pt; text-transform: uppercase; letter-spacing: .4pt; }
+  .td-n { text-align: center; color: #445566; }
+  .td-lbl { font-weight: 700; }
+  .abox { border-left: 3.5pt solid; border-top: 1pt solid #DDD; border-right: 1pt solid #DDD;
+          border-bottom: 1pt solid #DDD; border-radius: 0 4pt 4pt 0; padding: 9pt 11pt; margin: 6pt 0 10pt; }
+  .abox .at { font-size: 9.5pt; font-weight: 700; color: #1A2B3C; margin-bottom: 4pt; }
+  .abox .ab { font-size: 8.5pt; color: #1A2B3C; line-height: 1.65; }
+  .layer-grid { display: flex; gap: 6pt; margin: 4pt 0 0; }
+  .layer-card { flex: 1; border-top: 3.5pt solid; border-radius: 0 0 4pt 4pt;
+                border-right: 1pt solid #DDD; border-bottom: 1pt solid #DDD; border-left: 1pt solid #DDD;
+                padding: 6pt 7pt; background: white; }
+  .layer-card .li2 { font-size: 6pt; font-weight: 700; text-transform: uppercase; letter-spacing: .6pt; margin-bottom: 3pt; }
+  .layer-card .ln { font-size: 10pt; font-weight: 700; color: #1A2B3C; margin-bottom: 5pt; }
+  .layer-card .ld { font-size: 8pt; color: #445566; line-height: 1.5; margin-bottom: 7pt; }
+  .layer-card .la { font-size: 11pt; font-weight: 800; text-align: center; margin-bottom: 2pt; }
+  .layer-card .ls { font-size: 6.5pt; color: #7A95A8; font-style: italic; text-align: center; }
+  .ring-row { display: flex; align-items: center; justify-content: center; gap: 8pt; margin: 8pt 0; }
+  .ring-arrow { font-size: 20pt; color: #C8A96E; font-weight: 700; }
+  .sc-table { width: 100%; border-collapse: collapse; margin: 5pt 0 10pt; font-size: 8.5pt; }
+  .sc-table th, .sc-table td { padding: 5.5pt 9pt; }
+  .sc-table td { border: 1pt solid #DDD; }
+  .sc-table tr:nth-child(odd) td { background: #F7F7F7; }
+  .sc-table tr:nth-child(even) td { background: white; }
+  .mc-sq   { text-align: center; color: #C0392B; font-size: 10pt; font-weight: 700; }
+  .mc-arch { text-align: center; color: #2A9D8F; font-size: 10pt; font-weight: 700; }
+  .mc-diff { text-align: center; color: #C8A96E; font-weight: 700; }
+  .dtable { width: 100%; border-collapse: collapse; margin: 5pt 0 10pt; font-size: 8.5pt; }
+  .dtable td { padding: 5.5pt 9pt; border: 1pt solid #DDD; }
+  .dh { background: #0B1928; color: #C8A96E; font-weight: 700; font-size: 9pt; }
+  .dk { color: #445566; }
+  .dv-c { text-align: right; color: #2A9D8F; font-weight: 600; }
+  .dv-t { text-align: right; color: white; font-weight: 700; background: #0B1928; font-size: 10pt; }
+  .dtotal td { font-weight: 700; }
+  .why-grid { display: flex; gap: 6pt; margin: 8pt 0 10pt; }
+  .why-card { flex: 1; background: white; border: 1pt solid #DDD; border-radius: 4pt; padding: 8pt; }
+  .wt { font-size: 8.5pt; font-weight: 700; color: #1A2B3C; margin-bottom: 4pt; }
+  .wb { font-size: 7.5pt; color: #445566; line-height: 1.5; }
+  .step-box { border-left: 3.5pt solid #2A9D8F; border-top: 1pt solid #DDD; border-right: 1pt solid #DDD;
+              border-bottom: 1pt solid #DDD; border-radius: 0 4pt 4pt 0;
+              padding: 9pt 11pt; background: #E8F6F4; margin: 6pt 0 10pt; }
+  .disc-two { display: flex; gap: 24pt; }
+  .disc-col { flex: 1; }
+  .disc-section { margin-bottom: 10pt; }
+  .disc-title { font-size: 8pt; font-weight: 700; color: #1A2B3C; text-transform: uppercase;
+                letter-spacing: 0.4pt; margin-bottom: 3pt; }
+  .disc-text { font-size: 7.5pt; color: #445566; line-height: 1.6; }
+  .hdr-bar { display: flex; justify-content: space-between; align-items: flex-end;
+             border-bottom: 0.5pt solid #C8A96E; padding-bottom: 3pt; margin-bottom: 10pt; }
+  .hdr-logo-txt { font-size: 6.5pt; font-weight: 700; color: #C8A96E; letter-spacing: 1.4pt; text-transform: uppercase; }
+  .hdr-client { font-size: 7pt; color: #7A95A8; }
+  .footer-bar { display: flex; justify-content: space-between; align-items: center;
+                border-top: 0.5pt solid #2A3A4A; padding-top: 3pt; margin-top: 10pt;
+                font-size: 6pt; color: #8A9AAA; }
+  .footer-center { font-size: 5.5pt; color: #C8A96E; text-align: center; }
+  hr.gold { border: none; border-top: 1pt solid #C8A96E; margin: 10pt 0 8pt; }
+  img.ring-svg { max-width: 100%; }
+  .params-box { border-left-color: #C8A96E; background: #FBF5E8; }
+  .takeaway-box { border-left-color: #C8A96E; background: #FBF5E8; }
+  .explain-box { border-left-color: #2A9D8F; background: #E8F6F4; }
+  .warn-box { border-left-color: #C0392B; background: #FBF0F0; }
 </style>
 </head>
-<body style="margin:0;padding:24px;background:#F8F6F2;">
-<div style="max-width:760px;margin:0 auto;background:white;border:1px solid #DDD;border-radius:4px;overflow:hidden;">
+<body>
 
-  <!-- HEADER -->
-  <div style="background:#1A2B3C;padding:28px 36px;position:relative;">
-    <div style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#C8A96E,#D4873A,#9B7EC8);"></div>
-    <div style="font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#C8A96E;margin-bottom:6px;">Integrated Planning Partners</div>
-    <div style="font-size:30px;font-family:'Cormorant Garamond',Georgia,serif;font-weight:400;color:#F5F0E8;margin-bottom:3px;">IncomeArc™ Retirement Report</div>
-    <div style="font-size:12px;color:#7A9AB8;letter-spacing:.04em;">Retirement Income Architecture Analysis &nbsp;·&nbsp; Conceptual Illustration Only</div>
-    <div style="margin-top:16px;display:flex;gap:24px;flex-wrap:wrap;">
-      <div style="font-size:12px;color:#A8BFD0;"><span style="color:#C8A96E;font-weight:600;">${fullName}</span></div>
-      <div style="font-size:12px;color:#A8BFD0;">${isMFJ?'Married Filing Jointly':'Single'}</div>
-      <div style="font-size:12px;color:#A8BFD0;">Age ${inputs.currentAge} · Retire ${rAge} · Plan to ${pAge}</div>
-      <div style="font-size:12px;color:#A8BFD0;">${stateInfo2?stateInfo2.name:inputs.stateCode}</div>
-      <div style="font-size:12px;color:#A8BFD0;">Generated ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</div>
-    </div>
+<!-- ══════════════════════════════════════════════════════════
+     COVER PAGE
+     ══════════════════════════════════════════════════════════ -->
+<div class="page" style="page:cover-pg;">
+  <div class="cover">
+    <div style="font-size:8.5pt;font-weight:700;color:#C8A96E;letter-spacing:2.8pt;text-transform:uppercase;margin-bottom:26pt;">Integrated Planning Partners</div>
+    <div style="width:60pt;height:1pt;background:#C8A96E;margin:0 auto 26pt;"></div>
+    <div style="font-size:38pt;font-weight:800;color:white;line-height:1.1;letter-spacing:-0.5pt;margin-bottom:12pt;">Navigating<br>Retirement<br>With Confidence</div>
+    <div style="font-size:14pt;color:#8DAFC8;font-style:italic;line-height:1.4;margin-bottom:30pt;max-width:560pt;">A systematic approach to protecting what you've built —<br>because the best captains don't prepare for calm seas.</div>
+    <div style="width:90pt;height:0.5pt;background:rgba(200,169,110,0.4);margin:0 auto 26pt;"></div>
+    <div style="font-size:10pt;color:#C8A96E;letter-spacing:.5pt;text-transform:uppercase;margin-bottom:8pt;">Prepared For</div>
+    <div style="font-size:22pt;font-weight:700;color:white;margin-bottom:4pt;">${fullName}</div>
+    <div style="font-size:9pt;color:#7A95A8;margin-bottom:28pt;">Confidential Discussion Document &nbsp;·&nbsp; ${new Date().getFullYear()}</div>
+    <div style="font-size:10pt;font-weight:600;color:#C8A96E;margin-bottom:3pt;">Jeffrey Faine, CLU, RICP®</div>
+    <div style="font-size:8.5pt;color:#7A95A8;">Integrated Planning Partners &nbsp;·&nbsp; integratedplanningpartners.com</div>
   </div>
-
-  <div style="padding:32px 36px;">
-
-    <!-- EXECUTIVE SUMMARY -->
-    <div style="margin-bottom:36px;">
-      <div style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#C8A96E;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #C8A96E;">Executive Summary</div>
-      <p style="font-size:14px;color:#2A3A4A;line-height:1.75;margin-bottom:14px;">
-        This report analyzes the retirement income plan for <strong>${fullName}</strong> under two distinct scenarios. The <strong style="color:#8B1A1A;">Status Quo</strong> scenario projects outcomes without structural planning. The <strong style="color:#1A6B45;">IncomeArc™ Architecture</strong> scenario applies a coordinated, layered approach designed to insulate retirement income against the four primary threats to financial security.
-      </p>
-      <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
-        <tr style="background:#F0F4F8;">
-          <td style="padding:10px 14px;font-size:11px;font-weight:600;color:#4A6070;text-transform:uppercase;letter-spacing:.06em;width:34%;border:1px solid #DDE4EC;">Metric</td>
-          <td style="padding:10px 14px;font-size:11px;font-weight:600;color:#8B1A1A;text-transform:uppercase;letter-spacing:.06em;text-align:center;border:1px solid #DDE4EC;">Status Quo</td>
-          <td style="padding:10px 14px;font-size:11px;font-weight:600;color:#1A6B45;text-transform:uppercase;letter-spacing:.06em;text-align:center;border:1px solid #DDE4EC;">IncomeArc™ Architecture</td>
-        </tr>
-        ${[
-          ['MC Confidence Score', `<span style="font-weight:700;color:${confColor(sqConf)};background:${confBg(sqConf)};padding:2px 8px;border-radius:3px;">${sqConf}% — ${confLabel(sqConf)}</span>`, `<span style="font-weight:700;color:${confColor(confidence)};background:${confBg(confidence)};padding:2px 8px;border-radius:3px;">${confidence}% — ${confLabel(confidence)}</span>`],
-          ['Portfolio at Retirement', fmtD(totalPortfolioAtRetire), fmtD(totalPortfolioAtRetire)],
-          ['Portfolio at Age 90', sqExhaust && sqExhaust.age<=90 ? `<span style="color:#8B1A1A;font-weight:600;">Depleted age ${sqExhaust.age}</span>` : fmtD(sqPort90), archExhaust && archExhaust.age<=90 ? `<span style="color:#8B1A1A;font-weight:600;">Depleted age ${archExhaust.age}</span>` : fmtD(archPort90)],
-          [`Portfolio at Age ${pAge}`, sqExhaust ? `<span style="color:#8B1A1A;font-weight:600;">Depleted age ${sqExhaust.age}</span>` : fmtD(portFinal(sqYears)), archExhaust ? `<span style="color:#8B1A1A;font-weight:600;">Depleted age ${archExhaust.age}</span>` : fmtD(archFinalPort)],
-          ['Guaranteed Income Floor', (sqYears[0] ? Math.round((sqYears[0].grossGuaranteedIncome||0)/(sqYears[0].grossIncome||1)*100) : 0)+'%', guaranteedPct+'%'],
-          ['Est. Lifetime Tax Burden', fmtD(totalEstTax), fmtD(totalEstTax)],
-        ].map(([label, sq, arch], i) => `
-        <tr style="background:${i%2===0?'white':'#FAFBFC'};">
-          <td style="padding:9px 14px;font-size:13px;color:#3A4A5A;border:1px solid #DDE4EC;">${label}</td>
-          <td style="padding:9px 14px;font-size:13px;text-align:center;border:1px solid #DDE4EC;">${sq}</td>
-          <td style="padding:9px 14px;font-size:13px;text-align:center;border:1px solid #DDE4EC;">${arch}</td>
-        </tr>`).join('')}
-      </table>
-    </div>
-
-    <div style="height:1px;background:#E5E9EE;margin-bottom:32px;"></div>
-
-    <!-- SECTION 1: SORR -->
-    <div style="margin-bottom:36px;">
-      <div style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#C8A96E;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #C8A96E;">Section 1 &nbsp;·&nbsp; Sequence of Returns Risk</div>
-      <p style="font-size:14px;color:#2A3A4A;line-height:1.75;margin-bottom:12px;">
-        Sequence of returns risk is among the most underestimated threats in retirement. A significant market decline in the <strong>first three to five years</strong> of retirement creates permanent, compounding damage that no amount of long-term average returns can repair. When a portfolio is both losing value and being drawn down for living expenses simultaneously, each withdrawal locks in losses at the worst possible price.
-      </p>
-      <div style="background:#F5F5F0;border-left:3px solid #8A9AAA;padding:10px 14px;font-size:12px;color:#4A5A6A;line-height:1.6;margin-bottom:12px;">
-        <strong>Note:</strong> Each section isolates a single risk variable against an identical baseline to show the impact of that risk alone. The overall plan confidence in the Executive Summary reflects all active risks combined.
-      </div>
-      <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
-        <tr style="background:#F0F4F8;">
-          <td style="padding:9px 14px;font-size:11px;font-weight:600;color:#4A6070;text-transform:uppercase;letter-spacing:.06em;border:1px solid #DDE4EC;">Scenario</td>
-          <td style="padding:9px 14px;font-size:11px;font-weight:600;color:#4A6070;text-transform:uppercase;letter-spacing:.06em;text-align:center;border:1px solid #DDE4EC;">MC Confidence</td>
-          <td style="padding:9px 14px;font-size:11px;font-weight:600;color:#4A6070;text-transform:uppercase;letter-spacing:.06em;text-align:right;border:1px solid #DDE4EC;">Portfolio Outcome</td>
-        </tr>
-        <tr style="background:white;">
-          <td style="padding:9px 14px;font-size:13px;color:#3A4A5A;border:1px solid #DDE4EC;">Baseline — No stress events<br><span style="font-size:11px;color:#8A9AAA;font-style:italic;">Isolated comparison: SORR is the only variable</span></td>
-          <td style="padding:9px 14px;font-size:13px;text-align:center;border:1px solid #DDE4EC;"><span style="color:${confColor(sqConf)};font-weight:600;">${sqConf}%</span></td>
-          <td style="padding:9px 14px;font-size:13px;text-align:right;border:1px solid #DDE4EC;">${depleteStr(sqExhaust, sqYears)}</td>
-        </tr>
-        <tr style="background:#FDF2F2;">
-          <td style="padding:9px 14px;font-size:13px;color:#3A4A5A;border:1px solid #DDE4EC;">+ SORR (5-year decline sequence, all else equal)</td>
-          <td style="padding:9px 14px;font-size:13px;text-align:center;border:1px solid #DDE4EC;"><span style="color:${confColor(sorrConf)};font-weight:600;">${sorrConf}%</span></td>
-          <td style="padding:9px 14px;font-size:13px;text-align:right;border:1px solid #DDE4EC;">${depleteStr(sorrExhaust, sorrSQYears)}</td>
-        </tr>
-        <tr style="background:#EAF5EF;">
-          <td style="padding:9px 14px;font-size:13px;color:#3A4A5A;border:1px solid #DDE4EC;">IncomeArc™ Architecture — All risks active</td>
-          <td style="padding:9px 14px;font-size:13px;text-align:center;border:1px solid #DDE4EC;"><span style="color:${confColor(confidence)};font-weight:600;">${confidence}%</span></td>
-          <td style="padding:9px 14px;font-size:13px;text-align:right;border:1px solid #DDE4EC;">${depleteStr(archExhaust, yearsWithLtc)}</td>
-        </tr>
-      </table>
-      <div style="background:#F0F7FF;border-left:3px solid #3A7CC8;padding:12px 16px;font-size:13px;color:#2A3A5A;line-height:1.65;">
-        <strong>IncomeArc™ Response:</strong> ${isArch && inputs.rothAnnuityMonthly > 0 ? `The Roth Fixed Indexed Annuity (Layer 1) provides contractual income that never requires portfolio liquidation. ` : ''}${isArch && inputs.qualAnnuityMonthly > 0 ? `The Qualified Annuity (Layer 1) creates a pension-like floor from a qualified rollover, guaranteed for life without portfolio exposure. ` : ''}When guaranteed income covers essential expenses, the portfolio is never forced to sell at depressed prices.
-      </div>
-    </div>
-
-    <div style="height:1px;background:#E5E9EE;margin-bottom:32px;"></div>
-
-    <!-- SECTION 2: EXPENSE SHOCKS -->
-    <div style="margin-bottom:36px;">
-      <div style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#C8A96E;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #C8A96E;">Section 2 &nbsp;·&nbsp; Unplanned Large Expenses</div>
-      <p style="font-size:14px;color:#2A3A4A;line-height:1.75;margin-bottom:12px;">
-        Standard retirement projections model smooth, predictable spending. Actual retirements do not. Roof replacements, HVAC systems, vehicle failures, dental work not covered by Medicare, home modifications for aging in place — these are the ordinary texture of a 30-year retirement. ${hasShock ? `Modeled here at $${Math.round(inputs.expenseShockAmount/1000)}K recurring every ${inputs.expenseShockFrequency} years.` : 'Modeled at a conservative $50K recurring every 8 years.'}
-      </p>
-      <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
-        <tr style="background:#F0F4F8;">
-          <td style="padding:9px 14px;font-size:11px;font-weight:600;color:#4A6070;text-transform:uppercase;letter-spacing:.06em;border:1px solid #DDE4EC;">Scenario</td>
-          <td style="padding:9px 14px;font-size:11px;font-weight:600;color:#4A6070;text-transform:uppercase;letter-spacing:.06em;text-align:center;border:1px solid #DDE4EC;">MC Confidence</td>
-          <td style="padding:9px 14px;font-size:11px;font-weight:600;color:#4A6070;text-transform:uppercase;letter-spacing:.06em;text-align:right;border:1px solid #DDE4EC;">Portfolio Outcome</td>
-        </tr>
-        <tr style="background:white;">
-          <td style="padding:9px 14px;font-size:13px;color:#3A4A5A;border:1px solid #DDE4EC;">Baseline — No expense shocks<br><span style="font-size:11px;color:#8A9AAA;font-style:italic;">Isolated comparison: expense shocks are the only variable</span></td>
-          <td style="padding:9px 14px;font-size:13px;text-align:center;border:1px solid #DDE4EC;"><span style="color:${confColor(sqConf)};font-weight:600;">${sqConf}%</span></td>
-          <td style="padding:9px 14px;font-size:13px;text-align:right;border:1px solid #DDE4EC;">${depleteStr(sqExhaust, sqYears)}</td>
-        </tr>
-        <tr style="background:#FDF2F2;">
-          <td style="padding:9px 14px;font-size:13px;color:#3A4A5A;border:1px solid #DDE4EC;">+ Recurring Expense Shocks (all else equal)</td>
-          <td style="padding:9px 14px;font-size:13px;text-align:center;border:1px solid #DDE4EC;"><span style="color:${confColor(shockConf)};font-weight:600;">${shockConf}%</span></td>
-          <td style="padding:9px 14px;font-size:13px;text-align:right;border:1px solid #DDE4EC;">${depleteStr(shockExhaust, shockYears)}</td>
-        </tr>
-        <tr style="background:#EAF5EF;">
-          <td style="padding:9px 14px;font-size:13px;color:#3A4A5A;border:1px solid #DDE4EC;">IncomeArc™ Architecture — All risks active</td>
-          <td style="padding:9px 14px;font-size:13px;text-align:center;border:1px solid #DDE4EC;"><span style="color:${confColor(confidence)};font-weight:600;">${confidence}%</span></td>
-          <td style="padding:9px 14px;font-size:13px;text-align:right;border:1px solid #DDE4EC;">${depleteStr(archExhaust, yearsWithLtc)}</td>
-        </tr>
-      </table>
-      <div style="background:#F0F7FF;border-left:3px solid #3A7CC8;padding:12px 16px;font-size:13px;color:#2A3A5A;line-height:1.65;">
-        <strong>IncomeArc™ Response:</strong> A larger, less-stressed portfolio — preserved by guaranteed income streams that cover baseline expenses — is inherently better positioned to absorb irregular shocks. ${isArch && inputs.etaAnnualIncome > 0 ? `The ETA policy loan income (Layer 3) additionally provides tax-free liquidity accessible without a taxable event or MAGI spike.` : ''}
-      </div>
-    </div>
-
-    <div style="height:1px;background:#E5E9EE;margin-bottom:32px;"></div>
-
-    ${hasLtcNarr || hasSpLtcNarr ? `
-    <!-- SECTION 3: HEALTHCARE EVENTS -->
-    <div style="margin-bottom:36px;">
-      <div style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#C8A96E;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #C8A96E;">Section 3 &nbsp;·&nbsp; Long-Term Care & Healthcare Events</div>
-      <p style="font-size:14px;color:#2A3A4A;line-height:1.75;margin-bottom:12px;">
-        70% of people reaching age 65 will require some form of long-term care. Every dollar of care cost drawn from a traditional IRA must be grossed up for taxes. At a 24–32% marginal rate, a $${Math.round((inputs.ltcMonthlyCost||0)).toLocaleString()}/month care cost requires approximately $${Math.round((inputs.ltcMonthlyCost||0)/(1-0.27)).toLocaleString()}/month in gross IRA distributions — simultaneously drawing down the portfolio, elevating MAGI, and spiking IRMAA surcharges.
-      </p>
-      <table style="width:100%;border-collapse:collapse;margin-bottom:12px;">
-        <tr style="background:#F0F4F8;">
-          <td style="padding:8px 14px;font-size:11px;font-weight:600;color:#4A6070;text-transform:uppercase;letter-spacing:.06em;border:1px solid #DDE4EC;">Care Event Details</td>
-          ${hasLtcNarr ? `<td style="padding:8px 14px;font-size:11px;font-weight:600;color:#4A6070;text-transform:uppercase;letter-spacing:.06em;text-align:center;border:1px solid #DDE4EC;">${clientLabel}</td>` : ''}
-          ${hasSpLtcNarr ? `<td style="padding:8px 14px;font-size:11px;font-weight:600;color:#4A6070;text-transform:uppercase;letter-spacing:.06em;text-align:center;border:1px solid #DDE4EC;">${clientInfo.spouseName||'Spouse'}</td>` : ''}
-        </tr>
-        ${[
-          ['Event begins at age', hasLtcNarr?`Age ${inputs.ltcEventAge}`:'', hasSpLtcNarr?`Age ${inputs.spouseLtcEventAge}`:''],
-          ['Duration', hasLtcNarr?`${inputs.ltcDuration} years`:'', hasSpLtcNarr?`${inputs.spouseLtcDuration} years`:''],
-          ['Monthly cost (today\'s $)', hasLtcNarr?`$${Math.round(inputs.ltcMonthlyCost||0).toLocaleString()}/mo`:'', hasSpLtcNarr?`$${Math.round(inputs.spouseLtcMonthlyCost||0).toLocaleString()}/mo`:''],
-          ['Inflated cost at event age', hasLtcNarr?`$${Math.round(ltcInflated/12).toLocaleString()}/mo`:'', hasSpLtcNarr?`$${Math.round(spLtcInflated/12).toLocaleString()}/mo`:''],
-          ['Total cost over care period', hasLtcNarr?`<strong style="color:#8B1A1A;">${fmtD(ltcTotal)}</strong>`:'', hasSpLtcNarr?`<strong style="color:#8B1A1A;">${fmtD(spLtcTotal)}</strong>`:''],
-        ].map(([label, pVal, spVal], i) => `
-        <tr style="background:${i%2===0?'white':'#FAFBFC'};">
-          <td style="padding:8px 14px;font-size:13px;color:#3A4A5A;border:1px solid #DDE4EC;">${label}</td>
-          ${hasLtcNarr ? `<td style="padding:8px 14px;font-size:13px;text-align:center;border:1px solid #DDE4EC;">${pVal}</td>` : ''}
-          ${hasSpLtcNarr ? `<td style="padding:8px 14px;font-size:13px;text-align:center;border:1px solid #DDE4EC;">${spVal}</td>` : ''}
-        </tr>`).join('')}
-        ${hasLtcNarr && hasSpLtcNarr ? `
-        <tr style="background:#FDF5E0;">
-          <td style="padding:8px 14px;font-size:13px;font-weight:600;color:#3A4A5A;border:1px solid #DDE4EC;">Combined care exposure</td>
-          <td colspan="2" style="padding:8px 14px;font-size:14px;font-weight:700;color:#8B1A1A;text-align:center;border:1px solid #DDE4EC;">${fmtD(totalLtcExposure)} <span style="font-size:11px;font-weight:400;color:#6A7A8A;">(before tax gross-up)</span></td>
-        </tr>` : ''}
-      </table>
-      <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
-        <tr style="background:#F0F4F8;">
-          <td style="padding:9px 14px;font-size:11px;font-weight:600;color:#4A6070;text-transform:uppercase;letter-spacing:.06em;border:1px solid #DDE4EC;">Scenario</td>
-          <td style="padding:9px 14px;font-size:11px;font-weight:600;color:#4A6070;text-transform:uppercase;letter-spacing:.06em;text-align:center;border:1px solid #DDE4EC;">MC Confidence</td>
-          <td style="padding:9px 14px;font-size:11px;font-weight:600;color:#4A6070;text-transform:uppercase;letter-spacing:.06em;text-align:right;border:1px solid #DDE4EC;">Portfolio Outcome</td>
-        </tr>
-        <tr style="background:white;">
-          <td style="padding:9px 14px;font-size:13px;color:#3A4A5A;border:1px solid #DDE4EC;">Baseline — No care event, no stress scenarios<br><span style="font-size:11px;color:#8A9AAA;font-style:italic;">Isolated comparison: care is the only variable</span></td>
-          <td style="padding:9px 14px;font-size:13px;text-align:center;border:1px solid #DDE4EC;"><span style="color:${confColor(sqConf)};font-weight:600;">${sqConf}%</span></td>
-          <td style="padding:9px 14px;font-size:13px;text-align:right;border:1px solid #DDE4EC;">${depleteStr(sqExhaust, sqYears)}</td>
-        </tr>
-        <tr style="background:#FDF2F2;">
-          <td style="padding:9px 14px;font-size:13px;color:#3A4A5A;border:1px solid #DDE4EC;">+ Uninsured Care Event (all else equal)<br><span style="font-size:11px;color:#8A9AAA;font-style:italic;">Identical baseline — care event added, no Layer 2 protection</span></td>
-          <td style="padding:9px 14px;font-size:13px;text-align:center;border:1px solid #DDE4EC;"><span style="color:${confColor(hcConf)};font-weight:600;">${hcConf}%</span></td>
-          <td style="padding:9px 14px;font-size:13px;text-align:right;border:1px solid #DDE4EC;">${depleteStr(hcExhaust, hcYears)}</td>
-        </tr>
-        <tr style="background:#EAF5EF;">
-          <td style="padding:9px 14px;font-size:13px;color:#3A4A5A;border:1px solid #DDE4EC;">+ Care Event with Layer 2 Protection (all else equal)<br><span style="font-size:11px;color:#8A9AAA;font-style:italic;">Identical baseline — care event present, portfolio fully insulated</span></td>
-          <td style="padding:9px 14px;font-size:13px;text-align:center;border:1px solid #DDE4EC;"><span style="color:${confColor(hcInsConf)};font-weight:600;">${hcInsConf}%</span></td>
-          <td style="padding:9px 14px;font-size:13px;text-align:right;border:1px solid #DDE4EC;">${depleteStr(hcInsExhaust, hcInsYears)}</td>
-        </tr>
-      </table>
-      <div style="background:#F0F7FF;border-left:3px solid #3A7CC8;padding:12px 16px;font-size:13px;color:#2A3A5A;line-height:1.65;margin-bottom:12px;">
-        <strong>IncomeArc™ Layer 2 Response:</strong> The Living Benefits IUL with chronic care rider creates a dedicated pool for healthcare costs completely isolated from the retirement portfolio. When a qualifying care event occurs, the policy's death benefit accelerates tax-free — the portfolio is never touched. The tax gross-up problem is eliminated entirely.
-      </div>
-      <div style="background:#FDF5E0;border-left:3px solid #C8A96E;padding:12px 16px;font-size:13px;color:#3A3010;line-height:1.65;">
-        <strong>If care is never needed:</strong> The policy continues building cash value and delivers tax-free income in retirement with a tax-free death benefit for legacy. Unlike traditional long-term care insurance, no premium is ever wasted.
-      </div>
-    </div>
-
-    <div style="height:1px;background:#E5E9EE;margin-bottom:32px;"></div>` : ''}
-
-    <!-- SECTION 4: THE PERFECT STORM -->
-    <div style="margin-bottom:36px;">
-      <div style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#C8A96E;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #C8A96E;">Section 4 &nbsp;·&nbsp; The Perfect Storm — All Risks Combined</div>
-      <p style="font-size:14px;color:#2A3A4A;line-height:1.75;margin-bottom:16px;">
-        Retirement risks rarely arrive in isolation. A market correction in the first years of retirement stresses the portfolio. A roof replacement arrives during that same downturn. A care event begins just as the portfolio is most vulnerable. This is not a paranoid scenario — it is a plausible sequence for any 30-year retirement and the precise scenario that most plans are not structured to survive.
-      </p>
-      <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
-        <tr style="background:#F0F4F8;">
-          <td style="padding:9px 14px;font-size:11px;font-weight:600;color:#4A6070;text-transform:uppercase;letter-spacing:.06em;border:1px solid #DDE4EC;">Scenario</td>
-          <td style="padding:9px 14px;font-size:11px;font-weight:600;color:#4A6070;text-transform:uppercase;letter-spacing:.06em;text-align:center;border:1px solid #DDE4EC;">MC Confidence</td>
-          <td style="padding:9px 14px;font-size:11px;font-weight:600;color:#4A6070;text-transform:uppercase;letter-spacing:.06em;text-align:right;border:1px solid #DDE4EC;">Portfolio Outcome</td>
-        </tr>
-        <tr style="background:white;">
-          <td style="padding:9px 14px;font-size:13px;color:#3A4A5A;border:1px solid #DDE4EC;">Status Quo — No stress events</td>
-          <td style="padding:9px 14px;font-size:13px;text-align:center;border:1px solid #DDE4EC;"><span style="color:${confColor(sqConf)};font-weight:600;">${sqConf}%</span></td>
-          <td style="padding:9px 14px;font-size:13px;text-align:right;border:1px solid #DDE4EC;">${depleteStr(sqExhaust, sqYears)}</td>
-        </tr>
-        <tr style="background:#FDF2F2;">
-          <td style="padding:9px 14px;font-size:13px;color:#3A4A5A;border:1px solid #DDE4EC;"><strong>Status Quo — SORR + Expense Shocks + Uninsured Care</strong></td>
-          <td style="padding:9px 14px;font-size:13px;text-align:center;border:1px solid #DDE4EC;"><span style="color:${confColor(stormSQConf)};font-weight:700;font-size:14px;">${stormSQConf}%</span></td>
-          <td style="padding:9px 14px;font-size:13px;text-align:right;border:1px solid #DDE4EC;">${depleteStr(stormSQExhaust, stormSQYears)}</td>
-        </tr>
-        <tr style="background:#EAF5EF;">
-          <td style="padding:9px 14px;font-size:13px;color:#3A4A5A;border:1px solid #DDE4EC;"><strong>IncomeArc™ Architecture — Same perfect storm environment</strong></td>
-          <td style="padding:9px 14px;font-size:13px;text-align:center;border:1px solid #DDE4EC;"><span style="color:${confColor(stormArchConf)};font-weight:700;font-size:14px;">${stormArchConf}%</span></td>
-          <td style="padding:9px 14px;font-size:13px;text-align:right;border:1px solid #DDE4EC;">${depleteStr(stormArchExhaust, stormArchYears)}</td>
-        </tr>
-      </table>
-      ${stormSQExhaust ? `
-      <div style="background:#FBECEC;border-left:3px solid #C44;padding:12px 16px;font-size:13px;color:#5A1A1A;line-height:1.65;margin-bottom:12px;">
-        <strong>⚠ Status Quo Result:</strong> When all three risks converge, the unstructured plan depletes at age <strong>${stormSQExhaust.age}</strong> — ${pAge - stormSQExhaust.age} years before the end of the plan.
-      </div>` : ''}
-      ${stormSQExhaust && !stormArchExhaust ? `
-      <div style="background:#EAF5EF;border-left:3px solid #2A8A55;padding:12px 16px;font-size:13px;color:#1A3A28;line-height:1.65;">
-        <strong>✓ Architecture Result:</strong> Facing the identical perfect storm environment, the IncomeArc™ architecture reaches age ${pAge} with <strong>${fmtD(portFinal(stormArchYears))}</strong> remaining — converting a plan that fails at age ${stormSQExhaust.age} into one that survives to plan end. The ${Math.max(0, stormArchConf - stormSQConf)}-point confidence improvement represents the structural resilience built into every layer.
-      </div>` : `
-      <div style="background:#F0F7FF;border-left:3px solid #3A7CC8;padding:12px 16px;font-size:13px;color:#2A3A5A;line-height:1.65;">
-        <strong>Architecture Result:</strong> In the same perfect storm environment, the IncomeArc™ architecture achieves <strong>${stormArchConf}%</strong> confidence versus <strong>${stormSQConf}%</strong> without architecture — a <strong>${Math.max(0, stormArchConf - stormSQConf)}-point improvement</strong> under maximum stress conditions.
-      </div>`}
-    </div>
-
-    <div style="height:1px;background:#E5E9EE;margin-bottom:32px;"></div>
-
-    <!-- PLAN PARAMETERS -->
-    <div style="margin-bottom:32px;">
-      <div style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#C8A96E;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #C8A96E;">Plan Parameters & Assumptions</div>
-      <table style="width:100%;border-collapse:collapse;">
-        <tr style="background:#F0F4F8;">
-          <td colspan="4" style="padding:8px 14px;font-size:11px;font-weight:600;color:#4A6070;text-transform:uppercase;letter-spacing:.06em;border:1px solid #DDE4EC;">Model Inputs</td>
-        </tr>
-        ${[
-          ['Portfolio Return', inputs.portfolioReturn+'%', 'Inflation Rate', inputs.inflation+'%'],
-          ['Monte Carlo Trials', '500', 'Std Deviation', '12%'],
-          ['Traditional Balance', fmtD(inputs.traditionalBalance||0), 'Roth Balance', fmtD(inputs.rothBalance||0)],
-          ['Taxable Balance', fmtD(inputs.taxableBalance||0), 'Fixed Expenses', '$'+(inputs.fixedExpenses||0).toLocaleString()+'/mo'],
-          ['Monthly Lifestyle', '$'+(inputs.lifestyleExpenses||0).toLocaleString(), 'SORR Stress', inputs.sorrEnabled?'Active — Years 1–5':'Not modeled in base plan'],
-          ['Expense Shock', hasShock?'$'+Math.round((inputs.expenseShockAmount||0)/1000)+'K every '+(inputs.expenseShockFrequency||8)+' yrs':'Not modeled', 'State', stateInfo2?stateInfo2.name:inputs.stateCode],
-        ].map(([l1,v1,l2,v2], i) => `
-        <tr style="background:${i%2===0?'white':'#FAFBFC'};">
-          <td style="padding:7px 14px;font-size:12px;color:#5A6A7A;border:1px solid #DDE4EC;width:25%;">${l1}</td>
-          <td style="padding:7px 14px;font-size:12px;font-weight:500;color:#1A2332;border:1px solid #DDE4EC;width:25%;">${v1}</td>
-          <td style="padding:7px 14px;font-size:12px;color:#5A6A7A;border:1px solid #DDE4EC;width:25%;">${l2}</td>
-          <td style="padding:7px 14px;font-size:12px;font-weight:500;color:#1A2332;border:1px solid #DDE4EC;width:25%;">${v2}</td>
-        </tr>`).join('')}
-      </table>
-    </div>
-
-    <!-- DISCLOSURE -->
-    <div style="background:#F5F5F5;border:1px solid #DDD;border-radius:4px;padding:14px 16px;font-size:11px;color:#5A6A7A;line-height:1.7;">
-      <strong style="color:#3A4A5A;">Important Disclosure:</strong> These projections are hypothetical illustrations for conceptual and educational purposes only. They do not constitute a guarantee, prediction, or promise of future performance, results, or returns. Monte Carlo simulations model probability distributions based on assumed mean returns and standard deviations — actual market conditions will differ materially. Tax calculations are estimates based on current law and are subject to change. This report is prepared for use by licensed financial professionals in conjunction with a comprehensive financial planning engagement and is not investment advice.
-    </div>
-
-  </div>
-
-  <!-- FOOTER -->
-  <div style="background:#1A2B3C;padding:16px 36px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-    <div>
-      <div style="font-size:12px;color:#C8A96E;font-weight:600;margin-bottom:2px;">Integrated Planning Partners</div>
-      <div style="font-size:11px;color:#7A9AB8;">${clientInfo.advisorName || 'Jeffrey Faine, CLU, RICP®'} &nbsp;·&nbsp; ${clientInfo.advisorEmail || 'support@integratedplanningpartners.com'}</div>
-    </div>
-    <div style="text-align:right;">
-      <div style="font-size:11px;color:#7A9AB8;">IncomeArc™ is a proprietary methodology</div>
-      <div style="font-size:11px;color:#5A7A8A;">© 2026 Integrated Planning Partners. All rights reserved.</div>
-    </div>
-  </div>
-
 </div>
+
+<!-- ══════════════════════════════════════════════════════════
+     PAGE 2 — PART ONE: YOU'VE DONE THE HARD PART
+     ══════════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="hdr-bar"><div class="hdr-logo-txt">Integrated Planning Partners · IncomeArc™</div><div class="hdr-client">${fullName} &nbsp;·&nbsp; Integrated Planning Partners</div></div>
+  <div class="banner">
+    <div class="sec-label">Part One</div>
+    <h2>You've Done the Hard Part</h2>
+    <div class="sub">Decades of discipline have built something worth protecting. Now comes a different kind of challenge.</div>
+  </div>
+  <div class="two-col">
+    <div class="col-l">
+      <p class="lead">For most of your working life, the goal was straightforward: earn, save, and grow. Whether your wealth came from decades of employment, a business you built, or both — you made smart decisions, stayed disciplined, and the result is a level of financial security most Americans never reach.</p>
+      <p>But here's what nobody tells you at this stage: the skills that built wealth are not the same skills required to <em>distribute</em> it wisely. Accumulation rewards consistency — whether that came from a salary, a business, or both. Distribution requires strategy — because the rules change completely once the regular income stops and the portfolio has to take over.</p>
+      <p>The tax structure that worked in your favor during accumulation can become a headwind in distribution. A portfolio built to grow now has to generate income while absorbing healthcare costs, market volatility, and the unexpected expenses life reliably delivers — without the backstop of a paycheck or business cash flow.</p>
+      <div class="pullquote">
+        <p>"We make plans to buy a house, send our kids to college, and even to retire — but few Americans plan for <em>how</em> to distribute that wealth once retirement begins."</p>
+        <div class="attr">— A. Lynn White, CEO, CareScout Insurance</div>
+      </div>
+      <p>This document is not about selling anything. It's about laying out the terrain ahead — the predictable challenges, the quantifiable risks, and the question every serious plan must answer: <strong>what is the best way to make your wealth last — while maintaining the retirement lifestyle you intend to enjoy?</strong></p>
+    </div>
+    <div class="col-r">
+      <div class="sec-h">Where you stand — the transition ahead</div>
+      <table class="data">
+        <tr><th class="th-lbl">What changes at retirement</th><th class="th-bad">Accumulation Phase</th><th class="th-good">Distribution Phase</th></tr>
+        <tr><td class="td-lbl">Primary income source</td><td class="td-n">Salary or business income</td><td class="td-n">Portfolio + Social Security</td></tr>
+        <tr><td class="td-lbl">Tax on income</td><td class="td-n">Ordinary rate on earnings</td><td class="td-n">Ordinary rate on <em>every</em> IRA draw</td></tr>
+        <tr><td class="td-lbl">Healthcare costs</td><td class="td-n">Employer- or business-funded</td><td class="td-n">Self-funded — and rising</td></tr>
+        <tr><td class="td-lbl">Portfolio's job</td><td class="td-n">Grow &amp; compound</td><td class="td-n">Grow <em>and</em> generate income simultaneously</td></tr>
+        <tr><td class="td-lbl">Risk of bad timing</td><td class="td-n">Minimal — you're adding</td><td class="td-n">Severe — you're withdrawing</td></tr>
+        <tr><td class="td-lbl">Longevity risk</td><td class="td-n">An asset</td><td class="td-n">A liability without a plan</td></tr>
+      </table>
+      <div class="abox params-box">
+        <div class="at">The distribution paradox</div>
+        <div class="ab">Whether your wealth came through a career of saving into a 401(k), a business that funded a profit-sharing plan or cash balance plan, or both — the result is the same: a large pool of pre-tax dollars the government has never touched. Every dollar you withdraw is taxed as ordinary income. At ${iraBalance} in qualified accounts, you are managing not just your own retirement savings, but a substantial and growing tax liability. The question isn't whether to pay it — it's <em>when</em>, at what rate, and whether the timing is yours to control or the IRS's.</div>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bar">
+    <span>For discussion purposes only. All projections are hypothetical illustrations. Not investment, tax, or legal advice. See full disclosures on final page.</span>
+    <span class="footer-center">IncomeArc™ is proprietary to Integrated Planning Partners. This document is confidential.</span>
+    <span></span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     PAGE 3 — PART TWO: PREPARING FOR CHOPPY WATERS
+     ══════════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="hdr-bar"><div class="hdr-logo-txt">Integrated Planning Partners · IncomeArc™</div><div class="hdr-client">${fullName} &nbsp;·&nbsp; Integrated Planning Partners</div></div>
+  <div class="banner">
+    <div class="sec-label">Part Two</div>
+    <h2>The Goal: Preparing for Choppy Waters</h2>
+    <div class="sub">A durable retirement plan isn't built for average conditions — it's built for the conditions that test it most.</div>
+  </div>
+  <div class="two-col" style="margin-bottom:0;">
+    <div class="col-l">
+      <p class="lead">The most experienced ship captains don't study meteorology to plan for calm seas. They study it to know what's coming, how to read the conditions, and how to navigate when the weather turns. The same philosophy applies to retirement planning.</p>
+      <p>The goal is not to predict exactly what will happen in your retirement — it is to identify the risks that are <strong>statistically likely</strong>, quantify what they cost if unaddressed, and build a coordinated strategy that performs in a wide range of conditions — not just the good ones.</p>
+    </div>
+    <div class="col-r">
+      <div class="pullquote">
+        <p>"The goal is not to predict the storm. The goal is to make sure the ship holds together if one comes."</p>
+      </div>
+      <p>A coordinated retirement income plan addresses these risks before they become emergencies. The time to build the seawall is not during the flood — it's years before one is possible.</p>
+    </div>
+  </div>
+  <hr class="gold">
+  <div class="sec-h" style="margin-bottom:8pt;">The four risks we're systematically addressing</div>
+  <div class="risk-grid">
+    <div class="risk-card" style="border-top-color:#C0392B;">
+      <div class="ri" style="color:#C0392B;">Risk 1</div>
+      <div class="rn">Deferred Tax Exposure</div>
+      <ul>
+        <li>Every IRA dollar withdrawn is taxed as ordinary income — no capital gains rates</li>
+        <li>RMDs begin at age 73 whether you need the money or not</li>
+        <li>Higher income can trigger Medicare IRMAA surcharges of up to $594/mo per person</li>
+      </ul>
+      <div class="rv" style="color:#C0392B;">${lifetimeTaxDisp}</div>
+      <div class="rs">estimated lifetime tax exposure</div>
+    </div>
+    <div class="risk-card" style="border-top-color:#C8A966;">
+      <div class="ri" style="color:#C8A966;">Risk 2</div>
+      <div class="rn">Healthcare &amp; Long-Term Care</div>
+      <ul>
+        <li>75% chance at least one spouse in a married couple will need care</li>
+        <li>Average care duration is 3.3 years among those who need it</li>
+        <li>An uninsured care event requires drawing more from the IRA than the care actually costs</li>
+      </ul>
+      <div class="rv" style="color:#C8A966;">70%</div>
+      <div class="rs">of 65-year-olds need care</div>
+    </div>
+    <div class="risk-card" style="border-top-color:#8B6914;">
+      <div class="ri" style="color:#8B6914;">Risk 3</div>
+      <div class="rn">Sequence of Returns</div>
+      <ul>
+        <li>Selling during a downturn to fund expenses locks in losses permanently</li>
+        <li>Early retirement is the highest-risk window — withdrawals amplify market drops</li>
+        <li>A −28% decline at age ${rAge+2} can cut a portfolio's ${horizonYrs}-year survival rate nearly in half</li>
+      </ul>
+      <div class="rv" style="color:#8B6914;">−30%</div>
+      <div class="rs">early decline can be unrecoverable</div>
+    </div>
+    <div class="risk-card" style="border-top-color:#4A6275;">
+      <div class="ri" style="color:#4A6275;">Risk 4</div>
+      <div class="rn">Unplanned Expense Shocks</div>
+      <ul>
+        <li>Major home repairs average $15,000–$50,000 and arrive without warning</li>
+        <li>Out-of-pocket medical costs average $315,000 over a lifetime (Fidelity 2023)</li>
+        <li>Without a dedicated buffer, the portfolio absorbs every shock directly</li>
+      </ul>
+      <div class="rv" style="color:#4A6275;">Every</div>
+      <div class="rs">${expShockFreq} years on average</div>
+    </div>
+  </div>
+  <div class="footer-bar">
+    <span>For discussion purposes only. All projections are hypothetical illustrations. Not investment, tax, or legal advice. See full disclosures on final page.</span>
+    <span class="footer-center">IncomeArc™ is proprietary to Integrated Planning Partners. This document is confidential.</span>
+    <span></span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     PAGE 4 — PART THREE: WHAT THESE RISKS ACTUALLY COST
+     ══════════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="hdr-bar"><div class="hdr-logo-txt">Integrated Planning Partners · IncomeArc™</div><div class="hdr-client">${fullName} &nbsp;·&nbsp; Integrated Planning Partners</div></div>
+  <div class="banner">
+    <div class="sec-label">Part Three</div>
+    <h2>What These Risks Actually Cost</h2>
+    <div class="sub">Quantifying the challenge — because a risk you can measure is a risk you can plan for.</div>
+  </div>
+  <div class="two-col">
+    <div class="col-l">
+      <div class="sec-h">The tax burden: it's larger than most people realize</div>
+      <p>Every dollar in your traditional IRA has never been taxed. When you withdraw it — whether voluntarily or because the IRS requires it through RMDs — it becomes ordinary income. At your income level, that means the effective tax rate on IRA withdrawals will likely exceed 30% when federal, state, and IRMAA surcharges are combined.</p>
+      <div class="callout-row">
+        <div class="callout">
+          <div class="cv">${iraBalance}</div>
+          <div class="cl">IRA balance at retirement</div>
+          <div class="cs">The IRS is a co-owner of your IRA</div>
+        </div>
+        <div class="callout">
+          <div class="cv">${peakMargRateDisp}</div>
+          <div class="cl">Peak marginal rate — status quo</div>
+          <div class="cs">Triggered by RMDs starting at 73</div>
+        </div>
+        <div class="callout">
+          <div class="cv">${lifetimeTaxDisp}</div>
+          <div class="cl">Estimated lifetime federal tax</div>
+          <div class="cs">Under current law, current trajectory</div>
+        </div>
+      </div>
+      <div class="sec-h">The healthcare reality</div>
+      <p>Long-term care is not a remote possibility — it is a statistical expectation for the majority of Americans who live into their seventies and eighties. For a married couple, the probability that at least one partner will need significant care is higher than 75%.</p>
+      <p>But the financial damage is not just the cost of care itself. When an uninsured event occurs, the IRA must distribute enough to cover both the care cost <em>and the taxes on the distribution</em>.${ltcMonthlyCur > 0 ? ` A $${Math.round(ltcMonthlyCur).toLocaleString()}/month care bill at a ${peakMargRateDisp} marginal rate requires a $${ltcMonthlyGross.toLocaleString()}/month IRA draw. The difference — $${grossUpTaxMo.toLocaleString()}/month — goes directly to the IRS and never compounds for you again.` : ` The difference between what care costs and what the IRA must distribute goes directly to the IRS and never compounds for you again.`}</p>
+    </div>
+    <div class="col-r">
+      <div class="sec-h">Long-term care: the data is clear</div>
+      <div class="callout-row">
+        <div class="callout">
+          <div class="cv">70%</div>
+          <div class="cl">of 65-year-olds need LTC</div>
+          <div class="cs">Source: ASPE / HHS, 2019</div>
+        </div>
+        <div class="callout">
+          <div class="cv">75%</div>
+          <div class="cl">chance one partner needs care</div>
+          <div class="cs">Married couple — HealthView Services</div>
+        </div>
+        <div class="callout">
+          <div class="cv">3.3 yrs</div>
+          <div class="cl">average care duration</div>
+          <div class="cs">Among those who need it — ASPE 2019</div>
+        </div>
+      </div>
+      <div class="sec-h">Current cost of care — national median (2024)</div>
+      <table class="data">
+        <tr><th class="th-lbl">Care setting</th><th class="th-lbl" style="text-align:right;color:#8DAFC8;">Annual Median</th><th class="th-lbl" style="text-align:right;color:#8DAFC8;">Monthly</th></tr>
+        <tr><td class="td-lbl">Nursing home — private room</td><td style="text-align:right;color:#C0392B;font-weight:600;">$127,750</td><td style="text-align:right;color:#C0392B;font-weight:600;">$10,646</td></tr>
+        <tr><td class="td-lbl">Nursing home — semi-private</td><td style="text-align:right;color:#C0392B;font-weight:600;">$111,325</td><td style="text-align:right;color:#C0392B;font-weight:600;">$9,277</td></tr>
+        <tr><td class="td-lbl">Assisted living community</td><td style="text-align:right;color:#C0392B;font-weight:600;">$70,800</td><td style="text-align:right;color:#C0392B;font-weight:600;">$5,900</td></tr>
+        <tr><td class="td-lbl">Home health aide (44 hrs/wk)</td><td style="text-align:right;color:#C0392B;font-weight:600;">$77,792</td><td style="text-align:right;color:#C0392B;font-weight:600;">$6,483</td></tr>
+      </table>
+      <div style="font-size:6.5pt;color:#8A9AAA;margin-top:-6pt;margin-bottom:8pt;font-style:italic;">Source: Genworth/CareScout 2024 Cost of Care Survey. Care costs increase 4–6% annually.</div>
+      <div class="abox warn-box">
+        <div class="at">The gross-up problem — what it really costs</div>
+        <div class="ab">${ltcMonthlyCur > 0
+          ? `A $${Math.round(ltcMonthlyCur).toLocaleString()}/month care event at a ${peakMargRateDisp} marginal rate requires <strong>$${ltcMonthlyGross.toLocaleString()}/month</strong> from your IRA — $${Math.round(ltcMonthlyCur).toLocaleString()} for care and $${grossUpTaxMo.toLocaleString()} for taxes. That tax cost never provides a single hour of comfort, and the compounding lost on it over the remaining plan horizon is a further significant impairment to your portfolio.`
+          : `A $10,000/month care event at a 32% marginal rate requires <strong>$14,706/month</strong> from your IRA — $10,000 for care and $4,706 for taxes. Over a 3-year event, that's <strong>$170,000 in taxes paid on care</strong> that never provide a single hour of comfort. And the compounding lost on that $170,000 over 20 years is a further $548,000.`
+        }</div>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bar">
+    <span>For discussion purposes only. All projections are hypothetical illustrations. Not investment, tax, or legal advice. See full disclosures on final page.</span>
+    <span class="footer-center">IncomeArc™ is proprietary to Integrated Planning Partners. This document is confidential.</span>
+    <span></span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     PAGE 5 — PART FIVE: THE QUESTION WORTH ASKING
+     ══════════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="hdr-bar"><div class="hdr-logo-txt">Integrated Planning Partners · IncomeArc™</div><div class="hdr-client">${fullName} &nbsp;·&nbsp; Integrated Planning Partners</div></div>
+  <div class="banner">
+    <div class="sec-label">Part Five</div>
+    <h2>The Question Worth Asking</h2>
+    <div class="sub">What does a coordinated retirement income plan actually look like — and what does it change?</div>
+  </div>
+  <div class="two-col" style="margin-bottom:0;">
+    <div class="col-l">
+      <p class="lead">The risks on the previous pages are not new information. Most people near retirement know that taxes will be a factor, that healthcare costs money, and that markets go down. What most people lack is a <em>coordinated response</em> — a plan where each risk has a dedicated solution that doesn't compromise the others.</p>
+      <p>The conventional approach asks the portfolio to do everything: generate income, absorb care costs, pay taxes, and still compound. Those objectives conflict directly. Pulling from a portfolio during a downturn to fund care costs forces a sale at the bottom and eliminates future recovery.</p>
+    </div>
+    <div class="col-r">
+      <div class="pullquote">
+        <p>"A great ship captain doesn't choose between speed and safety. They build a ship that can do both — and they don't leave port without the right crew in place."</p>
+      </div>
+      <p>A coordinated plan separates these obligations. Income is guaranteed independently of the market. Care is funded by a dedicated protection layer. Tax exposure is repositioned before RMDs force it. The portfolio — freed from all three — can do the one thing it was built to do: grow.</p>
+    </div>
+  </div>
+  <hr class="gold">
+  <div class="sec-h" style="margin-bottom:6pt;">The coordinated approach — four layers, one purpose</div>
+  <div class="layer-grid">
+    <div class="layer-card" style="border-top-color:#2A9D8F;">
+      <div class="li2" style="color:#2A9D8F;">Layer 1 — Income</div>
+      <div class="ln">Guaranteed Income Floor</div>
+      <div class="ld">A tax-free annuity provides guaranteed lifetime income — no matter what markets do. The portfolio never has to sell holdings to cover living expenses.</div>
+      <div class="la" style="color:#2A9D8F;">Addresses Risk 3</div>
+      <div class="ls">Mitigates sequence-of-returns risk</div>
+    </div>
+    <div class="layer-card" style="border-top-color:#C8A96E;">
+      <div class="li2" style="color:#C8A96E;">Layer 2 — Protection</div>
+      <div class="ln">Living Benefits</div>
+      <div class="ld">A permanent life insurance policy with a chronic illness benefit pays care costs directly — tax-free. The IRA is never touched. No gross-up, no forced sale.</div>
+      <div class="la" style="color:#C8A96E;">Addresses Risk 2</div>
+      <div class="ls">Mitigates the gross-up tax burden</div>
+    </div>
+    <div class="layer-card" style="border-top-color:#C0392B;">
+      <div class="li2" style="color:#C0392B;">Layer 3 — Taxes</div>
+      <div class="ln">Tax Architecture</div>
+      <div class="ld">Pre-tax IRA dollars are repositioned into a tax-free structure before RMDs begin — shrinking the RMD base, reducing taxable income, suppressing Medicare surcharges.</div>
+      <div class="la" style="color:#C0392B;">Addresses Risk 1</div>
+      <div class="ls">Reduces lifetime tax burden</div>
+    </div>
+    <div class="layer-card" style="border-top-color:#4A6275;">
+      <div class="li2" style="color:#4A6275;">Layer 4 — Growth</div>
+      <div class="ln">Portfolio — Liberated</div>
+      <div class="ld">With income, care, and tax obligations each handled by a dedicated layer, the portfolio has one job: compound. It never sells at the wrong time.</div>
+      <div class="la" style="color:#4A6275;">Addresses Risk 4</div>
+      <div class="ls">Absorbs shocks from a position of strength</div>
+    </div>
+  </div>
+  <div class="footer-bar">
+    <span>For discussion purposes only. All projections are hypothetical illustrations. Not investment, tax, or legal advice. See full disclosures on final page.</span>
+    <span class="footer-center">IncomeArc™ is proprietary to Integrated Planning Partners. This document is confidential.</span>
+    <span></span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     PAGE 6 — SCENARIO 1: FOUNDATION COMPARISON
+     ══════════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="hdr-bar"><div class="hdr-logo-txt">Integrated Planning Partners · IncomeArc™</div><div class="hdr-client">${fullName} &nbsp;·&nbsp; Integrated Planning Partners</div></div>
+  <div class="banner">
+    <div class="sec-label">Part Six · Scenario 1 of 3</div>
+    <h2>Foundation Comparison — No Healthcare Events</h2>
+    <div class="sub">Same assets. Same timeline. What changes is the coordination.</div>
+  </div>
+  <div class="two-col">
+    <div class="col-l">
+      <div class="sec-h">What this scenario models</div>
+      <p>Scenario 1 is the baseline — the cleanest possible comparison between the current approach and the IncomeArc™ Architecture. No healthcare events, no market crashes, no expense shocks. Just ${fullName}'s retirement as-is, versus a coordinated four-layer plan, run through 1,000 simulated retirements.</p>
+      <p>If the architecture couldn't outperform in ideal conditions, nothing else would matter. It does — and by a meaningful margin.</p>
+      <div class="abox params-box">
+        <div class="at">Plan Parameters — ${fullName}</div>
+        <div class="ab">
+          <strong>IRA:</strong> ${iraBalance} &nbsp;·&nbsp;
+          <strong>Taxable portfolio:</strong> ${fmtD(inputs.taxableBalance||0)} &nbsp;·&nbsp;
+          <strong>SS ${clientLabel}:</strong> $${Math.round((inputs.ssIncome||0)/12).toLocaleString()}/mo at ${inputs.ssStartAge||67}${isMFJ && inputs.spouseSsIncome ? ` &nbsp;·&nbsp; <strong>SS ${clientInfo.spouseName||'Spouse'}:</strong> $${Math.round(inputs.spouseSsIncome/12).toLocaleString()}/mo` : ''}<br>
+          <strong>Return:</strong> ${inputs.portfolioReturn}% mean (log-normal) &nbsp;·&nbsp; <strong>Inflation:</strong> ${inputs.inflation}%<br>
+          <strong>Horizon:</strong> ${horizonDesc} &nbsp;·&nbsp; <strong>Expenses:</strong> $${Math.round(((inputs.fixedExpenses||0)+(inputs.lifestyleExpenses||0))*12).toLocaleString()}/yr (inflation-adjusted) &nbsp;·&nbsp; <strong>Trials:</strong> 1,000
+        </div>
+      </div>
+    </div>
+    <div class="col-r">
+      <div class="sec-h">Monte Carlo result &nbsp;·&nbsp; <span style="color:#C8A96E;font-weight:400;">Foundation Comparison</span></div>
+      <div style="margin:8pt 0;">${sc1SVG}</div>
+      <div style="font-size:7pt;color:#8DAFC8;font-style:italic;text-align:center;margin-top:4pt;">${sc1SQ}% ${confLabelTxt(sc1SQ)} → ${sc1Arch}% ${confLabelTxt(sc1Arch)} · The architecture alone — before any care event or stress — closes the gap and eliminates simulation failures across all 1,000 trials.</div>
+      <div class="abox explain-box" style="margin-top:8pt;">
+        <div class="at">What ${sc1SQ}% → ${sc1Arch}% means</div>
+        <div class="ab">Under the current plan, ${Math.round((1-sc1SQ/100)*1000)} of 1,000 simulated retirements fail before age ${pAge} — with no healthcare events and no market crashes. The IncomeArc™ Architecture eliminates all ${Math.round((1-sc1SQ/100)*1000)} failures.</div>
+      </div>
+      <div class="abox takeaway-box">
+        <div class="at">Key takeaway</div>
+        <div class="ab">Even with no illness, no market crisis, no surprises — the current plan leaves meaningful probability of failure on the table. Coordination alone closes the gap entirely. This is the foundation. Scenarios 2 and 3 test what happens when reality arrives.</div>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bar">
+    <span>For discussion purposes only. All projections are hypothetical illustrations. Not investment, tax, or legal advice. See full disclosures on final page.</span>
+    <span class="footer-center">IncomeArc™ is proprietary to Integrated Planning Partners. This document is confidential.</span>
+    <span></span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     PAGE 7 — SCENARIO 2: WITH HEALTHCARE EVENTS
+     ══════════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="hdr-bar"><div class="hdr-logo-txt">Integrated Planning Partners · IncomeArc™</div><div class="hdr-client">${fullName} &nbsp;·&nbsp; Integrated Planning Partners</div></div>
+  <div class="banner">
+    <div class="sec-label">Part Six · Scenario 2 of 3</div>
+    <h2>With Healthcare Events — The Statistical Reality</h2>
+    <div class="sub">Same plan parameters as Scenario 1 — with${isMFJ ? ' two' : ' a'} modeled care event${isMFJ ? 's' : ''} added.</div>
+  </div>
+  <div class="two-col">
+    <div class="col-l">
+      <div class="sec-h">What this scenario adds</div>
+      <p>All parameters from Scenario 1 remain identical, with one addition: ${isMFJ ? 'two statistically realistic healthcare events modeled at actuarially likely ages. These are median outcomes — not worst-case — for a married couple who both live into their eighties.' : 'a statistically realistic healthcare event modeled at an actuarially likely age. This is a median outcome — not worst-case.'}</p>
+      <div class="abox warn-box">
+        <div class="at">Modeled Healthcare Events</div>
+        <div class="ab">
+          ${hasLtcNarr ? `<strong>${clientLabel} — Age ${inputs.ltcEventAge}:</strong> ${inputs.ltcDuration}-year care event &nbsp;·&nbsp; $${Math.round(inputs.ltcMonthlyCost||0).toLocaleString()}/mo (today's median) &nbsp;·&nbsp; IRA gross-up required at ${peakMargRateDisp}<br>` : ''}
+          ${hasSpLtcNarr ? `<strong>${clientInfo.spouseName||'Spouse'} — Age ${inputs.spouseLtcEventAge}:</strong> ${inputs.spouseLtcDuration}-year care event &nbsp;·&nbsp; $${Math.round(inputs.spouseLtcMonthlyCost||0).toLocaleString()}/mo (today's median) &nbsp;·&nbsp; IRA gross-up required<br>` : ''}
+          ${!hasLtcNarr && !hasSpLtcNarr ? `<em>No specific healthcare events have been modeled in the tool. The scenario uses statistical median assumptions.</em><br>` : ''}
+          <strong>Total uninsured cost:</strong> Care + taxes + lost compounding = <strong>${totalCombPres > 0 ? fmtDollar(totalCombPres) : '$718,000+'}</strong> in permanent portfolio impairment
+        </div>
+      </div>
+      <div class="abox explain-box">
+        <div class="at">What Layer 2 does</div>
+        <div class="ab">${isMFJ ? 'Both care events are funded directly from the chronic illness benefit — tax-free, no IRA distribution required.' : 'The care event is funded directly from the chronic illness benefit — tax-free, no IRA distribution required.'} No gross-up, no compounding interruption, no tax acceleration. The portfolio never sees ${isMFJ ? 'either event' : 'the event'}.</div>
+      </div>
+    </div>
+    <div class="col-r">
+      <div class="sec-h">Monte Carlo result &nbsp;·&nbsp; <span style="color:#C8A96E;font-weight:400;">Healthcare Events</span></div>
+      <div style="margin:8pt 0;">${sc2SVG}</div>
+      <div style="font-size:7pt;color:#8DAFC8;font-style:italic;text-align:center;margin-top:4pt;">${sc2SQ}% ${confLabelTxt(sc2SQ)} → ${sc2Arch}% ${confLabelTxt(sc2Arch)} · Healthcare events added. Layer 2 returns confidence to ${sc2Arch}%.</div>
+
+      ${totalCombPres > 0 ? `
+      <div class="sec-h" style="margin-top:8pt;">The protection investment — how the math works</div>
+      <table class="dtable">
+        <tr><td class="dh" colspan="2">How the ${fmtDollar(totalCombPres)} is built</td></tr>
+        <tr><td class="dk">Inflated care costs absorbed${isMFJ?' ('+clientLabel+' + '+(clientInfo.spouseName||'Spouse')+')':''}</td><td class="dv-c">${fmtDollar(totalCombCare)}</td></tr>
+        <tr><td class="dk">IRA gross-up taxes avoided</td><td class="dv-c">${fmtDollar(totalCombGrossUp)}</td></tr>
+        <tr><td class="dk">Lost compounding preserved</td><td class="dv-c">${fmtDollar(totalCombComp)}</td></tr>
+        <tr class="dtotal"><td class="dk">= Total portfolio wealth preserved</td><td class="dv-t">${fmtDollar(totalCombPres)}</td></tr>
+        ${totalCombInvest > 0 ? `<tr><td class="dk">Combined Layer 2 investment</td><td style="text-align:right;">${fmtDollar(totalCombInvest)}</td></tr>
+        <tr class="dtotal"><td class="dk">Leverage ratio</td><td class="dv-t">${leverageRatio.toFixed(1)}×</td></tr>` : ''}
+      </table>
+      <div class="abox" style="border-left-color:#C8A96E;background:#FBF5E8;">
+        <div class="at">Understanding the leverage ratio</div>
+        <div class="ab">Every dollar of Layer 2 premium protects $${Math.round(leverageRatio)} of retirement wealth — not through speculation, but through structured risk transfer. The combined investment permanently removes three categories of portfolio risk: uninsured care costs, tax gross-up on those costs, and the compounding lost on both.</div>
+      </div>` : `
+      <div class="abox explain-box" style="margin-top:8pt;">
+        <div class="at">Key takeaway</div>
+        <div class="ab">Healthcare is not a risk to be ignored — it is a mathematical certainty to be planned for. ${isMFJ ? 'Two median care events reduce' : 'A median care event reduces'} a well-funded portfolio's survival rate by ${sc2Diff} points. Layer 2 returns it to ${sc2Arch}%. This is the clearest demonstration of what coordinated protection is worth: it doesn't improve the good scenarios — it eliminates the bad ones.</div>
+      </div>`}
+
+      <div class="abox explain-box">
+        <div class="at">Key takeaway</div>
+        <div class="ab">Healthcare is not a risk to be ignored — it is a mathematical certainty to be planned for. ${isMFJ ? 'Two median care events reduce' : 'A median care event reduces'} this portfolio's survival rate by ${sc2Diff} points. Layer 2 returns it to ${sc2Arch}%.</div>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bar">
+    <span>For discussion purposes only. All projections are hypothetical illustrations. Not investment, tax, or legal advice. See full disclosures on final page.</span>
+    <span class="footer-center">IncomeArc™ is proprietary to Integrated Planning Partners. This document is confidential.</span>
+    <span></span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     PAGE 8 — SCENARIO 3: THE PERFECT STORM
+     ══════════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="hdr-bar"><div class="hdr-logo-txt">Integrated Planning Partners · IncomeArc™</div><div class="hdr-client">${fullName} &nbsp;·&nbsp; Integrated Planning Partners</div></div>
+  <div class="banner">
+    <div class="sec-label">Part Six · Scenario 3 of 3</div>
+    <h2>The Perfect Storm — When Everything Goes Wrong at Once</h2>
+    <div class="sub">The same assets. The same ${isMFJ ? 'couple' : 'client'}. The risks that are entirely outside their control.</div>
+  </div>
+  <div class="two-col">
+    <div class="col-l">
+      <div class="sec-h">Read this carefully.</div>
+      <p>${clientLabel}${isMFJ?' and '+clientInfo.spouseName:''} ${isMFJ?'have':'has'} done everything right. ${isMFJ?'They have':'With'} ${iraBalance} in ${isMFJ?'their':'the'} IRA${isMFJ?'. They have':','} Social Security${isMFJ?'. They have':','} and a lifetime of disciplined saving behind them. By any measure, ${isMFJ?'they are':'this is'} prepared.</p>
+      <p>Now consider what happens when three risks — none of them unusual, none of them extreme — arrive in the same retirement. Not because ${isMFJ?clientLabel+' and '+clientInfo.spouseName:clientLabel+' made'} poor decisions. But because the sequence of events was outside their control.</p>
+      <div class="abox warn-box">
+        <div class="at">What this scenario stacks</div>
+        <div class="ab">
+          <strong>HC events from Scenario 2</strong>${hasLtcNarr ? ` — ${clientLabel} at ${inputs.ltcEventAge} (care event)` : ''}${hasSpLtcNarr ? `, ${clientInfo.spouseName||'Spouse'} at ${inputs.spouseLtcEventAge}` : ''}. Statistically average.<br>
+          <strong>−28% market decline at age ${rAge+2}</strong> — normal bear market range, hitting while withdrawals are already in progress (SORR).<br>
+          <strong>Expense shocks</strong> — $${Math.round(expShockAmt/1000)}K recurring every ${expShockFreq} years. Unremarkable over ${horizonYrs} years.<br>
+          <strong>Combined impact:</strong> Status quo MC collapses from ${sc1SQ}% → <strong>${sc3SQ}% ${confLabelTxt(sc3SQ)}</strong>.
+        </div>
+      </div>
+      <p style="font-size:8.5pt;font-weight:700;color:#C0392B;margin-top:4pt;">Not a catastrophe scenario. Ordinary risks in an unfortunate sequence — the kind that confronts real retirees every day.</p>
+    </div>
+    <div class="col-r">
+      <div class="sec-h">Monte Carlo result &nbsp;·&nbsp; <span style="color:#C8A96E;font-weight:400;">Perfect Storm</span></div>
+      <div style="margin:8pt 0;">${sc3SVG}</div>
+      <div style="font-size:7pt;color:#8DAFC8;font-style:italic;text-align:center;margin-top:4pt;">${sc3SQ}% ${confLabelTxt(sc3SQ)} → ${sc3Arch}% ${confLabelTxt(sc3Arch)} · HC events + early-retirement market decline + expense shocks — all simultaneous. The architecture holds. Every trial survives.</div>
+      <div class="abox warn-box" style="margin-top:8pt;">
+        <div class="at">What ${sc3SQ}% ${confLabelTxt(sc3SQ)} actually means</div>
+        <div class="ab">In ${Math.round((1-sc3SQ/100)*1000)} of 1,000 simulated retirements, the portfolio runs out before age ${pAge}. At a ${sc3SQ}% survival rate, the odds of financial security in later years are ${sc3SQ < 55 ? 'worse than a coin flip' : 'significantly impaired'} — not from carelessness, but because three unremarkable risks arrived in the same retirement.</div>
+      </div>
+      <div class="abox explain-box">
+        <div class="at">The architecture holds — every time</div>
+        <div class="ab">With all four layers in place: ${sc3Arch}% across all 1,000 trials. Income guaranteed regardless of markets. Care absorbed by Layer 2. Tax drag minimized by Layer 3. The portfolio is never forced to sell at the bottom.</div>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bar">
+    <span>For discussion purposes only. All projections are hypothetical illustrations. Not investment, tax, or legal advice. See full disclosures on final page.</span>
+    <span class="footer-center">IncomeArc™ is proprietary to Integrated Planning Partners. This document is confidential.</span>
+    <span></span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     PAGE 9 — SCENARIO SUMMARY + WHY IPP
+     ══════════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="hdr-bar"><div class="hdr-logo-txt">Integrated Planning Partners · IncomeArc™</div><div class="hdr-client">${fullName} &nbsp;·&nbsp; Integrated Planning Partners</div></div>
+  <div class="banner">
+    <div class="sec-label">Part Six · Summary</div>
+    <h2>All Three Scenarios — Side by Side</h2>
+    <div class="sub">Three stress tests · same assets · same plan horizon · what changes is the coordination.</div>
+  </div>
+  <div class="two-col">
+    <div class="col-l">
+      <div class="sec-h">Scenario comparison</div>
+      <table class="sc-table">
+        <tr>
+          <th class="th-lbl">Scenario</th>
+          <th class="th-bad">Status Quo</th>
+          <th class="th-good">IncomeArc™</th>
+          <th class="th-good" style="color:#C8A96E;">Change</th>
+        </tr>
+        <tr>
+          <td class="td-lbl">1 · No healthcare events</td>
+          <td class="mc-sq">${sc1SQ}% · ${confLabelTxt(sc1SQ)}</td>
+          <td class="mc-arch">${sc1Arch}% · ${confLabelTxt(sc1Arch)}</td>
+          <td class="mc-diff">+${sc1Diff} pts</td>
+        </tr>
+        <tr>
+          <td class="td-lbl">2 · With healthcare events</td>
+          <td class="mc-sq">${sc2SQ}% · ${confLabelTxt(sc2SQ)}</td>
+          <td class="mc-arch">${sc2Arch}% · ${confLabelTxt(sc2Arch)}</td>
+          <td class="mc-diff">+${sc2Diff} pts</td>
+        </tr>
+        <tr>
+          <td class="td-lbl">3 · Perfect storm (all risks)</td>
+          <td class="mc-sq">${sc3SQ}% · ${confLabelTxt(sc3SQ)}</td>
+          <td class="mc-arch">${sc3Arch}% · ${confLabelTxt(sc3Arch)}</td>
+          <td class="mc-diff">+${sc3Diff} pts</td>
+        </tr>
+      </table>
+      <div class="abox explain-box">
+        <div class="at">The consistent result</div>
+        <div class="ab">Across all three scenarios — baseline, with care events, and perfect storm — the IncomeArc™ Architecture produces a ${sc1Arch}% Monte Carlo confidence score. The architecture doesn't just perform better in good conditions. It holds in every condition the simulation can generate. That is the point of coordination: not to win when things go well, but to survive when they don't.</div>
+      </div>
+      <div class="pullquote" style="margin-top:10pt;">
+        <p>"We believe the best financial advice is the kind that makes you less dependent on luck — and more dependent on a plan."</p>
+      </div>
+      <p style="font-size:8.5pt;color:#C8A96E;font-weight:600;text-align:center;margin-top:8pt;">
+        Jeffrey Faine, CLU, RICP® &nbsp;·&nbsp; Integrated Planning Partners<br>
+        <span style="color:#7A95A8;font-weight:400;">jeff@enhancedfunding.com &nbsp;·&nbsp; integratedplanningpartners.com</span>
+      </p>
+    </div>
+    <div class="col-r">
+      <div class="sec-h">Why Integrated Planning Partners</div>
+      <p>Most financial professionals operate in a single domain — investments, insurance, or taxes. Retirement income planning lives at the intersection of all three. IPP was built on a different premise: the most durable plans are the ones where every layer knows what the others are doing.</p>
+      <div class="why-grid">
+        <div class="why-card"><div class="wt">Coordinated Strategy</div><div class="wb">We design income, protection, and tax layers together so each decision strengthens the others — the difference between a collection of products and an actual plan.</div></div>
+        <div class="why-card"><div class="wt">Fiduciary Approach</div><div class="wb">Our recommendations are driven by your goals — not commissions. We show you the math, explain the trade-offs, and let you decide.</div></div>
+        <div class="why-card"><div class="wt">Proprietary Modeling</div><div class="wb">We run 1,000 simulated retirement scenarios per scenario — quantifying the impact of every risk before anything is implemented.</div></div>
+        <div class="why-card"><div class="wt">Long-Term Relationship</div><div class="wb">We monitor and re-model as tax law changes, health situations evolve, and markets shift. The plan is designed to adapt.</div></div>
+      </div>
+      <div class="step-box">
+        <div class="at" style="font-size:9.5pt;font-weight:700;color:#1A2B3C;margin-bottom:4pt;">What engagement with us looks like</div>
+        <div class="ab" style="font-size:8.5pt;color:#1A2B3C;line-height:1.65;">
+          <strong>✓ Step 1 — Discovery <span style="color:#2A9D8F;">(Complete)</span>:</strong> Financial picture mapped — assets, income, tax exposure, goals.<br>
+          <strong>⟳ Step 2 — Modeling <span style="color:#C8A96E;">(In Progress)</span>:</strong> Your scenario has been run through the IncomeArchitect Tool. This document is the result.<br>
+          <strong>↳ Step 3 — Implementation <span style="color:#7A95A8;">(Up Next)</span>:</strong> Each layer implemented on your timeline, in the sequence that makes the most financial sense.<br>
+          <strong>→ Step 4 — Ongoing:</strong> Annual reviews and re-modeling as conditions change.
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bar">
+    <span>For discussion purposes only. All projections are hypothetical illustrations. Not investment, tax, or legal advice. See full disclosures on final page.</span>
+    <span class="footer-center">IncomeArc™ is proprietary to Integrated Planning Partners. This document is confidential.</span>
+    <span></span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     PAGE 10 — DISCLOSURES & DISCLAIMERS
+     ══════════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="hdr-bar"><div class="hdr-logo-txt">Integrated Planning Partners · IncomeArc™</div><div class="hdr-client">${fullName} &nbsp;·&nbsp; Integrated Planning Partners</div></div>
+  <div class="banner" style="margin-bottom:9pt;">
+    <div class="sec-label">Disclosures &amp; Disclaimers</div>
+    <h2>Important Information — Please Read</h2>
+    <div class="sub">This page is an integral part of this presentation and must be reviewed in conjunction with all preceding pages.</div>
+  </div>
+  <div class="disc-two">
+    <div class="disc-col">
+      <div class="disc-section">
+        <div class="disc-title">Nature of Illustrations</div>
+        <div class="disc-text">All figures, projections, Monte Carlo confidence scores, income estimates, tax calculations, and portfolio values shown in this presentation are hypothetical illustrations only. They are based on assumptions entered at the time of preparation and are not a guarantee, prediction, or projection of future results. Actual results will vary — potentially significantly — based on market conditions, tax law changes, health outcomes, inflation, interest rates, policy performance, and individual circumstances outside the control of Integrated Planning Partners or the presenting advisor. No client should rely on these illustrations as the primary basis for any financial decision.</div>
+      </div>
+      <div class="disc-section">
+        <div class="disc-title">Monte Carlo Methodology</div>
+        <div class="disc-text">Monte Carlo confidence scores represent the percentage of 1,000 simulated retirement trials in which the portfolio survived through the plan's stated end date without depletion. Each trial randomizes annual portfolio returns around the stated mean using a log-normal distribution. A score of 100% indicates all 1,000 simulated trials survived to plan end; it does not indicate that depletion is impossible under all circumstances. The "Perfect Storm" scenario simultaneously applies a sequence-of-returns stress to early retirement years, stated healthcare events without insurance coverage, and periodic expense shocks. Monte Carlo simulation does not predict future market behavior — actual returns may deviate materially from historical distributions.</div>
+      </div>
+      <div class="disc-section">
+        <div class="disc-title">Tax Information</div>
+        <div class="disc-text">Tax estimates are illustrative and based on federal marginal brackets and stated state tax treatment as of the presentation date. Tax laws are subject to change. This presentation does not constitute tax advice. Clients should consult a qualified tax professional regarding their specific situation. IRMAA surcharge estimates are based on current Medicare Part B and D surcharge schedules and income thresholds, which are adjusted annually by the Social Security Administration. State income tax treatment of retirement income shown per current state law for ${stateInfo2?stateInfo2.name:inputs.stateCode}, which may change.</div>
+      </div>
+      <div class="disc-section">
+        <div class="disc-title">Insurance Products</div>
+        <div class="disc-text">The annuity (Layer 1) and IUL policies (Layers 2 and 3) are insurance products, not securities, subject to the claims-paying ability of the issuer. Policy values and benefits are subject to individual policy illustrations reviewed separately. Participation rates and caps may change at renewal. Chronic illness and LTC riders require qualifying criteria — typically inability to perform 2 of 6 ADLs or cognitive impairment.</div>
+      </div>
+    </div>
+    <div class="disc-col">
+      <div class="disc-section">
+        <div class="disc-title">Long-Term Care Statistics</div>
+        <div class="disc-text">Long-term care statistics cited in this presentation are sourced from the U.S. Department of Health and Human Services / ASPE (2019), HealthView Services, and the Genworth/CareScout 2024 Cost of Care Survey. Care cost data reflects national median figures and may vary significantly by geographic region. Future care costs are projected to increase at 4–6% annually based on historical trends; actual increases may be higher or lower. Statistics are provided for educational and planning purposes only.</div>
+      </div>
+      <div class="disc-section">
+        <div class="disc-title">Not Investment Advice</div>
+        <div class="disc-text">This presentation is for educational and informational purposes only. It does not constitute investment advice, financial planning advice, or a recommendation to purchase any specific product or take any specific action. The IncomeArc™ methodology is an analytical framework used to illustrate the potential impact of coordinated retirement income planning strategies. Any decisions regarding the purchase of insurance products, annuities, or the restructuring of investment portfolios should be made in consultation with a licensed financial advisor, insurance professional, and/or tax attorney who has reviewed the client's complete financial picture.</div>
+      </div>
+      <div class="disc-section">
+        <div class="disc-title">Suitability &amp; Return Assumptions</div>
+        <div class="disc-text">Not all products or strategies described are suitable for all individuals. Suitability depends on complete financial situation, risk tolerance, liquidity needs, health status, investment timeline, and other factors. Insurance products are subject to underwriting approval. The base portfolio return assumption of ${inputs.portfolioReturn}% reflects an assumed long-term average annual return and is not guaranteed. Historical average returns do not predict future performance. Sequence-of-returns stress testing represents a stylized adverse scenario and does not represent the most extreme possible outcome.</div>
+      </div>
+      <div class="disc-section">
+        <div class="disc-title">Intellectual Property &amp; Confidentiality</div>
+        <div class="disc-text">This document is confidential and prepared exclusively for ${fullName}. IncomeArc™ and the Retirement Income Architecture™ methodology are the exclusive proprietary property of Integrated Planning Partners. This presentation, its underlying analytical model, design, output, and methodology may not be copied, reproduced, distributed, or used in any form without the explicit written permission of Integrated Planning Partners. © ${new Date().getFullYear()} Integrated Planning Partners. All rights reserved. Integrated Planning Partners · integratedplanningpartners.com</div>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bar">
+    <span>For discussion purposes only. All projections are hypothetical illustrations. Not investment, tax, or legal advice.</span>
+    <span class="footer-center">IncomeArc™ is proprietary to Integrated Planning Partners. This document is confidential.</span>
+    <span></span>
+  </div>
+</div>
+
 </body></html>`;
 
                   try {
@@ -3834,18 +3597,6 @@ p.lead { font-size: 10.5pt; color: #2A3A4A; font-weight: 500; line-height: 1.6; 
               transition:'all .2s',
             }}>
             <span style={{fontSize:15}}>📤</span> Send Report
-          </button>
-
-          <button
-            onClick={generatePrintReport}
-            style={{
-              padding:'8px 16px',borderRadius:7,fontSize:13,fontWeight:600,
-              fontFamily:"'DM Sans',sans-serif",cursor:'pointer',
-              background:'rgba(74,155,122,.12)',border:'1px solid rgba(74,155,122,.35)',
-              color:'#4A9B7A',letterSpacing:'.05em',display:'flex',alignItems:'center',gap:7,
-              transition:'all .2s',
-            }}>
-            <span style={{fontSize:15}}>🖨</span> Generate Report
           </button>
         </div>
       </div>
