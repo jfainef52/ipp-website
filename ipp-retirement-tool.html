@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>IncomeArc™ — Integrated Planning Partners</title>
+<title>IncomeArchitect™ Modeler — Integrated Planning Partners</title>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script>window.addEventListener('load',()=>{ if(typeof emailjs!=='undefined') emailjs.init('XyWTKKWFoeYOhfFbV'); });</script>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -2193,9 +2193,9 @@ function DisclaimerModal({ onAccept }) {
             Integrated Planning Partners
           </div>
           <h2 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:26,fontWeight:400,color:'#F5F2EC',letterSpacing:'.02em'}}>
-            IncomeArc™
+            IncomeArchitect™ Modeler
           </h2>
-          <div style={{fontSize:13,color:'#8DAFC8',marginTop:3}}>Retirement Income Architecture Modeler</div>
+          <div style={{fontSize:13,color:'#8DAFC8',marginTop:3}}>Powered by Integrated Planning Partners</div>
         </div>
 
         {/* Divider */}
@@ -2210,7 +2210,7 @@ function DisclaimerModal({ onAccept }) {
             Important Disclosure — Please Read
           </div>
           <p style={{fontSize:13,color:'#DDD6C4',lineHeight:1.75,marginBottom:12}}>
-            The projections, illustrations, and analyses provided by IncomeArc™ are <strong style={{color:'#F5F2EC'}}>for conceptual and educational purposes only</strong> and do not constitute financial, legal, tax, or investment advice.
+            The projections, illustrations, and analyses provided by IncomeArchitect™ Modeler are <strong style={{color:'#F5F2EC'}}>for conceptual and educational purposes only</strong> and do not constitute financial, legal, tax, or investment advice.
           </p>
           <p style={{fontSize:13,color:'#DDD6C4',lineHeight:1.75,marginBottom:12}}>
             All figures, income projections, tax estimates, Monte Carlo simulations, and portfolio outcomes are <strong style={{color:'#F5F2EC'}}>hypothetical illustrations based on assumptions entered by the user</strong>. They are not a guarantee, prediction, or promise of future performance, results, or returns.
@@ -2240,7 +2240,7 @@ function DisclaimerModal({ onAccept }) {
             {checked && <span style={{color:'#4A9B7A',fontSize:13,lineHeight:1,fontWeight:700}}>✓</span>}
           </div>
           <span style={{fontSize:13,color:'#DDD6C4',lineHeight:1.65}}>
-            I understand and acknowledge that the projections and illustrations presented in IncomeArc™ are <strong style={{color:'#F5F2EC'}}>hypothetical and for conceptual purposes only</strong>, and are not a guarantee of performance or future results.
+            I understand and acknowledge that the projections and illustrations presented in IncomeArchitect™ Modeler are <strong style={{color:'#F5F2EC'}}>hypothetical and for conceptual purposes only</strong>, and are not a guarantee of performance or future results.
           </span>
         </label>
 
@@ -2268,7 +2268,7 @@ function DisclaimerModal({ onAccept }) {
             transition:'all .2s',
             letterSpacing:'.04em',
           }}>
-          {checked ? 'I Understand — Proceed to IncomeArc™' : 'Please check the box above to proceed'}
+          {checked ? 'I Understand — Proceed to IncomeArchitect™ Modeler' : 'Please check the box above to proceed'}
         </button>
       </div>
     </div>
@@ -2502,7 +2502,7 @@ function App() {
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
               <div>
                 <div style={{fontSize:11,letterSpacing:'.2em',textTransform:'uppercase',color:'#C8A96E',marginBottom:4}}>Integrated Planning Partners</div>
-                <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:22,fontWeight:400,color:'#F5F2EC'}}>Send IncomeArc™ Report</div>
+                <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:22,fontWeight:400,color:'#F5F2EC'}}>Send IncomeArchitect™ Report</div>
               </div>
               <button onClick={()=>setReportModal(false)} style={{fontSize:20,color:'#8DAFC8',padding:4,cursor:'pointer',lineHeight:1}}>✕</button>
             </div>
@@ -2556,7 +2556,7 @@ function App() {
             {reportSent && (
               <div style={{padding:'12px 14px',background:'rgba(74,155,122,.08)',border:'1px solid rgba(74,155,122,.25)',borderRadius:8,marginBottom:16,fontSize:13,color:'#4A9B7A'}}>
                 <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}><span style={{fontSize:16}}>✓</span><strong>PDF report sent to {clientInfo.advisorEmail}</strong></div>
-                <div style={{fontSize:12,color:'#6A9A84',paddingLeft:24}}>The full IncomeArc™ report has been delivered as a PDF attachment.</div>
+                <div style={{fontSize:12,color:'#6A9A84',paddingLeft:24}}>The full IncomeArchitect™ report has been delivered as a PDF attachment.</div>
               </div>
             )}
             {reportError && (
@@ -3485,7 +3485,7 @@ function App() {
         <div class="at" style="font-size:9.5pt;font-weight:700;color:#1A2B3C;margin-bottom:4pt;">What engagement with us looks like</div>
         <div class="ab" style="font-size:8.5pt;color:#1A2B3C;line-height:1.65;">
           <strong>✓ Step 1 — Discovery <span style="color:#2A9D8F;">(Complete)</span>:</strong> Financial picture mapped — assets, income, tax exposure, goals.<br>
-          <strong>⟳ Step 2 — Modeling <span style="color:#C8A96E;">(In Progress)</span>:</strong> Your scenario has been run through the IncomeArchitect Tool. This document is the result.<br>
+          <strong>⟳ Step 2 — Modeling <span style="color:#C8A96E;">(In Progress)</span>:</strong> Your scenario has been run through the IncomeArchitect™ Modeler. This document is the result.<br>
           <strong>↳ Step 3 — Implementation <span style="color:#7A95A8;">(Up Next)</span>:</strong> Each layer implemented on your timeline, in the sequence that makes the most financial sense.<br>
           <strong>→ Step 4 — Ongoing:</strong> Annual reviews and re-modeling as conditions change.
         </div>
@@ -3618,7 +3618,7 @@ function App() {
     <div style="font-size:12px;color:#7A9AB8;margin-top:4px;">${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</div>
   </div>
   <div style="padding:22px 28px;background:#F8F6F2;">
-    <p style="font-size:14px;color:#2A3A4A;line-height:1.8;">The IncomeArc™ report for <strong>${fullName}</strong> is attached as a PDF.</p>
+    <p style="font-size:14px;color:#2A3A4A;line-height:1.8;">The IncomeArchitect™ report for <strong>${fullName}</strong> is attached as a PDF.</p>
     <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:10px;">
       <tr style="background:#0B1928;">
         <td style="padding:7px 10px;color:#8DAFC8;font-size:10px;font-weight:600;text-transform:uppercase;border:1px solid #1A2B3C;width:42%;">Scenario</td>
@@ -3695,7 +3695,7 @@ function App() {
             Best Experienced on Desktop or Tablet
           </div>
           <div style={{fontSize:12,color:'#8DAFC8',lineHeight:1.55}}>
-            IncomeArc™ is designed for use on a desktop or tablet (768px or wider). On smaller screens some charts and panels may require horizontal scrolling. For the best client presentation experience, please use a laptop, desktop, or iPad.
+            IncomeArchitect™ Modeler is designed for use on a desktop or tablet (768px or wider). On smaller screens some charts and panels may require horizontal scrolling. For the best client presentation experience, please use a laptop, desktop, or iPad.
           </div>
         </div>
       </div>
@@ -3707,9 +3707,9 @@ function App() {
             <span style={{fontSize:11,opacity:.7}}>←</span> Integrated Planning Partners
           </div>
           <h1 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:26,fontWeight:400,color:'#F5F2EC',letterSpacing:'.02em'}}>
-            IncomeArc™
+            IncomeArchitect™ Modeler
           </h1>
-          <p style={{fontSize:13,color:'#8DAFC8',marginTop:2}}>Retirement Income Architecture Modeler</p>
+          <p style={{fontSize:13,color:'#8DAFC8',marginTop:2}}>Retirement Income Architecture · Integrated Planning Partners</p>
         </a>
         <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
           <div style={{display:'flex',gap:6,background:'rgba(255,255,255,.03)',borderRadius:8,padding:4,border:'1px solid rgba(255,255,255,.06)'}}>
