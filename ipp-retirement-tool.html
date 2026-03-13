@@ -2289,37 +2289,36 @@ function App() {
     expenses: true, drawdown: true, ltc: true, tax: true, advanced: true
   });
   const [inputs, setInputs] = useState({
-    filingStatus: 'single',
-    // ── TEST DEFAULTS (Jeff's scenario) — swap back before production ──
-    currentAge: 57, retireAge: 65, planToAge: 98, fra: 67,
-    ssMonthly: 2800, ssClaimAge: 67,
-    spouseSsMonthly: 2800, spouseSsClaimAge: 67, spouseFra: 67, spouseDobOffset: 2, spouseCurrentAge: 55,
-    pensionMonthly: 2500, pensionStartAge: 65, pensionType: 'single', pensionSurvivorPct: 50,
+    filingStatus: 'mfj',
+    currentAge: 60, retireAge: 65, planToAge: 95, fra: 67,
+    ssMonthly: 2500, ssClaimAge: 67,
+    spouseSsMonthly: 1800, spouseSsClaimAge: 67, spouseFra: 67, spouseDobOffset: 2, spouseCurrentAge: 58,
+    pensionMonthly: 0, pensionStartAge: 65, pensionType: 'single', pensionSurvivorPct: 50,
     spousePensionMonthly: 0, spousePensionStartAge: 65,
     primaryDeathAge: 0,
-    traditionalBalance: 2500000, rothBalance: 150000, taxableBalance: 575000,
-    spouseTraditionalBalance: 125000,
-    rothAnnuityMonthly: 150000, rothAnnuityStartAge: 74,
-    etaAnnualIncome: 150000, etaStartAge: 74, etaFundingDraw: 0, etaColaRate: 3,
-    etaFundingAmount: 450000, etaFundingAge: 58,
+    traditionalBalance: 1000000, rothBalance: 0, taxableBalance: 0,
+    spouseTraditionalBalance: 0,
+    rothAnnuityMonthly: 0, rothAnnuityStartAge: 70,
+    etaAnnualIncome: 0, etaStartAge: 70, etaFundingDraw: 0, etaColaRate: 3,
+    etaFundingAmount: 0, etaFundingAge: 60,
     architectureEnabled: false,
-    rothConversionAmount: 350000, rothConversionAge: 58, rothConversionFinanced: 80000,
-    ltcNetAmount: 125000, ltcFundingAge: 57,
-    spouseLtcNetAmount: 125000, spouseLtcFundingAge: 57,
+    rothConversionAmount: 0, rothConversionAge: 60, rothConversionFinanced: 0,
+    ltcNetAmount: 0, ltcFundingAge: 60,
+    spouseLtcNetAmount: 0, spouseLtcFundingAge: 60,
     nonQualAnnuityMonthly: 0, nonQualAnnuityStartAge: 65, nonQualAnnuityBasis: 0, nonQualAnnuityTotalValue: 0,
     partTimeMonthly: 0, partTimeEndAge: 68,
-    fixedExpenses: 12000, lifestyleExpenses: 7000,
-    householdIncome: 250000,
-    ltcEventAge: 76, ltcMonthlyCost: 12000, ltcDuration: 3, ltcShowComparison: false, ltcMonthlyBenefit: 12000, ltcBenefitDuration: 3, ltcEventEnabled: true, ltcCareInflationRate: 4,
-    spouseLtcEventAge: 84, spouseLtcMonthlyCost: 13000, spouseLtcDuration: 4, spouseLtcMonthlyBenefit: 13000, spouseLtcBenefitDuration: 4, spouseLtcInsured: false, spouseLtcEventEnabled: true,
+    fixedExpenses: 5000, lifestyleExpenses: 5000,
+    householdIncome: 150000,
+    ltcEventAge: 76, ltcMonthlyCost: 10000, ltcDuration: 3, ltcShowComparison: false, ltcMonthlyBenefit: 10000, ltcBenefitDuration: 3, ltcEventEnabled: false, ltcCareInflationRate: 4,
+    spouseLtcEventAge: 84, spouseLtcMonthlyCost: 10000, spouseLtcDuration: 3, spouseLtcMonthlyBenefit: 10000, spouseLtcBenefitDuration: 3, spouseLtcInsured: false, spouseLtcEventEnabled: false,
     stateCode: 'IL', customStateRate: '', taxRateStressAdder: 0,
     annualTradDrawdown: 0, tradDrawdownStartAge: 0, tradDrawdownEndAge: 0,
     annualTaxableDrawdown: 0, taxableDrawdownStartAge: 0, taxableDrawdownEndAge: 0,
     annualRothDrawdown: 0, rothDrawdownStartAge: 0, rothDrawdownEndAge: 0,
     portfolioReturn: 6.5, inflation: 2.8, sorrEnabled: false,
-    annualTradContribution: 32500, tradContributionEndAge: 65,
-    annualTaxableContribution: 15000, taxableContributionEndAge: 65,
-    annualSpouseTradContribution: 24500, spouseTradContributionEndAge: 65,
+    annualTradContribution: 0, tradContributionEndAge: 65,
+    annualTaxableContribution: 0, taxableContributionEndAge: 65,
+    annualSpouseTradContribution: 0, spouseTradContributionEndAge: 65,
   });
 
   const set = (k, v) => setInputs(prev => ({...prev, [k]: v}));
@@ -2334,6 +2333,11 @@ function App() {
   };
   // Clean baseline — no LTC events, used for main confidence when events are OFF
   const { years: yearsClean, confidence: confidenceClean, fixedStreams, mcStartAge } = projectArc({ ...baseProjectionInputs, ltcInsured: false, ltcEventAge: 0, spouseLtcEventAge: 0 });
+
+  // Report arch baselines — always architectureEnabled: true regardless of UI toggle
+  // These drive the IncomeArc™ ring scores in the PDF report
+  const { confidence: rptArchBaseConf } = projectArc({ ...baseProjectionInputs, architectureEnabled: true, sorrEnabled: false, expenseShockEnabled: false, ltcEventAge: 0, spouseLtcEventAge: 0, ltcInsured: false });
+  const { confidence: rptArchStormConf } = projectArc({ ...baseProjectionInputs, architectureEnabled: true, sorrEnabled: true, expenseShockEnabled: true, expenseShockAmount: inputs.expenseShockAmount||50000, expenseShockFrequency: inputs.expenseShockFrequency||8, ltcInsured: true, spouseLtcInsured: inputs.filingStatus==='mfj' });
 
   const hasLtcEvent = inputs.ltcEventEnabled && inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
   const hasSpouseLtcEvent = (inputs.filingStatus === 'mfj') && inputs.spouseLtcEventEnabled && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
@@ -2679,18 +2683,17 @@ function App() {
                   };
 
                   // ── Scenario ring data ──
-                  // Scenario 1 (no events): sqConf vs archConf from sqBase vs full architecture (no LTC, no SORR, no shocks)
-                  const archBaseConf = projectArc({ ...baseProjectionInputs, architectureEnabled: true, sorrEnabled: false, expenseShockEnabled: false, ltcEventAge: 0, spouseLtcEventAge: 0 }).confidence;
-                  const sc1SQ   = sqConf;           // status quo, no events
-                  const sc1Arch = archBaseConf;      // architecture, no events
+                  // Scenario 1 (no events): sqConf vs always-on arch baseline
+                  const sc1SQ   = sqConf;
+                  const sc1Arch = rptArchBaseConf;
 
-                  // Scenario 2 (HC events): hcConf vs hcInsConf
-                  const sc2SQ   = hcConf;            // uninsured HC events
-                  const sc2Arch = hcInsConf;          // insured HC events
+                  // Scenario 2 (HC events): hcConf vs hcInsConf (already arch-enabled)
+                  const sc2SQ   = hcConf;
+                  const sc2Arch = hcInsConf;
 
-                  // Scenario 3 (perfect storm): stormSQConf vs stormArchConf
+                  // Scenario 3 (perfect storm): stormSQConf vs always-on arch storm
                   const sc3SQ   = stormSQConf;
-                  const sc3Arch = stormArchConf;
+                  const sc3Arch = rptArchStormConf;
 
                   const sc1SVG = ringPairSVG(sc1SQ, sc1Arch);
                   const sc2SVG = ringPairSVG(sc2SQ, sc2Arch);
@@ -3228,30 +3231,31 @@ function App() {
       </div>
     </div>
     <div class="col-r">
-      ${totalCombPres > 0 ? `
-      <div class="sec-h">The protection investment — how the math works</div>
-      <table class="dtable">
-        <tr><td class="dh" colspan="2">How the ${fmtDollar(totalCombPres)} is built</td></tr>
-        <tr><td class="dk">Inflated care costs absorbed${isMFJ?' ('+clientLabel+' + '+(clientInfo.spouseName||'Spouse')+')':''}</td><td class="dv-c">${fmtDollar(totalCombCare)}</td></tr>
-        <tr><td class="dk">IRA gross-up taxes avoided</td><td class="dv-c">${fmtDollar(totalCombGrossUp)}</td></tr>
-        <tr><td class="dk">Lost compounding preserved</td><td class="dv-c">${fmtDollar(totalCombComp)}</td></tr>
-        <tr class="dtotal"><td class="dk">= Total portfolio wealth preserved</td><td class="dv-t">${fmtDollar(totalCombPres)}</td></tr>
-        ${totalCombInvest > 0 ? `<tr><td class="dk">Combined Layer 2 investment</td><td style="text-align:right;">${fmtDollar(totalCombInvest)}</td></tr>
-        <tr class="dtotal"><td class="dk">Leverage ratio</td><td class="dv-t">${leverageRatio.toFixed(1)}×</td></tr>` : ''}
-      </table>
-      <div class="abox" style="border-left-color:#C8A96E;background:#FBF5E8;margin-top:8pt;">
-        <div class="at">Understanding the leverage ratio</div>
-        <div class="ab">Every dollar of Layer 2 premium protects $${Math.round(leverageRatio)} of retirement wealth — not through speculation, but through structured risk transfer. The $${(totalCombInvest/1000).toFixed(0)}K combined investment permanently removes three categories of portfolio risk: uninsured care costs, tax gross-up on those costs, and the compounding lost on both. The ${fmtDollar(totalCombPres)} in preserved wealth is the difference between what the portfolio looks like at plan end in the insured versus uninsured scenarios.</div>
-      </div>
-      <div class="abox explain-box" style="margin-top:8pt;">
-        <div class="at">Key takeaway</div>
-        <div class="ab">Healthcare is not a risk to be ignored — it is a mathematical certainty to be planned for. ${isMFJ ? 'Two median care events reduce' : 'A median care event reduces'} a well-funded portfolio's survival rate by ${sc2Diff} points. Layer 2 returns it to ${sc2Arch}%. This is the clearest demonstration of what coordinated protection is worth: it doesn't improve the good scenarios — it eliminates the bad ones.</div>
-      </div>` : `
-      <div class="abox explain-box">
-        <div class="at">Key takeaway</div>
-        <div class="ab">Healthcare is not a risk to be ignored — it is a mathematical certainty to be planned for. ${isMFJ ? 'Two median care events reduce' : 'A median care event reduces'} a well-funded portfolio's survival rate by ${sc2Diff} points. Layer 2 returns it to ${sc2Arch}%. This is the clearest demonstration of what coordinated protection is worth: it doesn't improve the good scenarios — it eliminates the bad ones.</div>
-      </div>`}
+      <div class="sec-h">The real cost — uninsured vs. insured</div>
 
+      <table class="dtable">
+        <tr><td class="dh" colspan="2">Without Layer 2 — what the IRA actually pays</td></tr>
+        <tr><td class="dk">Care costs (inflated to event age)${isMFJ?' — both spouses':''}</td><td class="dv-c">${fmtDollar(totalCombCare)}</td></tr>
+        <tr><td class="dk">IRA gross-up taxes (funds drawn to pay taxes on care draw)</td><td class="dv-c" style="color:#C0392B;">${fmtDollar(totalCombGrossUp)}</td></tr>
+        <tr><td class="dk">Lost compounding on gross-up (over ${yearsRem}-yr horizon at ${inputs.portfolioReturn}%)</td><td class="dv-c" style="color:#C0392B;">${fmtDollar(totalCombComp)}</td></tr>
+        <tr class="dtotal"><td class="dk">= Total permanent portfolio impairment</td><td class="dv-t" style="color:#C0392B;">${fmtDollar(totalCombPres)}</td></tr>
+      </table>
+
+      <table class="dtable" style="margin-top:8pt;">
+        <tr><td class="dh" colspan="2">With Layer 2 — what the benefit pays instead</td></tr>
+        <tr><td class="dk">Care costs paid directly by chronic illness benefit</td><td class="dv-c" style="color:#2A7A5A;">${fmtDollar(totalCombCare)}</td></tr>
+        <tr><td class="dk">IRA gross-up taxes avoided (no IRA draw required)</td><td class="dv-c" style="color:#2A7A5A;">${fmtDollar(totalCombGrossUp)}</td></tr>
+        <tr><td class="dk">Compounding preserved (portfolio never interrupted)</td><td class="dv-c" style="color:#2A7A5A;">${fmtDollar(totalCombComp)}</td></tr>
+        <tr class="dtotal"><td class="dk">= Total portfolio wealth preserved</td><td class="dv-t" style="color:#2A7A5A;">${fmtDollar(totalCombPres)}</td></tr>
+        ${totalCombInvest > 0 ? `
+        <tr><td class="dk">Combined Layer 2 premium investment</td><td style="text-align:right;padding:5pt 8pt;">${fmtDollar(totalCombInvest)}</td></tr>
+        <tr class="dtotal"><td class="dk">Return on premium — wealth protected per $1 spent</td><td class="dv-t" style="color:#C8A96E;">${leverageRatio.toFixed(1)}×</td></tr>` : ''}
+      </table>
+
+      <div class="abox" style="border-left-color:#C8A96E;background:#FBF5E8;margin-top:8pt;">
+        <div class="at">Why the leverage ratio matters</div>
+        <div class="ab">The ${fmtDollar(totalCombInvest > 0 ? totalCombInvest : 0)} Layer 2 premium doesn't just pay for care — it eliminates the gross-up tax on every dollar of care, and preserves the compounding that gross-up would have cost. Every $1 of premium protects $${Math.round(leverageRatio)} of retirement wealth. That is not a return on speculation. It is a return on structured risk transfer.</div>
+      </div>
     </div>
   </div>
   <div class="footer-bar">
