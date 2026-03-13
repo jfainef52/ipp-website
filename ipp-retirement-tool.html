@@ -3052,77 +3052,50 @@ function App() {
 </div>
 
 <!-- ══════════════════════════════════════════════════════════
-     PAGE 4 — PART THREE: WHAT THESE RISKS ACTUALLY COST
+     PAGE 4A — PART THREE: TAX RISKS
      ══════════════════════════════════════════════════════════ -->
 <div class="page">
   <div class="hdr-bar"><div><span class="hdr-logo-txt">Integrated Planning Partners</span><span class="hdr-logo-sub">IncomeArc™</span></div><div class="hdr-client">${fullName} &nbsp;·&nbsp; Integrated Planning Partners</div></div>
-  <div class="page-body">  <div class="banner">
-    <div class="sec-label">Part Three</div>
-    <h2>What These Risks Actually Cost</h2>
-    <div class="sub">Quantifying the challenge — because a risk you can measure is a risk you can plan for.</div>
-  </div>
-  <div class="two-col">
-    <div class="col-l">
-      <div class="sec-h">The tax burden: it's larger than most people realize</div>
-      <p>Every dollar in your traditional IRA has never been taxed. When you withdraw it — whether voluntarily or because the IRS requires it through RMDs — it becomes ordinary income. At your income level, that means the effective tax rate on IRA withdrawals will likely exceed 30% when federal, state, and IRMAA surcharges are combined.</p>
-      <div class="callout-row">
-        <div class="callout">
-          <div class="cv">${iraBalance}</div>
-          <div class="cl">IRA balance at retirement</div>
-          <div class="cs">The IRS is a co-owner of your IRA</div>
-        </div>
-        <div class="callout">
-          <div class="cv">${peakMargRateDisp}</div>
-          <div class="cl">Peak marginal rate — status quo</div>
-          <div class="cs">Triggered by RMDs starting at 73</div>
-        </div>
-        <div class="callout">
-          <div class="cv">${lifetimeTaxDisp}</div>
-          <div class="cl">Estimated lifetime federal tax</div>
-          <div class="cs">Under current law, current trajectory</div>
-        </div>
-      </div>
-      <div class="sec-h">The healthcare reality</div>
-      <p>Long-term care is not a remote possibility — it is a statistical expectation for the majority of Americans who live into their seventies and eighties. For a married couple, the probability that at least one partner will need significant care is higher than 75%.</p>
-      <p>But the financial damage is not just the cost of care itself. When an uninsured event occurs, the IRA must distribute enough to cover both the care cost <em>and the taxes on the distribution</em>.${ltcMonthlyCur > 0 ? ` A $${Math.round(ltcMonthlyCur).toLocaleString()}/month care bill at a ${peakMargRateDisp} marginal rate requires a $${ltcMonthlyGross.toLocaleString()}/month IRA draw. The difference — $${grossUpTaxMo.toLocaleString()}/month — goes directly to the IRS and never compounds for you again.` : ` The difference between what care costs and what the IRA must distribute goes directly to the IRS and never compounds for you again.`}</p>
+  <div class="page-body">
+    <div class="banner">
+      <div class="sec-label">Part Three</div>
+      <h2>What These Risks Actually Cost — Tax</h2>
+      <div class="sub">The tax burden in retirement is not fixed. For most retirees with qualified accounts, it compounds over time — often in ways they never anticipated.</div>
     </div>
-    <div class="col-r">
-      <div class="sec-h">Long-term care: the data is clear</div>
-      <div class="callout-row">
-        <div class="callout">
-          <div class="cv">70%</div>
-          <div class="cl">of 65-year-olds need LTC</div>
-          <div class="cs">Source: ASPE / HHS, 2019</div>
-        </div>
-        <div class="callout">
-          <div class="cv">75%</div>
-          <div class="cl">chance one partner needs care</div>
-          <div class="cs">Married couple — HealthView Services</div>
-        </div>
-        <div class="callout">
-          <div class="cv">3.3 yrs</div>
-          <div class="cl">average care duration</div>
-          <div class="cs">Among those who need it — ASPE 2019</div>
+    <div class="two-col">
+      <div class="col-l">
+        <div class="sec-h">The IRA: a tax-deferred account, not a tax-free one</div>
+        <p>Every dollar sitting in a traditional IRA or 401(k) has never been taxed. It looks like your money — but the IRS is a silent co-owner of every account. When withdrawals begin, whether voluntary or mandated, every dollar becomes ordinary income. At typical retirement income levels, the combined effect of federal income tax, state income tax, and Medicare surcharges can erode 30–40 cents of every dollar before it reaches the household.</p>
+
+        <div class="sec-h">Required Minimum Distributions — the tax you can't avoid</div>
+        <p>Beginning at age 73, the IRS requires annual withdrawals from every traditional IRA and pre-tax 401(k), calculated on the account balance each prior December 31st. There is no option to defer, reinvest, or skip — the distribution is mandatory and fully taxable. As balances grow, so do the RMDs. For retirees with significant IRA balances, RMDs alone can push income into higher brackets — triggering taxes on Social Security benefits, increasing capital gains rates on other investments, and activating Medicare surcharges that were never anticipated.</p>
+
+        <div class="abox warn-box" style="margin-top:8pt;">
+          <div class="at">The IRMAA surcharge — the tax within the tax</div>
+          <div class="ab">Medicare Part B and Part D premiums are not flat rates. They increase on a sliding scale based on your prior-year income. In 2026, a single retiree whose income exceeds $109,000 — or a married couple above $218,000 — begins paying IRMAA surcharges. At the highest bracket (above $500,000 individual / $750,000 joint), the monthly Part B surcharge alone reaches <strong>$487/month per person</strong> — nearly 2.4× the standard premium. An RMD that pushes income over a threshold by a single dollar triggers the full surcharge for the entire year. There are no partial adjustments. The surcharge is assessed on income from two years prior, meaning a Roth conversion or large sale today shows up in Medicare premiums in year three.</div>
         </div>
       </div>
-      <div class="sec-h">Current cost of care — national median (2024)</div>
-      <table class="data">
-        <tr><th class="th-lbl">Care setting</th><th class="th-lbl" style="text-align:right;color:#8DAFC8;">Annual Median</th><th class="th-lbl" style="text-align:right;color:#8DAFC8;">Monthly</th></tr>
-        <tr><td class="td-lbl">Nursing home — private room</td><td style="text-align:right;color:#C0392B;font-weight:600;">$127,750</td><td style="text-align:right;color:#C0392B;font-weight:600;">$10,646</td></tr>
-        <tr><td class="td-lbl">Nursing home — semi-private</td><td style="text-align:right;color:#C0392B;font-weight:600;">$111,325</td><td style="text-align:right;color:#C0392B;font-weight:600;">$9,277</td></tr>
-        <tr><td class="td-lbl">Assisted living community</td><td style="text-align:right;color:#C0392B;font-weight:600;">$70,800</td><td style="text-align:right;color:#C0392B;font-weight:600;">$5,900</td></tr>
-        <tr><td class="td-lbl">Home health aide (44 hrs/wk)</td><td style="text-align:right;color:#C0392B;font-weight:600;">$77,792</td><td style="text-align:right;color:#C0392B;font-weight:600;">$6,483</td></tr>
-      </table>
-      <div style="font-size:6.5pt;color:#8A9AAA;margin-top:-6pt;margin-bottom:8pt;font-style:italic;">Source: Genworth/CareScout 2024 Cost of Care Survey. Care costs increase 4–6% annually.</div>
-      <div class="abox warn-box">
-        <div class="at">The gross-up problem — what it really costs</div>
-        <div class="ab">${ltcMonthlyCur > 0
-          ? `A $${Math.round(ltcMonthlyCur).toLocaleString()}/month care event at a ${peakMargRateDisp} marginal rate requires <strong>$${ltcMonthlyGross.toLocaleString()}/month</strong> from your IRA — $${Math.round(ltcMonthlyCur).toLocaleString()} for care and $${grossUpTaxMo.toLocaleString()} for taxes. That tax cost never provides a single hour of comfort, and the compounding lost on it over the remaining plan horizon is a further significant impairment to your portfolio.`
-          : `A $10,000/month care event at a 32% marginal rate requires <strong>$14,706/month</strong> from your IRA — $10,000 for care and $4,706 for taxes. Over a 3-year event, that's <strong>$170,000 in taxes paid on care</strong> that never provide a single hour of comfort. And the compounding lost on that $170,000 over 20 years is a further $548,000.`
-        }</div>
+      <div class="col-r">
+        <div class="sec-h">2026 IRMAA — Medicare surcharge by income tier</div>
+        <table class="data">
+          <tr><th class="th-lbl">Joint Income (MAGI)</th><th class="th-lbl" style="text-align:right;color:#8DAFC8;">Monthly Part B / Person</th><th class="th-lbl" style="text-align:right;color:#8DAFC8;">Annual Add'l Cost / Couple</th></tr>
+          <tr><td class="td-lbl">Under $218,000</td><td style="text-align:right;">$202.90</td><td style="text-align:right;">Base premium</td></tr>
+          <tr><td class="td-lbl">$218,000 – $274,000</td><td style="text-align:right;color:#E07040;font-weight:600;">$284.10</td><td style="text-align:right;color:#E07040;font-weight:600;">+$1,954/yr</td></tr>
+          <tr><td class="td-lbl">$274,000 – $342,000</td><td style="text-align:right;color:#C0392B;font-weight:600;">$405.10</td><td style="text-align:right;color:#C0392B;font-weight:600;">+$4,853/yr</td></tr>
+          <tr><td class="td-lbl">$342,000 – $410,000</td><td style="text-align:right;color:#C0392B;font-weight:600;">$486.10</td><td style="text-align:right;color:#C0392B;font-weight:600;">+$6,796/yr</td></tr>
+          <tr><td class="td-lbl">Above $750,000</td><td style="text-align:right;color:#C0392B;font-weight:600;">$689.90</td><td style="text-align:right;color:#C0392B;font-weight:600;">+$11,688/yr</td></tr>
+        </table>
+        <div style="font-size:6.5pt;color:#8A9AAA;margin-top:-4pt;margin-bottom:8pt;font-style:italic;">Source: CMS / Kiplinger, 2026 IRMAA brackets. Does not include Part D surcharges. Surcharge is cliff-based — a $1 income increase can trigger the full bracket.</div>
+
+        <div class="sec-h">The inherited IRA — a tax accelerant for your heirs</div>
+        <p>Prior to 2020, a non-spouse beneficiary could stretch IRA distributions over their own lifetime — minimizing the annual tax impact. The SECURE Act eliminated this. Today, most non-spouse heirs must fully withdraw an inherited IRA within 10 years of the original owner's death. For a child in their peak earning years — ages 40–60 — those forced distributions land on top of their own salary, potentially pushing them into the 32%, 35%, or 37% federal bracket. A $500,000 IRA inherited by a beneficiary earning $200,000 could generate $50,000+ per year in additional taxable income for a decade. The family's wealth is taxed twice: once when withdrawn by the retiree, and again — at an accelerated rate — when inherited by the next generation.</p>
+
+        <div class="abox" style="margin-top:6pt;border-left-color:#C8A96E;">
+          <div class="at" style="color:#C8A96E;">The compounding effect of deferred taxation</div>
+          <div class="ab">Each dollar left in a pre-tax account continues to grow — but so does the embedded tax liability. A $1,000,000 IRA growing at 6% for 15 years becomes $2,397,000. At a 32% combined tax rate, the embedded liability grows from $320,000 to $767,000 over that same period. Deferral is not always an advantage.</div>
+        </div>
       </div>
     </div>
-  </div>
   </div>
   <div class="footer-bar">
     <span>For discussion purposes only. All projections are hypothetical illustrations. Not investment, tax, or legal advice. See full disclosures on final page.</span>
@@ -3132,7 +3105,84 @@ function App() {
 </div>
 
 <!-- ══════════════════════════════════════════════════════════
-     PAGE 5 — PART FIVE: THE QUESTION WORTH ASKING
+     PAGE 4B — PART THREE (CONTINUED): LONG-TERM CARE RISKS
+     ══════════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="hdr-bar"><div><span class="hdr-logo-txt">Integrated Planning Partners</span><span class="hdr-logo-sub">IncomeArc™</span></div><div class="hdr-client">${fullName} &nbsp;·&nbsp; Integrated Planning Partners</div></div>
+  <div class="page-body">
+    <div class="banner">
+      <div class="sec-label">Part Three · Continued</div>
+      <h2>What These Risks Actually Cost — Long-Term Care</h2>
+      <div class="sub">Long-term care is not a remote possibility. For most Americans who reach retirement age, it is a statistical expectation — and the financial damage extends well beyond the cost of care itself.</div>
+    </div>
+    <div class="two-col">
+      <div class="col-l">
+        <div class="sec-h">The probability: higher than most people assume</div>
+        <div class="callout-row">
+          <div class="callout">
+            <div class="cv">70%</div>
+            <div class="cl">of 65-year-olds will need some form of LTC</div>
+            <div class="cs">ASPE / HHS, 2025</div>
+          </div>
+          <div class="callout">
+            <div class="cv">20%</div>
+            <div class="cl">will require care for 5+ years</div>
+            <div class="cs">ASPE / HHS, 2025</div>
+          </div>
+          <div class="callout">
+            <div class="cv">1 in 5</div>
+            <div class="cl">turning 65 will face $200K+ in LTC costs</div>
+            <div class="cs">ASPE, 2025</div>
+          </div>
+        </div>
+
+        <div class="sec-h">Current cost of care — national median (2024)</div>
+        <table class="data">
+          <tr><th class="th-lbl">Care setting</th><th class="th-lbl" style="text-align:right;color:#8DAFC8;">Annual Median</th><th class="th-lbl" style="text-align:right;color:#8DAFC8;">Monthly</th></tr>
+          <tr><td class="td-lbl">Nursing home — private room</td><td style="text-align:right;color:#C0392B;font-weight:600;">$127,750</td><td style="text-align:right;color:#C0392B;font-weight:600;">$10,646</td></tr>
+          <tr><td class="td-lbl">Nursing home — semi-private</td><td style="text-align:right;color:#C0392B;font-weight:600;">$111,325</td><td style="text-align:right;color:#C0392B;font-weight:600;">$9,277</td></tr>
+          <tr><td class="td-lbl">Assisted living community</td><td style="text-align:right;color:#C0392B;font-weight:600;">$70,800</td><td style="text-align:right;color:#C0392B;font-weight:600;">$5,900</td></tr>
+          <tr><td class="td-lbl">Home health aide (44 hrs/wk)</td><td style="text-align:right;color:#C0392B;font-weight:600;">$77,792</td><td style="text-align:right;color:#C0392B;font-weight:600;">$6,483</td></tr>
+        </table>
+        <div style="font-size:6.5pt;color:#8A9AAA;margin-top:-4pt;margin-bottom:8pt;font-style:italic;">Source: Genworth/CareScout 2024 Cost of Care Survey. Care costs have increased 4–6% annually over the past decade.</div>
+
+        <div class="abox warn-box">
+          <div class="at">What Medicare actually covers — and what it doesn't</div>
+          <div class="ab">Medicare covers short-term skilled nursing care following a qualifying hospital stay — up to 100 days, with significant co-pays after day 20. It does not cover custodial care: help with bathing, dressing, eating, or mobility. That is precisely the type of care most people actually need. The gap between what Medicare pays and what care costs falls entirely on the household — and most commonly, on the portfolio.</div>
+        </div>
+      </div>
+
+      <div class="col-r">
+        <div class="sec-h">The gross-up problem: what care actually costs a portfolio</div>
+        <p>When an uninsured care event occurs and the household must fund it from a traditional IRA, the true withdrawal requirement is larger than the care bill. The IRA distribution is taxable income — so to net the dollars needed for care, the account must distribute enough to cover both the care cost <em>and</em> the taxes on the distribution. This is the gross-up problem.</p>
+
+        <table class="data" style="margin-bottom:6pt;">
+          <tr><th class="th-lbl">Monthly care cost</th><th class="th-lbl" style="text-align:right;color:#8DAFC8;">At 24% rate</th><th class="th-lbl" style="text-align:right;color:#8DAFC8;">At 32% rate</th><th class="th-lbl" style="text-align:right;color:#C0392B;">Tax paid / mo</th></tr>
+          <tr><td class="td-lbl">$6,000/month</td><td style="text-align:right;">$7,895</td><td style="text-align:right;">$8,824</td><td style="text-align:right;color:#C0392B;font-weight:600;">$1,895–$2,824</td></tr>
+          <tr><td class="td-lbl">$9,000/month</td><td style="text-align:right;">$11,842</td><td style="text-align:right;">$13,235</td><td style="text-align:right;color:#C0392B;font-weight:600;">$2,842–$4,235</td></tr>
+          <tr><td class="td-lbl">$10,646/month</td><td style="text-align:right;">$14,008</td><td style="text-align:right;">$15,656</td><td style="text-align:right;color:#C0392B;font-weight:600;">$3,362–$5,010</td></tr>
+        </table>
+        <div style="font-size:6.5pt;color:#8A9AAA;margin-top:-4pt;margin-bottom:8pt;font-style:italic;">Gross-up calculation: care cost ÷ (1 − tax rate). Tax dollars shown go directly to the IRS and provide zero care value.</div>
+
+        <div class="sec-h">The market timing problem: care doesn't wait for a recovery</div>
+        <p>A care event rarely arrives at a convenient time for the portfolio. When a care need coincides with a market decline — a sequence-of-returns event — the household is forced to liquidate assets at depressed prices to fund ongoing expenses. Each withdrawal locks in losses permanently. There is no recovery for shares already sold. According to Morningstar, a 70-year-old couple experiencing long-term care costs sees their overall wealth decrease by an average of 21% over nine years — even in a relatively normal market environment. In a down market, the damage is significantly worse.</p>
+
+        <div class="abox" style="border-left-color:#C8A96E;">
+          <div class="at" style="color:#C8A96E;">The compounding loss of gross-up taxes over time</div>
+          <div class="ab">A $4,000/month tax cost on care, sustained over a 3-year event, represents $144,000 in total taxes that produced not one hour of care or one dollar of family benefit. At a 6% average return over 20 remaining retirement years, the compounding value of that $144,000 is an additional <strong>$462,000</strong> in foregone wealth. The tax is paid once. The loss compounds indefinitely.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bar">
+    <span>For discussion purposes only. All projections are hypothetical illustrations. Not investment, tax, or legal advice. See full disclosures on final page.</span>
+    <span class="footer-center">IncomeArc™ is proprietary to Integrated Planning Partners. This document is confidential.</span>
+    <span></span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     PAGE 5 — PART FOUR: THE QUESTION WORTH ASKING
      ══════════════════════════════════════════════════════════ -->
 <div class="page">
   <div class="hdr-bar"><div><span class="hdr-logo-txt">Integrated Planning Partners</span><span class="hdr-logo-sub">IncomeArc™</span></div><div class="hdr-client">${fullName} &nbsp;·&nbsp; Integrated Planning Partners</div></div>
@@ -3194,7 +3244,7 @@ function App() {
 </div>
 
 <!-- ══════════════════════════════════════════════════════════
-     PAGE 6 — THE INCOMEARC™ SYSTEM: HOW IT WORKS
+     PAGE 6 — PART FIVE: THE INCOMEARC™ SYSTEM
      ══════════════════════════════════════════════════════════ -->
 <div class="page">
   <div class="hdr-bar"><div><span class="hdr-logo-txt">Integrated Planning Partners</span><span class="hdr-logo-sub">IncomeArc™</span></div><div class="hdr-client">${fullName} &nbsp;·&nbsp; Integrated Planning Partners</div></div>
@@ -3421,7 +3471,7 @@ function App() {
 </div>
 
 <!-- ══════════════════════════════════════════════════════════
-     PAGE 10 — SCENARIO SUMMARY + WHY IPP
+     PAGE 10 — PART SEVEN: SCENARIO SUMMARY + WHY IPP
      ══════════════════════════════════════════════════════════ -->
 <div class="page">
   <div class="hdr-bar"><div><span class="hdr-logo-txt">Integrated Planning Partners</span><span class="hdr-logo-sub">IncomeArc™</span></div><div class="hdr-client">${fullName} &nbsp;·&nbsp; Integrated Planning Partners</div></div>
