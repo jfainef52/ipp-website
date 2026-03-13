@@ -3434,9 +3434,15 @@ function App() {
 </body></html>`;
 
                   try {
-                    // ── Encode full report as base64 for EmailJS Variable Attachment ──
-                    // btoa() requires all chars <= 255; encode to UTF-8 bytes first
-                    const utf8Bytes = new TextEncoder().encode(htmlContent);
+                    // ── Minify then base64-encode the report HTML ──
+                    // Minify: strip HTML comments, collapse whitespace between tags
+                    const minified = htmlContent
+                      .replace(/<!--[\s\S]*?-->/g, '')
+                      .replace(/>\s+</g, '><')
+                      .replace(/\s{2,}/g, ' ')
+                      .trim();
+                    // btoa() requires Latin-1; encode UTF-8 to bytes first
+                    const utf8Bytes = new TextEncoder().encode(minified);
                     let binary = '';
                     const chunkSize = 8192;
                     for (let i = 0; i < utf8Bytes.length; i += chunkSize) {
@@ -3575,30 +3581,17 @@ function App() {
 
 </div>`;
 
-                    const makePayload = (toEmail) => ({
-                      service_id: 'IPP Support',
-                      template_id: 'template_qxximsu',
-                      user_id: 'XyWTKKWFoeYOhfFbV',
-                      template_params: {
-                        to_email: toEmail,
-                        client_name: fullName,
-                        html_content: emailBody,
-                        report_attachment: reportBase64,
-                        report_filename: fileName,
-                      }
+                    const makeParams = (toEmail) => ({
+                      to_email: toEmail,
+                      client_name: fullName,
+                      html_content: emailBody,
+                      report_attachment: reportBase64,
+                      report_filename: fileName,
                     });
 
-                    const res1 = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
-                      method: 'POST', headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify(makePayload(clientInfo.advisorEmail))
-                    });
-                    if (!res1.ok) throw new Error(await res1.text());
-
-                    // CC to IPP support
-                    await fetch('https://api.emailjs.com/api/v1.0/email/send', {
-                      method: 'POST', headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify(makePayload('support@integratedplanningpartners.com'))
-                    });
+                    // Use EmailJS SDK (not raw fetch) — required for attachment variables to work correctly
+                    await emailjs.send('IPP Support', 'template_qxximsu', makeParams(clientInfo.advisorEmail));
+                    await emailjs.send('IPP Support', 'template_qxximsu', makeParams('support@integratedplanningpartners.com'));
 
                     setReportSent(true);
                   } catch(e) {
