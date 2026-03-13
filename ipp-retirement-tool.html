@@ -3455,14 +3455,12 @@ function App() {
                     // ── Email body — warm, advisor-focused, with full instructions ──
                     const emailBody = `<div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;color:#1A2B3C;">
 
-  <!-- Header -->
   <div style="background:#0B1928;padding:22px 30px;border-bottom:3px solid #C8A96E;">
     <div style="font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#C8A96E;margin-bottom:6px;">Integrated Planning Partners</div>
     <div style="font-size:24px;color:#F5F0E8;font-family:Georgia,serif;font-weight:400;">IncomeArc™ Report Ready</div>
     <div style="font-size:12px;color:#7A9AB8;margin-top:5px;">${fullName} &nbsp;·&nbsp; Generated ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</div>
   </div>
 
-  <!-- Intro -->
   <div style="padding:26px 30px 0;background:#F8F6F2;">
     <p style="font-size:14px;color:#2A3A4A;line-height:1.8;margin-bottom:0;">
       Hey — your IncomeArc™ report for <strong>${fullName}</strong> is attached and ready to go.
@@ -3470,7 +3468,6 @@ function App() {
     </p>
   </div>
 
-  <!-- Scenario snapshot -->
   <div style="padding:20px 30px;background:#F8F6F2;">
     <div style="font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#C8A96E;margin-bottom:10px;padding-bottom:6px;border-bottom:1.5px solid #C8A96E;">Scenario Snapshot</div>
     <table style="width:100%;border-collapse:collapse;font-size:13px;">
@@ -3501,7 +3498,6 @@ function App() {
     </table>
   </div>
 
-  <!-- Plan details -->
   <div style="padding:0 30px 20px;background:#F8F6F2;">
     <div style="font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#C8A96E;margin-bottom:10px;padding-bottom:6px;border-bottom:1.5px solid #C8A96E;">Plan Details</div>
     <table style="width:100%;border-collapse:collapse;font-size:13px;">
@@ -3515,7 +3511,6 @@ function App() {
     </table>
   </div>
 
-  <!-- How to print instructions -->
   <div style="padding:0 30px 20px;background:#F8F6F2;">
     <div style="font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#C8A96E;margin-bottom:10px;padding-bottom:6px;border-bottom:1.5px solid #C8A96E;">How to Print the Report</div>
     <div style="background:white;border:1px solid #DDE4EC;border-radius:4px;padding:16px 18px;">
@@ -3531,7 +3526,6 @@ function App() {
     </div>
   </div>
 
-  <!-- How to use in the meeting -->
   <div style="padding:0 30px 20px;background:#F8F6F2;">
     <div style="font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#C8A96E;margin-bottom:10px;padding-bottom:6px;border-bottom:1.5px solid #C8A96E;">Using This in the Client Meeting</div>
     <div style="background:white;border:1px solid #DDE4EC;border-radius:4px;padding:16px 18px;font-size:13px;color:#2A3A4A;line-height:1.85;">
@@ -3547,7 +3541,6 @@ function App() {
     </div>
   </div>
 
-  <!-- Next steps -->
   <div style="padding:0 30px 26px;background:#F8F6F2;">
     <div style="font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#C8A96E;margin-bottom:10px;padding-bottom:6px;border-bottom:1.5px solid #C8A96E;">Suggested Next Steps</div>
     <div style="background:white;border:1px solid #DDE4EC;border-radius:4px;padding:16px 18px;font-size:13px;color:#2A3A4A;line-height:2.1;">
@@ -3570,7 +3563,6 @@ function App() {
     </div>
   </div>
 
-  <!-- Footer -->
   <div style="background:#0B1928;padding:16px 30px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
     <div>
       <div style="font-size:12px;color:#C8A96E;font-weight:600;margin-bottom:2px;">Integrated Planning Partners</div>
@@ -3589,13 +3581,31 @@ function App() {
                       report_filename: fileName,
                     });
 
-                    // Use EmailJS SDK (not raw fetch) — required for attachment variables to work correctly
-                    await emailjs.send('IPP Support', 'template_qxximsu', makeParams(clientInfo.advisorEmail));
-                    await emailjs.send('IPP Support', 'template_qxximsu', makeParams('support@integratedplanningpartners.com'));
+                    // Send via REST API — service_id accepts display name, handles attachment variables
+                    const sendEmail = async (toEmail) => {
+                      const res = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          service_id: 'IPP Support',
+                          template_id: 'v4cp0al',
+                          user_id: 'XyWTKKWFoeYOhfFbV',
+                          template_params: makeParams(toEmail),
+                        })
+                      });
+                      if (!res.ok) {
+                        const errText = await res.text();
+                        throw new Error('EmailJS error: ' + errText);
+                      }
+                    };
+                    await sendEmail(clientInfo.advisorEmail);
+                    await sendEmail('support@integratedplanningpartners.com');
 
                     setReportSent(true);
                   } catch(e) {
                     console.error('Report send error:', e);
+                    console.error('Error message:', e.message);
+                    console.error('Error stack:', e.stack);
                     setReportError(true);
                   }
                   setReportSending(false);
