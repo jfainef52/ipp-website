@@ -2752,6 +2752,7 @@ function App() {
                   const rptPMidAge       = rptPLtcAge + rptLtcDur / 2;
                   const rptSMidAge       = rptSLtcAge + rptSpLtcDur / 2;
                   const rptPDirect       = rptPTotalCare + rptPGrossUp;
+                  const yearsRem         = Math.round(pAge - rptPMidAge);
                   const rptSDirect       = rptSTotalCare + rptSGrossUp;
                   const totalCombComp    = rptPDirect * (Math.pow(1 + combRet, Math.max(0, pAge - rptPMidAge)) - 1)
                                          + (isMFJ ? rptSDirect * (Math.pow(1 + combRet, Math.max(0, pAge - rptSMidAge)) - 1) : 0);
@@ -2776,7 +2777,9 @@ function App() {
                   const horizonYrs   = pAge - (inputs.currentAge || 65);
                   const horizonDesc  = `Age ${inputs.currentAge||65}\u2192${pAge} (${horizonYrs} yrs)`;
 
-                  const htmlContent = `<!DOCTYPE html>
+                  let htmlContent;
+                  try {
+                  htmlContent = `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
@@ -3470,6 +3473,13 @@ function App() {
 </div>
 
 </body></html>`;
+
+                  } catch(e) {
+                    console.error('Send report error:', e.message);
+                    setReportError(e.name === 'AbortError' ? 'PDFShift timed out after 90s — try again' : (e.message || String(e)));
+                    setReportSending(false);
+                    return;
+                  }
 
                   try {
                     const fileName = `IncomeArc-${(fullName).replace(/[^a-zA-Z0-9]/g,'-')}-${new Date().toISOString().slice(0,10)}.pdf`;
