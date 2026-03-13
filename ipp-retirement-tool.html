@@ -31,6 +31,7 @@ const GS = `
   @keyframes arcDraw  { from { stroke-dashoffset: 2000; } to { stroke-dashoffset: 0; } }
   @keyframes barGrow  { from { transform: scaleY(0); } to { transform: scaleY(1); } }
   @keyframes pulse    { 0%,100% { opacity:.6; } 50% { opacity:1; } }
+  @keyframes spin     { to { transform: rotate(360deg); } }
   @keyframes shimmer  { from { background-position: -200% center; } to { background-position: 200% center; } }
 
   .fade-up   { animation: fadeUp .5s ease both; }
@@ -2280,7 +2281,8 @@ function App() {
   const [reportModal, setReportModal] = useState(false);
   const [reportSending, setReportSending] = useState(false);
   const [reportSent, setReportSent] = useState(false);
-  const [reportError, setReportError] = useState(false);
+  const [reportError, setReportError] = useState('');
+  const [reportStep, setReportStep] = useState('');
   const [clientInfo, setClientInfo] = useState({
     primaryName: '', spouseName: '', advisorEmail: '', advisorName: '',
   });
@@ -2558,9 +2560,17 @@ function App() {
               </div>
             )}
             {reportError && (
-              <div style={{padding:'12px 14px',background:'rgba(196,106,106,.08)',border:'1px solid rgba(196,106,106,.25)',borderRadius:8,marginBottom:16,fontSize:13,color:'#C47A7A',display:'flex',alignItems:'center',gap:8}}>
-                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}><span>⚠</span><strong>Failed to send report</strong></div>
-                <div style={{fontSize:12,color:'#AA6060',paddingLeft:24}}>Please check the advisor email address and try again, or contact support@integratedplanningpartners.com</div>
+              <div style={{padding:'12px 14px',background:'rgba(196,106,106,.08)',border:'1px solid rgba(196,106,106,.25)',borderRadius:8,marginBottom:16,fontSize:13,color:'#C47A7A'}}>
+                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}><span>⚠</span><strong>Failed at: {reportStep}</strong></div>
+                <div style={{fontSize:11,color:'#AA6060',fontFamily:'monospace',background:'rgba(0,0,0,.15)',padding:'8px',borderRadius:4,wordBreak:'break-all'}}>{reportError}</div>
+              </div>
+            )}
+            {reportSending && (
+              <div style={{padding:'12px 14px',background:'rgba(200,169,110,.06)',border:'1px solid rgba(200,169,110,.2)',borderRadius:8,marginBottom:16,fontSize:13,color:'#C8A96E'}}>
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <span style={{display:'inline-block',width:14,height:14,border:'2px solid #C8A96E',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}/>
+                  <span>{reportStep || 'Starting…'}</span>
+                </div>
               </div>
             )}
 
@@ -2574,7 +2584,7 @@ function App() {
               <button
                 onClick={async()=>{
                   if(!clientInfo.advisorEmail || reportSending) return;
-                  setReportSending(true); setReportSent(false); setReportError(false);
+                  setReportSending(true); setReportSent(false); setReportError(''); setReportStep('Building report…');
 
                   const clientLabel = clientInfo.primaryName || 'Client';
                   const spouseLabel = inputs.filingStatus==='mfj'&&clientInfo.spouseName ? ` & ${clientInfo.spouseName}` : '';
@@ -2770,8 +2780,9 @@ function App() {
 <html>
 <head>
 <meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500;600;700&display=swap');
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'DM Sans', Arial, sans-serif; font-size: 9pt; color: #1A2B3C;
          line-height: 1.5; background: white; }
@@ -3463,8 +3474,9 @@ function App() {
                   try {
                     const fileName = `IncomeArc-${(fullName).replace(/[^a-zA-Z0-9]/g,'-')}-${new Date().toISOString().slice(0,10)}.pdf`;
 
-                    // ── Step 1: Generate real PDF via PDFShift API ──
-                    const pdfShiftRes = await fetch('https://api.pdfshift.io/v3/convert/pdf', {
+                    // ── Step 1: Generate PDF via PDFShift → download to browser ──
+                    setReportStep('Generating PDF… (15–30 seconds)');
+                    const pdfRes = await fetch('https://api.pdfshift.io/v3/convert/pdf', {
                       method: 'POST',
                       headers: {
                         'Content-Type': 'application/json',
@@ -3476,162 +3488,76 @@ function App() {
                         format: 'Letter',
                         margin: '0',
                         use_print: false,
-                      })
+                      }),
                     });
-                    if (!pdfShiftRes.ok) {
-                      const errText = await pdfShiftRes.text();
-                      throw new Error('PDFShift error: ' + errText);
+                    if (!pdfRes.ok) {
+                      const errText = await pdfRes.text();
+                      throw new Error('PDFShift ' + pdfRes.status + ': ' + errText);
                     }
 
-                    // ── Step 2: Convert PDF binary to base64 for EmailJS attachment ──
-                    const pdfArrayBuffer = await pdfShiftRes.arrayBuffer();
-                    const pdfBytes = new Uint8Array(pdfArrayBuffer);
-                    let binary = '';
-                    const chunkSize = 8192;
-                    for (let i = 0; i < pdfBytes.length; i += chunkSize) {
-                      binary += String.fromCharCode(...pdfBytes.subarray(i, i + chunkSize));
-                    }
-                    const reportBase64 = btoa(binary);
+                    // ── Step 2: Download PDF directly to device ──
+                    setReportStep('Downloading PDF…');
+                    const blob = await pdfRes.blob();
+                    const blobUrl = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = blobUrl;
+                    a.download = fileName;
+                    a.click();
+                    setTimeout(() => URL.revokeObjectURL(blobUrl), 15000);
 
-                    // ── Email body — warm, advisor-focused, with full instructions ──
-                    const emailBody = `<div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;color:#1A2B3C;">
-
-  <div style="background:#0B1928;padding:22px 30px;border-bottom:3px solid #C8A96E;">
-    <div style="font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#C8A96E;margin-bottom:6px;">Integrated Planning Partners</div>
-    <div style="font-size:24px;color:#F5F0E8;font-family:Georgia,serif;font-weight:400;">IncomeArc™ Report Ready</div>
-    <div style="font-size:12px;color:#7A9AB8;margin-top:5px;">${fullName} &nbsp;·&nbsp; Generated ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</div>
+                    // ── Step 3: Send lightweight notification email (no attachment) ──
+                    setReportStep('Sending notification email…');
+                    const notifyHtml = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+  <div style="background:#0B1928;padding:20px 28px;border-bottom:3px solid #C8A96E;">
+    <div style="font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:#C8A96E;margin-bottom:5px;">Integrated Planning Partners</div>
+    <div style="font-size:22px;color:#F5F0E8;font-family:Georgia,serif;">IncomeArc™ Report Generated</div>
+    <div style="font-size:12px;color:#7A9AB8;margin-top:4px;">${fullName} · ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</div>
   </div>
-
-  <div style="padding:26px 30px 0;background:#F8F6F2;">
-    <p style="font-size:14px;color:#2A3A4A;line-height:1.8;margin-bottom:0;">
-      Your IncomeArc™ report for <strong>${fullName}</strong> is attached as a PDF and ready to present.
-    </p>
-  </div>
-
-  <div style="padding:20px 30px;background:#F8F6F2;">
-    <div style="font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#C8A96E;margin-bottom:10px;padding-bottom:6px;border-bottom:1.5px solid #C8A96E;">Scenario Snapshot</div>
-    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+  <div style="padding:22px 28px;background:#F8F6F2;">
+    <p style="font-size:14px;color:#2A3A4A;line-height:1.8;">The IncomeArc™ report for <strong>${fullName}</strong> was generated and downloaded to your device as <strong>${fileName}</strong>. Attach it to your client email or open it directly for the meeting.</p>
+    <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:10px;">
       <tr style="background:#0B1928;">
-        <td style="padding:8px 12px;font-weight:600;color:#8DAFC8;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border:1px solid #1A2B3C;width:38%;">Scenario</td>
-        <td style="padding:8px 12px;font-weight:600;color:#C47A7A;font-size:11px;text-transform:uppercase;letter-spacing:.05em;text-align:center;border:1px solid #1A2B3C;">Status Quo</td>
-        <td style="padding:8px 12px;font-weight:600;color:#4A9B7A;font-size:11px;text-transform:uppercase;letter-spacing:.05em;text-align:center;border:1px solid #1A2B3C;">IncomeArc™</td>
-        <td style="padding:8px 12px;font-weight:600;color:#C8A96E;font-size:11px;text-transform:uppercase;letter-spacing:.05em;text-align:center;border:1px solid #1A2B3C;">Lift</td>
+        <td style="padding:7px 10px;color:#8DAFC8;font-size:10px;font-weight:600;text-transform:uppercase;border:1px solid #1A2B3C;width:42%;">Scenario</td>
+        <td style="padding:7px 10px;color:#C47A7A;font-size:10px;font-weight:600;text-transform:uppercase;text-align:center;border:1px solid #1A2B3C;">Status Quo</td>
+        <td style="padding:7px 10px;color:#4A9B7A;font-size:10px;font-weight:600;text-transform:uppercase;text-align:center;border:1px solid #1A2B3C;">IncomeArc™</td>
+        <td style="padding:7px 10px;color:#C8A96E;font-size:10px;font-weight:600;text-transform:uppercase;text-align:center;border:1px solid #1A2B3C;">Lift</td>
       </tr>
-      <tr style="background:white;">
-        <td style="padding:8px 12px;color:#3A4A5A;border:1px solid #DDE4EC;">1 · No healthcare events</td>
-        <td style="padding:8px 12px;text-align:center;font-weight:700;color:#8B1A1A;border:1px solid #DDE4EC;">${sc1SQ}%</td>
-        <td style="padding:8px 12px;text-align:center;font-weight:700;color:#1A6B45;border:1px solid #DDE4EC;">${sc1Arch}%</td>
-        <td style="padding:8px 12px;text-align:center;font-weight:700;color:#8B6914;border:1px solid #DDE4EC;">+${sc1Diff} pts</td>
-      </tr>
-      <tr style="background:#FAFBFC;">
-        <td style="padding:8px 12px;color:#3A4A5A;border:1px solid #DDE4EC;">2 · With healthcare events</td>
-        <td style="padding:8px 12px;text-align:center;font-weight:700;color:#8B1A1A;border:1px solid #DDE4EC;">${sc2SQ}%</td>
-        <td style="padding:8px 12px;text-align:center;font-weight:700;color:#1A6B45;border:1px solid #DDE4EC;">${sc2Arch}%</td>
-        <td style="padding:8px 12px;text-align:center;font-weight:700;color:#8B6914;border:1px solid #DDE4EC;">+${sc2Diff} pts</td>
-      </tr>
-      <tr style="background:white;">
-        <td style="padding:8px 12px;color:#3A4A5A;border:1px solid #DDE4EC;">3 · Perfect storm (all risks)</td>
-        <td style="padding:8px 12px;text-align:center;font-weight:700;color:#8B1A1A;border:1px solid #DDE4EC;">${sc3SQ}%</td>
-        <td style="padding:8px 12px;text-align:center;font-weight:700;color:#1A6B45;border:1px solid #DDE4EC;">${sc3Arch}%</td>
-        <td style="padding:8px 12px;text-align:center;font-weight:700;color:#8B6914;border:1px solid #DDE4EC;">+${sc3Diff} pts</td>
-      </tr>
+      <tr style="background:white;"><td style="padding:6px 10px;border:1px solid #DDE4EC;">1 · No healthcare events</td><td style="padding:6px 10px;text-align:center;font-weight:700;border:1px solid #DDE4EC;">${sc1SQ}%</td><td style="padding:6px 10px;text-align:center;font-weight:700;color:#1A6B45;border:1px solid #DDE4EC;">${sc1Arch}%</td><td style="padding:6px 10px;text-align:center;font-weight:700;color:#8B6914;border:1px solid #DDE4EC;">+${sc1Diff} pts</td></tr>
+      <tr style="background:#FAFBFC;"><td style="padding:6px 10px;border:1px solid #DDE4EC;">2 · With healthcare events</td><td style="padding:6px 10px;text-align:center;font-weight:700;border:1px solid #DDE4EC;">${sc2SQ}%</td><td style="padding:6px 10px;text-align:center;font-weight:700;color:#1A6B45;border:1px solid #DDE4EC;">${sc2Arch}%</td><td style="padding:6px 10px;text-align:center;font-weight:700;color:#8B6914;border:1px solid #DDE4EC;">+${sc2Diff} pts</td></tr>
+      <tr style="background:white;"><td style="padding:6px 10px;border:1px solid #DDE4EC;">3 · Perfect storm</td><td style="padding:6px 10px;text-align:center;font-weight:700;border:1px solid #DDE4EC;">${sc3SQ}%</td><td style="padding:6px 10px;text-align:center;font-weight:700;color:#1A6B45;border:1px solid #DDE4EC;">${sc3Arch}%</td><td style="padding:6px 10px;text-align:center;font-weight:700;color:#8B6914;border:1px solid #DDE4EC;">+${sc3Diff} pts</td></tr>
     </table>
   </div>
-
-  <div style="padding:0 30px 20px;background:#F8F6F2;">
-    <div style="font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#C8A96E;margin-bottom:10px;padding-bottom:6px;border-bottom:1.5px solid #C8A96E;">Plan Details</div>
-    <table style="width:100%;border-collapse:collapse;font-size:13px;">
-      <tr style="background:white;"><td style="padding:7px 12px;color:#6A7A8A;width:38%;border:1px solid #DDE4EC;">Client</td><td style="padding:7px 12px;font-weight:500;border:1px solid #DDE4EC;">${fullName}</td></tr>
-      <tr style="background:#FAFBFC;"><td style="padding:7px 12px;color:#6A7A8A;border:1px solid #DDE4EC;">Filing Status</td><td style="padding:7px 12px;font-weight:500;border:1px solid #DDE4EC;">${isMFJ?'Married Filing Jointly':'Single'}</td></tr>
-      <tr style="background:white;"><td style="padding:7px 12px;color:#6A7A8A;border:1px solid #DDE4EC;">State</td><td style="padding:7px 12px;font-weight:500;border:1px solid #DDE4EC;">${stateInfo2?stateInfo2.name:inputs.stateCode}</td></tr>
-      <tr style="background:#FAFBFC;"><td style="padding:7px 12px;color:#6A7A8A;border:1px solid #DDE4EC;">Age / Retire / Plan To</td><td style="padding:7px 12px;font-weight:500;border:1px solid #DDE4EC;">${inputs.currentAge} / ${rAge} / ${pAge}</td></tr>
-      <tr style="background:white;"><td style="padding:7px 12px;color:#6A7A8A;border:1px solid #DDE4EC;">IRA Balance</td><td style="padding:7px 12px;font-weight:500;border:1px solid #DDE4EC;">${iraBalance}</td></tr>
-      <tr style="background:#FAFBFC;"><td style="padding:7px 12px;color:#6A7A8A;border:1px solid #DDE4EC;">Est. Lifetime Tax</td><td style="padding:7px 12px;font-weight:500;border:1px solid #DDE4EC;">${lifetimeTaxDisp}</td></tr>
-      <tr style="background:white;"><td style="padding:7px 12px;color:#6A7A8A;border:1px solid #DDE4EC;">Return / Inflation</td><td style="padding:7px 12px;font-weight:500;border:1px solid #DDE4EC;">${inputs.portfolioReturn}% / ${inputs.inflation}%</td></tr>
-    </table>
+  <div style="background:#0B1928;padding:14px 28px;">
+    <div style="font-size:11px;color:#7A9AB8;">Jeffrey Faine, CLU, RICP® · jeff@enhancedfunding.com · integratedplanningpartners.com</div>
   </div>
-
-  <div style="padding:0 30px 20px;background:#F8F6F2;">
-    <div style="font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#C8A96E;margin-bottom:10px;padding-bottom:6px;border-bottom:1.5px solid #C8A96E;">Using This in the Client Meeting</div>
-    <div style="background:white;border:1px solid #DDE4EC;border-radius:4px;padding:16px 18px;font-size:13px;color:#2A3A4A;line-height:1.85;">
-      <p style="margin:0 0 10px;">The report is designed to walk page by page — start to finish is the intended flow. A few notes on the key moments:</p>
-      <ul style="margin:0;padding-left:18px;line-height:2.1;">
-        <li><strong>Pages 1–4</strong> build the case before any solution is introduced. Let the risk data land before you pivot to architecture.</li>
-        <li><strong>Page 5</strong> (The Four Layers) is the pivot point — this is where you shift from problem to plan.</li>
-        <li><strong>Scenario 1</strong> establishes the baseline improvement. Even in a best-case world, coordination matters.</li>
-        <li><strong>Scenario 2</strong> is often the most visceral for married clients — use the leverage ratio to anchor the Layer 2 conversation.</li>
-        <li><strong>Scenario 3</strong> (Perfect Storm) closes the case. The jump from ${sc3SQ}% to ${sc3Arch}% tends to do the work on its own.</li>
-        <li>The <strong>disclosures page</strong> is intentional — walking through it briefly signals professionalism and builds trust.</li>
-      </ul>
-    </div>
-  </div>
-
-  <div style="padding:0 30px 26px;background:#F8F6F2;">
-    <div style="font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#C8A96E;margin-bottom:10px;padding-bottom:6px;border-bottom:1.5px solid #C8A96E;">Suggested Next Steps</div>
-    <div style="background:white;border:1px solid #DDE4EC;border-radius:4px;padding:16px 18px;font-size:13px;color:#2A3A4A;line-height:2.1;">
-      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;">
-        <span style="color:#4A9B7A;font-weight:700;flex-shrink:0;">✓ Complete</span>
-        <span>Discovery — financial picture mapped</span>
-      </div>
-      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;">
-        <span style="color:#C8A96E;font-weight:700;flex-shrink:0;">⟳ In Progress</span>
-        <span>Modeling — this report is the output</span>
-      </div>
-      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;">
-        <span style="color:#7A95A8;font-weight:700;flex-shrink:0;">↳ Up Next</span>
-        <span><strong>Present the report</strong> — schedule the client review meeting and walk through all three scenarios</span>
-      </div>
-      <div style="display:flex;align-items:flex-start;gap:10px;">
-        <span style="color:#7A95A8;font-weight:700;flex-shrink:0;">→ Then</span>
-        <span><strong>Implementation</strong> — sequence each layer on the timeline that makes the most financial sense for ${fullName}</span>
-      </div>
-    </div>
-  </div>
-
-  <div style="background:#0B1928;padding:16px 30px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-    <div>
-      <div style="font-size:12px;color:#C8A96E;font-weight:600;margin-bottom:2px;">Integrated Planning Partners</div>
-      <div style="font-size:11px;color:#7A9AB8;">Jeffrey Faine, CLU, RICP® &nbsp;·&nbsp; jeff@enhancedfunding.com &nbsp;·&nbsp; integratedplanningpartners.com</div>
-    </div>
-    <div style="font-size:11px;color:#5A7A8A;text-align:right;">© ${new Date().getFullYear()} Integrated Planning Partners<br>All rights reserved.</div>
-  </div>
-
 </div>`;
 
-                    const makeParams = (toEmail) => ({
-                      to_email: toEmail,
-                      client_name: fullName,
-                      html_content: emailBody,
-                      report_attachment: reportBase64,
-                      report_filename: fileName,
-                    });
-
-                    // Send via REST API — service_id accepts display name, handles attachment variables
-                    const sendEmail = async (toEmail) => {
-                      const res = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+                    const sendNotify = async (toEmail) => {
+                      const r = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                          service_id: 'IPP Support',
+                          service_id: 'service_ipp01',
                           template_id: 'template_qxximsu',
                           user_id: 'XyWTKKWFoeYOhfFbV',
-                          template_params: makeParams(toEmail),
+                          template_params: { to_email: toEmail, client_name: fullName, html_content: notifyHtml, report_attachment: '', report_filename: fileName },
                         })
                       });
-                      if (!res.ok) {
-                        const errText = await res.text();
-                        throw new Error('EmailJS error: ' + errText);
-                      }
+                      if (!r.ok) throw new Error('EmailJS ' + r.status + ': ' + await r.text());
                     };
-                    await sendEmail(clientInfo.advisorEmail);
-                    await sendEmail('support@integratedplanningpartners.com');
+                    try {
+                      await sendNotify(clientInfo.advisorEmail);
+                      await sendNotify('support@integratedplanningpartners.com');
+                    } catch(emailErr) {
+                      console.warn('Notification email failed (PDF still downloaded):', emailErr.message);
+                      // Don't throw — PDF download already succeeded
+                    }
 
+                    setReportStep('');
                     setReportSent(true);
                   } catch(e) {
-                    console.error('Report send error:', e);
-                    console.error('Error message:', e.message);
-                    console.error('Error stack:', e.stack);
-                    setReportError(true);
+                    console.error('Send report error:', e.message);
+                    setReportError(e.name === 'AbortError' ? 'PDFShift timed out after 90s — try again' : (e.message || String(e)));
                   }
                   setReportSending(false);
                 }}
@@ -3756,7 +3682,7 @@ function App() {
           ))}
 
           <button
-            onClick={()=>{ setReportSent(false); setReportError(false); setReportModal(true); }}
+            onClick={()=>{ setReportSent(false); setReportError(''); setReportModal(true); }}
             style={{
               padding:'8px 16px',borderRadius:7,fontSize:13,fontWeight:600,
               fontFamily:"'DM Sans',sans-serif",cursor:'pointer',
