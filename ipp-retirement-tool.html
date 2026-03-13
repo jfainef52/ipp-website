@@ -2548,13 +2548,15 @@ function App() {
 
             {/* Status messages */}
             {reportSent && (
-              <div style={{padding:'12px 14px',background:'rgba(74,155,122,.08)',border:'1px solid rgba(74,155,122,.25)',borderRadius:8,marginBottom:16,fontSize:13,color:'#4A9B7A',display:'flex',alignItems:'center',gap:8}}>
-                <span style={{fontSize:16}}>✓</span> Report sent successfully to {clientInfo.advisorEmail}
+              <div style={{padding:'12px 14px',background:'rgba(74,155,122,.08)',border:'1px solid rgba(74,155,122,.25)',borderRadius:8,marginBottom:16,fontSize:13,color:'#4A9B7A'}}>
+                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}><span style={{fontSize:16}}>✓</span><strong>Report sent to {clientInfo.advisorEmail}</strong></div>
+                <div style={{fontSize:12,color:'#6A9A84',paddingLeft:24}}>Full report attached as an HTML file. Open the attachment in any browser, then <strong>Print → Save as PDF</strong>.</div>
               </div>
             )}
             {reportError && (
               <div style={{padding:'12px 14px',background:'rgba(196,106,106,.08)',border:'1px solid rgba(196,106,106,.25)',borderRadius:8,marginBottom:16,fontSize:13,color:'#C47A7A',display:'flex',alignItems:'center',gap:8}}>
-                <span>⚠</span> Something went wrong. Please try again or email support@integratedplanningpartners.com
+                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}><span>⚠</span><strong>Failed to send report</strong></div>
+                <div style={{fontSize:12,color:'#AA6060',paddingLeft:24}}>Please check the advisor email address and try again, or contact support@integratedplanningpartners.com</div>
               </div>
             )}
 
@@ -3432,37 +3434,175 @@ function App() {
 </body></html>`;
 
                   try {
-                    const res1 = await fetch('https://api.emailjs.com/api/v1.0/email/send',{
-                      method:'POST',headers:{'Content-Type':'application/json'},
-                      body:JSON.stringify({
-                        service_id:'IPP Support',
-                        template_id:'template_qxximsu',
-                        user_id:'XyWTKKWFoeYOhfFbV',
-                        template_params:{
-                          to_email: clientInfo.advisorEmail,
-                          client_name: fullName,
-                          html_content: htmlContent,
-                        }
-                      })
+                    // ── Encode full report as base64 for EmailJS Variable Attachment ──
+                    // btoa() requires all chars <= 255; encode to UTF-8 bytes first
+                    const utf8Bytes = new TextEncoder().encode(htmlContent);
+                    let binary = '';
+                    const chunkSize = 8192;
+                    for (let i = 0; i < utf8Bytes.length; i += chunkSize) {
+                      binary += String.fromCharCode(...utf8Bytes.subarray(i, i + chunkSize));
+                    }
+                    const reportBase64 = btoa(binary);
+
+                    const fileName = `IncomeArc-${(fullName).replace(/[^a-zA-Z0-9]/g,'-')}-${new Date().toISOString().slice(0,10)}.html`;
+
+                    // ── Email body — warm, advisor-focused, with full instructions ──
+                    const emailBody = `<div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;color:#1A2B3C;">
+
+  <!-- Header -->
+  <div style="background:#0B1928;padding:22px 30px;border-bottom:3px solid #C8A96E;">
+    <div style="font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#C8A96E;margin-bottom:6px;">Integrated Planning Partners</div>
+    <div style="font-size:24px;color:#F5F0E8;font-family:Georgia,serif;font-weight:400;">IncomeArc™ Report Ready</div>
+    <div style="font-size:12px;color:#7A9AB8;margin-top:5px;">${fullName} &nbsp;·&nbsp; Generated ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</div>
+  </div>
+
+  <!-- Intro -->
+  <div style="padding:26px 30px 0;background:#F8F6F2;">
+    <p style="font-size:14px;color:#2A3A4A;line-height:1.8;margin-bottom:0;">
+      Hey — your IncomeArc™ report for <strong>${fullName}</strong> is attached and ready to go.
+      The full 10-page presentation is in the attached HTML file. Here's everything you need to get it printed and into the meeting.
+    </p>
+  </div>
+
+  <!-- Scenario snapshot -->
+  <div style="padding:20px 30px;background:#F8F6F2;">
+    <div style="font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#C8A96E;margin-bottom:10px;padding-bottom:6px;border-bottom:1.5px solid #C8A96E;">Scenario Snapshot</div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <tr style="background:#0B1928;">
+        <td style="padding:8px 12px;font-weight:600;color:#8DAFC8;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border:1px solid #1A2B3C;width:38%;">Scenario</td>
+        <td style="padding:8px 12px;font-weight:600;color:#C47A7A;font-size:11px;text-transform:uppercase;letter-spacing:.05em;text-align:center;border:1px solid #1A2B3C;">Status Quo</td>
+        <td style="padding:8px 12px;font-weight:600;color:#4A9B7A;font-size:11px;text-transform:uppercase;letter-spacing:.05em;text-align:center;border:1px solid #1A2B3C;">IncomeArc™</td>
+        <td style="padding:8px 12px;font-weight:600;color:#C8A96E;font-size:11px;text-transform:uppercase;letter-spacing:.05em;text-align:center;border:1px solid #1A2B3C;">Lift</td>
+      </tr>
+      <tr style="background:white;">
+        <td style="padding:8px 12px;color:#3A4A5A;border:1px solid #DDE4EC;">1 · No healthcare events</td>
+        <td style="padding:8px 12px;text-align:center;font-weight:700;color:#8B1A1A;border:1px solid #DDE4EC;">${sc1SQ}%</td>
+        <td style="padding:8px 12px;text-align:center;font-weight:700;color:#1A6B45;border:1px solid #DDE4EC;">${sc1Arch}%</td>
+        <td style="padding:8px 12px;text-align:center;font-weight:700;color:#8B6914;border:1px solid #DDE4EC;">+${sc1Diff} pts</td>
+      </tr>
+      <tr style="background:#FAFBFC;">
+        <td style="padding:8px 12px;color:#3A4A5A;border:1px solid #DDE4EC;">2 · With healthcare events</td>
+        <td style="padding:8px 12px;text-align:center;font-weight:700;color:#8B1A1A;border:1px solid #DDE4EC;">${sc2SQ}%</td>
+        <td style="padding:8px 12px;text-align:center;font-weight:700;color:#1A6B45;border:1px solid #DDE4EC;">${sc2Arch}%</td>
+        <td style="padding:8px 12px;text-align:center;font-weight:700;color:#8B6914;border:1px solid #DDE4EC;">+${sc2Diff} pts</td>
+      </tr>
+      <tr style="background:white;">
+        <td style="padding:8px 12px;color:#3A4A5A;border:1px solid #DDE4EC;">3 · Perfect storm (all risks)</td>
+        <td style="padding:8px 12px;text-align:center;font-weight:700;color:#8B1A1A;border:1px solid #DDE4EC;">${sc3SQ}%</td>
+        <td style="padding:8px 12px;text-align:center;font-weight:700;color:#1A6B45;border:1px solid #DDE4EC;">${sc3Arch}%</td>
+        <td style="padding:8px 12px;text-align:center;font-weight:700;color:#8B6914;border:1px solid #DDE4EC;">+${sc3Diff} pts</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- Plan details -->
+  <div style="padding:0 30px 20px;background:#F8F6F2;">
+    <div style="font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#C8A96E;margin-bottom:10px;padding-bottom:6px;border-bottom:1.5px solid #C8A96E;">Plan Details</div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <tr style="background:white;"><td style="padding:7px 12px;color:#6A7A8A;width:38%;border:1px solid #DDE4EC;">Client</td><td style="padding:7px 12px;font-weight:500;border:1px solid #DDE4EC;">${fullName}</td></tr>
+      <tr style="background:#FAFBFC;"><td style="padding:7px 12px;color:#6A7A8A;border:1px solid #DDE4EC;">Filing Status</td><td style="padding:7px 12px;font-weight:500;border:1px solid #DDE4EC;">${isMFJ?'Married Filing Jointly':'Single'}</td></tr>
+      <tr style="background:white;"><td style="padding:7px 12px;color:#6A7A8A;border:1px solid #DDE4EC;">State</td><td style="padding:7px 12px;font-weight:500;border:1px solid #DDE4EC;">${stateInfo2?stateInfo2.name:inputs.stateCode}</td></tr>
+      <tr style="background:#FAFBFC;"><td style="padding:7px 12px;color:#6A7A8A;border:1px solid #DDE4EC;">Age / Retire / Plan To</td><td style="padding:7px 12px;font-weight:500;border:1px solid #DDE4EC;">${inputs.currentAge} / ${rAge} / ${pAge}</td></tr>
+      <tr style="background:white;"><td style="padding:7px 12px;color:#6A7A8A;border:1px solid #DDE4EC;">IRA Balance</td><td style="padding:7px 12px;font-weight:500;border:1px solid #DDE4EC;">${iraBalance}</td></tr>
+      <tr style="background:#FAFBFC;"><td style="padding:7px 12px;color:#6A7A8A;border:1px solid #DDE4EC;">Est. Lifetime Tax</td><td style="padding:7px 12px;font-weight:500;border:1px solid #DDE4EC;">${lifetimeTaxDisp}</td></tr>
+      <tr style="background:white;"><td style="padding:7px 12px;color:#6A7A8A;border:1px solid #DDE4EC;">Return / Inflation</td><td style="padding:7px 12px;font-weight:500;border:1px solid #DDE4EC;">${inputs.portfolioReturn}% / ${inputs.inflation}%</td></tr>
+    </table>
+  </div>
+
+  <!-- How to print instructions -->
+  <div style="padding:0 30px 20px;background:#F8F6F2;">
+    <div style="font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#C8A96E;margin-bottom:10px;padding-bottom:6px;border-bottom:1.5px solid #C8A96E;">How to Print the Report</div>
+    <div style="background:white;border:1px solid #DDE4EC;border-radius:4px;padding:16px 18px;">
+      <ol style="font-size:13px;color:#2A3A4A;line-height:2;margin:0;padding-left:18px;">
+        <li>Open the attached <strong>${fileName}</strong> file in <strong>Chrome or Edge</strong> (best results)</li>
+        <li>Press <strong>Ctrl+P</strong> (Windows) or <strong>⌘+P</strong> (Mac) to open Print</li>
+        <li>Set <strong>Destination</strong> to <em>Save as PDF</em></li>
+        <li>Set <strong>Layout</strong> to <em>Landscape</em></li>
+        <li>Under <em>More settings</em>, set <strong>Paper size</strong> to <em>Letter</em> and <strong>Margins</strong> to <em>None</em></li>
+        <li>Make sure <strong>Background graphics</strong> is checked — this preserves the dark headers and ring charts</li>
+        <li>Click <strong>Save</strong> — you're done</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- How to use in the meeting -->
+  <div style="padding:0 30px 20px;background:#F8F6F2;">
+    <div style="font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#C8A96E;margin-bottom:10px;padding-bottom:6px;border-bottom:1.5px solid #C8A96E;">Using This in the Client Meeting</div>
+    <div style="background:white;border:1px solid #DDE4EC;border-radius:4px;padding:16px 18px;font-size:13px;color:#2A3A4A;line-height:1.85;">
+      <p style="margin:0 0 10px;">The report is designed to walk page by page — start to finish is the intended flow. A few notes on the key moments:</p>
+      <ul style="margin:0;padding-left:18px;line-height:2.1;">
+        <li><strong>Pages 1–4</strong> build the case before any solution is introduced. Let the risk data land before you pivot to architecture.</li>
+        <li><strong>Page 5</strong> (The Four Layers) is the pivot point — this is where you shift from problem to plan.</li>
+        <li><strong>Scenario 1</strong> establishes the baseline improvement. Even in a best-case world, coordination matters.</li>
+        <li><strong>Scenario 2</strong> is often the most visceral for married clients — use the leverage ratio to anchor the Layer 2 conversation.</li>
+        <li><strong>Scenario 3</strong> (Perfect Storm) closes the case. The jump from ${sc3SQ}% to ${sc3Arch}% tends to do the work on its own.</li>
+        <li>The <strong>disclosures page</strong> is intentional — walking through it briefly signals professionalism and builds trust.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Next steps -->
+  <div style="padding:0 30px 26px;background:#F8F6F2;">
+    <div style="font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#C8A96E;margin-bottom:10px;padding-bottom:6px;border-bottom:1.5px solid #C8A96E;">Suggested Next Steps</div>
+    <div style="background:white;border:1px solid #DDE4EC;border-radius:4px;padding:16px 18px;font-size:13px;color:#2A3A4A;line-height:2.1;">
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;">
+        <span style="color:#4A9B7A;font-weight:700;flex-shrink:0;">✓ Complete</span>
+        <span>Discovery — financial picture mapped</span>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;">
+        <span style="color:#C8A96E;font-weight:700;flex-shrink:0;">⟳ In Progress</span>
+        <span>Modeling — this report is the output</span>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;">
+        <span style="color:#7A95A8;font-weight:700;flex-shrink:0;">↳ Up Next</span>
+        <span><strong>Present the report</strong> — schedule the client review meeting and walk through all three scenarios</span>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:10px;">
+        <span style="color:#7A95A8;font-weight:700;flex-shrink:0;">→ Then</span>
+        <span><strong>Implementation</strong> — sequence each layer on the timeline that makes the most financial sense for ${fullName}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div style="background:#0B1928;padding:16px 30px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+    <div>
+      <div style="font-size:12px;color:#C8A96E;font-weight:600;margin-bottom:2px;">Integrated Planning Partners</div>
+      <div style="font-size:11px;color:#7A9AB8;">Jeffrey Faine, CLU, RICP® &nbsp;·&nbsp; jeff@enhancedfunding.com &nbsp;·&nbsp; integratedplanningpartners.com</div>
+    </div>
+    <div style="font-size:11px;color:#5A7A8A;text-align:right;">© ${new Date().getFullYear()} Integrated Planning Partners<br>All rights reserved.</div>
+  </div>
+
+</div>`;
+
+                    const makePayload = (toEmail) => ({
+                      service_id: 'IPP Support',
+                      template_id: 'template_qxximsu',
+                      user_id: 'XyWTKKWFoeYOhfFbV',
+                      template_params: {
+                        to_email: toEmail,
+                        client_name: fullName,
+                        html_content: emailBody,
+                        report_attachment: reportBase64,
+                        report_filename: fileName,
+                      }
                     });
-                    if(!res1.ok) throw new Error(await res1.text());
-                    // Copy to IPP support
-                    await fetch('https://api.emailjs.com/api/v1.0/email/send',{
-                      method:'POST',headers:{'Content-Type':'application/json'},
-                      body:JSON.stringify({
-                        service_id:'IPP Support',
-                        template_id:'template_qxximsu',
-                        user_id:'XyWTKKWFoeYOhfFbV',
-                        template_params:{
-                          to_email: 'support@integratedplanningpartners.com',
-                          client_name: fullName,
-                          html_content: htmlContent,
-                        }
-                      })
+
+                    const res1 = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+                      method: 'POST', headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(makePayload(clientInfo.advisorEmail))
                     });
+                    if (!res1.ok) throw new Error(await res1.text());
+
+                    // CC to IPP support
+                    await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+                      method: 'POST', headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(makePayload('support@integratedplanningpartners.com'))
+                    });
+
                     setReportSent(true);
                   } catch(e) {
-                    console.error('Report email error:',e);
+                    console.error('Report send error:', e);
                     setReportError(true);
                   }
                   setReportSending(false);
