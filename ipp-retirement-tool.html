@@ -2549,8 +2549,8 @@ function App() {
             {/* Status messages */}
             {reportSent && (
               <div style={{padding:'12px 14px',background:'rgba(74,155,122,.08)',border:'1px solid rgba(74,155,122,.25)',borderRadius:8,marginBottom:16,fontSize:13,color:'#4A9B7A'}}>
-                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}><span style={{fontSize:16}}>✓</span><strong>Report sent to {clientInfo.advisorEmail}</strong></div>
-                <div style={{fontSize:12,color:'#6A9A84',paddingLeft:24}}>Full report attached as an HTML file. Open the attachment in any browser, then <strong>Print → Save as PDF</strong>.</div>
+                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}><span style={{fontSize:16}}>✓</span><strong>PDF report sent to {clientInfo.advisorEmail}</strong></div>
+                <div style={{fontSize:12,color:'#6A9A84',paddingLeft:24}}>The full IncomeArc™ report has been delivered as a PDF attachment.</div>
               </div>
             )}
             {reportError && (
@@ -3238,10 +3238,6 @@ function App() {
         <div class="ab">Healthcare is not a risk to be ignored — it is a mathematical certainty to be planned for. ${isMFJ ? 'Two median care events reduce' : 'A median care event reduces'} a well-funded portfolio's survival rate by ${sc2Diff} points. Layer 2 returns it to ${sc2Arch}%. This is the clearest demonstration of what coordinated protection is worth: it doesn't improve the good scenarios — it eliminates the bad ones.</div>
       </div>`}
 
-      <div class="abox explain-box">
-        <div class="at">Key takeaway</div>
-        <div class="ab">Healthcare is not a risk to be ignored — it is a mathematical certainty to be planned for. ${isMFJ ? 'Two median care events reduce' : 'A median care event reduces'} this portfolio's survival rate by ${sc2Diff} points. Layer 2 returns it to ${sc2Arch}%.</div>
-      </div>
     </div>
   </div>
   <div class="footer-bar">
@@ -3434,23 +3430,37 @@ function App() {
 </body></html>`;
 
                   try {
-                    // ── Minify then base64-encode the report HTML ──
-                    // Minify: strip HTML comments, collapse whitespace between tags
-                    const minified = htmlContent
-                      .replace(/<!--[\s\S]*?-->/g, '')
-                      .replace(/>\s+</g, '><')
-                      .replace(/\s{2,}/g, ' ')
-                      .trim();
-                    // btoa() requires Latin-1; encode UTF-8 to bytes first
-                    const utf8Bytes = new TextEncoder().encode(minified);
+                    const fileName = `IncomeArc-${(fullName).replace(/[^a-zA-Z0-9]/g,'-')}-${new Date().toISOString().slice(0,10)}.pdf`;
+
+                    // ── Step 1: Generate real PDF via PDFShift API ──
+                    const pdfShiftRes = await fetch('https://api.pdfshift.io/v3/convert/pdf', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Basic ' + btoa('api:sk_16ca63aa484a6cb3d2c5b071206cdcde035967d3'),
+                      },
+                      body: JSON.stringify({
+                        source: htmlContent,
+                        landscape: true,
+                        format: 'Letter',
+                        margin: '0',
+                        use_print: false,
+                      })
+                    });
+                    if (!pdfShiftRes.ok) {
+                      const errText = await pdfShiftRes.text();
+                      throw new Error('PDFShift error: ' + errText);
+                    }
+
+                    // ── Step 2: Convert PDF binary to base64 for EmailJS attachment ──
+                    const pdfArrayBuffer = await pdfShiftRes.arrayBuffer();
+                    const pdfBytes = new Uint8Array(pdfArrayBuffer);
                     let binary = '';
                     const chunkSize = 8192;
-                    for (let i = 0; i < utf8Bytes.length; i += chunkSize) {
-                      binary += String.fromCharCode(...utf8Bytes.subarray(i, i + chunkSize));
+                    for (let i = 0; i < pdfBytes.length; i += chunkSize) {
+                      binary += String.fromCharCode(...pdfBytes.subarray(i, i + chunkSize));
                     }
                     const reportBase64 = btoa(binary);
-
-                    const fileName = `IncomeArc-${(fullName).replace(/[^a-zA-Z0-9]/g,'-')}-${new Date().toISOString().slice(0,10)}.html`;
 
                     // ── Email body — warm, advisor-focused, with full instructions ──
                     const emailBody = `<div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;color:#1A2B3C;">
@@ -3463,8 +3473,7 @@ function App() {
 
   <div style="padding:26px 30px 0;background:#F8F6F2;">
     <p style="font-size:14px;color:#2A3A4A;line-height:1.8;margin-bottom:0;">
-      Hey — your IncomeArc™ report for <strong>${fullName}</strong> is attached and ready to go.
-      The full 10-page presentation is in the attached HTML file. Here's everything you need to get it printed and into the meeting.
+      Your IncomeArc™ report for <strong>${fullName}</strong> is attached as a PDF and ready to present.
     </p>
   </div>
 
@@ -3509,21 +3518,6 @@ function App() {
       <tr style="background:#FAFBFC;"><td style="padding:7px 12px;color:#6A7A8A;border:1px solid #DDE4EC;">Est. Lifetime Tax</td><td style="padding:7px 12px;font-weight:500;border:1px solid #DDE4EC;">${lifetimeTaxDisp}</td></tr>
       <tr style="background:white;"><td style="padding:7px 12px;color:#6A7A8A;border:1px solid #DDE4EC;">Return / Inflation</td><td style="padding:7px 12px;font-weight:500;border:1px solid #DDE4EC;">${inputs.portfolioReturn}% / ${inputs.inflation}%</td></tr>
     </table>
-  </div>
-
-  <div style="padding:0 30px 20px;background:#F8F6F2;">
-    <div style="font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#C8A96E;margin-bottom:10px;padding-bottom:6px;border-bottom:1.5px solid #C8A96E;">How to Print the Report</div>
-    <div style="background:white;border:1px solid #DDE4EC;border-radius:4px;padding:16px 18px;">
-      <ol style="font-size:13px;color:#2A3A4A;line-height:2;margin:0;padding-left:18px;">
-        <li>Open the attached <strong>${fileName}</strong> file in <strong>Chrome or Edge</strong> (best results)</li>
-        <li>Press <strong>Ctrl+P</strong> (Windows) or <strong>⌘+P</strong> (Mac) to open Print</li>
-        <li>Set <strong>Destination</strong> to <em>Save as PDF</em></li>
-        <li>Set <strong>Layout</strong> to <em>Landscape</em></li>
-        <li>Under <em>More settings</em>, set <strong>Paper size</strong> to <em>Letter</em> and <strong>Margins</strong> to <em>None</em></li>
-        <li>Make sure <strong>Background graphics</strong> is checked — this preserves the dark headers and ring charts</li>
-        <li>Click <strong>Save</strong> — you're done</li>
-      </ol>
-    </div>
   </div>
 
   <div style="padding:0 30px 20px;background:#F8F6F2;">
