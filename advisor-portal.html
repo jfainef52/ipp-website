@@ -885,15 +885,23 @@ async function handleRegister() {
   const type = params.get('type');
   const accessToken = params.get('access_token');
 
-  if (type === 'recovery' && accessToken) {
+  if ((type === 'recovery' || type === 'invite') && accessToken) {
     // Hide tab switcher, show set password panel
     document.getElementById('tab-switcher').style.display = 'none';
     document.querySelectorAll('.form-panel').forEach(p => p.classList.remove('active'));
+
+    // Update title for invite vs recovery
+    if (type === 'invite') {
+      document.querySelector('#panel-set-password .form-title').innerHTML = 'Welcome. Set Your <em>Password.</em>';
+      document.querySelector('#panel-set-password .form-subtitle').textContent = 'Your account has been approved. Choose a password to access the Integrated Planning Partners Advisor Portal.';
+      document.querySelector('#set-password-btn').textContent = 'Activate My Account';
+    }
+
     document.getElementById('panel-set-password').classList.add('active');
 
-    // Store the recovery token so we can use it to update password
+    // Store the token so we can use it to update password
     window._recoveryToken = accessToken;
-    // Clear the hash from the URL so it's not visible
+    // Clean URL
     history.replaceState(null, '', window.location.pathname);
   }
 })();
