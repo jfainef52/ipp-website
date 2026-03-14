@@ -428,6 +428,19 @@ const supabase = (() => {
     .right-panel { padding: 48px 28px; }
   }
 </style>
+<script>
+/* Cloudflare email decode fallback */
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.__cf_email__').forEach(function(el) {
+    var enc = el.getAttribute('data-cfemail');
+    if (!enc) return;
+    var str = '', r = parseInt(enc.substr(0,2),16);
+    for (var i=2; i<enc.length; i+=2) str += String.fromCharCode(parseInt(enc.substr(i,2),16)^r);
+    if (el.parentNode && el.parentNode.tagName==='A') el.parentNode.href = 'mailto:'+str;
+    el.outerHTML = str;
+  });
+});
+</script>
 </head>
 <body>
 
