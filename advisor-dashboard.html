@@ -484,10 +484,12 @@ const supabase = (() => {
     width: fit-content;
   }
 
-  .badge-marketing  { background: rgba(200,169,110,0.15); color: var(--gold); }
-  .badge-sample_case { background: rgba(123,175,132,0.15); color: #7BAF84; }
-  .badge-advisor_brief { background: rgba(110,130,153,0.15); color: #8BADC4; }
-  .badge-other { background: rgba(200,191,168,0.15); color: var(--warm); }
+  .badge-marketing   { background: rgba(200,169,110,0.15); color: var(--gold); }
+  .badge-playbook    { background: rgba(123,175,132,0.15); color: #7BAF84; }
+  .badge-white_paper { background: rgba(110,130,153,0.15); color: #8BADC4; }
+  .badge-case_study  { background: rgba(180,140,200,0.15); color: #C8A0DC; }
+  .badge-sample_case { background: rgba(200,150,100,0.15); color: #E8A87C; }
+  .badge-other       { background: rgba(200,191,168,0.15); color: var(--warm); }
 
   .resource-title {
     font-family: 'Barlow Condensed', sans-serif;
@@ -789,9 +791,10 @@ const supabase = (() => {
       <div class="resource-filters">
         <button class="filter-btn active" onclick="filterResources('all', this)">All</button>
         <button class="filter-btn" onclick="filterResources('marketing', this)">Marketing</button>
+        <button class="filter-btn" onclick="filterResources('playbook', this)">Playbooks</button>
+        <button class="filter-btn" onclick="filterResources('white_paper', this)">White Papers</button>
+        <button class="filter-btn" onclick="filterResources('case_study', this)">Case Studies</button>
         <button class="filter-btn" onclick="filterResources('sample_case', this)">Sample Cases</button>
-        <button class="filter-btn" onclick="filterResources('advisor_brief', this)">Advisor Briefs</button>
-        <button class="filter-btn" onclick="filterResources('other', this)">Other</button>
       </div>
 
       <div class="resource-grid" id="resource-grid">
@@ -916,6 +919,35 @@ async function loadResources() {
     return;
   }
 
+  // Generate signed URLs for each file using the advisor's session token
+  const session = JSON.parse(localStorage.getItem('ipp_sb_session') || 'null');
+  const token = session?.access_token;
+
+  if (token) {
+    await Promise.all(data.map(async r => {
+      if (r.file_name) {
+        try {
+          const res = await fetch(
+            'https://piixgvxrasddphklgazh.supabase.co/storage/v1/object/sign/resources/' + encodeURIComponent(r.file_name),
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': 'sb_publishable_acvdk0hBniaB6qOD8_k8XQ_9R6FNbP_',
+                'Authorization': 'Bearer ' + token
+              },
+              body: JSON.stringify({ expiresIn: 3600 })
+            }
+          );
+          const signed = await res.json();
+          r.signed_url = signed.signedURL
+            ? 'https://piixgvxrasddphklgazh.supabase.co/storage/v1' + signed.signedURL
+            : null;
+        } catch(e) { r.signed_url = null; }
+      }
+    }));
+  }
+
   allResources = data;
   renderResources('all');
 }
@@ -931,10 +963,12 @@ function renderResources(filter) {
   }
 
   const categoryLabels = {
-    marketing:     'Marketing',
-    sample_case:   'Sample Case',
-    advisor_brief: 'Advisor Brief',
-    other:         'Other'
+    marketing:   'Marketing',
+    playbook:    'Playbook',
+    white_paper: 'White Paper',
+    case_study:  'Case Study',
+    sample_case: 'Sample Case',
+    other:       'Other'
   };
 
   grid.innerHTML = items.map(r => `
@@ -942,10 +976,16 @@ function renderResources(filter) {
       <span class="resource-badge badge-${r.category}">${categoryLabels[r.category] || r.category}</span>
       <div class="resource-title">${r.title}</div>
       ${r.description ? `<div class="resource-desc">${r.description}</div>` : ''}
-      ${r.file_url
-        ? `<a class="resource-action" href="${r.file_url}" target="_blank" rel="noopener">Download <span>↓</span></a>`
-        : `<span class="resource-action" style="opacity:0.4;cursor:default;">Coming soon</span>`
-      }
+      <div style="display:flex;gap:12px;margin-top:4px;">
+        ${r.signed_url ? `
+          <a class="resource-action" href="${r.signed_url}" target="_blank" rel="noopener">
+            View <span style="font-size:11px;">↗</span>
+          </a>
+          <a class="resource-action" href="${r.signed_url}" download="${r.file_name || ''}" style="color:var(--gray);">
+            Download <span>↓</span>
+          </a>
+        ` : `<span class="resource-action" style="opacity:0.4;cursor:default;">Loading…</span>`}
+      </div>
     </div>
   `).join('');
 }
