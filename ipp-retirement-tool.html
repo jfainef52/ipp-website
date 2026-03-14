@@ -3376,7 +3376,7 @@ function App() {
           <div style="flex:1; background:white; border:1pt solid #DDD; border-top:2.5pt solid #5B8FA8; border-radius:0 3pt 3pt 0; padding:5pt 8pt;">
             <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2pt;">
               <div style="font-size:8pt; font-weight:800; color:#1A2B3C;">Living Benefits IUL — ${clientLabel}</div>
-              <div style="font-size:7pt; font-weight:700; color:#5B8FA8;">Chronic Care · Tax-Free · Death Benefit</div>
+              <div style="font-size:7pt; font-weight:700; color:#5B8FA8;">Chronic Care · Tax-Free Income · Tax-Free Death Benefit</div>
             </div>
             <div style="font-size:6.5pt; color:#445566; line-height:1.5;">QP gross draw funds net premium of ${inputs.ltcNetAmount > 0 ? fmtD(inputs.ltcNetAmount) : '[net premium]'}. Chronic illness benefit accelerates tax-free — portfolio never touched during a care event. Death benefit preserved if care never needed.</div>
           </div>
@@ -3398,7 +3398,7 @@ function App() {
           <div style="flex:1; background:white; border:1pt solid #DDD; border-top:2.5pt solid #5B8FA8; border-radius:0 3pt 3pt 0; padding:5pt 8pt; opacity:0.9;">
             <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2pt;">
               <div style="font-size:8pt; font-weight:800; color:#1A2B3C;">Living Benefits IUL — ${clientInfo.spouseName || 'Spouse'}</div>
-              <div style="font-size:7pt; font-weight:700; color:#5B8FA8;">Chronic Care · Tax-Free</div>
+              <div style="font-size:7pt; font-weight:700; color:#5B8FA8;">Chronic Care · Tax-Free Income · Tax-Free Death Benefit</div>
             </div>
             <div style="font-size:6.5pt; color:#445566; line-height:1.5;">Mirrors primary Layer 2 structure. Separate policy — both partners fully protected. QP gross draw at age ${inputs.spouseLtcFundingAge || inputs.ltcFundingAge || 60} funds net premium of ${inputs.spouseLtcNetAmount > 0 ? fmtD(inputs.spouseLtcNetAmount) : '[spouse net premium]'}.</div>
           </div>
