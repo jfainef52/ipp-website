@@ -441,6 +441,8 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });
 </script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script>window.addEventListener("load",()=>{ if(typeof emailjs!=="undefined") emailjs.init("XyWTKKWFoeYOhfFbV"); });</script>
 </head>
 <body>
 
@@ -816,6 +818,31 @@ async function handleRegister() {
     showError('register-error', 'Something went wrong. Please try again or contact us directly.');
     console.error(error);
     return;
+  }
+
+  // Send email notification to IPP team
+  try {
+    await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        service_id:  'IPP Support',
+        template_id: 'template_access_request',
+        user_id:     'XyWTKKWFoeYOhfFbV',
+        template_params: {
+          to_email:    'support@integratedplanningpartners.com',
+          from_name:   first + ' ' + last,
+          from_email:  email,
+          phone:       phone   || 'Not provided',
+          firm_name:   firm    || 'Not provided',
+          firm_type:   type    || 'Not provided',
+          referral:    referral|| 'Not provided'
+        }
+      })
+    });
+  } catch(e) {
+    // Notification failed silently — request still saved to Supabase
+    console.warn('Notification email failed:', e);
   }
 
   // Success
