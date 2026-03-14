@@ -7,112 +7,75 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&family=Barlow:wght@300;400;500;600&family=Barlow+Condensed:wght@400;500;600&display=swap" rel="stylesheet">
 <script>
-// ── Supabase client — inline, no CDN required ──────────────────
+// ── Supabase inline client — no CDN required ───────────────────
 const supabase = (() => {
-  const URL  = 'https://piixgvxrasddphklgazh.supabase.co';
-  const KEY  = 'sb_publishable_acvdk0hBniaB6qOD8_k8XQ_9R6FNbP_';
-  const SESSION_KEY = 'ipp_sb_session';
-
-  function saveSession(data) {
-    try { localStorage.setItem(SESSION_KEY, JSON.stringify(data)); } catch(e) {}
-  }
-  function loadSession() {
-    try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch(e) { return null; }
-  }
-  function clearSession() {
-    try { localStorage.removeItem(SESSION_KEY); } catch(e) {}
-  }
-
-  const auth = {
-    async getSession() {
-      const s = loadSession();
-      if (!s || !s.access_token) return { data: { session: null } };
-      // Check expiry
-      if (s.expires_at && Date.now() / 1000 > s.expires_at - 60) {
-        clearSession();
-        return { data: { session: null } };
+  const U = 'https://piixgvxrasddphklgazh.supabase.co';
+  const K = 'sb_publishable_acvdk0hBniaB6qOD8_k8XQ_9R6FNbP_';
+  const SK = 'ipp_sb_session';
+  const save  = d => { try { localStorage.setItem(SK, JSON.stringify(d)); } catch(e) {} };
+  const load  = () => { try { return JSON.parse(localStorage.getItem(SK)||'null'); } catch(e) { return null; } };
+  const clear = () => { try { localStorage.removeItem(SK); } catch(e) {} };
+  return {
+    auth: {
+      async getSession() {
+        const s = load();
+        if (!s?.access_token) return { data: { session: null } };
+        if (s.expires_at && Date.now()/1000 > s.expires_at - 60) { clear(); return { data: { session: null } }; }
+        return { data: { session: s } };
+      },
+      async signInWithPassword({ email, password }) {
+        const r = await fetch(U+'/auth/v1/token?grant_type=password', {
+          method:'POST', headers:{'Content-Type':'application/json','apikey':K},
+          body: JSON.stringify({ email, password })
+        });
+        const d = await r.json();
+        if (!r.ok) return { error: { message: d.error_description || d.msg || 'Invalid login credentials' } };
+        save(d); return { data: d, error: null };
+      },
+      async resetPasswordForEmail(email, opts) {
+        await fetch(U+'/auth/v1/recover', {
+          method:'POST', headers:{'Content-Type':'application/json','apikey':K},
+          body: JSON.stringify({ email, ...(opts?.redirectTo ? {redirect_to: opts.redirectTo} : {}) })
+        });
+      },
+      async signOut() {
+        const s = load();
+        if (s?.access_token) await fetch(U+'/auth/v1/logout', { method:'POST', headers:{'apikey':K,'Authorization':'Bearer '+s.access_token} }).catch(()=>{});
+        clear();
       }
-      return { data: { session: s } };
     },
-    async signInWithPassword({ email, password }) {
-      const r = await fetch(URL + '/auth/v1/token?grant_type=password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'apikey': KEY },
-        body: JSON.stringify({ email, password })
-      });
-      const data = await r.json();
-      if (!r.ok) return { error: { message: data.error_description || data.msg || 'Invalid login credentials' } };
-      saveSession(data);
-      return { data, error: null };
-    },
-    async resetPasswordForEmail(email, opts) {
-      await fetch(URL + '/auth/v1/recover', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'apikey': KEY },
-        body: JSON.stringify({ email, ...(opts?.redirectTo ? { redirect_to: opts.redirectTo } : {}) })
-      });
-    },
-    async signOut() {
-      const s = loadSession();
-      if (s?.access_token) {
-        await fetch(URL + '/auth/v1/logout', {
-          method: 'POST',
-          headers: { 'apikey': KEY, 'Authorization': 'Bearer ' + s.access_token }
-        }).catch(() => {});
-      }
-      clearSession();
+    from(table) {
+      const s = load(); const token = s?.access_token || K;
+      return {
+        async insert(row) {
+          const r = await fetch(U+'/rest/v1/'+table, {
+            method:'POST', headers:{'Content-Type':'application/json','apikey':K,'Authorization':'Bearer '+token,'Prefer':'return=minimal'},
+            body: JSON.stringify(row)
+          });
+          if (!r.ok) { const e = await r.json().catch(()=>({})); return { error: e }; }
+          return { error: null };
+        },
+        select(cols) {
+          const q = { cols:cols||'*', filters:[], isSingle:false, ord:null };
+          const api = {
+            eq(c,v)      { q.filters.push(c+'=eq.'+encodeURIComponent(v)); return api; },
+            order(c,o)   { q.ord = c+(o?.ascending===false?'.desc':'.asc'); return api; },
+            single()     { q.isSingle=true; return api; },
+            then(res,rej) {
+              let qs='?select='+q.cols;
+              if (q.filters.length) qs+='&'+q.filters.join('&');
+              if (q.ord) qs+='&order='+q.ord;
+              const h={'apikey':K,'Authorization':'Bearer '+token};
+              if (q.isSingle) h['Accept']='application/vnd.pgrst.object+json';
+              fetch(U+'/rest/v1/'+table+qs,{headers:h})
+                .then(async r=>{ if(!r.ok){const e=await r.json().catch(()=>({}));return res({data:null,error:e});} res({data:await r.json(),error:null}); })
+                .catch(rej);
+            }
+          }; return api;
+        }
+      };
     }
   };
-
-  function from(table) {
-    const s = loadSession();
-    const token = s?.access_token || KEY;
-    return {
-      async insert(row) {
-        const r = await fetch(URL + '/rest/v1/' + table, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': KEY,
-            'Authorization': 'Bearer ' + token,
-            'Prefer': 'return=minimal'
-          },
-          body: JSON.stringify(row)
-        });
-        if (!r.ok) {
-          const e = await r.json().catch(() => ({}));
-          return { error: e };
-        }
-        return { error: null };
-      },
-      select(cols) {
-        const self = this;
-        self._cols = cols || '*';
-        self._filters = [];
-        self._single = false;
-        self._order = null;
-        self.eq = (col, val) => { self._filters.push(col + '=eq.' + val); return self; };
-        self.order = (col, opts) => { self._order = col + (opts?.ascending === false ? '.desc' : '.asc'); return self; };
-        self.single = () => { self._single = true; return self; };
-        self.then = async (resolve, reject) => {
-          try {
-            let qs = '?select=' + self._cols;
-            if (self._filters.length) qs += '&' + self._filters.join('&');
-            if (self._order) qs += '&order=' + self._order;
-            const headers = { 'apikey': KEY, 'Authorization': 'Bearer ' + token };
-            if (self._single) headers['Accept'] = 'application/vnd.pgrst.object+json';
-            const r = await fetch(URL + '/rest/v1/' + table + qs, { headers });
-            if (!r.ok) { const e = await r.json().catch(() => ({})); return resolve({ data: null, error: e }); }
-            const data = await r.json();
-            resolve({ data, error: null });
-          } catch(e) { reject(e); }
-        };
-        return self;
-      }
-    };
-  }
-
-  return { auth, from };
 })();
 </script>
 <style>
@@ -514,7 +477,7 @@ const supabase = (() => {
 
   <div class="left-footer">
     <div class="left-footer-text">
-      Questions? Contact us at <a href="/cdn-cgi/l/email-protection#23505653534c5157634a4d5746445142574647534f424d4d4a4d44534251574d4651500d404c4e"><span class="__cf_email__" data-cfemail="dcafa9acacb3aea89cb5b2a8b9bbaebda8b9b8acb0bdb2b2b5b2bbacbdaea8b2b9aeaff2bfb3b1">[email&#160;protected]</span></a><br>
+      Questions? Contact us at <a href="/cdn-cgi/l/email-protection#5f2c2a2f2f302d2b1f36312b3a382d3e2b3a3b2f333e31313631382f3e2d2b313a2d2c713c3032"><span class="__cf_email__" data-cfemail="4a393f3a3a25383e0a23243e2f2d382b3e2f2e3a262b242423242d3a2b383e242f383964292527">[email&#160;protected]</span></a><br>
       or call <a href="tel:7733189608">773-318-9608</a>
     </div>
   </div>
@@ -649,7 +612,7 @@ const supabase = (() => {
     <div class="success-title">Request <em style="font-style:italic;color:var(--gold);">received.</em></div>
     <p class="success-body">
       We've received your access request and will review it within one business day. You'll hear from us directly at the email address you provided.<br><br>
-      In the meantime, feel free to <a href="index.html#structure-review">begin a StructureReview™</a> or reach out directly at <a href="/cdn-cgi/l/email-protection#c1b2b4b1b1aeb3b581a8afb5a4a6b3a0b5a4a5b1ada0afafa8afa6b1a0b3b5afa4b3b2efa2aeac"><span class="__cf_email__" data-cfemail="2a595f5a5a45585e6a43445e4f4d584b5e4f4e5a464b444443444d5a4b585e444f585904494547">[email&#160;protected]</span></a>.
+      In the meantime, feel free to <a href="index.html#structure-review">begin a StructureReview™</a> or reach out directly at <a href="/cdn-cgi/l/email-protection#95e6e0e5e5fae7e1d5fcfbe1f0f2e7f4e1f0f1e5f9f4fbfbfcfbf2e5f4e7e1fbf0e7e6bbf6faf8"><span class="__cf_email__" data-cfemail="c9babcb9b9a6bbbd89a0a7bdacaebba8bdacadb9a5a8a7a7a0a7aeb9a8bbbda7acbbbae7aaa6a4">[email&#160;protected]</span></a>.
     </p>
   </div>
 
@@ -819,3 +782,13 @@ async function handleRegister() {
 }
 
 // ── Enter key support ────────────
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  const loginActive = document.getElementById('panel-login').classList.contains('active');
+  const resetActive = document.getElementById('panel-reset') && document.getElementById('panel-reset').classList.contains('active');
+  if (loginActive) handleLogin();
+  if (resetActive) handleReset();
+});
+</script>
+</body>
+</html>
