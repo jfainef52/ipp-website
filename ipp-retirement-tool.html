@@ -4,21 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>IncomeArchitect™ Modeler — Integrated Planning Partners</title>
-<!-- ── Auth guard: redirect to portal if not logged in ── -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-(async () => {
-  const { createClient } = supabase;
-  const sb = createClient(
-    'https://piixgvxrasddphklgazh.supabase.co',
-    'sb_publishable_acvdk0hBniaB6qOD8_k8XQ_9R6FNbP_'
-  );
-  const { data: { session } } = await sb.auth.getSession();
-  if (!session) {
-    window.location.replace('advisor-portal.html');
-  }
-})();
-</script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script>window.addEventListener('load',()=>{ if(typeof emailjs!=='undefined') emailjs.init('XyWTKKWFoeYOhfFbV'); });</script>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
