@@ -3311,55 +3311,7 @@ function App() {
 </div>
 
 <!-- ══════════════════════════════════════════════════════════
-     PAGE 7 — SCENARIO 1: FOUNDATION COMPARISON
-     ══════════════════════════════════════════════════════════ -->
-<div class="page">
-  <div class="hdr-bar"><div><span class="hdr-logo-txt">Integrated Planning Partners</span><span class="hdr-logo-sub">IncomeArc™</span></div><div class="hdr-client">${fullName} &nbsp;·&nbsp; Integrated Planning Partners</div></div>
-  <div class="page-body">  <div class="banner">
-    <div class="sec-label">Part Six · Scenario 1 of 3</div>
-    <h2>Foundation Comparison — No Healthcare Events</h2>
-    <div class="sub">Same assets. Same timeline. What changes is the coordination.</div>
-  </div>
-  <div class="two-col">
-    <div class="col-l">
-      <div class="sec-h">What this scenario models</div>
-      <p>Scenario 1 is the baseline — the cleanest possible comparison between the current approach and the IncomeArc™ Architecture. No healthcare events, no market crashes, no expense shocks. Just ${fullName}'s retirement as-is, versus a coordinated four-layer plan, run through 1,000 simulated retirements.</p>
-      <p>If the architecture couldn't outperform in ideal conditions, nothing else would matter. It does — and by a meaningful margin.</p>
-      <div class="abox params-box">
-        <div class="at">Plan Parameters — ${fullName}</div>
-        <div class="ab">
-          <strong>IRA:</strong> ${iraBalance} &nbsp;·&nbsp;
-          <strong>Taxable portfolio:</strong> ${fmtD(inputs.taxableBalance||0)} &nbsp;·&nbsp;
-          <strong>SS ${clientLabel}:</strong> $${Math.round((inputs.ssIncome||0)/12).toLocaleString()}/mo at ${inputs.ssStartAge||67}${isMFJ && inputs.spouseSsIncome ? ` &nbsp;·&nbsp; <strong>SS ${clientInfo.spouseName||'Spouse'}:</strong> $${Math.round(inputs.spouseSsIncome/12).toLocaleString()}/mo` : ''}<br>
-          <strong>Return:</strong> ${inputs.portfolioReturn}% mean (log-normal) &nbsp;·&nbsp; <strong>Inflation:</strong> ${inputs.inflation}%<br>
-          <strong>Horizon:</strong> ${horizonDesc} &nbsp;·&nbsp; <strong>Expenses:</strong> $${Math.round(((inputs.fixedExpenses||0)+(inputs.lifestyleExpenses||0))*12).toLocaleString()}/yr (inflation-adjusted) &nbsp;·&nbsp; <strong>Trials:</strong> 1,000
-        </div>
-      </div>
-    </div>
-    <div class="col-r">
-      <div class="sec-h">Monte Carlo result &nbsp;·&nbsp; <span style="color:#C8A96E;font-weight:400;">Foundation Comparison</span></div>
-      <div style="margin:8pt 0;">${sc1SVG}</div>
-      <div style="font-size:7pt;color:#8DAFC8;font-style:italic;text-align:center;margin-top:4pt;">${sc1SQ}% ${confLabelTxt(sc1SQ)} → ${sc1Arch}% ${confLabelTxt(sc1Arch)} · The architecture alone — before any care event or stress — closes the gap and eliminates simulation failures across all 1,000 trials.</div>
-      <div class="abox explain-box" style="margin-top:8pt;">
-        <div class="at">What ${sc1SQ}% → ${sc1Arch}% means</div>
-        <div class="ab">Under the current plan, ${Math.round((1-sc1SQ/100)*1000)} of 1,000 simulated retirements fail before age ${pAge} — with no healthcare events and no market crashes. The IncomeArc™ Architecture eliminates all ${Math.round((1-sc1SQ/100)*1000)} failures.</div>
-      </div>
-      <div class="abox takeaway-box">
-        <div class="at">Key takeaway</div>
-        <div class="ab">Even with no illness, no market crisis, no surprises — the current plan leaves meaningful probability of failure on the table. Coordination alone closes the gap entirely. This is the foundation. Scenarios 2 and 3 test what happens when reality arrives.</div>
-      </div>
-    </div>
-  </div>
-  </div>
-  <div class="footer-bar">
-    <span>For discussion purposes only. All projections are hypothetical illustrations. Not investment, tax, or legal advice. See full disclosures on final page.</span>
-    <span class="footer-center">IncomeArc™ is proprietary to Integrated Planning Partners. This document is confidential.</span>
-    <span></span>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════════════════════
-     PAGE 7B — INCOMEARC™ FLOW OF FUNDS
+     PAGE 7 — INCOMEARC™ FLOW OF FUNDS
      ══════════════════════════════════════════════════════════ -->
 <div class="page">
   <div class="hdr-bar"><div><span class="hdr-logo-txt">Integrated Planning Partners</span><span class="hdr-logo-sub">IncomeArc™</span></div><div class="hdr-client">${fullName} &nbsp;·&nbsp; Integrated Planning Partners</div></div>
@@ -3445,10 +3397,10 @@ function App() {
           </div>
           <div style="flex:1; background:white; border:1pt solid #DDD; border-top:2.5pt solid #5B8FA8; border-radius:0 3pt 3pt 0; padding:5pt 8pt; opacity:0.9;">
             <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2pt;">
-              <div style="font-size:8pt; font-weight:800; color:#1A2B3C;">Living Benefits IUL — ${inputs.spouseName || 'Spouse'}</div>
+              <div style="font-size:8pt; font-weight:800; color:#1A2B3C;">Living Benefits IUL — ${clientInfo.spouseName || 'Spouse'}</div>
               <div style="font-size:7pt; font-weight:700; color:#5B8FA8;">Chronic Care · Tax-Free</div>
             </div>
-            <div style="font-size:6.5pt; color:#445566; line-height:1.5;">Mirrors primary Layer 2 structure. Separate policy — both partners fully protected. QP gross draw at age ${inputs.ltcFundingAge || 60} funds net premium of ${inputs.spouseLtcNetAmount > 0 ? fmtD(inputs.spouseLtcNetAmount) : '[spouse net premium]'}.</div>
+            <div style="font-size:6.5pt; color:#445566; line-height:1.5;">Mirrors primary Layer 2 structure. Separate policy — both partners fully protected. QP gross draw at age ${inputs.spouseLtcFundingAge || inputs.ltcFundingAge || 60} funds net premium of ${inputs.spouseLtcNetAmount > 0 ? fmtD(inputs.spouseLtcNetAmount) : '[spouse net premium]'}.</div>
           </div>
           <div style="width:60pt; flex-shrink:0; text-align:center;">
             <div style="background:rgba(91,143,168,0.08); border:1pt solid rgba(91,143,168,0.3); border-radius:3pt; padding:4pt 5pt;">
@@ -3538,7 +3490,7 @@ function App() {
         (() => {
           const parts = [];
           if (inputs.rothConversionAmount > 0) parts.push(`Layer 1 converts ${fmtD(inputs.rothConversionAmount)} into guaranteed tax-free income of $${Math.round(inputs.rothAnnuityMonthly||0).toLocaleString()}/mo beginning age ${inputs.rothAnnuityStartAge||70}`);
-          if (inputs.ltcNetAmount > 0) parts.push(`Layer 2 funds chronic care protection (${fmtD(inputs.ltcNetAmount)} net premium) for ${clientLabel}${inputs.filingStatus==='mfj'&&inputs.spouseLtcNetAmount>0?' and '+inputs.spouseName:''} — portfolio untouched during any care event`);
+          if (inputs.ltcNetAmount > 0) parts.push(`Layer 2 funds chronic care protection (${fmtD(inputs.ltcNetAmount)} net premium) for ${clientLabel}${inputs.filingStatus==='mfj'&&inputs.spouseLtcNetAmount>0?' and '+(clientInfo.spouseName||'Spouse'):''} — portfolio untouched during any care event`);
           if (inputs.etaFundingAmount > 0) parts.push(`Layer 3 repositions ${fmtD(inputs.etaFundingAmount)} via bank non-recourse loan — eliminating the distribution tax and permanently reducing the RMD base`);
           parts.push(`Layer 4 preserves the remaining QP balance for liquidity, discretionary access, and continued tax-deferred growth`);
           return parts.join('. ') + '. The layers do not compete — each owns a distinct piece of the problem, so the portfolio is never forced to do the wrong thing at the wrong time.';
@@ -3555,7 +3507,55 @@ function App() {
 </div>
 
 <!-- ══════════════════════════════════════════════════════════
-     PAGE 8 — SCENARIO 2: WITH HEALTHCARE EVENTS
+     PAGE 8 — SCENARIO 1: FOUNDATION COMPARISON
+     ══════════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="hdr-bar"><div><span class="hdr-logo-txt">Integrated Planning Partners</span><span class="hdr-logo-sub">IncomeArc™</span></div><div class="hdr-client">${fullName} &nbsp;·&nbsp; Integrated Planning Partners</div></div>
+  <div class="page-body">  <div class="banner">
+    <div class="sec-label">Part Six · Scenario 1 of 3</div>
+    <h2>Foundation Comparison — No Healthcare Events</h2>
+    <div class="sub">Same assets. Same timeline. What changes is the coordination.</div>
+  </div>
+  <div class="two-col">
+    <div class="col-l">
+      <div class="sec-h">What this scenario models</div>
+      <p>Scenario 1 is the baseline — the cleanest possible comparison between the current approach and the IncomeArc™ Architecture. No healthcare events, no market crashes, no expense shocks. Just ${fullName}'s retirement as-is, versus a coordinated four-layer plan, run through 1,000 simulated retirements.</p>
+      <p>If the architecture couldn't outperform in ideal conditions, nothing else would matter. It does — and by a meaningful margin.</p>
+      <div class="abox params-box">
+        <div class="at">Plan Parameters — ${fullName}</div>
+        <div class="ab">
+          <strong>IRA:</strong> ${iraBalance} &nbsp;·&nbsp;
+          <strong>Taxable portfolio:</strong> ${fmtD(inputs.taxableBalance||0)} &nbsp;·&nbsp;
+          <strong>SS ${clientLabel}:</strong> $${Math.round((inputs.ssIncome||0)/12).toLocaleString()}/mo at ${inputs.ssStartAge||67}${isMFJ && inputs.spouseSsIncome ? ` &nbsp;·&nbsp; <strong>SS ${clientInfo.spouseName||'Spouse'}:</strong> $${Math.round(inputs.spouseSsIncome/12).toLocaleString()}/mo` : ''}<br>
+          <strong>Return:</strong> ${inputs.portfolioReturn}% mean (log-normal) &nbsp;·&nbsp; <strong>Inflation:</strong> ${inputs.inflation}%<br>
+          <strong>Horizon:</strong> ${horizonDesc} &nbsp;·&nbsp; <strong>Expenses:</strong> $${Math.round(((inputs.fixedExpenses||0)+(inputs.lifestyleExpenses||0))*12).toLocaleString()}/yr (inflation-adjusted) &nbsp;·&nbsp; <strong>Trials:</strong> 1,000
+        </div>
+      </div>
+    </div>
+    <div class="col-r">
+      <div class="sec-h">Monte Carlo result &nbsp;·&nbsp; <span style="color:#C8A96E;font-weight:400;">Foundation Comparison</span></div>
+      <div style="margin:8pt 0;">${sc1SVG}</div>
+      <div style="font-size:7pt;color:#8DAFC8;font-style:italic;text-align:center;margin-top:4pt;">${sc1SQ}% ${confLabelTxt(sc1SQ)} → ${sc1Arch}% ${confLabelTxt(sc1Arch)} · The architecture alone — before any care event or stress — closes the gap and eliminates simulation failures across all 1,000 trials.</div>
+      <div class="abox explain-box" style="margin-top:8pt;">
+        <div class="at">What ${sc1SQ}% → ${sc1Arch}% means</div>
+        <div class="ab">Under the current plan, ${Math.round((1-sc1SQ/100)*1000)} of 1,000 simulated retirements fail before age ${pAge} — with no healthcare events and no market crashes. The IncomeArc™ Architecture eliminates all ${Math.round((1-sc1SQ/100)*1000)} failures.</div>
+      </div>
+      <div class="abox takeaway-box">
+        <div class="at">Key takeaway</div>
+        <div class="ab">Even with no illness, no market crisis, no surprises — the current plan leaves meaningful probability of failure on the table. Coordination alone closes the gap entirely. This is the foundation. Scenarios 2 and 3 test what happens when reality arrives.</div>
+      </div>
+    </div>
+  </div>
+  </div>
+  <div class="footer-bar">
+    <span>For discussion purposes only. All projections are hypothetical illustrations. Not investment, tax, or legal advice. See full disclosures on final page.</span>
+    <span class="footer-center">IncomeArc™ is proprietary to Integrated Planning Partners. This document is confidential.</span>
+    <span></span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     PAGE 9 — SCENARIO 2: WITH HEALTHCARE EVENTS
      ══════════════════════════════════════════════════════════ -->
 <div class="page">
   <div class="hdr-bar"><div><span class="hdr-logo-txt">Integrated Planning Partners</span><span class="hdr-logo-sub">IncomeArc™</span></div><div class="hdr-client">${fullName} &nbsp;·&nbsp; Integrated Planning Partners</div></div>
@@ -3619,7 +3619,7 @@ function App() {
 </div>
 
 <!-- ══════════════════════════════════════════════════════════
-     PAGE 9 — SCENARIO 3: THE PERFECT STORM
+     PAGE 10 — SCENARIO 3: THE PERFECT STORM
      ══════════════════════════════════════════════════════════ -->
 <div class="page">
   <div class="hdr-bar"><div><span class="hdr-logo-txt">Integrated Planning Partners</span><span class="hdr-logo-sub">IncomeArc™</span></div><div class="hdr-client">${fullName} &nbsp;·&nbsp; Integrated Planning Partners</div></div>
