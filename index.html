@@ -1049,6 +1049,26 @@
 
 </style>
 <style>.hero { background-image:linear-gradient(135deg,rgba(8,18,38,0.85) 0%,rgba(8,18,38,0.65) 50%,rgba(15,30,58,0.55) 100%), url('https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=1800&q=80&fit=crop');background-size:cover;background-position:center 40%;background-repeat:no-repeat; }</style>
+<script>
+/* Cloudflare email decode fallback — runs if CF script hasn't already decoded */
+document.addEventListener('DOMContentLoaded', function() {
+  if (document.querySelector('.__cf_email__')) {
+    document.querySelectorAll('.__cf_email__').forEach(function(el) {
+      var enc = el.getAttribute('data-cfemail');
+      if (!enc) return;
+      var str = '', r = parseInt(enc.substr(0,2),16);
+      for (var i = 2; i < enc.length; i += 2) {
+        str += String.fromCharCode(parseInt(enc.substr(i,2),16) ^ r);
+      }
+      var parent = el.parentNode;
+      if (parent && parent.tagName === 'A') {
+        parent.href = 'mailto:' + str;
+      }
+      el.outerHTML = str;
+    });
+  }
+});
+</script>
 </head>
 <body>
 
@@ -1389,7 +1409,7 @@
         For clients who want to understand the thinking behind IncomeArc™ and StructureReview™ — and for advisors who want to deliver planning conversations at a different level entirely.
       </p>
       <div class="book-cta">
-        <a href="/cdn-cgi/l/email-protection#05767075756a7771456c6b71606277647160617569646b6b6c6b62756477716b6077762b666a683a7670676f606671384b6a716c637c25486025647125557067696c6664716c6a6b" class="btn-secondary">Notify Me at Publication</a>
+        <a href="/cdn-cgi/l/email-protection#31424441415e434571585f4554564350455455415d505f5f585f56415043455f5443421f525e5c0e4244535b5452450c7f5e45585748117c54115045116144535d58525045585e5f" class="btn-secondary">Notify Me at Publication</a>
       </div>
     </div>
   </div>
@@ -1448,7 +1468,7 @@
     <span>Built for Planning. Designed for Execution.</span>
   </div>
   <div class="footer-contact">
-    <a href="/cdn-cgi/l/email-protection#691a1c1919061b1d2900071d0c0e1b081d0c0d190508070700070e19081b1d070c1b1a470a0604"><span class="__cf_email__" data-cfemail="94e7e1e4e4fbe6e0d4fdfae0f1f3e6f5e0f1f0e4f8f5fafafdfaf3e4f5e6e0faf1e6e7baf7fbf9">[email&#160;protected]</span></a>
+    <a href="/cdn-cgi/l/email-protection#ccbfb9bcbca3beb88ca5a2b8a9abbeadb8a9a8bca0ada2a2a5a2abbcadbeb8a2a9bebfe2afa3a1"><span class="__cf_email__" data-cfemail="11626461617e636551787f6574766370657475617d707f7f787f76617063657f7463623f727e7c">[email&#160;protected]</span></a>
     <div><a href="tel:7733189608">773-318-9608</a></div>
     <div><a href="https://integratedplanningpartners.com">integratedplanningpartners.com</a></div>
   </div>
