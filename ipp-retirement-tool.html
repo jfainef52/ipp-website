@@ -3359,6 +3359,202 @@ function App() {
 </div>
 
 <!-- ══════════════════════════════════════════════════════════
+     PAGE 7B — INCOMEARC™ FLOW OF FUNDS
+     ══════════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="hdr-bar"><div><span class="hdr-logo-txt">Integrated Planning Partners</span><span class="hdr-logo-sub">IncomeArc™</span></div><div class="hdr-client">${fullName} &nbsp;·&nbsp; Integrated Planning Partners</div></div>
+  <div class="page-body">
+
+    <div class="banner">
+      <div class="sec-label">Part Five · The IncomeArc™ System</div>
+      <h2>Flow of Funds — One Qualified Plan. Four Coordinated Destinations.</h2>
+      <div class="sub">Each layer solves a distinct problem. Together, they eliminate the four forces that erode retirement wealth.</div>
+    </div>
+
+    <!-- ── Central Flow Diagram ── -->
+    <div style="display:flex; gap:14pt; align-items:flex-start; margin-bottom:10pt;">
+
+      <!-- LEFT: QP Source box -->
+      <div style="width:100pt; flex-shrink:0;">
+        <div style="background:#0B1928; border-radius:5pt; padding:10pt 8pt; text-align:center; border:1.5pt solid #C8A96E;">
+          <div style="font-size:6pt; font-weight:700; color:#C8A96E; letter-spacing:1pt; text-transform:uppercase; margin-bottom:4pt;">Source</div>
+          <div style="font-size:11pt; font-weight:800; color:white; line-height:1.2; margin-bottom:3pt;">Qualified<br>Plan</div>
+          <div style="font-size:7.5pt; color:#8DAFC8; margin-bottom:5pt;">${iraBalance}</div>
+          <div style="width:100%; height:1pt; background:rgba(200,169,110,0.3); margin-bottom:5pt;"></div>
+          <div style="font-size:6.5pt; color:#C8A96E; font-style:italic;">IRA / 401(k)<br>Traditional QP</div>
+        </div>
+        <!-- Arrow down-right -->
+        <div style="text-align:center; margin-top:4pt;">
+          <svg width="90" height="18" viewBox="0 0 90 18" style="overflow:visible;">
+            <line x1="5" y1="9" x2="85" y2="9" stroke="#C8A96E" stroke-width="1.5" stroke-dasharray="3,2"/>
+            <polygon points="82,5 90,9 82,13" fill="#C8A96E"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- CENTER: Flow arrows + layer cards -->
+      <div style="flex:1; display:flex; flex-direction:column; gap:6pt;">
+
+        <!-- L1 -->
+        <div style="display:flex; align-items:center; gap:8pt;">
+          <div style="width:22pt; text-align:center; flex-shrink:0;">
+            <div style="background:#9B7EC8; color:white; font-size:7pt; font-weight:800; border-radius:50%; width:18pt; height:18pt; display:flex; align-items:center; justify-content:center; margin:auto;">L1</div>
+          </div>
+          <div style="flex:1; background:white; border-top:2.5pt solid #9B7EC8; border:1pt solid #DDD; border-top:2.5pt solid #9B7EC8; border-radius:0 3pt 3pt 0; padding:5pt 8pt;">
+            <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2pt;">
+              <div style="font-size:8pt; font-weight:800; color:#1A2B3C;">Roth Fixed Indexed Annuity</div>
+              <div style="font-size:7pt; font-weight:700; color:#9B7EC8;">${inputs.rothAnnuityMonthly > 0 ? '$'+Math.round(inputs.rothAnnuityMonthly).toLocaleString()+'/mo · tax-free' : 'Guaranteed Income · Tax-Free'}</div>
+            </div>
+            <div style="font-size:6.5pt; color:#445566; line-height:1.5;">QP funds repositioned → Roth annuity with GLWB rider. Guaranteed income begins age ${inputs.rothAnnuityStartAge || 70}. Markets cannot reduce it. Longevity cannot exhaust it. Permanently removed from RMD calculation.</div>
+          </div>
+          <div style="width:60pt; flex-shrink:0; text-align:center;">
+            <div style="background:rgba(155,126,200,0.08); border:1pt solid rgba(155,126,200,0.3); border-radius:3pt; padding:4pt 5pt;">
+              <div style="font-size:6pt; color:#9B7EC8; text-transform:uppercase; letter-spacing:.5pt;">Benefit</div>
+              <div style="font-size:8pt; font-weight:700; color:#1A2B3C; line-height:1.2;">${inputs.rothConversionAmount > 0 ? fmtD(inputs.rothConversionAmount) : '—'}</div>
+              <div style="font-size:5.5pt; color:#7A95A8;">converted</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- L2 Client -->
+        <div style="display:flex; align-items:center; gap:8pt;">
+          <div style="width:22pt; text-align:center; flex-shrink:0;">
+            <div style="background:#5B8FA8; color:white; font-size:7pt; font-weight:800; border-radius:50%; width:18pt; height:18pt; display:flex; align-items:center; justify-content:center; margin:auto;">L2</div>
+          </div>
+          <div style="flex:1; background:white; border:1pt solid #DDD; border-top:2.5pt solid #5B8FA8; border-radius:0 3pt 3pt 0; padding:5pt 8pt;">
+            <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2pt;">
+              <div style="font-size:8pt; font-weight:800; color:#1A2B3C;">Living Benefits IUL — ${clientLabel}</div>
+              <div style="font-size:7pt; font-weight:700; color:#5B8FA8;">Chronic Care · Tax-Free · Death Benefit</div>
+            </div>
+            <div style="font-size:6.5pt; color:#445566; line-height:1.5;">QP gross draw funds net premium of ${inputs.ltcNetAmount > 0 ? fmtD(inputs.ltcNetAmount) : '[net premium]'}. Chronic illness benefit accelerates tax-free — portfolio never touched during a care event. Death benefit preserved if care never needed.</div>
+          </div>
+          <div style="width:60pt; flex-shrink:0; text-align:center;">
+            <div style="background:rgba(91,143,168,0.08); border:1pt solid rgba(91,143,168,0.3); border-radius:3pt; padding:4pt 5pt;">
+              <div style="font-size:6pt; color:#5B8FA8; text-transform:uppercase; letter-spacing:.5pt;">Net Prem.</div>
+              <div style="font-size:8pt; font-weight:700; color:#1A2B3C;">${inputs.ltcNetAmount > 0 ? fmtD(inputs.ltcNetAmount) : '—'}</div>
+              <div style="font-size:5.5pt; color:#7A95A8;">annual</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- L2 Spouse (conditional) -->
+        ${inputs.filingStatus === 'mfj' ? `
+        <div style="display:flex; align-items:center; gap:8pt;">
+          <div style="width:22pt; text-align:center; flex-shrink:0;">
+            <div style="background:#5B8FA8; color:white; font-size:7pt; font-weight:800; border-radius:50%; width:18pt; height:18pt; display:flex; align-items:center; justify-content:center; margin:auto; opacity:0.75;">L2</div>
+          </div>
+          <div style="flex:1; background:white; border:1pt solid #DDD; border-top:2.5pt solid #5B8FA8; border-radius:0 3pt 3pt 0; padding:5pt 8pt; opacity:0.9;">
+            <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2pt;">
+              <div style="font-size:8pt; font-weight:800; color:#1A2B3C;">Living Benefits IUL — ${inputs.spouseName || 'Spouse'}</div>
+              <div style="font-size:7pt; font-weight:700; color:#5B8FA8;">Chronic Care · Tax-Free</div>
+            </div>
+            <div style="font-size:6.5pt; color:#445566; line-height:1.5;">Mirrors primary Layer 2 structure. Separate policy — both partners fully protected. QP gross draw at age ${inputs.ltcFundingAge || 60} funds net premium of ${inputs.spouseLtcNetAmount > 0 ? fmtD(inputs.spouseLtcNetAmount) : '[spouse net premium]'}.</div>
+          </div>
+          <div style="width:60pt; flex-shrink:0; text-align:center;">
+            <div style="background:rgba(91,143,168,0.08); border:1pt solid rgba(91,143,168,0.3); border-radius:3pt; padding:4pt 5pt;">
+              <div style="font-size:6pt; color:#5B8FA8; text-transform:uppercase; letter-spacing:.5pt;">Net Prem.</div>
+              <div style="font-size:8pt; font-weight:700; color:#1A2B3C;">${inputs.spouseLtcNetAmount > 0 ? fmtD(inputs.spouseLtcNetAmount) : '—'}</div>
+              <div style="font-size:5.5pt; color:#7A95A8;">annual</div>
+            </div>
+          </div>
+        </div>` : ''}
+
+        <!-- L3 -->
+        <div style="display:flex; align-items:center; gap:8pt;">
+          <div style="width:22pt; text-align:center; flex-shrink:0;">
+            <div style="background:#4A9B7A; color:white; font-size:7pt; font-weight:800; border-radius:50%; width:18pt; height:18pt; display:flex; align-items:center; justify-content:center; margin:auto;">L3</div>
+          </div>
+          <div style="flex:1; background:white; border:1pt solid #DDD; border-top:2.5pt solid #4A9B7A; border-radius:0 3pt 3pt 0; padding:5pt 8pt;">
+            <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2pt;">
+              <div style="font-size:8pt; font-weight:800; color:#1A2B3C;">ETA Life Policy (Layer 3)</div>
+              <div style="font-size:7pt; font-weight:700; color:#4A9B7A;">Tax Elimination · RMD Reduction · Income Age ${inputs.etaStartAge || 70}</div>
+            </div>
+            <div style="font-size:6.5pt; color:#445566; line-height:1.5;">Bank non-recourse loan covers IRA distribution tax — no personal guarantee. Full gross proceeds enter IUL policy tax-free. Permanently reduces QP balance → reduces future RMDs → reduces IRMAA exposure. Policy loan income begins age ${inputs.etaStartAge || 70}${inputs.etaAnnualIncome > 0 ? ' · $'+Math.round(inputs.etaAnnualIncome).toLocaleString()+'/yr' : ''}.</div>
+          </div>
+          <div style="width:60pt; flex-shrink:0; text-align:center;">
+            <div style="background:rgba(74,155,122,0.08); border:1pt solid rgba(74,155,122,0.3); border-radius:3pt; padding:4pt 5pt;">
+              <div style="font-size:6pt; color:#4A9B7A; text-transform:uppercase; letter-spacing:.5pt;">Funded</div>
+              <div style="font-size:8pt; font-weight:700; color:#1A2B3C;">${inputs.etaFundingAmount > 0 ? fmtD(inputs.etaFundingAmount) : '—'}</div>
+              <div style="font-size:5.5pt; color:#7A95A8;">at age ${inputs.etaFundingAge || 60}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- L4 -->
+        <div style="display:flex; align-items:center; gap:8pt;">
+          <div style="width:22pt; text-align:center; flex-shrink:0;">
+            <div style="background:#C8A96E; color:white; font-size:7pt; font-weight:800; border-radius:50%; width:18pt; height:18pt; display:flex; align-items:center; justify-content:center; margin:auto;">L4</div>
+          </div>
+          <div style="flex:1; background:white; border:1pt solid #DDD; border-top:2.5pt solid #C8A96E; border-radius:0 3pt 3pt 0; padding:5pt 8pt;">
+            <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2pt;">
+              <div style="font-size:8pt; font-weight:800; color:#1A2B3C;">Qualified Plan — Remainder (L4)</div>
+              <div style="font-size:7pt; font-weight:700; color:#C8A96E;">Immediate Liquidity · Tax-Deferred Growth · Reserve</div>
+            </div>
+            <div style="font-size:6.5pt; color:#445566; line-height:1.5;">The balance of the QP after L1–L3 funding remains in the plan. Accessible for emergencies, discretionary spending, and continued tax-deferred compounding. A smaller balance means a smaller future RMD obligation — a permanent structural benefit of the architecture.</div>
+          </div>
+          <div style="width:60pt; flex-shrink:0; text-align:center;">
+            <div style="background:rgba(200,169,110,0.08); border:1pt solid rgba(200,169,110,0.3); border-radius:3pt; padding:4pt 5pt;">
+              <div style="font-size:6pt; color:#C8A96E; text-transform:uppercase; letter-spacing:.5pt;">Remains</div>
+              <div style="font-size:8pt; font-weight:700; color:#1A2B3C;">${inputs.traditionalBalance > 0 ? fmtD(Math.max(0, inputs.traditionalBalance - (inputs.rothConversionAmount||0) - (inputs.etaFundingAmount||0) - (inputs.ltcNetAmount||0) - (inputs.spouseLtcNetAmount||0))) : '—'}</div>
+              <div style="font-size:5.5pt; color:#7A95A8;">stays in QP</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── What each layer eliminates ── -->
+    <div style="margin-top:4pt;">
+      <div class="sec-h">What each layer eliminates from the retirement balance sheet</div>
+      <div style="display:flex; gap:7pt; margin-top:5pt;">
+        <div style="flex:1; background:#F7F0FF; border-top:2pt solid #9B7EC8; border:1pt solid #DDD; border-top:2pt solid #9B7EC8; border-radius:0 0 3pt 3pt; padding:6pt 7pt; text-align:center;">
+          <div style="font-size:6pt; font-weight:700; color:#9B7EC8; text-transform:uppercase; letter-spacing:.6pt; margin-bottom:3pt;">Layer 1 Eliminates</div>
+          <div style="font-size:7.5pt; font-weight:700; color:#1A2B3C; margin-bottom:2pt;">Longevity Risk</div>
+          <div style="font-size:6.5pt; color:#445566; line-height:1.5;">Outliving the portfolio. Guaranteed income for life regardless of market returns or how long you live.</div>
+        </div>
+        <div style="flex:1; background:#EFF6FA; border-top:2pt solid #5B8FA8; border:1pt solid #DDD; border-top:2pt solid #5B8FA8; border-radius:0 0 3pt 3pt; padding:6pt 7pt; text-align:center;">
+          <div style="font-size:6pt; font-weight:700; color:#5B8FA8; text-transform:uppercase; letter-spacing:.6pt; margin-bottom:3pt;">Layer 2 Eliminates</div>
+          <div style="font-size:7.5pt; font-weight:700; color:#1A2B3C; margin-bottom:2pt;">Healthcare Risk</div>
+          <div style="font-size:6.5pt; color:#445566; line-height:1.5;">A care event forcing IRA draws, triggering gross-up taxes, and permanently impairing the portfolio's compounding base.</div>
+        </div>
+        <div style="flex:1; background:#EEF8F4; border-top:2pt solid #4A9B7A; border:1pt solid #DDD; border-top:2pt solid #4A9B7A; border-radius:0 0 3pt 3pt; padding:6pt 7pt; text-align:center;">
+          <div style="font-size:6pt; font-weight:700; color:#4A9B7A; text-transform:uppercase; letter-spacing:.6pt; margin-bottom:3pt;">Layer 3 Eliminates</div>
+          <div style="font-size:7.5pt; font-weight:700; color:#1A2B3C; margin-bottom:2pt;">Tax &amp; RMD Risk</div>
+          <div style="font-size:6.5pt; color:#445566; line-height:1.5;">The IRA distribution tax on repositioned funds. Reduces the RMD base, lowering future taxable income and IRMAA surcharges for life.</div>
+        </div>
+        <div style="flex:1; background:#FBF5E8; border-top:2pt solid #C8A96E; border:1pt solid #DDD; border-top:2pt solid #C8A96E; border-radius:0 0 3pt 3pt; padding:6pt 7pt; text-align:center;">
+          <div style="font-size:6pt; font-weight:700; color:#C8A96E; text-transform:uppercase; letter-spacing:.6pt; margin-bottom:3pt;">Layer 4 Preserves</div>
+          <div style="font-size:7.5pt; font-weight:700; color:#1A2B3C; margin-bottom:2pt;">Flexibility &amp; Liquidity</div>
+          <div style="font-size:6.5pt; color:#445566; line-height:1.5;">The QP remainder stays accessible. Smaller balance = smaller future RMD obligation — the architecture's permanent structural benefit.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Narrative callout ── -->
+    <div class="abox takeaway-box" style="margin-top:8pt;">
+      <div class="at">One qualified plan. Four coordinated destinations.</div>
+      <div class="ab">${
+        (() => {
+          const parts = [];
+          if (inputs.rothConversionAmount > 0) parts.push(`Layer 1 converts ${fmtD(inputs.rothConversionAmount)} into guaranteed tax-free income of $${Math.round(inputs.rothAnnuityMonthly||0).toLocaleString()}/mo beginning age ${inputs.rothAnnuityStartAge||70}`);
+          if (inputs.ltcNetAmount > 0) parts.push(`Layer 2 funds chronic care protection (${fmtD(inputs.ltcNetAmount)} net premium) for ${clientLabel}${inputs.filingStatus==='mfj'&&inputs.spouseLtcNetAmount>0?' and '+inputs.spouseName:''} — portfolio untouched during any care event`);
+          if (inputs.etaFundingAmount > 0) parts.push(`Layer 3 repositions ${fmtD(inputs.etaFundingAmount)} via bank non-recourse loan — eliminating the distribution tax and permanently reducing the RMD base`);
+          parts.push(`Layer 4 preserves the remaining QP balance for liquidity, discretionary access, and continued tax-deferred growth`);
+          return parts.join('. ') + '. The layers do not compete — each owns a distinct piece of the problem, so the portfolio is never forced to do the wrong thing at the wrong time.';
+        })()
+      }</div>
+    </div>
+
+  </div>
+  <div class="footer-bar">
+    <span>For discussion purposes only. All projections are hypothetical illustrations. Not investment, tax, or legal advice. See full disclosures on final page.</span>
+    <span class="footer-center">IncomeArc™ is proprietary to Integrated Planning Partners. This document is confidential.</span>
+    <span></span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
      PAGE 8 — SCENARIO 2: WITH HEALTHCARE EVENTS
      ══════════════════════════════════════════════════════════ -->
 <div class="page">
