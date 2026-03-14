@@ -6,7 +6,111 @@
 <title>Advisor Dashboard — Integrated Planning Partners</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&family=Barlow:wght@300;400;500;600&family=Barlow+Condensed:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ── Supabase client — inline, no CDN required ──────────────────
+const supabase = (() => {
+  const URL  = 'https://piixgvxrasddphklgazh.supabase.co';
+  const KEY  = 'sb_publishable_acvdk0hBniaB6qOD8_k8XQ_9R6FNbP_';
+  const SESSION_KEY = 'ipp_sb_session';
+
+  function saveSession(data) {
+    try { localStorage.setItem(SESSION_KEY, JSON.stringify(data)); } catch(e) {}
+  }
+  function loadSession() {
+    try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch(e) { return null; }
+  }
+  function clearSession() {
+    try { localStorage.removeItem(SESSION_KEY); } catch(e) {}
+  }
+
+  const auth = {
+    async getSession() {
+      const s = loadSession();
+      if (!s || !s.access_token) return { data: { session: null } };
+      if (s.expires_at && Date.now() / 1000 > s.expires_at - 60) {
+        clearSession();
+        return { data: { session: null } };
+      }
+      return { data: { session: s } };
+    },
+    async signInWithPassword({ email, password }) {
+      const r = await fetch(URL + '/auth/v1/token?grant_type=password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': KEY },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await r.json();
+      if (!r.ok) return { error: { message: data.error_description || data.msg || 'Invalid login credentials' } };
+      saveSession(data);
+      return { data, error: null };
+    },
+    async resetPasswordForEmail(email, opts) {
+      await fetch(URL + '/auth/v1/recover', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': KEY },
+        body: JSON.stringify({ email, ...(opts?.redirectTo ? { redirect_to: opts.redirectTo } : {}) })
+      });
+    },
+    async signOut() {
+      const s = loadSession();
+      if (s?.access_token) {
+        await fetch(URL + '/auth/v1/logout', {
+          method: 'POST',
+          headers: { 'apikey': KEY, 'Authorization': 'Bearer ' + s.access_token }
+        }).catch(() => {});
+      }
+      clearSession();
+    }
+  };
+
+  function from(table) {
+    return {
+      insert(row) {
+        const s = loadSession();
+        const token = s?.access_token || KEY;
+        return fetch(URL + '/rest/v1/' + table, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': KEY,
+            'Authorization': 'Bearer ' + token,
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify(row)
+        }).then(async r => {
+          if (!r.ok) { const e = await r.json().catch(() => ({})); return { error: e }; }
+          return { error: null };
+        });
+      },
+      select(cols) {
+        const s = loadSession();
+        const token = s?.access_token || KEY;
+        const q = { table, cols: cols || '*', filters: [], isSingle: false, orderCol: null };
+        const api = {
+          eq(col, val)      { q.filters.push(col + '=eq.' + encodeURIComponent(val)); return api; },
+          order(col, opts)  { q.orderCol = col + (opts?.ascending === false ? '.desc' : '.asc'); return api; },
+          single()          { q.isSingle = true; return api; },
+          then(resolve, reject) {
+            let qs = '?select=' + q.cols;
+            if (q.filters.length) qs += '&' + q.filters.join('&');
+            if (q.orderCol)       qs += '&order=' + q.orderCol;
+            const headers = { 'apikey': KEY, 'Authorization': 'Bearer ' + token };
+            if (q.isSingle) headers['Accept'] = 'application/vnd.pgrst.object+json';
+            fetch(URL + '/rest/v1/' + q.table + qs, { headers })
+              .then(async r => {
+                if (!r.ok) { const e = await r.json().catch(() => ({})); return resolve({ data: null, error: e }); }
+                resolve({ data: await r.json(), error: null });
+              })
+              .catch(reject);
+          }
+        };
+        return api;
+      }
+    };
+  }
+
+  return { auth, from };
+})();
 <style>
   :root {
     --navy:      #0E1C2E;
@@ -744,8 +848,7 @@
 // ── Supabase init ──────────────────────────────────────────────
 const SUPABASE_URL = 'https://piixgvxrasddphklgazh.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_acvdk0hBniaB6qOD8_k8XQ_9R6FNbP_';
-const { createClient } = supabase;
-const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+const sb = supabase;
 
 let currentUser    = null;
 let allResources   = [];
