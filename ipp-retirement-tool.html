@@ -3385,6 +3385,106 @@ function App() {
         <div class="at">What Layer 2 does</div>
         <div class="ab">${isMFJ ? 'Both care events are funded directly from the chronic illness benefit — tax-free, no IRA distribution required.' : 'The care event is funded directly from the chronic illness benefit — tax-free, no IRA distribution required.'} No gross-up, no compounding interruption, no tax acceleration. The portfolio never sees ${isMFJ ? 'either event' : 'the event'}.</div>
       </div>
+
+      ${(() => {
+        // ── IncomeArc Flow of Funds — one QP, four destinations ──
+        // Only render rows where the advisor has entered values
+        const l1Amt  = inputs.rothAnnuityMonthly > 0 ? inputs.rothAnnuityMonthly : 0;
+        const l1Age  = inputs.rothAnnuityStartAge || 70;
+        const l2PNet = rptPPolicyNet || 0;
+        const l2PGross = l2PNet > 0 ? Math.round(l2PNet + rptPPolicyGrossUp) : 0;
+        const l2PAge = inputs.ltcFundingAge || 0;
+        const l2SNet = isMFJ ? (rptSPolicyNet || 0) : 0;
+        const l2SGross = l2SNet > 0 ? Math.round(l2SNet + rptSPolicyGrossUp) : 0;
+        const l2SAge = inputs.spouseLtcFundingAge || 0;
+        const l3Amt  = inputs.etaFundingAmount || 0;
+        const l3Age  = inputs.etaFundingAge || 0;
+        const l3Inc  = inputs.etaAnnualIncome || 0;
+        const l3IncAge = inputs.etaStartAge || 70;
+        const hasAny = l1Amt > 0 || l2PNet > 0 || l2SNet > 0 || l3Amt > 0;
+        if (!hasAny) return '';
+
+        // Total moved out of QP (gross draws)
+        const totalMoved = l2PGross + l2SGross + l3Amt;
+        const qpBalance  = (inputs.traditionalBalance || 0) + (inputs.spouseTraditionalBalance || 0);
+        const l4Rem      = qpBalance > 0 ? qpBalance - totalMoved : 0;
+
+        const rows = [];
+
+        if (l1Amt > 0) rows.push({
+          badge: 'L1', color: '#4A9B7A', bg: 'rgba(74,155,122,.08)', border: 'rgba(74,155,122,.25)',
+          from: 'Qualified Plan',
+          arrow: '→',
+          to: 'Roth Fixed Indexed Annuity',
+          benefit: `$${Math.round(l1Amt).toLocaleString()}/mo guaranteed income · tax-free · starting age ${l1Age}`,
+        });
+
+        if (l2PNet > 0) rows.push({
+          badge: 'L2', color: '#5B8FA8', bg: 'rgba(91,143,168,.08)', border: 'rgba(91,143,168,.25)',
+          from: `QP gross draw ${l2PAge > 0 ? '(age '+l2PAge+')' : ''}: ${fmtDollar(l2PGross)}`,
+          arrow: '→',
+          to: `Living Benefits IUL · ${clientLabel}`,
+          benefit: `Net premium: ${fmtDollar(l2PNet)} · chronic care benefit tax-free · death benefit preserved`,
+        });
+
+        if (l2SNet > 0) rows.push({
+          badge: 'L2', color: '#5B8FA8', bg: 'rgba(91,143,168,.08)', border: 'rgba(91,143,168,.25)',
+          from: `QP gross draw ${l2SAge > 0 ? '(age '+l2SAge+')' : ''}: ${fmtDollar(l2SGross)}`,
+          arrow: '→',
+          to: `Living Benefits IUL · ${clientInfo.spouseName||'Spouse'}`,
+          benefit: `Net premium: ${fmtDollar(l2SNet)} · chronic care benefit tax-free · death benefit preserved`,
+        });
+
+        if (l3Amt > 0) rows.push({
+          badge: 'L3', color: '#9B7EC8', bg: 'rgba(155,126,200,.08)', border: 'rgba(155,126,200,.25)',
+          from: `QP gross draw ${l3Age > 0 ? '(age '+l3Age+')' : ''}: ${fmtDollar(l3Amt)}`,
+          arrow: '→',
+          to: 'ETA Life Policy',
+          benefit: `Non-recourse loan covers IRA tax · full gross enters policy tax-free${l3Inc > 0 ? ` · $${Math.round(l3Inc/12).toLocaleString()}/mo income at age ${l3IncAge}` : ''} · reduces RMD exposure`,
+        });
+
+        if (l4Rem > 0) rows.push({
+          badge: 'L4', color: '#C8A96E', bg: 'rgba(200,169,110,.06)', border: 'rgba(200,169,110,.2)',
+          from: 'Qualified Plan — remainder',
+          arrow: '→',
+          to: `${fmtDollar(l4Rem)} stays in QP`,
+          benefit: 'Immediate liquidity · future reserve · continues to grow tax-deferred under IncomeArc™ management',
+        });
+
+        const narrativeParts = [];
+        if (l1Amt > 0) narrativeParts.push(`a guaranteed tax-free income floor of $${Math.round(l1Amt).toLocaleString()}/mo through the Roth annuity (Layer 1)`);
+        if (l2PNet > 0 || l2SNet > 0) narrativeParts.push(`chronic care protection for ${l2SNet > 0 ? 'both spouses' : clientLabel} through Living Benefits IUL — funded, not borrowed (Layer 2)`);
+        if (l3Amt > 0) narrativeParts.push(`downside protection and RMD mitigation through the ETA policy (Layer 3)`);
+        if (l4Rem > 0) narrativeParts.push(`${fmtDollar(l4Rem)} remaining in the qualified plan for liquidity and growth (Layer 4)`);
+        const narrativeList = narrativeParts.length > 1
+          ? narrativeParts.slice(0,-1).join(', ') + ', and ' + narrativeParts[narrativeParts.length-1]
+          : narrativeParts[0] || '';
+
+        return `
+        <div class="sec-h" style="margin-top:10pt;">IncomeArc™ — Flow of Funds</div>
+        <table style="width:100%;border-collapse:collapse;font-size:7.5pt;margin-bottom:6pt;">
+          <tr style="background:#1E2E44;">
+            <th style="padding:4pt 6pt;text-align:left;color:#8DAFC8;font-weight:600;letter-spacing:.08em;text-transform:uppercase;width:26%;">From</th>
+            <th style="padding:4pt 4pt;color:#8DAFC8;width:5%;"></th>
+            <th style="padding:4pt 6pt;text-align:left;color:#8DAFC8;font-weight:600;letter-spacing:.08em;text-transform:uppercase;width:24%;">New Asset</th>
+            <th style="padding:4pt 6pt;text-align:left;color:#8DAFC8;font-weight:600;letter-spacing:.08em;text-transform:uppercase;">Benefit Created</th>
+          </tr>
+          ${rows.map(r => `
+          <tr style="background:${r.bg};border-bottom:1px solid ${r.border};">
+            <td style="padding:4pt 6pt;vertical-align:top;">
+              <span style="display:inline-block;background:${r.color};color:white;font-size:6.5pt;font-weight:700;padding:1pt 4pt;border-radius:3pt;margin-right:4pt;">${r.badge}</span>
+              <span style="color:#C8BFA8;">${r.from}</span>
+            </td>
+            <td style="padding:4pt 2pt;text-align:center;color:${r.color};font-weight:700;font-size:9pt;">→</td>
+            <td style="padding:4pt 6pt;font-weight:600;color:#F5F2EC;vertical-align:top;">${r.to}</td>
+            <td style="padding:4pt 6pt;color:#9EB8CC;font-size:7pt;vertical-align:top;">${r.benefit}</td>
+          </tr>`).join('')}
+        </table>
+        ${narrativeList ? `<div class="abox" style="border-left-color:#C8A96E;margin-top:4pt;padding:7pt 10pt;">
+          <div class="at" style="color:#C8A96E;">One qualified plan. Four coordinated destinations.</div>
+          <div class="ab">${fullName.split(' ')[0]}'s qualified plan is the funding source for the entire architecture — but the funds don't stay in one place or serve one purpose. The repositioning creates ${narrativeList}. The assets are different in nature, tax treatment, and function. That is the point: one source, multiple layers of protection, all still under ${isMFJ?'their':'their'} control.</div>
+        </div>` : ''}`;
+      })()}
     </div>
     <div class="col-r">
       <div class="sec-h">The real cost — uninsured vs. insured</div>
@@ -3413,7 +3513,6 @@ function App() {
         <div class="ab">The ${fmtDollar(totalCombInvest > 0 ? totalCombInvest : 0)} Layer 2 premium doesn't just pay for care — it eliminates the gross-up tax on every dollar of care, and preserves the compounding that gross-up would have cost. Every $1 of premium protects $${Math.round(leverageRatio)} of retirement wealth. That is not a return on speculation. It is a return on structured risk transfer.</div>
       </div>
     </div>
-  </div>
   </div>
   <div class="footer-bar">
     <span>For discussion purposes only. All projections are hypothetical illustrations. Not investment, tax, or legal advice. See full disclosures on final page.</span>
