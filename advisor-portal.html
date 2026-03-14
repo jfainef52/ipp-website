@@ -420,6 +420,8 @@ const supabase = (() => {
   /* Reset password panel */
   #panel-reset { display: none; }
   #panel-reset.active { display: block; }
+  #panel-set-password { display: none; }
+  #panel-set-password.active { display: block; }
 
   /* Responsive */
   @media (max-width: 860px) {
@@ -670,6 +672,30 @@ document.addEventListener('DOMContentLoaded', function() {
     </p>
   </div>
 
+  <!-- ── SET NEW PASSWORD (reached via reset email link) ── -->
+  <div id="panel-set-password">
+    <div class="form-title">Set New <em>Password.</em></div>
+    <p class="form-subtitle">Choose a new password for your Integrated Planning Partners advisor account.</p>
+    <div id="set-password-error" style="display:none;background:rgba(196,122,122,0.12);border:1px solid #C47A7A;border-radius:2px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:#C47A7A;line-height:1.5;"></div>
+    <div class="form-group">
+      <label>New Password</label>
+      <input type="password" id="new-password" placeholder="••••••••" autocomplete="new-password">
+    </div>
+    <div class="form-group">
+      <label>Confirm New Password</label>
+      <input type="password" id="confirm-password" placeholder="••••••••" autocomplete="new-password">
+    </div>
+    <button class="form-submit" id="set-password-btn" onclick="handleSetPassword()">Set New Password</button>
+  </div>
+
+  <div class="success-msg" id="success-set-password">
+    <div class="success-icon">✦</div>
+    <div class="success-title">Password <em style="font-style:italic;color:var(--gold);">updated.</em></div>
+    <p class="success-body">
+      Your password has been changed successfully.<br><br>
+      <a onclick="switchTab('login')" style="color:var(--gold);cursor:pointer;">Sign in to your account →</a>
+    </p>
+  </div>
 </div>
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
@@ -852,6 +878,77 @@ async function handleRegister() {
 }
 
 // ── Enter key support ────────────
+// ── Detect password reset token in URL ────────────────────────
+(function() {
+  const hash = window.location.hash;
+  const params = new URLSearchParams(hash.replace('#', '?'));
+  const type = params.get('type');
+  const accessToken = params.get('access_token');
+
+  if (type === 'recovery' && accessToken) {
+    // Hide tab switcher, show set password panel
+    document.getElementById('tab-switcher').style.display = 'none';
+    document.querySelectorAll('.form-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('panel-set-password').classList.add('active');
+
+    // Store the recovery token so we can use it to update password
+    window._recoveryToken = accessToken;
+    // Clear the hash from the URL so it's not visible
+    history.replaceState(null, '', window.location.pathname);
+  }
+})();
+
+// ── Set New Password ───────────────────────────────────────────
+async function handleSetPassword() {
+  const newPw  = document.getElementById('new-password').value;
+  const confPw = document.getElementById('confirm-password').value;
+  const btn    = document.getElementById('set-password-btn');
+  const errEl  = document.getElementById('set-password-error');
+
+  errEl.style.display = 'none';
+
+  if (!newPw || newPw.length < 6) {
+    errEl.textContent = 'Password must be at least 6 characters.';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (newPw !== confPw) {
+    errEl.textContent = 'Passwords do not match.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Updating…';
+
+  try {
+    const r = await fetch('https://piixgvxrasddphklgazh.supabase.co/auth/v1/user', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': 'sb_publishable_acvdk0hBniaB6qOD8_k8XQ_9R6FNbP_',
+        'Authorization': 'Bearer ' + window._recoveryToken
+      },
+      body: JSON.stringify({ password: newPw })
+    });
+
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      throw new Error(e.message || 'Unable to update password.');
+    }
+
+    // Success
+    document.getElementById('panel-set-password').classList.remove('active');
+    document.getElementById('success-set-password').classList.add('visible');
+
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = 'Set New Password';
+    errEl.textContent = e.message || 'Something went wrong. Please request a new reset link.';
+    errEl.style.display = 'block';
+  }
+}
+
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Enter') return;
   const loginActive = document.getElementById('panel-login').classList.contains('active');
