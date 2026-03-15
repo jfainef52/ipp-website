@@ -568,6 +568,91 @@ const supabase = (() => {
     margin: 0 auto;
   }
 
+
+  /* ── SEARCH & SORT ── */
+  .resource-controls {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .resource-search {
+    flex: 1;
+    min-width: 220px;
+    background: var(--navy2);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 10px 16px 10px 38px;
+    font-family: 'Barlow', sans-serif;
+    font-size: 13px;
+    font-weight: 300;
+    color: var(--off-white);
+    outline: none;
+    transition: border-color 0.2s;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' stroke='%236E8299' stroke-width='2' viewBox='0 0 24 24'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: 12px center;
+  }
+  .resource-search:focus { border-color: var(--gold-dim); }
+  .resource-search::placeholder { color: var(--gray); }
+
+  .resource-sort {
+    background: var(--navy2);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 10px 16px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--gray);
+    outline: none;
+    cursor: pointer;
+    appearance: none;
+    transition: border-color 0.2s;
+    min-width: 160px;
+  }
+  .resource-sort:focus { border-color: var(--gold-dim); }
+  .resource-sort option { background: var(--navy2); }
+
+  /* ── TAGS ── */
+  .resource-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .resource-tag {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 2px;
+    background: var(--navy3);
+    border: 1px solid var(--border);
+    color: var(--gray);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .resource-tag:hover { border-color: var(--gold-dim); color: var(--warm); }
+  .resource-tag.active { background: rgba(200,169,110,0.15); border-color: var(--gold-dim); color: var(--gold); }
+
+  .resource-count {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--gray);
+    text-transform: uppercase;
+    align-self: center;
+    margin-left: auto;
+  }
+
   /* ── LOADING STATE ── */
   .loading-row {
     display: flex;
@@ -788,15 +873,29 @@ const supabase = (() => {
         <p class="section-desc">Marketing pieces, sample cases, and advisor briefs curated for your practice.</p>
       </div>
 
-      <div class="resource-filters">
-        <button class="filter-btn active" onclick="filterResources('all', this)">All</button>
-        <button class="filter-btn" onclick="filterResources('marketing', this)">Marketing</button>
-        <button class="filter-btn" onclick="filterResources('playbook', this)">Playbooks</button>
-        <button class="filter-btn" onclick="filterResources('white_paper', this)">White Papers</button>
-        <button class="filter-btn" onclick="filterResources('case_study', this)">Case Studies</button>
-        <button class="filter-btn" onclick="filterResources('sample_case', this)">Sample Cases</button>
+      <div class="resource-controls">
+        <input class="resource-search" id="resource-search" type="text" placeholder="Search by title, description or tag…" oninput="applyFilters()">
+        <select class="resource-sort" id="resource-sort" onchange="applyFilters()">
+          <option value="sort_order">Default Order</option>
+          <option value="title_asc">Title A → Z</option>
+          <option value="title_desc">Title Z → A</option>
+          <option value="newest">Newest First</option>
+          <option value="category">By Category</option>
+        </select>
       </div>
 
+      <div class="resource-filters">
+        <button class="filter-btn active" onclick="setCategory('all', this)">All</button>
+        <button class="filter-btn" onclick="setCategory('marketing', this)">Marketing</button>
+        <button class="filter-btn" onclick="setCategory('playbook', this)">Playbooks</button>
+        <button class="filter-btn" onclick="setCategory('white_paper', this)">White Papers</button>
+        <button class="filter-btn" onclick="setCategory('case_study', this)">Case Studies</button>
+        <button class="filter-btn" onclick="setCategory('sample_case', this)">Sample Cases</button>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <span id="resource-count" class="resource-count"></span>
+      </div>
       <div class="resource-grid" id="resource-grid">
         <div class="loading-row">
           <div class="mini-spinner"></div>
@@ -835,6 +934,8 @@ const sb = supabase;
 
 let currentUser    = null;
 let allResources   = [];
+let activeCategory = 'all';
+let activeTag      = null;
 let toolLoaded     = false;
 
 // ── Auth gate ──────────────────────────────────────────────────
@@ -949,34 +1050,102 @@ async function loadResources() {
   }
 
   allResources = data;
-  renderResources('all');
+  applyFilters();
+}
+
+// ── Category labels & colours ──────────────────────────────────
+const CATEGORY_LABELS = {
+  marketing:   'Marketing',
+  playbook:    'Playbook',
+  white_paper: 'White Paper',
+  case_study:  'Case Study',
+  sample_case: 'Sample Case',
+  other:       'Other'
+};
+
+// ── Set category filter ─────────────────────────────────────────
+function setCategory(category, btn) {
+  activeCategory = category;
+  activeTag = null;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  applyFilters();
+}
+
+// ── Apply all filters (search + category + tag + sort) ──────────
+function applyFilters() {
+  const query  = (document.getElementById('resource-search')?.value || '').toLowerCase().trim();
+  const sortBy = document.getElementById('resource-sort')?.value || 'sort_order';
+
+  let items = [...allResources];
+
+  // Category filter
+  if (activeCategory !== 'all') {
+    items = items.filter(r => r.category === activeCategory);
+  }
+
+  // Tag filter
+  if (activeTag) {
+    items = items.filter(r => r.tags && r.tags.includes(activeTag));
+  }
+
+  // Search filter — matches title, description, tags
+  if (query) {
+    items = items.filter(r => {
+      const searchable = [
+        r.title || '',
+        r.description || '',
+        (r.tags || []).join(' ')
+      ].join(' ').toLowerCase();
+      return query.split(' ').every(word => searchable.includes(word));
+    });
+  }
+
+  // Sort
+  items.sort((a, b) => {
+    if (sortBy === 'title_asc')  return a.title.localeCompare(b.title);
+    if (sortBy === 'title_desc') return b.title.localeCompare(a.title);
+    if (sortBy === 'newest')     return new Date(b.created_at) - new Date(a.created_at);
+    if (sortBy === 'category')   return (a.category || '').localeCompare(b.category || '');
+    return (a.sort_order || 0) - (b.sort_order || 0);
+  });
+
+  renderResources(items);
+}
+
+// ── Toggle tag filter ───────────────────────────────────────────
+function toggleTag(tag) {
+  activeTag = activeTag === tag ? null : tag;
+  // Update tag button states
+  document.querySelectorAll('.resource-tag').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tag === activeTag);
+  });
+  applyFilters();
 }
 
 // ── Render resources ────────────────────────────────────────────
-function renderResources(filter) {
+function renderResources(items) {
   const grid = document.getElementById('resource-grid');
-  const items = filter === 'all' ? allResources : allResources.filter(r => r.category === filter);
+
+  // Update count
+  const countEl = document.getElementById('resource-count');
+  if (countEl) countEl.textContent = items.length + ' resource' + (items.length !== 1 ? 's' : '');
 
   if (!items.length) {
-    grid.innerHTML = '<div class="resource-empty">No resources in this category yet.</div>';
+    grid.innerHTML = '<div class="resource-empty">No resources match your search.</div>';
     return;
   }
 
-  const categoryLabels = {
-    marketing:   'Marketing',
-    playbook:    'Playbook',
-    white_paper: 'White Paper',
-    case_study:  'Case Study',
-    sample_case: 'Sample Case',
-    other:       'Other'
-  };
-
   grid.innerHTML = items.map(r => `
     <div class="resource-card" data-category="${r.category}">
-      <span class="resource-badge badge-${r.category}">${categoryLabels[r.category] || r.category}</span>
+      <span class="resource-badge badge-${r.category}">${CATEGORY_LABELS[r.category] || r.category}</span>
       <div class="resource-title">${r.title}</div>
       ${r.description ? `<div class="resource-desc">${r.description}</div>` : ''}
-      <div style="display:flex;gap:12px;margin-top:4px;">
+      ${r.tags && r.tags.length ? `
+        <div class="resource-tags">
+          ${r.tags.map(t => `<button class="resource-tag${activeTag === t ? ' active' : ''}" data-tag="${t}" onclick="toggleTag('${t}')">${t}</button>`).join('')}
+        </div>` : ''}
+      <div style="display:flex;gap:12px;margin-top:8px;">
         ${r.signed_url ? `
           <a class="resource-action" href="${r.signed_url}" target="_blank" rel="noopener">
             View <span style="font-size:11px;">↗</span>
@@ -990,11 +1159,9 @@ function renderResources(filter) {
   `).join('');
 }
 
-// ── Filter resources ────────────────────────────────────────────
+// ── filterResources kept for backwards compatibility ────────────
 function filterResources(category, btn) {
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  renderResources(category);
+  setCategory(category, btn);
 }
 
 // ── Sign out ────────────────────────────────────────────────────
