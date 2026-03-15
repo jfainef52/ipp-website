@@ -675,9 +675,13 @@ const supabase = (() => {
   .video-thumb {
     position: relative;
     width: 100%;
-    padding-top: 56.25%; /* 16:9 */
+    padding-top: 56.25%; /* 16:9 default */
     background: var(--navy3);
     overflow: hidden;
+  }
+
+  .video-thumb.is-short {
+    padding-top: 177.78%; /* 9:16 for Shorts */
   }
 
   .video-thumb img {
@@ -788,10 +792,16 @@ const supabase = (() => {
   .video-embed-wrap {
     position: relative;
     width: 100%;
-    padding-top: 56.25%;
+    padding-top: 56.25%; /* 16:9 default */
     background: #000;
     border-radius: 4px;
     overflow: hidden;
+  }
+
+  .video-embed-wrap.is-short {
+    max-width: 400px;
+    margin: 0 auto;
+    padding-top: 177.78%; /* 9:16 for Shorts */
   }
 
   .video-embed-wrap iframe {
@@ -1467,8 +1477,8 @@ function renderVideos(items) {
   }
 
   grid.innerHTML = items.map(v => `
-    <div class="video-card" onclick="openVideo('${v.youtube_id}', '${v.title.replace(/'/g, "\'")}')">
-      <div class="video-thumb">
+    <div class="video-card" onclick="openVideo('${v.youtube_id}', '${v.title.replace(/'/g, "\'")}', ${v.is_short ? 'true' : 'false'})">
+      <div class="video-thumb${v.is_short ? ' is-short' : ''}">
         <img src="https://img.youtube.com/vi/${v.youtube_id}/mqdefault.jpg" alt="${v.title}" loading="lazy">
         <div class="video-play-btn">
           <div class="video-play-circle">
@@ -1494,10 +1504,12 @@ function renderVideos(items) {
 }
 
 // ── Lightbox ────────────────────────────────────────────────────
-function openVideo(youtubeId, title) {
+function openVideo(youtubeId, title, isShort = false) {
   document.getElementById('lightbox-title').textContent = title;
   document.getElementById('lightbox-iframe').src =
     'https://www.youtube.com/embed/' + youtubeId + '?autoplay=1&rel=0';
+  const wrap = document.querySelector('.video-embed-wrap');
+  wrap.classList.toggle('is-short', isShort);
   document.getElementById('video-lightbox').classList.add('open');
   document.body.style.overflow = 'hidden';
 }
