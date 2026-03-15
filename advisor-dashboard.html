@@ -753,7 +753,8 @@ const supabase = (() => {
     align-items: center;
     justify-content: center;
     flex-direction: column;
-    padding: 40px;
+    padding: 20px;
+    overflow-y: auto;
   }
   .video-lightbox.open { display: flex; }
 
@@ -761,12 +762,28 @@ const supabase = (() => {
     width: 100%;
     max-width: 900px;
     position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .video-lightbox-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    flex-shrink: 0;
+  }
+
+  .video-lightbox-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 20px;
+    font-weight: 300;
+    color: var(--off-white);
+    flex: 1;
+    padding-right: 20px;
   }
 
   .video-lightbox-close {
-    position: absolute;
-    top: -40px;
-    right: 0;
     font-family: 'Barlow Condensed', sans-serif;
     font-size: 11px;
     font-weight: 600;
@@ -774,34 +791,35 @@ const supabase = (() => {
     text-transform: uppercase;
     color: var(--gray);
     cursor: pointer;
-    border: none;
-    background: none;
-    transition: color 0.2s;
+    border: 1px solid var(--border);
+    background: var(--navy2);
+    padding: 8px 14px;
+    border-radius: 2px;
+    transition: color 0.2s, border-color 0.2s;
+    flex-shrink: 0;
+    white-space: nowrap;
   }
-  .video-lightbox-close:hover { color: var(--gold); }
+  .video-lightbox-close:hover { color: var(--gold); border-color: var(--gold-dim); }
 
-  .video-lightbox-title {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 22px;
-    font-weight: 300;
-    color: var(--off-white);
-    margin-bottom: 16px;
-    text-align: center;
-  }
-
+  /* Regular video — widescreen */
   .video-embed-wrap {
     position: relative;
     width: 100%;
-    padding-top: 56.25%; /* 16:9 default */
+    padding-top: 56.25%;
     background: #000;
     border-radius: 4px;
     overflow: hidden;
   }
 
+  /* Shorts — constrain height so it fits on screen with controls visible */
   .video-embed-wrap.is-short {
-    max-width: 400px;
+    padding-top: 0;
+    width: auto;
+    max-width: min(340px, 50vh);
+    height: min(600px, 85vh);
     margin: 0 auto;
-    padding-top: 177.78%; /* 9:16 for Shorts */
+    border-radius: 4px;
+    overflow: hidden;
   }
 
   .video-embed-wrap iframe {
@@ -810,6 +828,14 @@ const supabase = (() => {
     width: 100%;
     height: 100%;
     border: none;
+  }
+
+  /* Shorts iframe — not absolutely positioned since container has fixed height */
+  .video-embed-wrap.is-short iframe {
+    position: static;
+    width: 100%;
+    height: 100%;
+    display: block;
   }
 
   .badge-strategy_overview  { background: rgba(200,169,110,0.15); color: var(--gold); }
@@ -1146,10 +1172,12 @@ const supabase = (() => {
   <!-- ── VIDEO LIGHTBOX ── -->
   <div class="video-lightbox" id="video-lightbox" onclick="closeLightbox(event)">
     <div class="video-lightbox-inner">
-      <button class="video-lightbox-close" onclick="closeLightbox()">✕ Close</button>
-      <div class="video-lightbox-title" id="lightbox-title"></div>
-      <div class="video-embed-wrap">
-        <iframe id="lightbox-iframe" src="" allowfullscreen allow="autoplay; encrypted-media"></iframe>
+      <div class="video-lightbox-header">
+        <div class="video-lightbox-title" id="lightbox-title"></div>
+        <button class="video-lightbox-close" onclick="closeLightbox({ target: document.getElementById('video-lightbox') })">✕ Close</button>
+      </div>
+      <div class="video-embed-wrap" id="lightbox-embed-wrap">
+        <iframe id="lightbox-iframe" src="" allowfullscreen allow="autoplay; encrypted-media; fullscreen"></iframe>
       </div>
     </div>
   </div>
@@ -1506,9 +1534,13 @@ function renderVideos(items) {
 // ── Lightbox ────────────────────────────────────────────────────
 function openVideo(youtubeId, title, isShort = false) {
   document.getElementById('lightbox-title').textContent = title;
-  document.getElementById('lightbox-iframe').src =
-    'https://www.youtube.com/embed/' + youtubeId + '?autoplay=1&rel=0';
-  const wrap = document.querySelector('.video-embed-wrap');
+  // Force controls=1 so play/pause/seek are always visible
+  // For Shorts use /shorts/ embed path which enables full controls
+  const embedUrl = isShort
+    ? 'https://www.youtube.com/embed/' + youtubeId + '?autoplay=1&controls=1&rel=0&loop=1&playlist=' + youtubeId
+    : 'https://www.youtube.com/embed/' + youtubeId + '?autoplay=1&controls=1&rel=0';
+  document.getElementById('lightbox-iframe').src = embedUrl;
+  const wrap = document.getElementById('lightbox-embed-wrap');
   wrap.classList.toggle('is-short', isShort);
   document.getElementById('video-lightbox').classList.add('open');
   document.body.style.overflow = 'hidden';
