@@ -31,26 +31,85 @@ const supabase = (() => {
     },
     from(table) {
       const s = load(); const token = s?.access_token || K;
-      return {
-        select(cols) {
-          const q = { cols:cols||'*', filters:[], isSingle:false, ord:null };
-          const api = {
-            eq(c,v)     { q.filters.push(c+'=eq.'+encodeURIComponent(v)); return api; },
-            order(c,o)  { q.ord = c+(o?.ascending===false?'.desc':'.asc'); return api; },
-            single()    { q.isSingle=true; return api; },
-            then(res,rej) {
-              let qs='?select='+q.cols;
-              if (q.filters.length) qs+='&'+q.filters.join('&');
-              if (q.ord) qs+='&order='+q.ord;
-              const h={'apikey':K,'Authorization':'Bearer '+token};
-              if (q.isSingle) h['Accept']='application/vnd.pgrst.object+json';
-              fetch(U+'/rest/v1/'+table+qs,{headers:h})
-                .then(async r=>{ if(!r.ok){const e=await r.json().catch(()=>({}));return res({data:null,error:e});} res({data:await r.json(),error:null}); })
-                .catch(rej);
-            }
-          }; return api;
-        }
+      const hdrs = (extra={}) => ({ 'Content-Type':'application/json', 'apikey':K, 'Authorization':'Bearer '+token, ...extra });
+
+      // ── insert ──
+      const insertFn = (rows) => {
+        const isArray = Array.isArray(rows);
+        const q = { returning: null };
+        const api = {
+          select(cols) { q.returning = cols||'*'; return api; },
+          single()     { q.isSingle = true; return api; },
+          then(res, rej) {
+            const prefer = q.returning ? 'return=representation' : 'return=minimal';
+            const h = hdrs({ 'Prefer': prefer });
+            if (q.returning && q.isSingle) h['Accept'] = 'application/vnd.pgrst.object+json';
+            const qs = q.returning ? '?select=' + q.returning : '';
+            fetch(U+'/rest/v1/'+table+qs, { method:'POST', headers:h, body:JSON.stringify(rows) })
+              .then(async r => {
+                if (!r.ok) { const e = await r.json().catch(()=>({})); return res({data:null,error:e}); }
+                if (q.returning) { const d = await r.json(); return res({data:d,error:null}); }
+                res({data:null,error:null});
+              }).catch(rej);
+          }
+        };
+        return api;
       };
+
+      // ── update ──
+      const updateFn = (vals) => {
+        const q = { filters:[] };
+        const api = {
+          eq(c,v)  { q.filters.push(c+'=eq.'+encodeURIComponent(v)); return api; },
+          then(res,rej) {
+            let qs = q.filters.length ? '?'+q.filters.join('&') : '';
+            fetch(U+'/rest/v1/'+table+qs, { method:'PATCH', headers:hdrs({'Prefer':'return=minimal'}), body:JSON.stringify(vals) })
+              .then(async r => { if(!r.ok){const e=await r.json().catch(()=>({}));return res({error:e});} res({error:null}); })
+              .catch(rej);
+          }
+        };
+        return api;
+      };
+
+      // ── delete ──
+      const deleteFn = () => {
+        const q = { filters:[] };
+        const api = {
+          eq(c,v)  { q.filters.push(c+'=eq.'+encodeURIComponent(v)); return api; },
+          then(res,rej) {
+            const qs = q.filters.length ? '?'+q.filters.join('&') : '';
+            fetch(U+'/rest/v1/'+table+qs, { method:'DELETE', headers:hdrs() })
+              .then(async r => { if(!r.ok){const e=await r.json().catch(()=>({}));return res({error:e});} res({error:null}); })
+              .catch(rej);
+          }
+        };
+        return api;
+      };
+
+      // ── select ──
+      const selectFn = (cols) => {
+        const q = { cols:cols||'*', filters:[], isSingle:false, ord:null, lim:null };
+        const api = {
+          eq(c,v)      { q.filters.push(c+'=eq.'+encodeURIComponent(v)); return api; },
+          neq(c,v)     { q.filters.push(c+'=neq.'+encodeURIComponent(v)); return api; },
+          order(c,o)   { q.ord = c+(o?.ascending===false?'.desc':'.asc'); return api; },
+          limit(n)     { q.lim = n; return api; },
+          single()     { q.isSingle=true; return api; },
+          then(res,rej) {
+            let qs='?select='+q.cols;
+            if (q.filters.length) qs+='&'+q.filters.join('&');
+            if (q.ord)  qs+='&order='+q.ord;
+            if (q.lim)  qs+='&limit='+q.lim;
+            const h={'apikey':K,'Authorization':'Bearer '+token};
+            if (q.isSingle) h['Accept']='application/vnd.pgrst.object+json';
+            fetch(U+'/rest/v1/'+table+qs,{headers:h})
+              .then(async r=>{ if(!r.ok){const e=await r.json().catch(()=>({}));return res({data:null,error:e});} res({data:await r.json(),error:null}); })
+              .catch(rej);
+          }
+        }; return api;
+      };
+
+      return { select: selectFn, insert: insertFn, update: updateFn, delete: deleteFn };
     }
   };
 })();
