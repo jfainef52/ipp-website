@@ -321,11 +321,21 @@ const supabase = (() => {
 
   /* ── PAGE SECTIONS ── */
   .page-section { display: none; }
-  .page-section.active { display: block; }
+  .page-section.active {
+    display: block;
+    min-height: calc(100vh - 64px); /* full height minus topbar */
+  }
 
   .section-inner {
     padding: 40px;
     max-width: 1100px;
+  }
+
+  /* Admin sections need full width */
+  #section-admin-clients .section-inner,
+  #section-admin-pipeline .section-inner,
+  #section-admin-advisors .section-inner {
+    max-width: 100%;
   }
 
   .section-header {
@@ -1120,6 +1130,7 @@ const supabase = (() => {
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 16px;
     align-content: start;
+    padding-bottom: 40px;
   }
 
   .scorecard-card {
@@ -2914,21 +2925,29 @@ async function loadPipeline() {
 
 // ── Load scorecards ─────────────────────────────────────────────
 async function loadScorecards() {
-  const { data, error } = await sb
-    .from('advisor_scorecard')
-    .select('*')
-    .neq('role', 'admin');
-
   const grid = document.getElementById('scorecard-grid');
 
-  if (error || !data || !data.length) {
-    grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📊</div><div class="empty-state-title">No advisors yet</div><div class="empty-state-desc">Advisor scorecards will appear here once advisors are added.</div></div>';
-    return;
-  }
+  try {
+    const { data, error } = await sb
+      .from('advisor_scorecard')
+      .select('*');
 
-  const fmt$ = v => v ? '$' + Number(v).toLocaleString(undefined, {minimumFractionDigits:0, maximumFractionDigits:0}) : '$0';
+    if (error) throw new Error(error.message || 'Failed to load scorecards');
 
-  grid.innerHTML = data.map(a => `
+    // Filter out admins client-side to avoid neq dependency
+    const advisors = (data || []).filter(a => a.role !== 'admin');
+
+    if (!advisors.length) {
+      grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📊</div><div class="empty-state-title">No advisors yet</div><div class="empty-state-desc">Advisor scorecards will appear here once advisors are added.</div></div>';
+      return;
+    }
+
+    // Reassign data reference for rendering
+    const renderData = advisors;
+
+    const fmt$ = v => v ? '$' + Number(v).toLocaleString(undefined, {minimumFractionDigits:0, maximumFractionDigits:0}) : '$0';
+
+    grid.innerHTML = renderData.map(a => `
     <div class="scorecard-card">
       <div class="scorecard-name">${a.advisor_name || 'Unnamed Advisor'}</div>
       <div class="scorecard-firm">${a.firm_name || a.firm_type || '—'} · ${a.onboarding_status || 'onboarding'}</div>
@@ -2976,6 +2995,11 @@ async function loadScorecards() {
         </div>
       </div>
     </div>`).join('');
+
+  } catch(e) {
+    document.getElementById('scorecard-grid').innerHTML =
+      '<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-title">Error loading scorecards</div><div class="empty-state-desc">' + e.message + '</div></div>';
+  }
 }
 
 // ── New client modal ────────────────────────────────────────────
