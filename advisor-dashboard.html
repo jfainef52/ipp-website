@@ -641,8 +641,13 @@ const supabase = (() => {
 
   /* ── ADMIN SECTION ── */
   .admin-only { display: none; }
-  body.is-admin .admin-only { display: block; }
+  /* Show admin nav items and cards when admin */
   body.is-admin .nav-item.admin-only { display: flex; }
+  body.is-admin .dash-card.admin-only { display: block; }
+  body.is-admin .nav-section-label.admin-only { display: block; }
+  /* Page sections use their own show/hide — never show via admin-only alone */
+  body.is-admin .page-section.admin-only { display: none; }
+  body.is-admin .page-section.admin-only.active { display: block; }
 
   .admin-badge {
     font-family: 'Barlow Condensed', sans-serif;
