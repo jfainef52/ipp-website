@@ -912,6 +912,7 @@ async function handleSetPassword() {
   const confPw = document.getElementById('confirm-password').value;
   const btn    = document.getElementById('set-password-btn');
   const errEl  = document.getElementById('set-password-error');
+  const isInvite = btn.textContent.includes('Activate');
 
   errEl.style.display = 'none';
 
@@ -927,15 +928,20 @@ async function handleSetPassword() {
   }
 
   btn.disabled = true;
-  btn.textContent = 'Updating…';
+  btn.textContent = isInvite ? 'Activating…' : 'Updating…';
+
+  const SB_URL = 'https://piixgvxrasddphklgazh.supabase.co';
+  const SB_KEY = 'sb_publishable_acvdk0hBniaB6qOD8_k8XQ_9R6FNbP_';
+  const token  = window._recoveryToken;
 
   try {
-    const r = await fetch('https://piixgvxrasddphklgazh.supabase.co/auth/v1/user', {
+    // ── Step 1: Set password ──────────────────────────────────
+    const r = await fetch(SB_URL + '/auth/v1/user', {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        'apikey': 'sb_publishable_acvdk0hBniaB6qOD8_k8XQ_9R6FNbP_',
-        'Authorization': 'Bearer ' + window._recoveryToken
+        'apikey': SB_KEY,
+        'Authorization': 'Bearer ' + token
       },
       body: JSON.stringify({ password: newPw })
     });
@@ -945,13 +951,76 @@ async function handleSetPassword() {
       throw new Error(e.message || 'Unable to update password.');
     }
 
-    // Success
+    const userData = await r.json();
+    const userId   = userData.id;
+    const userEmail = userData.email;
+
+    // ── Step 2: If invite activation, auto-populate profile ───
+    if (isInvite && userId) {
+      btn.textContent = 'Setting up your account…';
+
+      // Look up their access request by email
+      const arRes = await fetch(
+        SB_URL + '/rest/v1/access_requests?select=first_name,last_name,firm_name,firm_type&email=eq.' + encodeURIComponent(userEmail) + '&order=created_at.desc&limit=1',
+        { headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + token } }
+      );
+
+      let profileData = {
+        onboarding_status: 'active',
+        ipp_start_date: new Date().toISOString().split('T')[0]
+      };
+
+      if (arRes.ok) {
+        const arData = await arRes.json();
+        if (arData && arData.length > 0) {
+          const ar = arData[0];
+          profileData.first_name = ar.first_name  || null;
+          profileData.last_name  = ar.last_name   || null;
+          profileData.firm_name  = ar.firm_name   || null;
+          profileData.firm_type  = ar.firm_type   || null;
+        }
+      }
+
+      // Update their advisor_profiles row
+      await fetch(
+        SB_URL + '/rest/v1/advisor_profiles?id=eq.' + userId,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SB_KEY,
+            'Authorization': 'Bearer ' + token,
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify(profileData)
+        }
+      );
+
+      // Mark access request as approved
+      if (userEmail) {
+        await fetch(
+          SB_URL + '/rest/v1/access_requests?email=eq.' + encodeURIComponent(userEmail),
+          {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': SB_KEY,
+              'Authorization': 'Bearer ' + token,
+              'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify({ status: 'approved' })
+          }
+        );
+      }
+    }
+
+    // ── Step 3: Show success ──────────────────────────────────
     document.getElementById('panel-set-password').classList.remove('active');
     document.getElementById('success-set-password').classList.add('visible');
 
   } catch(e) {
     btn.disabled = false;
-    btn.textContent = 'Set New Password';
+    btn.textContent = isInvite ? 'Activate My Account' : 'Set New Password';
     errEl.textContent = e.message || 'Something went wrong. Please request a new reset link.';
     errEl.style.display = 'block';
   }
