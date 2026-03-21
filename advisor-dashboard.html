@@ -569,6 +569,665 @@ const supabase = (() => {
   }
 
 
+
+  /* ── ADMIN SECTION ── */
+  .admin-only { display: none; }
+  body.is-admin .admin-only { display: block; }
+  body.is-admin .nav-item.admin-only { display: flex; }
+
+  .admin-badge {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    background: rgba(200,169,110,0.2);
+    color: var(--gold);
+    padding: 2px 6px;
+    border-radius: 2px;
+    margin-left: auto;
+  }
+
+  /* ── CLIENT LIST ── */
+  .client-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .client-table th {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--gray);
+    padding: 10px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    background: var(--navy2);
+    position: sticky;
+    top: 0;
+  }
+
+  .client-table td {
+    padding: 12px 16px;
+    font-size: 13px;
+    color: var(--warm);
+    border-bottom: 1px solid rgba(42,63,88,0.5);
+    vertical-align: middle;
+  }
+
+  .client-table tr:hover td { background: var(--navy3); cursor: pointer; }
+
+  .client-table tr.selected td { background: var(--navy4); }
+
+  .status-badge {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+
+  .status-prospect   { background: rgba(110,130,153,0.2); color: #8BADC4; }
+  .status-active     { background: rgba(123,175,132,0.2); color: #7BAF84; }
+  .status-closed     { background: rgba(200,191,168,0.15); color: var(--warm); }
+
+  .case-status-badge {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+  .cs-structure_review  { background: rgba(110,130,153,0.2); color: #8BADC4; }
+  .cs-proposal          { background: rgba(200,169,110,0.15); color: var(--gold); }
+  .cs-greenlit          { background: rgba(123,175,132,0.2); color: #7BAF84; }
+  .cs-submitted_uw      { background: rgba(180,140,200,0.2); color: #C8A0DC; }
+  .cs-approved          { background: rgba(123,175,132,0.3); color: #5FAF6A; }
+  .cs-declined          { background: rgba(196,122,122,0.2); color: #C47A7A; }
+  .cs-taken             { background: rgba(200,169,110,0.25); color: var(--gold2); }
+  .cs-not_taken         { background: rgba(196,122,122,0.15); color: #C47A7A; }
+  .cs-placed            { background: rgba(100,180,120,0.3); color: #7BAF84; }
+
+  /* ── CLIENT DETAIL PANEL ── */
+  .detail-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(7,16,26,0.7);
+    z-index: 500;
+    align-items: flex-start;
+    justify-content: flex-end;
+  }
+  .detail-overlay.open { display: flex; }
+
+  .detail-panel {
+    width: min(680px, 92vw);
+    height: 100vh;
+    background: var(--navy2);
+    border-left: 1px solid var(--border);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .detail-header {
+    padding: 24px 28px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    background: var(--navy2);
+    z-index: 10;
+  }
+
+  .detail-close {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--gray);
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: none;
+    padding: 7px 12px;
+    border-radius: 2px;
+    transition: color 0.2s, border-color 0.2s;
+    flex-shrink: 0;
+  }
+  .detail-close:hover { color: var(--gold); border-color: var(--gold-dim); }
+
+  .detail-body { padding: 24px 28px; flex: 1; }
+
+  .detail-section {
+    margin-bottom: 28px;
+  }
+
+  .detail-section-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .detail-section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .detail-field { display: flex; flex-direction: column; gap: 4px; }
+
+  .detail-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--gray);
+  }
+
+  .detail-value {
+    font-size: 13px;
+    color: var(--off-white);
+    line-height: 1.4;
+  }
+
+  .detail-value.empty { color: var(--gray); font-style: italic; }
+
+  /* ── ADMIN FORM ── */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(7,16,26,0.85);
+    z-index: 600;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    overflow-y: auto;
+  }
+  .modal-overlay.open { display: flex; }
+
+  .modal-box {
+    background: var(--navy2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    width: 100%;
+    max-width: 660px;
+    max-height: 90vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .modal-header {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    background: var(--navy2);
+    z-index: 5;
+  }
+
+  .modal-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px;
+    font-weight: 300;
+    color: var(--off-white);
+  }
+  .modal-title em { font-style: italic; color: var(--gold); }
+
+  .modal-close {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--gray);
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: none;
+    padding: 7px 12px;
+    border-radius: 2px;
+    transition: color 0.2s;
+  }
+  .modal-close:hover { color: var(--error); }
+
+  .modal-body { padding: 24px; }
+
+  .modal-footer {
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    flex-shrink: 0;
+    position: sticky;
+    bottom: 0;
+    background: var(--navy2);
+  }
+
+  .btn-primary {
+    padding: 11px 24px;
+    background: var(--gold);
+    color: var(--navy);
+    border: none;
+    border-radius: 2px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .btn-primary:hover { background: var(--gold2); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .btn-secondary {
+    padding: 11px 20px;
+    background: transparent;
+    color: var(--gray);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .btn-secondary:hover { color: var(--warm); border-color: var(--gray); }
+
+  .form-row-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .form-row-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .form-field { margin-bottom: 16px; }
+  .form-field label {
+    display: block;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--gray);
+    margin-bottom: 6px;
+  }
+  .form-field input,
+  .form-field select,
+  .form-field textarea {
+    width: 100%;
+    background: var(--navy3);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 10px 14px;
+    font-family: 'Barlow', sans-serif;
+    font-size: 13px;
+    font-weight: 300;
+    color: var(--off-white);
+    outline: none;
+    transition: border-color 0.2s;
+    appearance: none;
+  }
+  .form-field input:focus,
+  .form-field select:focus,
+  .form-field textarea:focus { border-color: var(--gold-dim); }
+  .form-field input::placeholder { color: var(--gray); }
+  .form-field select option { background: var(--navy3); }
+  .form-field textarea { resize: vertical; min-height: 80px; line-height: 1.6; }
+
+  .form-section-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin: 24px 0 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .checkbox-row input[type=checkbox] {
+    width: 16px; height: 16px;
+    accent-color: var(--gold);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .checkbox-row label {
+    font-size: 13px;
+    color: var(--warm);
+    cursor: pointer;
+    margin: 0;
+    font-family: 'Barlow', sans-serif;
+    font-weight: 300;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .program-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .program-item {
+    background: var(--navy3);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .program-item.selected { border-color: var(--gold-dim); background: var(--navy4); }
+  .program-item-name {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--off-white);
+    margin-bottom: 4px;
+  }
+  .program-item-desc {
+    font-size: 11px;
+    color: var(--gray);
+    line-height: 1.4;
+  }
+
+  /* ── PIPELINE ── */
+  .pipeline-cols {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+
+  .pipeline-col {
+    background: var(--navy2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .pipeline-col-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .pipeline-col-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--off-white);
+  }
+
+  .pipeline-count {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    background: var(--navy3);
+    color: var(--gray);
+    padding: 3px 8px;
+    border-radius: 10px;
+  }
+
+  .pipeline-item {
+    padding: 14px 18px;
+    border-bottom: 1px solid rgba(42,63,88,0.5);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .pipeline-item:hover { background: var(--navy3); }
+  .pipeline-item:last-child { border-bottom: none; }
+
+  .pipeline-client {
+    font-size: 13px;
+    color: var(--off-white);
+    font-weight: 400;
+    margin-bottom: 4px;
+  }
+
+  .pipeline-meta {
+    font-size: 11px;
+    color: var(--gray);
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  /* ── SCORECARD ── */
+  .scorecard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+  }
+
+  .scorecard-card {
+    background: var(--navy2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 20px;
+    transition: border-color 0.2s;
+  }
+  .scorecard-card:hover { border-color: var(--gold-dim); }
+
+  .scorecard-name {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--off-white);
+    margin-bottom: 4px;
+  }
+
+  .scorecard-firm {
+    font-size: 12px;
+    color: var(--gray);
+    margin-bottom: 16px;
+  }
+
+  .scorecard-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .scorecard-stat { text-align: center; }
+
+  .scorecard-stat-value {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 24px;
+    font-weight: 300;
+    color: var(--gold);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .scorecard-stat-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 8px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--gray);
+  }
+
+  .scorecard-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 12px 0;
+  }
+
+  .scorecard-commission {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+
+  .scorecard-commission-total {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 20px;
+    color: var(--off-white);
+  }
+
+  .scorecard-commission-avg {
+    font-size: 11px;
+    color: var(--gray);
+  }
+
+  /* ── NOTES THREAD ── */
+  .notes-thread {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .note-item {
+    background: var(--navy3);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 14px 16px;
+  }
+
+  .note-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .note-author {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--gold);
+  }
+
+  .note-date {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    color: var(--gray);
+  }
+
+  .note-text {
+    font-size: 13px;
+    color: var(--warm);
+    line-height: 1.6;
+  }
+
+  .note-input-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .note-input-row textarea {
+    flex: 1;
+    background: var(--navy3);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 10px 14px;
+    font-family: 'Barlow', sans-serif;
+    font-size: 13px;
+    font-weight: 300;
+    color: var(--off-white);
+    outline: none;
+    resize: vertical;
+    min-height: 70px;
+    transition: border-color 0.2s;
+    line-height: 1.6;
+  }
+  .note-input-row textarea:focus { border-color: var(--gold-dim); }
+  .note-input-row textarea::placeholder { color: var(--gray); }
+
+  /* ── EMPTY STATES ── */
+  .empty-state {
+    text-align: center;
+    padding: 48px 20px;
+    color: var(--gray);
+  }
+  .empty-state-icon {
+    font-size: 32px;
+    margin-bottom: 12px;
+    opacity: 0.5;
+  }
+  .empty-state-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 20px;
+    font-weight: 300;
+    color: var(--warm);
+    margin-bottom: 8px;
+  }
+  .empty-state-desc {
+    font-size: 13px;
+    line-height: 1.6;
+    max-width: 360px;
+    margin: 0 auto;
+  }
+
+  @media (max-width: 900px) {
+    .pipeline-cols { grid-template-columns: 1fr; }
+    .scorecard-grid { grid-template-columns: 1fr; }
+    .form-row-2, .form-row-3 { grid-template-columns: 1fr; }
+  }
+
   /* ── SEARCH & SORT ── */
   .resource-controls {
     display: flex;
@@ -975,7 +1634,33 @@ const supabase = (() => {
       <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
       </svg>
-      Saved Cases
+      My Cases
+    </button>
+
+    <div class="nav-section-label admin-only" style="margin-top:16px;">Admin</div>
+
+    <button class="nav-item admin-only" onclick="showSection('admin-clients')">
+      <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+      </svg>
+      Clients
+      <span class="admin-badge">Admin</span>
+    </button>
+
+    <button class="nav-item admin-only" onclick="showSection('admin-pipeline')">
+      <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/>
+      </svg>
+      Pipeline
+      <span class="admin-badge">Admin</span>
+    </button>
+
+    <button class="nav-item admin-only" onclick="showSection('admin-advisors')">
+      <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+      </svg>
+      Advisor Scorecards
+      <span class="admin-badge">Admin</span>
     </button>
 
   </nav>
@@ -1036,8 +1721,29 @@ const supabase = (() => {
 
         <div class="dash-card" onclick="showSection('saved-cases')">
           <div class="dash-card-icon">💾</div>
-          <div class="dash-card-title">Saved Cases</div>
+          <div class="dash-card-title">My Cases</div>
           <div class="dash-card-desc">Access your saved IncomeArchitect™ and StructureReview™ outputs, organized by client.</div>
+          <div class="dash-card-arrow">→</div>
+        </div>
+
+        <div class="dash-card admin-only" onclick="showSection('admin-clients')" style="border-color:rgba(200,169,110,0.3);">
+          <div class="dash-card-icon">👥</div>
+          <div class="dash-card-title">Client Management</div>
+          <div class="dash-card-desc">Add clients, assign advisors, manage records and StructureReview intake.</div>
+          <div class="dash-card-arrow">→</div>
+        </div>
+
+        <div class="dash-card admin-only" onclick="showSection('admin-pipeline')" style="border-color:rgba(200,169,110,0.3);">
+          <div class="dash-card-icon">📊</div>
+          <div class="dash-card-title">Pipeline</div>
+          <div class="dash-card-desc">Live view of cases in underwriting, approved, and placed in the last 30 days.</div>
+          <div class="dash-card-arrow">→</div>
+        </div>
+
+        <div class="dash-card admin-only" onclick="showSection('admin-advisors')" style="border-color:rgba(200,169,110,0.3);">
+          <div class="dash-card-icon">📈</div>
+          <div class="dash-card-title">Advisor Scorecards</div>
+          <div class="dash-card-desc">Performance metrics, commission tracking, and pipeline stats per advisor.</div>
           <div class="dash-card-arrow">→</div>
         </div>
       </div>
@@ -1181,6 +1887,296 @@ const supabase = (() => {
       </div>
     </div>
   </div>
+  <!-- ── ADMIN: CLIENTS ── -->
+  <div class="page-section admin-only" id="section-admin-clients">
+    <div class="section-inner" style="max-width:100%;">
+      <div class="section-header">
+        <div class="section-eyebrow">Admin</div>
+        <h1 class="section-title">Client <em>Management</em></h1>
+        <p class="section-desc">All clients across the firm. Create new clients, assign advisors, and manage records.</p>
+      </div>
+
+      <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;align-items:center;">
+        <input class="resource-search" id="client-search" type="text"
+          placeholder="Search by name, email, advisor…" oninput="filterClients()"
+          style="max-width:320px;">
+        <select class="resource-sort" id="client-status-filter" onchange="filterClients()" style="min-width:140px;">
+          <option value="all">All Statuses</option>
+          <option value="prospect">Prospect</option>
+          <option value="active">Active</option>
+          <option value="closed">Closed</option>
+        </select>
+        <select class="resource-sort" id="client-advisor-filter" onchange="filterClients()" style="min-width:160px;">
+          <option value="all">All Advisors</option>
+        </select>
+        <button class="btn-primary" onclick="openNewClientModal()" style="margin-left:auto;">
+          + New Client
+        </button>
+      </div>
+
+      <div style="background:var(--navy2);border:1px solid var(--border);border-radius:4px;overflow:hidden;">
+        <div style="overflow-x:auto;">
+          <table class="client-table" id="client-table">
+            <thead>
+              <tr>
+                <th>Client</th>
+                <th>Status</th>
+                <th>Programs</th>
+                <th>Advisor</th>
+                <th>Last Updated</th>
+              </tr>
+            </thead>
+            <tbody id="client-table-body">
+              <tr><td colspan="5">
+                <div class="loading-row" style="justify-content:center;">
+                  <div class="mini-spinner"></div> Loading clients…
+                </div>
+              </td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ADMIN: PIPELINE ── -->
+  <div class="page-section admin-only" id="section-admin-pipeline">
+    <div class="section-inner" style="max-width:100%;">
+      <div class="section-header">
+        <div class="section-eyebrow">Admin</div>
+        <h1 class="section-title">Case <em>Pipeline</em></h1>
+        <p class="section-desc">Live operational view — push cases forward and track follow-ups.</p>
+      </div>
+
+      <div class="pipeline-cols" id="pipeline-cols">
+        <div class="pipeline-col">
+          <div class="pipeline-col-header">
+            <div class="pipeline-col-title">Out to Underwriting</div>
+            <span class="pipeline-count" id="uw-count">0</span>
+          </div>
+          <div id="pipeline-uw">
+            <div class="loading-row" style="padding:20px;justify-content:center;">
+              <div class="mini-spinner"></div>
+            </div>
+          </div>
+        </div>
+        <div class="pipeline-col">
+          <div class="pipeline-col-header">
+            <div class="pipeline-col-title">Approved</div>
+            <span class="pipeline-count" id="approved-count">0</span>
+          </div>
+          <div id="pipeline-approved">
+            <div class="loading-row" style="padding:20px;justify-content:center;">
+              <div class="mini-spinner"></div>
+            </div>
+          </div>
+        </div>
+        <div class="pipeline-col">
+          <div class="pipeline-col-header">
+            <div class="pipeline-col-title" style="color:var(--gold);">Placed — Last 30 Days</div>
+            <span class="pipeline-count" id="placed-count">0</span>
+          </div>
+          <div id="pipeline-placed">
+            <div class="loading-row" style="padding:20px;justify-content:center;">
+              <div class="mini-spinner"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ADMIN: ADVISOR SCORECARDS ── -->
+  <div class="page-section admin-only" id="section-admin-advisors">
+    <div class="section-inner" style="max-width:100%;">
+      <div class="section-header">
+        <div class="section-eyebrow">Admin</div>
+        <h1 class="section-title">Advisor <em>Scorecards</em></h1>
+        <p class="section-desc">Performance metrics, pipeline stats, and commission tracking per advisor.</p>
+      </div>
+      <div class="scorecard-grid" id="scorecard-grid">
+        <div class="loading-row">
+          <div class="mini-spinner"></div> Loading scorecards…
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CLIENT DETAIL SIDE PANEL ── -->
+  <div class="detail-overlay" id="client-detail-overlay" onclick="closeClientDetail(event)">
+    <div class="detail-panel" id="client-detail-panel">
+      <div class="detail-header">
+        <div>
+          <div style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:300;color:var(--off-white);" id="detail-client-name">Client Detail</div>
+          <div style="font-size:12px;color:var(--gray);margin-top:4px;" id="detail-client-sub"></div>
+        </div>
+        <button class="detail-close" onclick="closeClientDetail()">✕ Close</button>
+      </div>
+      <div class="detail-body" id="detail-body">
+        <div class="loading-row"><div class="mini-spinner"></div> Loading…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── NEW CLIENT MODAL ── -->
+  <div class="modal-overlay" id="new-client-modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title">New <em>Client</em></div>
+        <button class="modal-close" onclick="closeNewClientModal()">✕ Cancel</button>
+      </div>
+      <div class="modal-body">
+        <div id="new-client-error" style="display:none;background:rgba(196,122,122,0.12);border:1px solid #C47A7A;border-radius:2px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#C47A7A;"></div>
+
+        <div class="form-section-title">Primary Client</div>
+        <div class="form-row-2">
+          <div class="form-field">
+            <label>First Name *</label>
+            <input type="text" id="nc-first" placeholder="First name">
+          </div>
+          <div class="form-field">
+            <label>Last Name *</label>
+            <input type="text" id="nc-last" placeholder="Last name">
+          </div>
+        </div>
+        <div class="form-row-3">
+          <div class="form-field">
+            <label>Date of Birth</label>
+            <input type="date" id="nc-dob">
+          </div>
+          <div class="form-field">
+            <label>Filing Status</label>
+            <select id="nc-filing">
+              <option value="">Select…</option>
+              <option value="married">Married</option>
+              <option value="single">Single</option>
+              <option value="mfs">Married Filing Separately</option>
+              <option value="widowed">Widowed</option>
+              <option value="divorced">Divorced</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label>Status</label>
+            <select id="nc-status">
+              <option value="prospect">Prospect</option>
+              <option value="active">Active</option>
+              <option value="closed">Closed</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row-2">
+          <div class="form-field">
+            <label>Phone</label>
+            <input type="tel" id="nc-phone" placeholder="(000) 000-0000">
+          </div>
+          <div class="form-field">
+            <label>Email</label>
+            <input type="email" id="nc-email" placeholder="client@email.com">
+          </div>
+        </div>
+        <div class="form-row-2">
+          <div class="checkbox-row" style="margin-top:8px;">
+            <input type="checkbox" id="nc-tobacco">
+            <label for="nc-tobacco">Tobacco User</label>
+          </div>
+        </div>
+
+        <div id="nc-spouse-section" style="display:none;">
+          <div class="form-section-title">Spouse</div>
+          <div class="form-row-2">
+            <div class="form-field">
+              <label>Spouse First Name</label>
+              <input type="text" id="nc-spouse-first" placeholder="First name">
+            </div>
+            <div class="form-field">
+              <label>Spouse Last Name</label>
+              <input type="text" id="nc-spouse-last" placeholder="Last name">
+            </div>
+          </div>
+          <div class="form-row-2">
+            <div class="form-field">
+              <label>Spouse Date of Birth</label>
+              <input type="date" id="nc-spouse-dob">
+            </div>
+            <div class="form-field" style="display:flex;align-items:flex-end;padding-bottom:8px;">
+              <div class="checkbox-row">
+                <input type="checkbox" id="nc-spouse-tobacco">
+                <label for="nc-spouse-tobacco">Spouse Tobacco User</label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section-title">Assign &amp; Referral</div>
+        <div class="form-row-2">
+          <div class="form-field">
+            <label>Assign to Advisor *</label>
+            <select id="nc-advisor">
+              <option value="">Select advisor…</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label>Referral Source</label>
+            <input type="text" id="nc-referral" placeholder="Referral source or contact">
+          </div>
+        </div>
+        <div class="form-row-2">
+          <div class="form-field">
+            <div class="checkbox-row" style="margin-top:20px;">
+              <input type="checkbox" id="nc-seminar" onchange="toggleSeminarField()">
+              <label for="nc-seminar">Attended a Seminar</label>
+            </div>
+          </div>
+          <div class="form-field" id="nc-seminar-field" style="display:none;">
+            <label>Seminar Location</label>
+            <select id="nc-seminar-id">
+              <option value="">Select seminar…</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-section-title">Programs</div>
+        <p style="font-size:12px;color:var(--gray);margin-bottom:14px;">Select all programs this client is pursuing. Layers are a la carte.</p>
+        <div class="program-grid" id="nc-programs">
+          <div class="program-item" data-program="L1" onclick="toggleProgram(this)">
+            <div class="program-item-name">Layer 1</div>
+            <div class="program-item-desc">Guaranteed fixed income bucket (Annuity)</div>
+          </div>
+          <div class="program-item" data-program="L2" onclick="toggleProgram(this)">
+            <div class="program-item-name">Layer 2</div>
+            <div class="program-item-desc">Dedicated LTC asset with tax-free flexibility (IUL)</div>
+          </div>
+          <div class="program-item" data-program="L3" onclick="toggleProgram(this)">
+            <div class="program-item-name">Layer 3</div>
+            <div class="program-item-desc">Tax-advantaged growth bucket (IUL + ETA)</div>
+          </div>
+          <div class="program-item" data-program="ETA" onclick="toggleProgram(this)">
+            <div class="program-item-name">ETA</div>
+            <div class="program-item-desc">Engineered Tax Approach (standalone)</div>
+          </div>
+          <div class="program-item" data-program="DEF" onclick="toggleProgram(this)">
+            <div class="program-item-name">DEF</div>
+            <div class="program-item-desc">Deferred Enhanced Funding</div>
+          </div>
+          <div class="program-item" data-program="EP" onclick="toggleProgram(this)">
+            <div class="program-item-name">EP</div>
+            <div class="program-item-desc">Enhanced Pension</div>
+          </div>
+        </div>
+
+        <div class="form-section-title">Initial Note (Optional)</div>
+        <div class="form-field">
+          <label>Note</label>
+          <textarea id="nc-note" placeholder="Add a note about this client — e.g. came from StructureReview, key details from intake…" style="min-height:80px;"></textarea>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeNewClientModal()">Cancel</button>
+        <button class="btn-primary" id="nc-submit-btn" onclick="submitNewClient()">Create Client</button>
+      </div>
+    </div>
+  </div>
 
 </main>
 
@@ -1207,15 +2203,18 @@ let toolLoaded     = false;
 
   currentUser = session.user;
 
-  // Load advisor profile
+  // Load advisor profile including role
   const { data: profile } = await sb.from('advisor_profiles')
-    .select('first_name, last_name, firm_name')
+    .select('first_name, last_name, firm_name, role')
     .eq('id', currentUser.id)
     .single();
 
   const firstName = profile?.first_name || currentUser.email.split('@')[0];
   const lastName  = profile?.last_name  || '';
   const firm      = profile?.firm_name  || '';
+
+  // Apply admin mode if applicable
+  applyAdminMode(profile?.role === 'admin');
 
   // Populate UI
   document.getElementById('greeting-name').textContent = firstName + (lastName ? ' ' + lastName : '') + '.';
@@ -1235,20 +2234,25 @@ let toolLoaded     = false;
 })();
 
 // ── Section navigation ──────────────────────────────────────────
-let videosLoaded = false;
+let videosLoaded       = false;
+let pipelineLoaded     = false;
+let scorecardsLoaded   = false;
+let clientsLoaded      = false;
 
 function showSection(id) {
   document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
 
-  document.getElementById('section-' + id).classList.add('active');
+  const section = document.getElementById('section-' + id);
+  if (!section) return;
+  section.classList.add('active');
 
-  // Highlight nav
-  const navMap = {
-    'home': 0, 'income-architect': 1, 'resources': 2, 'videos': 3, 'saved-cases': 4
-  };
-  const navItems = document.querySelectorAll('.nav-item');
-  if (navMap[id] !== undefined) navItems[navMap[id]].classList.add('active');
+  // Highlight nav — find by onclick attribute
+  document.querySelectorAll('.nav-item').forEach(btn => {
+    if (btn.getAttribute('onclick') === `showSection('${id}')`) {
+      btn.classList.add('active');
+    }
+  });
 
   // Update topbar title
   const titles = {
@@ -1256,7 +2260,10 @@ function showSection(id) {
     'income-architect': 'IncomeArchitect™ <em>Modeler</em>',
     'resources':        'Resource <em>Library</em>',
     'videos':           'Video <em>Library</em>',
-    'saved-cases':      'Saved <em>Cases</em>'
+    'saved-cases':      'My <em>Cases</em>',
+    'admin-clients':    'Client <em>Management</em>',
+    'admin-pipeline':   'Case <em>Pipeline</em>',
+    'admin-advisors':   'Advisor <em>Scorecards</em>'
   };
   document.querySelector('.topbar-title').innerHTML = titles[id] || 'Advisor <em>Portal</em>';
 
@@ -1270,6 +2277,20 @@ function showSection(id) {
   if (id === 'videos' && !videosLoaded) {
     loadVideos();
     videosLoaded = true;
+  }
+
+  // Lazy-load admin sections
+  if (id === 'admin-clients' && !clientsLoaded) {
+    loadClients();
+    clientsLoaded = true;
+  }
+  if (id === 'admin-pipeline' && !pipelineLoaded) {
+    loadPipeline();
+    pipelineLoaded = true;
+  }
+  if (id === 'admin-advisors' && !scorecardsLoaded) {
+    loadScorecards();
+    scorecardsLoaded = true;
   }
 }
 
@@ -1559,6 +2580,504 @@ function closeLightbox(event) {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeLightbox({ target: document.getElementById('video-lightbox') });
 });
+
+// ── Admin detection ─────────────────────────────────────────────
+let isAdmin = false;
+let allAdvisors = [];
+let allClients  = [];
+
+function applyAdminMode(adminFlag) {
+  isAdmin = adminFlag;
+  if (isAdmin) {
+    document.body.classList.add('is-admin');
+  }
+}
+
+// ── Load clients (admin) ────────────────────────────────────────
+async function loadClients() {
+  const { data, error } = await sb
+    .from('clients')
+    .select(`
+      id, first_name, last_name, status, filing_status,
+      created_at, updated_at,
+      advisor:advisor_id ( id, first_name, last_name, firm_name ),
+      client_programs ( program )
+    `)
+    .order('updated_at', { ascending: false });
+
+  if (error) {
+    document.getElementById('client-table-body').innerHTML =
+      '<tr><td colspan="5" style="text-align:center;color:var(--error);padding:20px;">Error loading clients.</td></tr>';
+    return;
+  }
+
+  allClients = data || [];
+
+  // Populate advisor filter
+  const advisorFilter = document.getElementById('client-advisor-filter');
+  const advisorSet = new Map();
+  allClients.forEach(c => {
+    if (c.advisor && !advisorSet.has(c.advisor.id)) {
+      advisorSet.set(c.advisor.id, c.advisor);
+    }
+  });
+  advisorSet.forEach((adv) => {
+    const opt = document.createElement('option');
+    opt.value = adv.id;
+    opt.textContent = adv.first_name + ' ' + adv.last_name;
+    advisorFilter.appendChild(opt);
+  });
+
+  renderClients(allClients);
+}
+
+function filterClients() {
+  const q       = (document.getElementById('client-search')?.value || '').toLowerCase();
+  const status  = document.getElementById('client-status-filter')?.value || 'all';
+  const advisor = document.getElementById('client-advisor-filter')?.value || 'all';
+
+  let items = [...allClients];
+  if (status !== 'all')  items = items.filter(c => c.status === status);
+  if (advisor !== 'all') items = items.filter(c => c.advisor?.id === advisor);
+  if (q) {
+    items = items.filter(c => {
+      const s = [c.first_name, c.last_name, c.email,
+                 c.advisor?.first_name, c.advisor?.last_name,
+                 c.advisor?.firm_name].join(' ').toLowerCase();
+      return s.includes(q);
+    });
+  }
+  renderClients(items);
+}
+
+function renderClients(items) {
+  const tbody = document.getElementById('client-table-body');
+  if (!items.length) {
+    tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="empty-state-icon">👥</div><div class="empty-state-title">No clients yet</div><div class="empty-state-desc">Click "+ New Client" to add the first client.</div></div></td></tr>';
+    return;
+  }
+
+  const STATUS_LABELS = { prospect:'Prospect', active:'Active', closed:'Closed' };
+
+  tbody.innerHTML = items.map(c => {
+    const programs = (c.client_programs || []).map(p => p.program).join(', ') || '—';
+    const advisor  = c.advisor ? c.advisor.first_name + ' ' + c.advisor.last_name : '—';
+    const updated  = c.updated_at ? new Date(c.updated_at).toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'}) : '—';
+    return `
+      <tr onclick="openClientDetail('${c.id}')">
+        <td>
+          <div style="font-weight:400;color:var(--off-white);">${c.first_name} ${c.last_name}</div>
+        </td>
+        <td><span class="status-badge status-${c.status}">${STATUS_LABELS[c.status] || c.status}</span></td>
+        <td style="font-size:12px;">${programs}</td>
+        <td style="font-size:12px;">${advisor}</td>
+        <td style="font-size:12px;">${updated}</td>
+      </tr>`;
+  }).join('');
+}
+
+// ── Client detail panel ─────────────────────────────────────────
+async function openClientDetail(clientId) {
+  document.getElementById('client-detail-overlay').classList.add('open');
+  document.getElementById('detail-body').innerHTML = '<div class="loading-row"><div class="mini-spinner"></div> Loading client…</div>';
+
+  const { data: c, error } = await sb
+    .from('clients')
+    .select(`
+      *, 
+      advisor:advisor_id ( id, first_name, last_name, firm_name ),
+      client_programs ( * ),
+      policies ( * ),
+      client_notes ( *, author:author_id ( first_name, last_name ) )
+    `)
+    .eq('id', clientId)
+    .single();
+
+  if (error || !c) {
+    document.getElementById('detail-body').innerHTML = '<div style="color:var(--error);padding:20px;">Error loading client.</div>';
+    return;
+  }
+
+  // Store current client ID for note submission
+  window._currentClientId = clientId;
+
+  const name = c.first_name + ' ' + c.last_name;
+  const STATUS_LABELS = { prospect:'Prospect', active:'Active', closed:'Closed' };
+  const FILING_LABELS = { married:'Married', single:'Single', mfs:'Married Filing Separately', widowed:'Widowed', divorced:'Divorced' };
+  const PROGRAM_LABELS = { L1:'Layer 1', L2:'Layer 2', L3:'Layer 3', ETA:'ETA', DEF:'DEF', EP:'EP' };
+  const CS_LABELS = {
+    structure_review:'Structure Review', proposal:'Proposal', greenlit:'Greenlit',
+    submitted_uw:'Submitted to UW', approved:'Approved', declined:'Declined',
+    taken:'Taken', not_taken:'Not Taken', placed:'Placed'
+  };
+
+  document.getElementById('detail-client-name').textContent = name;
+  document.getElementById('detail-client-sub').textContent =
+    (FILING_LABELS[c.filing_status] || '') + (c.advisor ? ' · ' + c.advisor.first_name + ' ' + c.advisor.last_name : '');
+
+  const fmtDate = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'}) : '—';
+  const val = (v) => v ? `<span>${v}</span>` : '<span class="empty">Not provided</span>';
+
+  // Notes HTML
+  const notes = (c.client_notes || []).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+  const notesHtml = notes.length ? notes.map(n => `
+    <div class="note-item">
+      <div class="note-meta">
+        <span class="note-author">${n.author ? n.author.first_name + ' ' + n.author.last_name : 'Unknown'}</span>
+        <span class="note-date">${new Date(n.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'})}</span>
+      </div>
+      <div class="note-text">${n.note_text}</div>
+    </div>`).join('') :
+    '<div style="font-size:13px;color:var(--gray);font-style:italic;padding:8px 0;">No notes yet.</div>';
+
+  // Programs HTML
+  const programsHtml = (c.client_programs || []).length ?
+    (c.client_programs || []).map(p => `
+      <div style="background:var(--navy3);border:1px solid var(--border);border-radius:4px;padding:12px 14px;margin-bottom:10px;">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--gold);margin-bottom:6px;">
+          ${PROGRAM_LABELS[p.program] || p.program}
+          ${!p.qualified ? '<span style="color:var(--error);margin-left:8px;font-size:9px;">NOT QUALIFIED</span>' : ''}
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;">
+          <div><span style="color:var(--gray);">Health Rating: </span>${p.health_rating || '—'}</div>
+          <div><span style="color:var(--gray);">Tobacco: </span>${p.tobacco ? 'Yes' : 'No'}</div>
+          ${p.notes ? `<div style="grid-column:1/-1;color:var(--warm);">${p.notes}</div>` : ''}
+        </div>
+      </div>`).join('') :
+    '<div style="font-size:13px;color:var(--gray);font-style:italic;">No programs assigned.</div>';
+
+  // Policies HTML
+  const policiesHtml = (c.policies || []).filter(p => p.is_active).length ?
+    (c.policies || []).filter(p => p.is_active).map(p => `
+      <div style="background:var(--navy3);border:1px solid var(--border);border-radius:4px;padding:12px 14px;margin-bottom:10px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;">
+          <div><span style="color:var(--gray);">Policy #: </span>${p.policy_number || '—'}</div>
+          <div><span style="color:var(--gray);">Carrier: </span>${p.carrier || '—'}</div>
+          <div><span style="color:var(--gray);">Program: </span>${PROGRAM_LABELS[p.program] || p.program || '—'}</div>
+          <div><span style="color:var(--gray);">Issue Date: </span>${fmtDate(p.issue_date)}</div>
+          ${p.face_amount ? `<div><span style="color:var(--gray);">Face Amount: </span>$${Number(p.face_amount).toLocaleString()}</div>` : ''}
+          ${p.premium_amount ? `<div><span style="color:var(--gray);">Premium: </span>$${Number(p.premium_amount).toLocaleString()}</div>` : ''}
+        </div>
+      </div>`).join('') :
+    '<div style="font-size:13px;color:var(--gray);font-style:italic;">No policies on file.</div>';
+
+  document.getElementById('detail-body').innerHTML = `
+    <div class="detail-section">
+      <div class="detail-section-title">Client Information</div>
+      <div class="detail-grid">
+        <div class="detail-field"><div class="detail-label">Date of Birth</div><div class="detail-value">${fmtDate(c.dob)}</div></div>
+        <div class="detail-field"><div class="detail-label">Status</div><div class="detail-value"><span class="status-badge status-${c.status}">${STATUS_LABELS[c.status]}</span></div></div>
+        <div class="detail-field"><div class="detail-label">Phone</div><div class="detail-value">${val(c.phone)}</div></div>
+        <div class="detail-field"><div class="detail-label">Email</div><div class="detail-value">${val(c.email)}</div></div>
+        <div class="detail-field"><div class="detail-label">Tobacco</div><div class="detail-value">${c.tobacco ? 'Yes' : 'No'}</div></div>
+        <div class="detail-field"><div class="detail-label">Filing Status</div><div class="detail-value">${FILING_LABELS[c.filing_status] || '—'}</div></div>
+        ${c.spouse_first_name ? `
+        <div class="detail-field"><div class="detail-label">Spouse</div><div class="detail-value">${c.spouse_first_name} ${c.spouse_last_name || ''}</div></div>
+        <div class="detail-field"><div class="detail-label">Spouse DOB</div><div class="detail-value">${fmtDate(c.spouse_dob)}</div></div>
+        <div class="detail-field"><div class="detail-label">Spouse Tobacco</div><div class="detail-value">${c.spouse_tobacco ? 'Yes' : 'No'}</div></div>
+        ` : ''}
+        <div class="detail-field"><div class="detail-label">Referral Source</div><div class="detail-value">${val(c.referral_source)}</div></div>
+        <div class="detail-field"><div class="detail-label">Assigned Advisor</div><div class="detail-value">${c.advisor ? c.advisor.first_name + ' ' + c.advisor.last_name : '—'}</div></div>
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">Programs</div>
+      ${programsHtml}
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">Policies</div>
+      ${policiesHtml}
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">Notes</div>
+      <div class="notes-thread">${notesHtml}</div>
+      <div class="note-input-row">
+        <textarea id="new-note-text" placeholder="Add a note…"></textarea>
+        <button class="btn-primary" onclick="submitNote()" style="padding:10px 16px;align-self:flex-end;">Add</button>
+      </div>
+    </div>`;
+}
+
+function closeClientDetail(event) {
+  if (event && event.target !== document.getElementById('client-detail-overlay')) return;
+  document.getElementById('client-detail-overlay').classList.remove('open');
+  window._currentClientId = null;
+}
+
+// ── Submit note ─────────────────────────────────────────────────
+async function submitNote() {
+  const text = document.getElementById('new-note-text')?.value?.trim();
+  if (!text || !window._currentClientId) return;
+
+  const { error } = await sb.from('client_notes').insert({
+    client_id:   window._currentClientId,
+    author_id:   currentUser.id,
+    author_name: document.getElementById('sidebar-name').textContent,
+    note_text:   text
+  });
+
+  if (!error) {
+    document.getElementById('new-note-text').value = '';
+    // Reload the client detail
+    openClientDetail(window._currentClientId);
+  }
+}
+
+// ── Load pipeline ───────────────────────────────────────────────
+async function loadPipeline() {
+  const { data, error } = await sb
+    .from('admin_pipeline')
+    .select('*');
+
+  if (error || !data) {
+    ['pipeline-uw','pipeline-approved','pipeline-placed'].forEach(id => {
+      document.getElementById(id).innerHTML = '<div style="padding:16px;color:var(--error);font-size:13px;">Error loading pipeline.</div>';
+    });
+    return;
+  }
+
+  const uw       = data.filter(c => c.status === 'submitted_uw');
+  const approved = data.filter(c => c.status === 'approved');
+  const placed   = data.filter(c => c.status === 'placed');
+
+  document.getElementById('uw-count').textContent      = uw.length;
+  document.getElementById('approved-count').textContent = approved.length;
+  document.getElementById('placed-count').textContent   = placed.length;
+
+  const renderPipelineItems = (items, dateField, dateLabel) => {
+    if (!items.length) return '<div style="padding:20px;text-align:center;font-size:13px;color:var(--gray);">No cases here yet.</div>';
+    return items.map(c => `
+      <div class="pipeline-item">
+        <div class="pipeline-client">${c.client_name || 'Unknown Client'}</div>
+        <div class="pipeline-meta">
+          <span>${c.advisor_name || '—'}</span>
+          ${c.program ? `<span>${c.program}</span>` : ''}
+          ${c.carrier ? `<span>${c.carrier}</span>` : ''}
+          ${c[dateField] ? `<span>${dateLabel}: ${new Date(c[dateField]).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span>` : ''}
+        </div>
+      </div>`).join('');
+  };
+
+  document.getElementById('pipeline-uw').innerHTML       = renderPipelineItems(uw, 'submitted_date', 'Submitted');
+  document.getElementById('pipeline-approved').innerHTML  = renderPipelineItems(approved, 'approved_date', 'Approved');
+  document.getElementById('pipeline-placed').innerHTML    = renderPipelineItems(placed, 'placed_date', 'Placed');
+}
+
+// ── Load scorecards ─────────────────────────────────────────────
+async function loadScorecards() {
+  const { data, error } = await sb
+    .from('advisor_scorecard')
+    .select('*')
+    .neq('role', 'admin');
+
+  const grid = document.getElementById('scorecard-grid');
+
+  if (error || !data || !data.length) {
+    grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📊</div><div class="empty-state-title">No advisors yet</div><div class="empty-state-desc">Advisor scorecards will appear here once advisors are added.</div></div>';
+    return;
+  }
+
+  const fmt$ = v => v ? '$' + Number(v).toLocaleString(undefined, {minimumFractionDigits:0, maximumFractionDigits:0}) : '$0';
+
+  grid.innerHTML = data.map(a => `
+    <div class="scorecard-card">
+      <div class="scorecard-name">${a.advisor_name || 'Unnamed Advisor'}</div>
+      <div class="scorecard-firm">${a.firm_name || a.firm_type || '—'} · ${a.onboarding_status || 'onboarding'}</div>
+      <div class="scorecard-stats">
+        <div class="scorecard-stat">
+          <div class="scorecard-stat-value">${a.active_clients || 0}</div>
+          <div class="scorecard-stat-label">Active Clients</div>
+        </div>
+        <div class="scorecard-stat">
+          <div class="scorecard-stat-value">${a.proposals || 0}</div>
+          <div class="scorecard-stat-label">Proposals</div>
+        </div>
+        <div class="scorecard-stat">
+          <div class="scorecard-stat-value">${a.placed || 0}</div>
+          <div class="scorecard-stat-label">Placed</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;">
+        <div style="text-align:center;">
+          <div style="font-size:16px;font-family:'Cormorant Garamond',serif;color:var(--off-white);">${a.submitted_uw || 0}</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:8px;letter-spacing:0.1em;text-transform:uppercase;color:var(--gray);">In UW</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:16px;font-family:'Cormorant Garamond',serif;color:var(--off-white);">${a.approved || 0}</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:8px;letter-spacing:0.1em;text-transform:uppercase;color:var(--gray);">Approved</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:16px;font-family:'Cormorant Garamond',serif;color:var(--off-white);">${a.declined || 0}</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:8px;letter-spacing:0.1em;text-transform:uppercase;color:var(--gray);">Declined</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:16px;font-family:'Cormorant Garamond',serif;color:var(--off-white);">${a.not_taken || 0}</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:8px;letter-spacing:0.1em;text-transform:uppercase;color:var(--gray);">Not Taken</div>
+        </div>
+      </div>
+      <div class="scorecard-divider"></div>
+      <div class="scorecard-commission">
+        <div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--gray);margin-bottom:4px;">Total Commissions</div>
+          <div class="scorecard-commission-total">${fmt$(a.total_commissions)}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--gray);margin-bottom:4px;">Avg / Case</div>
+          <div class="scorecard-commission-avg">${fmt$(a.avg_commission_per_case)}</div>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+// ── New client modal ────────────────────────────────────────────
+async function openNewClientModal() {
+  // Load advisors into dropdown
+  const advSelect = document.getElementById('nc-advisor');
+  if (advSelect.options.length <= 1) {
+    const { data } = await sb.from('advisor_profiles').select('id, first_name, last_name, firm_name').order('last_name');
+    (data || []).forEach(a => {
+      const opt = document.createElement('option');
+      opt.value = a.id;
+      opt.textContent = a.first_name + ' ' + a.last_name + (a.firm_name ? ' — ' + a.firm_name : '');
+      advSelect.appendChild(opt);
+    });
+  }
+
+  // Load seminars
+  const semSelect = document.getElementById('nc-seminar-id');
+  if (semSelect.options.length <= 1) {
+    const { data } = await sb.from('seminars').select('id, name, city, state').eq('is_active', true).order('event_date', {ascending: false});
+    (data || []).forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.id;
+      opt.textContent = s.name + (s.city ? ' — ' + s.city + ', ' + s.state : '');
+      semSelect.appendChild(opt);
+    });
+  }
+
+  // Show/hide spouse section based on filing status
+  document.getElementById('nc-filing').addEventListener('change', function() {
+    const showSpouse = this.value === 'married' || this.value === 'mfs';
+    document.getElementById('nc-spouse-section').style.display = showSpouse ? 'block' : 'none';
+  });
+
+  document.getElementById('new-client-modal').classList.add('open');
+}
+
+function closeNewClientModal() {
+  document.getElementById('new-client-modal').classList.remove('open');
+  // Reset form
+  ['nc-first','nc-last','nc-email','nc-phone','nc-referral','nc-note',
+   'nc-spouse-first','nc-spouse-last'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  ['nc-dob','nc-spouse-dob'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  ['nc-filing','nc-status'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.selectedIndex = 0;
+  });
+  ['nc-tobacco','nc-spouse-tobacco','nc-seminar'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.checked = false;
+  });
+  document.getElementById('nc-spouse-section').style.display = 'none';
+  document.getElementById('nc-seminar-field').style.display = 'none';
+  document.getElementById('nc-programs').querySelectorAll('.program-item').forEach(p => p.classList.remove('selected'));
+  document.getElementById('new-client-error').style.display = 'none';
+  document.getElementById('nc-submit-btn').disabled = false;
+  document.getElementById('nc-submit-btn').textContent = 'Create Client';
+}
+
+function toggleSeminarField() {
+  const checked = document.getElementById('nc-seminar').checked;
+  document.getElementById('nc-seminar-field').style.display = checked ? 'block' : 'none';
+}
+
+function toggleProgram(el) {
+  el.classList.toggle('selected');
+}
+
+async function submitNewClient() {
+  const first   = document.getElementById('nc-first').value.trim();
+  const last    = document.getElementById('nc-last').value.trim();
+  const advisor = document.getElementById('nc-advisor').value;
+  const errEl   = document.getElementById('new-client-error');
+  const btn     = document.getElementById('nc-submit-btn');
+
+  errEl.style.display = 'none';
+
+  if (!first || !last) { errEl.textContent = 'First and last name are required.'; errEl.style.display = 'block'; return; }
+  if (!advisor)        { errEl.textContent = 'Please assign this client to an advisor.'; errEl.style.display = 'block'; return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Creating…';
+
+  const seminarChecked = document.getElementById('nc-seminar').checked;
+  const seminarId = seminarChecked ? document.getElementById('nc-seminar-id').value || null : null;
+
+  const clientData = {
+    first_name:       first,
+    last_name:        last,
+    dob:              document.getElementById('nc-dob').value || null,
+    filing_status:    document.getElementById('nc-filing').value || null,
+    status:           document.getElementById('nc-status').value || 'prospect',
+    phone:            document.getElementById('nc-phone').value.trim() || null,
+    email:            document.getElementById('nc-email').value.trim() || null,
+    tobacco:          document.getElementById('nc-tobacco').checked,
+    spouse_first_name: document.getElementById('nc-spouse-first').value.trim() || null,
+    spouse_last_name:  document.getElementById('nc-spouse-last').value.trim() || null,
+    spouse_dob:        document.getElementById('nc-spouse-dob').value || null,
+    spouse_tobacco:    document.getElementById('nc-spouse-tobacco').checked,
+    referral_source:  document.getElementById('nc-referral').value.trim() || null,
+    seminar_attended: seminarChecked,
+    seminar_id:       seminarId,
+    advisor_id:       advisor,
+    created_by:       currentUser.id
+  };
+
+  const { data: newClient, error } = await sb.from('clients').insert(clientData).select().single();
+
+  if (error) {
+    btn.disabled = false;
+    btn.textContent = 'Create Client';
+    errEl.textContent = 'Error creating client: ' + (error.message || 'Please try again.');
+    errEl.style.display = 'block';
+    return;
+  }
+
+  // Insert selected programs
+  const selectedPrograms = Array.from(
+    document.getElementById('nc-programs').querySelectorAll('.program-item.selected')
+  ).map(el => ({ client_id: newClient.id, program: el.dataset.program }));
+
+  if (selectedPrograms.length) {
+    await sb.from('client_programs').insert(selectedPrograms);
+  }
+
+  // Insert initial note if provided
+  const noteText = document.getElementById('nc-note').value.trim();
+  if (noteText) {
+    await sb.from('client_notes').insert({
+      client_id:   newClient.id,
+      author_id:   currentUser.id,
+      author_name: document.getElementById('sidebar-name').textContent,
+      note_text:   noteText
+    });
+  }
+
+  closeNewClientModal();
+  // Reload client list
+  clientsLoaded = false;
+  allClients = [];
+  loadClients();
+}
 
 // ── Sign out ────────────────────────────────────────────────────
 async function handleSignOut() {
