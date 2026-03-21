@@ -1051,6 +1051,15 @@ const supabase = (() => {
     border: 1px solid var(--border);
     border-radius: 4px;
     overflow: hidden;
+    max-height: 600px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .pipeline-col > div:last-child {
+    flex: 1;
+    overflow-y: auto;
   }
 
   .pipeline-col-header {
@@ -1110,6 +1119,7 @@ const supabase = (() => {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 16px;
+    align-content: start;
   }
 
   .scorecard-card {
@@ -2013,33 +2023,21 @@ const supabase = (() => {
             <div class="pipeline-col-title">Out to Underwriting</div>
             <span class="pipeline-count" id="uw-count">0</span>
           </div>
-          <div id="pipeline-uw">
-            <div class="loading-row" style="padding:20px;justify-content:center;">
-              <div class="mini-spinner"></div>
-            </div>
-          </div>
+          <div id="pipeline-uw"></div>
         </div>
         <div class="pipeline-col">
           <div class="pipeline-col-header">
             <div class="pipeline-col-title">Approved</div>
             <span class="pipeline-count" id="approved-count">0</span>
           </div>
-          <div id="pipeline-approved">
-            <div class="loading-row" style="padding:20px;justify-content:center;">
-              <div class="mini-spinner"></div>
-            </div>
-          </div>
+          <div id="pipeline-approved"></div>
         </div>
         <div class="pipeline-col">
           <div class="pipeline-col-header">
             <div class="pipeline-col-title" style="color:var(--gold);">Placed — Last 30 Days</div>
             <span class="pipeline-count" id="placed-count">0</span>
           </div>
-          <div id="pipeline-placed">
-            <div class="loading-row" style="padding:20px;justify-content:center;">
-              <div class="mini-spinner"></div>
-            </div>
-          </div>
+          <div id="pipeline-placed"></div>
         </div>
       </div>
     </div>
@@ -2896,7 +2894,7 @@ async function loadPipeline() {
   document.getElementById('placed-count').textContent   = placed.length;
 
   const renderPipelineItems = (items, dateField, dateLabel) => {
-    if (!items.length) return '<div style="padding:20px;text-align:center;font-size:13px;color:var(--gray);">No cases here yet.</div>';
+    if (!items.length) return '<div class="empty-state" style="padding:32px 20px;"><div class="empty-state-icon" style="font-size:24px;">📋</div><div class="empty-state-desc">No cases here yet.</div></div>';
     return items.map(c => `
       <div class="pipeline-item">
         <div class="pipeline-client">${c.client_name || 'Unknown Client'}</div>
