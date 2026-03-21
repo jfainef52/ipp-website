@@ -2656,12 +2656,7 @@ function applyAdminMode(adminFlag) {
 async function loadClients() {
   const { data, error } = await sb
     .from('clients')
-    .select(`
-      id, first_name, last_name, status, filing_status,
-      created_at, updated_at,
-      advisor:advisor_id ( id, first_name, last_name, firm_name ),
-      client_programs ( program )
-    `)
+    .select('id,first_name,last_name,status,filing_status,created_at,updated_at,advisor:advisor_id(id,first_name,last_name,firm_name),client_programs(program)')
     .order('updated_at', { ascending: false });
 
   if (error) {
@@ -2742,13 +2737,7 @@ async function openClientDetail(clientId) {
 
   const { data: c, error } = await sb
     .from('clients')
-    .select(`
-      *, 
-      advisor:advisor_id ( id, first_name, last_name, firm_name ),
-      client_programs ( * ),
-      policies ( * ),
-      client_notes ( *, author:author_id ( first_name, last_name ) )
-    `)
+    .select('*,advisor:advisor_id(id,first_name,last_name,firm_name),client_programs(*),policies(*),client_notes(*,author:author_id(first_name,last_name))')
     .eq('id', clientId)
     .single();
 
