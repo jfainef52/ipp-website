@@ -1858,7 +1858,7 @@ const supabase = (() => {
               <span style="font-size:14px;">+</span> New Client
             </button>
           </div>
-          <select id="ia-client-select" onchange="document.getElementById('ia-sr-check').checked=false;onIAClientChange();" style="width:100%;max-width:420px;background:#0B1928;border:1px solid rgba(200,169,110,.25);color:#F5F2EC;border-radius:8px;padding:10px 14px;font-size:14px;cursor:pointer;outline:none;">
+          <select id="ia-client-select" onchange="onIAClientChange();" style="width:100%;max-width:420px;background:#0B1928;border:1px solid rgba(200,169,110,.25);color:#F5F2EC;border-radius:8px;padding:10px 14px;font-size:14px;cursor:pointer;outline:none;">
             <option value="">— Choose a client —</option>
           </select>
         </div>
@@ -3241,6 +3241,12 @@ async function checkSRStatus(clientId) {
   const lbl = document.getElementById('ia-sr-label');
   const hint = document.getElementById('ia-sr-hint');
   if (!chk) return;
+  // Reset to unchecked/enabled immediately before async fetch
+  // so there is no stale state visible while we wait for the DB
+  chk.checked  = false;
+  chk.disabled = false;
+  if (lbl) { lbl.style.opacity = '1'; lbl.style.borderColor = 'rgba(255,255,255,.08)'; lbl.title = ''; }
+  if (hint) hint.textContent = '';
   const { data } = await supabase
     .from('clients')
     .select('structure_review_confirmed, structure_review_confirmed_at')
