@@ -1851,14 +1851,25 @@ const supabase = (() => {
         </div>
 
         <!-- Client selector -->
-        <div style="margin-bottom:20px;">
+        <div style="margin-bottom:16px;">
           <label style="display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#8DAFC8;margin-bottom:8px;">Select Client</label>
-          <select id="ia-client-select" onchange="onIAClientChange()" style="width:100%;max-width:420px;background:#0B1928;border:1px solid rgba(200,169,110,.25);color:#F5F2EC;border-radius:8px;padding:10px 14px;font-size:14px;cursor:pointer;outline:none;">
+          <select id="ia-client-select" onchange="document.getElementById('ia-sr-check').checked=false;onIAClientChange();" style="width:100%;max-width:420px;background:#0B1928;border:1px solid rgba(200,169,110,.25);color:#F5F2EC;border-radius:8px;padding:10px 14px;font-size:14px;cursor:pointer;outline:none;">
             <option value="">— Choose a client —</option>
           </select>
         </div>
 
-        <!-- Session status + launch button -->
+        <!-- StructureReview confirmation checkbox -->
+        <div style="margin-bottom:20px;">
+          <label id="ia-sr-label" style="display:inline-flex;align-items:center;gap:10px;cursor:pointer;padding:12px 16px;border-radius:8px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.02);transition:border-color .2s;">
+            <input type="checkbox" id="ia-sr-check" onchange="onIAClientChange()"
+              style="width:16px;height:16px;cursor:pointer;accent-color:#4A9B7A;flex-shrink:0;">
+            <span style="font-size:13px;color:#8DAFC8;line-height:1.5;">
+              I confirm a <strong style="color:#F5F2EC;">StructureReview™</strong> has been completed for this client
+            </span>
+          </label>
+        </div>
+
+        <!-- Launch button + session status -->
         <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
           <button id="ia-launch-btn" onclick="launchIncomeArchitect()" disabled
             style="padding:11px 24px;border-radius:8px;font-size:14px;font-weight:600;cursor:not-allowed;opacity:.45;
@@ -3203,12 +3214,17 @@ async function loadIAClientList() {
 }
 
 function onIAClientChange() {
-  const sel = document.getElementById('ia-client-select');
-  const btn = document.getElementById('ia-launch-btn');
-  const hasClient = sel && sel.value;
-  btn.disabled = !hasClient;
-  btn.style.opacity = hasClient ? '1' : '.45';
-  btn.style.cursor  = hasClient ? 'pointer' : 'not-allowed';
+  const sel   = document.getElementById('ia-client-select');
+  const chk   = document.getElementById('ia-sr-check');
+  const btn   = document.getElementById('ia-launch-btn');
+  const lbl   = document.getElementById('ia-sr-label');
+  const ready = !!(sel && sel.value && chk && chk.checked);
+  btn.disabled       = !ready;
+  btn.style.opacity  = ready ? '1' : '.45';
+  btn.style.cursor   = ready ? 'pointer' : 'not-allowed';
+  // Highlight checkbox border green when checked
+  if (lbl) lbl.style.borderColor = chk && chk.checked
+    ? 'rgba(74,155,122,.5)' : 'rgba(255,255,255,.08)';
 }
 
 async function launchIncomeArchitect() {
