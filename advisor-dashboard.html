@@ -1858,7 +1858,7 @@ const supabase = (() => {
               <span style="font-size:14px;">+</span> New Client
             </button>
           </div>
-          <select id="ia-client-select" onchange="onIAClientChange();" style="width:100%;max-width:420px;background:#0B1928;border:1px solid rgba(200,169,110,.25);color:#F5F2EC;border-radius:8px;padding:10px 14px;font-size:14px;cursor:pointer;outline:none;">
+          <select id="ia-client-select" onchange="onIAClientSelected();" style="width:100%;max-width:420px;background:#0B1928;border:1px solid rgba(200,169,110,.25);color:#F5F2EC;border-radius:8px;padding:10px 14px;font-size:14px;cursor:pointer;outline:none;">
             <option value="">— Choose a client —</option>
           </select>
         </div>
@@ -3221,6 +3221,7 @@ async function loadIAClientList() {
 }
 
 function onIAClientChange() {
+  // Called when checkbox changes — just update button state
   const sel   = document.getElementById('ia-client-select');
   const chk   = document.getElementById('ia-sr-check');
   const btn   = document.getElementById('ia-launch-btn');
@@ -3229,11 +3230,15 @@ function onIAClientChange() {
   btn.disabled       = !ready;
   btn.style.opacity  = ready ? '1' : '.45';
   btn.style.cursor   = ready ? 'pointer' : 'not-allowed';
-  // Highlight checkbox border green when checked
   if (lbl) lbl.style.borderColor = chk && chk.checked
     ? 'rgba(74,155,122,.5)' : 'rgba(255,255,255,.08)';
-  // If a client is selected, check whether SR is already confirmed and pre-tick if so
+}
+
+function onIAClientSelected() {
+  // Called ONLY when the client dropdown changes — runs SR lookup then updates button
+  const sel = document.getElementById('ia-client-select');
   if (sel && sel.value) checkSRStatus(sel.value);
+  else onIAClientChange(); // no client selected — just reset button
 }
 
 async function checkSRStatus(clientId) {
