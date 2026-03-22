@@ -1844,18 +1844,36 @@ const supabase = (() => {
         <p class="section-desc">Model retirement income structures for your clients. This tool is available exclusively to Integrated Planning Partners member advisors.</p>
       </div>
 
-      <div class="tool-container">
-        <div class="tool-header">
+      <div class="tool-container" style="background:rgba(255,255,255,.03);border:1px solid rgba(200,169,110,.18);border-radius:14px;padding:28px 24px;">
+        <div class="tool-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
           <div class="tool-header-label">Live Tool — Advisor Access Only</div>
-          <span style="font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:0.1em;color:var(--gray);text-transform:uppercase;">IncomeArchitect™ v1.0</span>
+          <span style="font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:0.1em;color:var(--gray);text-transform:uppercase;">IncomeArchitect™ v2.0</span>
         </div>
-        <iframe
-          class="tool-iframe"
-          id="income-architect-frame"
-          src="about:blank"
-          title="IncomeArchitect™ Modeler"
-          allowfullscreen>
-        </iframe>
+
+        <!-- Client selector -->
+        <div style="margin-bottom:20px;">
+          <label style="display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#8DAFC8;margin-bottom:8px;">Select Client</label>
+          <select id="ia-client-select" onchange="onIAClientChange()" style="width:100%;max-width:420px;background:#0B1928;border:1px solid rgba(200,169,110,.25);color:#F5F2EC;border-radius:8px;padding:10px 14px;font-size:14px;cursor:pointer;outline:none;">
+            <option value="">— Choose a client —</option>
+          </select>
+        </div>
+
+        <!-- Session status + launch button -->
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+          <button id="ia-launch-btn" onclick="launchIncomeArchitect()" disabled
+            style="padding:11px 24px;border-radius:8px;font-size:14px;font-weight:600;cursor:not-allowed;opacity:.45;
+                   background:linear-gradient(135deg,rgba(200,169,110,.18),rgba(200,169,110,.08));
+                   border:1px solid rgba(200,169,110,.4);color:#C8A96E;
+                   font-family:'DM Sans',sans-serif;letter-spacing:.04em;
+                   display:flex;align-items:center;gap:8px;transition:all .2s;">
+            <span style="font-size:16px;">&#x1F680;</span> Launch IncomeArchitect™
+          </button>
+          <div id="ia-session-status" style="font-size:12px;color:#8DAFC8;"></div>
+        </div>
+
+        <p style="margin-top:16px;font-size:12px;color:rgba(141,175,200,.6);line-height:1.6;">
+          Opens full-screen in a new window. Session auto-closes after 60 minutes — inputs are auto-saved every 60 seconds so your work is never lost.
+        </p>
       </div>
     </div>
   </div>
@@ -2340,10 +2358,9 @@ function showSection(id) {
   };
   document.querySelector('.topbar-title').innerHTML = titles[id] || 'Advisor <em>Portal</em>';
 
-  // Lazy-load iframe
-  if (id === 'income-architect' && !toolLoaded) {
-    document.getElementById('income-architect-frame').src = 'ipp-retirement-tool.html';
-    toolLoaded = true;
+  // Load client list when IncomeArchitect section opens
+  if (id === 'income-architect') {
+    loadIAClientList();
   }
 
   // Lazy-load videos
@@ -3159,6 +3176,94 @@ async function handleSignOut() {
   await sb.auth.signOut();
   window.location.href = 'advisor-portal.html';
 }
+
+// ── IncomeArchitect Pop-Out ──────────────────────────────────────────────────
+
+let _iaPopup = null;
+let _iaSessionTimer = null;
+const IA_SESSION_MINUTES = 60;
+
+async function loadIAClientList() {
+  const sel = document.getElementById('ia-client-select');
+  if (!sel || sel.options.length > 1) return; // already loaded
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return;
+  // Load clients belonging to this advisor
+  const res = await supabase.from('clients')
+    .select('id, first_name, last_name')
+    .order('last_name', { ascending: true });
+  if (res.data) {
+    res.data.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.last_name + ', ' + c.first_name;
+      sel.appendChild(opt);
+    });
+  }
+}
+
+function onIAClientChange() {
+  const sel = document.getElementById('ia-client-select');
+  const btn = document.getElementById('ia-launch-btn');
+  const hasClient = sel && sel.value;
+  btn.disabled = !hasClient;
+  btn.style.opacity = hasClient ? '1' : '.45';
+  btn.style.cursor  = hasClient ? 'pointer' : 'not-allowed';
+}
+
+async function launchIncomeArchitect() {
+  const sel = document.getElementById('ia-client-select');
+  if (!sel || !sel.value) return;
+  const clientId = sel.value;
+  const clientName = sel.options[sel.selectedIndex].text;
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) { alert('Session expired — please log in again.'); return; }
+
+  // Build URL with session token + client context
+  const params = new URLSearchParams({
+    token:      session.access_token,
+    clientId:   clientId,
+    clientName: clientName,
+    advisorId:  session.user.id,
+  });
+  const toolUrl = '/ipp-retirement-tool.html?' + params.toString();
+
+  // Close any existing popup
+  if (_iaPopup && !_iaPopup.closed) _iaPopup.close();
+  clearTimeout(_iaSessionTimer);
+
+  // Open full-screen popup
+  const w = screen.availWidth, h = screen.availHeight;
+  _iaPopup = window.open(toolUrl, 'IncomeArchitect',
+    `width=${w},height=${h},left=0,top=0,menubar=no,toolbar=no,location=no,status=no,scrollbars=yes`);
+
+  // Start session countdown
+  const expiresAt = Date.now() + IA_SESSION_MINUTES * 60 * 1000;
+  updateIAStatus(expiresAt);
+
+  _iaSessionTimer = setTimeout(() => {
+    if (_iaPopup && !_iaPopup.closed) {
+      _iaPopup.close();
+    }
+    document.getElementById('ia-session-status').textContent = 'Session expired — relaunch to continue.';
+  }, IA_SESSION_MINUTES * 60 * 1000);
+}
+
+function updateIAStatus(expiresAt) {
+  const el = document.getElementById('ia-session-status');
+  if (!el) return;
+  const tick = () => {
+    if (!_iaPopup || _iaPopup.closed) { el.textContent = 'Window closed.'; return; }
+    const mins = Math.max(0, Math.ceil((expiresAt - Date.now()) / 60000));
+    el.textContent = mins > 0 ? `Session active — ${mins} min remaining` : 'Session expired.';
+    if (mins > 0) setTimeout(tick, 30000);
+  };
+  tick();
+}
+
+// ── End IncomeArchitect Pop-Out ──────────────────────────────────────────────
+
 </script>
 </body>
 </html>
