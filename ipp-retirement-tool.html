@@ -2295,11 +2295,22 @@ function App() {
 
   // ── Session + Save/Load state ──────────────────────────────────────────
   const _params        = new URLSearchParams(window.location.search);
-  const _token         = _params.get('token')    || '';
-  const _clientId      = _params.get('clientId') || '';
-  const _clientName    = _params.get('clientName') || '';
-  const _advisorId     = _params.get('advisorId') || '';
+  const _token         = _params.get('token')        || '';
+  const _clientId      = _params.get('clientId')     || '';
+  const _clientName    = _params.get('clientName')   || '';
+  const _advisorId     = _params.get('advisorId')    || '';
   const _isPopout      = !!_token;
+  // Pre-fill data passed from dashboard
+  const _prefill = {
+    primaryName:     _params.get('primaryName')     || '',
+    spouseName:      _params.get('spouseName')      || '',
+    advisorName:     _params.get('advisorName')     || '',
+    advisorEmail:    _params.get('advisorEmail')    || '',
+    filingStatus:    _params.get('filingStatus')    || '',
+    currentAge:      _params.get('currentAge')      ? parseInt(_params.get('currentAge'))      : null,
+    spouseCurrentAge:_params.get('spouseCurrentAge')? parseInt(_params.get('spouseCurrentAge')): null,
+    spouseDobOffset: _params.get('spouseDobOffset') ? parseInt(_params.get('spouseDobOffset')) : null,
+  };
 
   const SUPABASE_URL   = 'https://piixgvxrasddphklgazh.supabase.co';
   const SUPABASE_KEY   = 'sb_publishable_acvdk0hBniaB6qOD8_k8XQ_9R6FNbP_';
@@ -2523,6 +2534,24 @@ function App() {
     tick();
     const t = setInterval(tick, 60000);
     return () => clearInterval(t);
+  }, []);
+
+  // ── Pre-fill client info from URL params (runs once on mount) ─────────────
+  React.useEffect(() => {
+    if (!_isPopout) return;
+    // Only pre-fill if NOT restoring from autosave (autosave will override via recovery)
+    if (_prefill.primaryName)  setClientInfo(p => ({...p, primaryName:  _prefill.primaryName}));
+    if (_prefill.spouseName)   setClientInfo(p => ({...p, spouseName:   _prefill.spouseName}));
+    if (_prefill.advisorName)  setClientInfo(p => ({...p, advisorName:  _prefill.advisorName}));
+    if (_prefill.advisorEmail) setClientInfo(p => ({...p, advisorEmail: _prefill.advisorEmail}));
+    // Apply filing status and ages together so spouseDobOffset is consistent
+    setInputs(p => ({
+      ...p,
+      ...(_prefill.filingStatus    && { filingStatus:     _prefill.filingStatus }),
+      ...(_prefill.currentAge      !== null && { currentAge:       _prefill.currentAge }),
+      ...(_prefill.spouseCurrentAge!== null && { spouseCurrentAge: _prefill.spouseCurrentAge }),
+      ...(_prefill.spouseDobOffset !== null && { spouseDobOffset:  _prefill.spouseDobOffset }),
+    }));
   }, []);
 
   // ── Load scenarios + check for autosave on open ──────────────────────────
