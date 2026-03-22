@@ -1852,7 +1852,12 @@ const supabase = (() => {
 
         <!-- Client selector -->
         <div style="margin-bottom:16px;">
-          <label style="display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#8DAFC8;margin-bottom:8px;">Select Client</label>
+          <div style="display:flex;align-items:center;justify-content:space-between;max-width:420px;margin-bottom:8px;">
+            <label style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#8DAFC8;">Select Client</label>
+            <button onclick="openIANewClientModal()" style="font-size:11px;color:#C8A96E;background:none;border:none;cursor:pointer;padding:0;letter-spacing:.04em;display:flex;align-items:center;gap:4px;font-family:inherit;opacity:.85;transition:opacity .15s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.85">
+              <span style="font-size:14px;">+</span> New Client
+            </button>
+          </div>
           <select id="ia-client-select" onchange="document.getElementById('ia-sr-check').checked=false;onIAClientChange();" style="width:100%;max-width:420px;background:#0B1928;border:1px solid rgba(200,169,110,.25);color:#F5F2EC;border-radius:8px;padding:10px 14px;font-size:14px;cursor:pointer;outline:none;">
             <option value="">— Choose a client —</option>
           </select>
@@ -3327,6 +3332,188 @@ function updateIAStatus(expiresAt) {
 
 // ── End IncomeArchitect Pop-Out ──────────────────────────────────────────────
 
+
+// ── IA Quick Add Client Modal ────────────────────────────────────────────────
+
+function openIANewClientModal() {
+  // Clear fields
+  ['ia-nc-first','ia-nc-last','ia-nc-spouse-first','ia-nc-spouse-last','ia-nc-dob'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  const filing = document.getElementById('ia-nc-filing');
+  if (filing) filing.value = '';
+  const chk = document.getElementById('ia-nc-sr-check');
+  if (chk) chk.checked = false;
+  const err = document.getElementById('ia-nc-error');
+  if (err) err.style.display = 'none';
+  const modal = document.getElementById('ia-new-client-modal');
+  if (modal) { modal.style.display = 'flex'; }
+  setTimeout(() => document.getElementById('ia-nc-first')?.focus(), 100);
+}
+
+function closeIANewClientModal() {
+  const modal = document.getElementById('ia-new-client-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function submitIANewClient() {
+  const first  = document.getElementById('ia-nc-first')?.value.trim();
+  const last   = document.getElementById('ia-nc-last')?.value.trim();
+  const srDone = document.getElementById('ia-nc-sr-check')?.checked;
+  const errEl  = document.getElementById('ia-nc-error');
+  const btn    = document.getElementById('ia-nc-submit');
+
+  // Validate
+  if (!first || !last) {
+    errEl.textContent = 'First and last name are required.';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (!srDone) {
+    errEl.textContent = 'Please confirm the StructureReview™ has been completed before adding this client.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Creating…';
+  errEl.style.display = 'none';
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    errEl.textContent = 'Session expired — please log in again.';
+    errEl.style.display = 'block';
+    btn.disabled = false; btn.textContent = 'Create & Select';
+    return;
+  }
+
+  const clientData = {
+    first_name:                   first,
+    last_name:                    last,
+    spouse_first_name:            document.getElementById('ia-nc-spouse-first')?.value.trim() || null,
+    spouse_last_name:             document.getElementById('ia-nc-spouse-last')?.value.trim()  || null,
+    dob:                          document.getElementById('ia-nc-dob')?.value || null,
+    filing_status:                document.getElementById('ia-nc-filing')?.value || null,
+    status:                       'prospect',
+    advisor_id:                   session.user.id,
+    created_by:                   session.user.id,
+    structure_review_confirmed:    true,
+    structure_review_confirmed_at: new Date().toISOString(),
+    structure_review_confirmed_by: session.user.id,
+  };
+
+  const { data: newClient, error } = await supabase
+    .from('clients')
+    .insert(clientData)
+    .select()
+    .single();
+
+  if (error) {
+    errEl.textContent = 'Error creating client: ' + (error.message || 'Please try again.');
+    errEl.style.display = 'block';
+    btn.disabled = false; btn.textContent = 'Create & Select';
+    return;
+  }
+
+  // Add to dropdown and auto-select
+  const sel = document.getElementById('ia-client-select');
+  const opt = document.createElement('option');
+  opt.value = newClient.id;
+  opt.textContent = newClient.last_name + ', ' + newClient.first_name;
+  sel.appendChild(opt);
+  sel.value = newClient.id;
+
+  // Pre-tick SR checkbox (already confirmed) and update button state
+  const srChk = document.getElementById('ia-sr-check');
+  const srLbl = document.getElementById('ia-sr-label');
+  const srHint = document.getElementById('ia-sr-hint');
+  if (srChk) { srChk.checked = true; srChk.disabled = true; }
+  if (srLbl) { srLbl.style.borderColor = 'rgba(74,155,122,.5)'; srLbl.style.opacity = '.75'; }
+  if (srHint) srHint.textContent = '✓ Confirmed just now';
+
+  onIAClientChange();
+  closeIANewClientModal();
+
+  btn.disabled = false;
+  btn.textContent = 'Create & Select';
+}
+
+// ── End IA Quick Add Client Modal ────────────────────────────────────────────
+
 </script>
+
+  <!-- ── IA Quick Add Client Modal ── -->
+  <div class="modal-overlay" id="ia-new-client-modal" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(7,16,26,.88);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px;">
+    <div style="background:#0D1E2E;border:1px solid rgba(200,169,110,.22);border-radius:14px;padding:28px 26px;max-width:460px;width:100%;box-shadow:0 24px 80px rgba(0,0,0,.55);animation:modalIn .25s ease both;">
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <div>
+          <div style="font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#C8A96E;margin-bottom:4px;">IncomeArchitect™ Modeler</div>
+          <div style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:400;color:#F5F2EC;">Add New Client</div>
+        </div>
+        <button onclick="closeIANewClientModal()" style="font-size:20px;color:#8DAFC8;background:none;border:none;cursor:pointer;padding:4px;line-height:1;">✕</button>
+      </div>
+
+      <div style="height:1px;background:rgba(200,169,110,.12);margin-bottom:20px;"></div>
+
+      <div id="ia-nc-error" style="display:none;background:rgba(196,122,122,.1);border:1px solid rgba(196,122,122,.3);border-radius:8px;padding:10px 14px;font-size:13px;color:#C47A7A;margin-bottom:16px;"></div>
+
+      <!-- Name row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+        <div>
+          <label style="display:block;font-size:11px;color:#8DAFC8;letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px;">First Name *</label>
+          <input id="ia-nc-first" type="text" placeholder="First" style="width:100%;background:#0B1928;border:1px solid rgba(255,255,255,.1);border-radius:7px;padding:9px 12px;font-size:14px;color:#F5F2EC;outline:none;font-family:inherit;">
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;color:#8DAFC8;letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px;">Last Name *</label>
+          <input id="ia-nc-last" type="text" placeholder="Last" style="width:100%;background:#0B1928;border:1px solid rgba(255,255,255,.1);border-radius:7px;padding:9px 12px;font-size:14px;color:#F5F2EC;outline:none;font-family:inherit;">
+        </div>
+      </div>
+
+      <!-- Spouse name row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+        <div>
+          <label style="display:block;font-size:11px;color:#8DAFC8;letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px;">Spouse First</label>
+          <input id="ia-nc-spouse-first" type="text" placeholder="Optional" style="width:100%;background:#0B1928;border:1px solid rgba(255,255,255,.1);border-radius:7px;padding:9px 12px;font-size:14px;color:#F5F2EC;outline:none;font-family:inherit;">
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;color:#8DAFC8;letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px;">Spouse Last</label>
+          <input id="ia-nc-spouse-last" type="text" placeholder="Optional" style="width:100%;background:#0B1928;border:1px solid rgba(255,255,255,.1);border-radius:7px;padding:9px 12px;font-size:14px;color:#F5F2EC;outline:none;font-family:inherit;">
+        </div>
+      </div>
+
+      <!-- DOB + Filing Status row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+        <div>
+          <label style="display:block;font-size:11px;color:#8DAFC8;letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px;">Date of Birth</label>
+          <input id="ia-nc-dob" type="date" style="width:100%;background:#0B1928;border:1px solid rgba(255,255,255,.1);border-radius:7px;padding:9px 12px;font-size:14px;color:#F5F2EC;outline:none;font-family:inherit;color-scheme:dark;">
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;color:#8DAFC8;letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px;">Filing Status</label>
+          <select id="ia-nc-filing" style="width:100%;background:#0B1928;border:1px solid rgba(255,255,255,.1);border-radius:7px;padding:9px 12px;font-size:14px;color:#F5F2EC;outline:none;font-family:inherit;">
+            <option value="">— Select —</option>
+            <option value="mfj">Married Filing Jointly</option>
+            <option value="single">Single</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- StructureReview confirm -->
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px 14px;border-radius:8px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.02);margin-bottom:20px;">
+        <input type="checkbox" id="ia-nc-sr-check" style="width:16px;height:16px;cursor:pointer;accent-color:#4A9B7A;flex-shrink:0;">
+        <span style="font-size:13px;color:#8DAFC8;line-height:1.5;">
+          I confirm a <strong style="color:#F5F2EC;">StructureReview™</strong> has been completed for this client
+        </span>
+      </label>
+
+      <!-- Buttons -->
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="closeIANewClientModal()" style="padding:9px 20px;border-radius:7px;font-size:13px;cursor:pointer;background:transparent;border:1px solid rgba(255,255,255,.1);color:#8DAFC8;font-family:inherit;">Cancel</button>
+        <button id="ia-nc-submit" onclick="submitIANewClient()" style="padding:9px 22px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;background:rgba(200,169,110,.15);border:1px solid rgba(200,169,110,.4);color:#C8A96E;font-family:inherit;">Create &amp; Select</button>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>
