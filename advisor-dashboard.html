@@ -1882,6 +1882,8 @@ const supabase = (() => {
           <div id="ia-session-status" style="font-size:12px;color:#8DAFC8;"></div>
         </div>
 
+        <div id="ia-sr-hint" style="margin-top:-10px;margin-bottom:16px;font-size:11px;color:#4A9B7A;padding-left:2px;"></div>
+
         <p style="margin-top:16px;font-size:12px;color:rgba(141,175,200,.6);line-height:1.6;">
           Opens full-screen in a new window. Session auto-closes after 60 minutes — inputs are auto-saved every 60 seconds so your work is never lost.
         </p>
@@ -3225,16 +3227,61 @@ function onIAClientChange() {
   // Highlight checkbox border green when checked
   if (lbl) lbl.style.borderColor = chk && chk.checked
     ? 'rgba(74,155,122,.5)' : 'rgba(255,255,255,.08)';
+  // If a client is selected, check whether SR is already confirmed and pre-tick if so
+  if (sel && sel.value) checkSRStatus(sel.value);
+}
+
+async function checkSRStatus(clientId) {
+  const chk = document.getElementById('ia-sr-check');
+  const lbl = document.getElementById('ia-sr-label');
+  const hint = document.getElementById('ia-sr-hint');
+  if (!chk) return;
+  const { data } = await supabase
+    .from('clients')
+    .select('structure_review_confirmed, structure_review_confirmed_at')
+    .eq('id', clientId)
+    .single();
+  if (data?.structure_review_confirmed) {
+    chk.checked = true;
+    chk.disabled = true;
+    if (lbl) {
+      lbl.style.borderColor = 'rgba(74,155,122,.5)';
+      lbl.style.opacity = '.75';
+      lbl.title = 'StructureReview confirmed on ' + new Date(data.structure_review_confirmed_at).toLocaleDateString();
+    }
+    if (hint) hint.textContent = '✓ Previously confirmed — ' + new Date(data.structure_review_confirmed_at).toLocaleDateString();
+  } else {
+    chk.checked = false;
+    chk.disabled = false;
+    if (lbl) { lbl.style.opacity = '1'; lbl.title = ''; }
+    if (hint) hint.textContent = '';
+  }
+  // Re-evaluate button state after SR check
+  const btn = document.getElementById('ia-launch-btn');
+  const ready = !!(chk.checked);
+  btn.disabled = !ready;
+  btn.style.opacity = ready ? '1' : '.45';
+  btn.style.cursor  = ready ? 'pointer' : 'not-allowed';
 }
 
 async function launchIncomeArchitect() {
   const sel = document.getElementById('ia-client-select');
-  if (!sel || !sel.value) return;
+  const chk = document.getElementById('ia-sr-check');
+  if (!sel || !sel.value || !chk || !chk.checked) return;
   const clientId = sel.value;
   const clientName = sel.options[sel.selectedIndex].text;
 
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) { alert('Session expired — please log in again.'); return; }
+
+  // Write StructureReview confirmation to the client record (fire and forget)
+  supabase.from('clients').update({
+    structure_review_confirmed:    true,
+    structure_review_confirmed_at: new Date().toISOString(),
+    structure_review_confirmed_by: session.user.id,
+  }).eq('id', clientId).then(({ error }) => {
+    if (error) console.warn('SR confirmation write failed:', error.message);
+  });
 
   // Build URL with session token + client context
   const params = new URLSearchParams({
