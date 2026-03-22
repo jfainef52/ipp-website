@@ -14,7 +14,6 @@
 html, body { background: #07101A; min-height: 100vh; }
 #root { min-height: 100vh; }
 </style>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 </head>
 <body>
 <div id="root"></div>
@@ -1147,6 +1146,7 @@ function projectArc(inputs) {
       : undefined;
     const stateTax = calcStateTax(row.sources, stateCode, inflFactor, effectiveStateRate, stressAdder);
 
+    row.federalTax = taxResult.totalTax;
     row.effectiveTaxRate = taxResult.effectiveRate;
     row.marginalFedRate = taxResult.marginalRate;
     // All-in marginal = federal marginal + state effective rate on top dollar
@@ -2291,31 +2291,6 @@ function App() {
     basic: true, ss: true, spouseSs: true, widower: true, pension: true, portfolio: true, income: true,
     expenses: true, drawdown: true, ltc: true, tax: true, advanced: true
   });
-
-  // ── Session + Save/Load state ──────────────────────────────────────────
-  const _params        = new URLSearchParams(window.location.search);
-  const _token         = _params.get('token')    || '';
-  const _clientId      = _params.get('clientId') || '';
-  const _clientName    = _params.get('clientName') || '';
-  const _advisorId     = _params.get('advisorId') || '';
-  const _isPopout      = !!_token;
-
-  const SUPABASE_URL   = 'https://piixgvxrasddphklgazh.supabase.co';
-  const SUPABASE_KEY   = 'sb_publishable_acvdk0hBniaB6qOD8_k8XQ_9R6FNbP_';
-  const _sb = _isPopout
-    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-        global: { headers: { Authorization: 'Bearer ' + _token } }
-      })
-    : null;
-
-  const [saveStatus,    setSaveStatus]    = React.useState('');   // 'saving' | 'saved' | 'error'
-  const [scenarios,     setScenarios]     = React.useState([]);   // list of named saves
-  const [showSaveAs,    setShowSaveAs]    = React.useState(false);
-  const [saveAsName,    setSaveAsName]    = React.useState('');
-  const [recoveryData,  setRecoveryData]  = React.useState(null); // autosave to offer recovery
-  const [showRecovery,  setShowRecovery]  = React.useState(false);
-  const [sessionMins,   setSessionMins]   = React.useState(60);
-  // ── End session state ──────────────────────────────────────────────────
   const [inputs, setInputs] = useState({
     filingStatus: 'mfj',
     currentAge: 60, retireAge: 65, planToAge: 95, fra: 67,
@@ -2507,220 +2482,11 @@ function App() {
     return () => document.head.removeChild(s);
   }, []);
 
-  // ── Session timer countdown ──────────────────────────────────────────────
-  React.useEffect(() => {
-    if (!_isPopout) return;
-    const start = Date.now();
-    const totalMs = 60 * 60 * 1000;
-    const tick = () => {
-      const elapsed = Date.now() - start;
-      const minsLeft = Math.max(0, Math.ceil((totalMs - elapsed) / 60000));
-      setSessionMins(minsLeft);
-      if (minsLeft <= 0) window.close();
-    };
-    tick();
-    const t = setInterval(tick, 60000);
-    return () => clearInterval(t);
-  }, []);
-
-  // ── Load scenarios + check for autosave on open ──────────────────────────
-  React.useEffect(() => {
-    if (!_isPopout || !_sb) return;
-    (async () => {
-      const { data } = await _sb
-        .from('income_architect_scenarios')
-        .select('id, scenario_name, inputs_json, updated_at')
-        .eq('client_id', _clientId)
-        .eq('advisor_id', _advisorId)
-        .order('updated_at', { ascending: false });
-      if (!data) return;
-      setScenarios(data.filter(r => r.scenario_name !== '_autosave'));
-      const autosave = data.find(r => r.scenario_name === '_autosave');
-      if (autosave && autosave.inputs_json && Object.keys(autosave.inputs_json).length > 0) {
-        setRecoveryData(autosave);
-        setShowRecovery(true);
-      }
-    })();
-  }, []);
-
-  // ── Auto-save every 60 seconds ───────────────────────────────────────────
-  const _inputsRef = React.useRef(null);
-  _inputsRef.current = inputs;
-  React.useEffect(() => {
-    if (!_isPopout || !_sb) return;
-    const doAutoSave = async () => {
-      if (!_clientId || !_advisorId) return;
-      setSaveStatus('saving');
-      const { error } = await _sb
-        .from('income_architect_scenarios')
-        .upsert({
-          client_id:     _clientId,
-          advisor_id:    _advisorId,
-          scenario_name: '_autosave',
-          inputs_json:   _inputsRef.current,
-        }, { onConflict: 'client_id,advisor_id,scenario_name' });
-      setSaveStatus(error ? 'error' : 'saved');
-      setTimeout(() => setSaveStatus(''), 2000);
-    };
-    const t = setInterval(doAutoSave, 60000);
-    return () => clearInterval(t);
-  }, []);
-
-  // ── Manual save function ──────────────────────────────────────────────────
-  const saveScenario = async (name) => {
-    if (!_isPopout || !_sb || !name.trim()) return;
-    setSaveStatus('saving');
-    const { error } = await _sb
-      .from('income_architect_scenarios')
-      .upsert({
-        client_id:     _clientId,
-        advisor_id:    _advisorId,
-        scenario_name: name.trim(),
-        inputs_json:   inputs,
-      }, { onConflict: 'client_id,advisor_id,scenario_name' });
-    if (!error) {
-      setSaveStatus('saved');
-      setShowSaveAs(false);
-      setSaveAsName('');
-      // Refresh scenario list
-      const { data } = await _sb
-        .from('income_architect_scenarios')
-        .select('id, scenario_name, inputs_json, updated_at')
-        .eq('client_id', _clientId)
-        .eq('advisor_id', _advisorId)
-        .neq('scenario_name', '_autosave')
-        .order('updated_at', { ascending: false });
-      if (data) setScenarios(data);
-    } else {
-      setSaveStatus('error');
-    }
-    setTimeout(() => setSaveStatus(''), 3000);
-  };
-
-  // ── Load scenario ────────────────────────────────────────────────────────
-  const loadScenario = (scenarioInputs) => {
-    setInputs(prev => ({ ...prev, ...scenarioInputs }));
-  };
-  // ── End save/load functions ──────────────────────────────────────────────
-
-
   return (
     <div style={{minHeight:'100vh',background:'#07101A',fontFamily:"'DM Sans',sans-serif",color:'#F5F2EC'}}>
 
       {/* Disclaimer modal — blocks app until accepted */}
       {!disclaimerAccepted && <DisclaimerModal onAccept={()=>setDisclaimerAccepted(true)}/>}
-
-      {/* ── Recovery Banner ── */}
-      {showRecovery && recoveryData && (
-        <div style={{
-          position:'fixed',top:0,left:0,right:0,zIndex:9999,
-          background:'linear-gradient(135deg,#0D2A1A,#0B1928)',
-          borderBottom:'1px solid rgba(29,158,117,.4)',
-          padding:'10px 20px',display:'flex',alignItems:'center',
-          justifyContent:'space-between',gap:12,flexWrap:'wrap',
-        }}>
-          <div style={{display:'flex',alignItems:'center',gap:10}}>
-            <span style={{fontSize:18}}>&#x1F4BE;</span>
-            <div>
-              <div style={{fontSize:13,fontWeight:600,color:'#5DCAA5'}}>Unsaved work recovered</div>
-              <div style={{fontSize:11,color:'#8DAFC8'}}>
-                Auto-saved {new Date(recoveryData.updated_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})} — resume where you left off?
-              </div>
-            </div>
-          </div>
-          <div style={{display:'flex',gap:8}}>
-            <button onClick={() => { loadScenario(recoveryData.inputs_json); setShowRecovery(false); }}
-              style={{padding:'6px 16px',borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer',
-                      background:'rgba(29,158,117,.2)',border:'1px solid rgba(29,158,117,.5)',color:'#5DCAA5'}}>
-              &#x2713; Restore
-            </button>
-            <button onClick={() => setShowRecovery(false)}
-              style={{padding:'6px 14px',borderRadius:6,fontSize:12,cursor:'pointer',
-                      background:'transparent',border:'1px solid rgba(255,255,255,.1)',color:'#8DAFC8'}}>
-              Dismiss
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Save/Load Bar ── */}
-      {_isPopout && (
-        <div style={{
-          position:'fixed',bottom:0,left:0,right:0,zIndex:9990,
-          background:'rgba(7,16,26,.96)',backdropFilter:'blur(8px)',
-          borderTop:'1px solid rgba(200,169,110,.18)',
-          padding:'8px 16px',display:'flex',alignItems:'center',
-          gap:10,flexWrap:'wrap',
-        }}>
-          {/* Client name */}
-          <div style={{fontSize:12,color:'#C8A96E',fontWeight:600,marginRight:4}}>
-            &#x1F464; {_clientName}
-          </div>
-          <div style={{width:1,height:18,background:'rgba(255,255,255,.1)'}}/>
-
-          {/* Scenario loader */}
-          {scenarios.length > 0 && (
-            <select onChange={e => { if(e.target.value) { const s = scenarios.find(x=>x.id===e.target.value); if(s) loadScenario(s.inputs_json); e.target.value=''; } }}
-              style={{background:'#0B1928',border:'1px solid rgba(200,169,110,.25)',color:'#F5F2EC',
-                      borderRadius:6,padding:'5px 10px',fontSize:12,cursor:'pointer'}}>
-              <option value="">&#x1F4C2; Load scenario…</option>
-              {scenarios.map(s => (
-                <option key={s.id} value={s.id}>{s.scenario_name}</option>
-              ))}
-            </select>
-          )}
-
-          {/* Save As button */}
-          {!showSaveAs ? (
-            <button onClick={() => setShowSaveAs(true)}
-              style={{padding:'5px 14px',borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer',
-                      background:'rgba(200,169,110,.1)',border:'1px solid rgba(200,169,110,.3)',color:'#C8A96E'}}>
-              &#x1F4BE; Save As…
-            </button>
-          ) : (
-            <div style={{display:'flex',alignItems:'center',gap:6}}>
-              <input value={saveAsName} onChange={e=>setSaveAsName(e.target.value)}
-                onKeyDown={e=>{ if(e.key==='Enter') saveScenario(saveAsName); if(e.key==='Escape') {setShowSaveAs(false);setSaveAsName('');} }}
-                placeholder="Scenario name…" autoFocus
-                style={{padding:'5px 10px',borderRadius:6,fontSize:12,
-                        background:'#0B1928',border:'1px solid rgba(200,169,110,.4)',
-                        color:'#F5F2EC',width:160,outline:'none'}}/>
-              <button onClick={() => saveScenario(saveAsName)}
-                style={{padding:'5px 12px',borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer',
-                        background:'rgba(29,158,117,.2)',border:'1px solid rgba(29,158,117,.4)',color:'#5DCAA5'}}>
-                Save
-              </button>
-              <button onClick={() => {setShowSaveAs(false);setSaveAsName('');}}
-                style={{padding:'5px 10px',borderRadius:6,fontSize:12,cursor:'pointer',
-                        background:'transparent',border:'1px solid rgba(255,255,255,.1)',color:'#8DAFC8'}}>
-                ✕
-              </button>
-            </div>
-          )}
-
-          {/* Save status */}
-          {saveStatus && (
-            <span style={{fontSize:11,color: saveStatus==='saved'?'#5DCAA5':saveStatus==='error'?'#C47A7A':'#C8A96E'}}>
-              {saveStatus==='saving'?'&#x23F3; Saving…':saveStatus==='saved'?'&#x2713; Saved':' Error saving'}
-            </span>
-          )}
-
-          {/* Spacer */}
-          <div style={{flex:1}}/>
-
-          {/* Session timer */}
-          <div style={{fontSize:11,color: sessionMins<=5?'#C47A7A':sessionMins<=10?'#C8A96E':'#8DAFC8',
-                       display:'flex',alignItems:'center',gap:4}}>
-            <span>&#x23F1;</span>
-            {sessionMins > 0 ? `${sessionMins} min remaining` : 'Session expired'}
-          </div>
-          <button onClick={() => window.close()}
-            style={{padding:'4px 10px',borderRadius:6,fontSize:11,cursor:'pointer',
-                    background:'transparent',border:'1px solid rgba(255,255,255,.08)',color:'rgba(141,175,200,.6)'}}>
-            Close
-          </button>
-        </div>
-      )}
 
       {/* ── Send Report Modal ── */}
       {reportModal && (
@@ -5623,14 +5389,16 @@ function App() {
 
           {/* Tax Rate Panel — Year 1 + Peak side by side */}
           {retireData && (() => {
-            const RateBox = ({ title, fedMarginal, stateRate, fedEffective, stateTax, grossInc, irmaaAmt, magi, sources, peakAge, deltaVsY1, accentColor, stateInfo, tooltipLines }) => {
+            const RateBox = ({ title, fedMarginal, stateRate, fedEffective, fedTaxDollars, stateTax, grossInc, irmaaAmt, magi, sources, peakAge, deltaVsY1, accentColor, stateInfo, tooltipLines }) => {
               const [showTip, setShowTip] = React.useState(false);
               const stateExempt = stateInfo?.treatment === 'none' || stateInfo?.treatment === 'exempt';
               // TRUE marginal = federal bracket rate + state marginal rate on the same dollar
               const stateMarginal   = stateExempt ? 0 : stateRate;
               const trueMarginal    = fedMarginal + stateMarginal;
-              // EFFECTIVE = (fed tax + state tax + IRMAA) / gross income — blended average
-              const allInEffective  = grossInc > 0 ? ((grossInc * fedEffective) + stateTax + irmaaAmt) / grossInc : 0;
+              // EFFECTIVE = (fed tax dollars + state tax + IRMAA) / gross income — blended average
+              // Use actual federal tax dollars (not rate × gross) to avoid denominator mismatch
+              const fedTax = fedTaxDollars > 0 ? fedTaxDollars : (grossInc * fedEffective);
+              const allInEffective  = grossInc > 0 ? (fedTax + stateTax + irmaaAmt) / grossInc : 0;
               const irmaaPct        = grossInc > 0 ? (irmaaAmt / grossInc * 100) : 0;
               const taxableSources  = [
                 { key:'ss',       label:'Soc Sec',    val: sources?.ss,       color: COLORS.ss.fill },
@@ -5748,6 +5516,7 @@ function App() {
                     fedMarginal={fedMarginalRate}
                     stateRate={retireData.stateTaxRate||0}
                     fedEffective={retireData.effectiveTaxRate||0}
+                    fedTaxDollars={retireData.federalTax||0}
                     stateTax={retireData.stateTax||0}
                     grossInc={retireGross}
                     irmaaAmt={retireData.irmaa||0}
@@ -5763,6 +5532,7 @@ function App() {
                       fedMarginal={peakFedMarginalRate}
                       stateRate={peakMarginalRow.stateTaxRate||0}
                       fedEffective={peakMarginalRow.effectiveTaxRate||0}
+                      fedTaxDollars={peakMarginalRow.federalTax||0}
                       stateTax={peakMarginalRow.stateTax||0}
                       grossInc={peakMarginalRow.grossIncome||peakMarginalRow.totalIncome||1}
                       irmaaAmt={peakMarginalRow.irmaa||0}
