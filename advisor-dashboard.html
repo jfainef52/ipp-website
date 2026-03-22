@@ -3288,12 +3288,60 @@ async function launchIncomeArchitect() {
     if (error) console.warn('SR confirmation write failed:', error.message);
   });
 
-  // Build URL with session token + client context
+  // Fetch full client record to get names, spouse, filing status
+  const { data: clientRecord } = await supabase
+    .from('clients')
+    .select('first_name, last_name, spouse_first_name, spouse_last_name, filing_status, dob, spouse_dob')
+    .eq('id', clientId)
+    .single();
+
+  // Build advisor full name from profile (already loaded at login — use sidebar text)
+  const advisorFullName = document.getElementById('sidebar-name')?.textContent?.trim() || '';
+  const advisorEmail    = session.user.email || '';
+
+  // Map DB filing_status to modeler value
+  const filingStatusMap = { 'married': 'mfj', 'single': 'single' };
+  const filingStatus = filingStatusMap[clientRecord?.filing_status] || '';
+
+  // Build primary client name
+  const clientFirst = clientRecord?.first_name || '';
+  const clientLast  = clientRecord?.last_name  || '';
+  const primaryName = [clientFirst, clientLast].filter(Boolean).join(' ');
+
+  // Spouse name (optional)
+  const spouseFirst = clientRecord?.spouse_first_name || '';
+  const spouseLast  = clientRecord?.spouse_last_name  || '';
+  const spouseName  = [spouseFirst, spouseLast].filter(Boolean).join(' ');
+
+  // Calculate current ages from DOB
+  const calcAge = (dobStr) => {
+    if (!dobStr) return null;
+    const dob = new Date(dobStr);
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const m = today.getMonth() - dob.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
+    return age;
+  };
+  const currentAge     = calcAge(clientRecord?.dob);
+  const spouseAge      = calcAge(clientRecord?.spouse_dob);
+  const spouseDobOffset = (currentAge !== null && spouseAge !== null)
+    ? currentAge - spouseAge : null;
+
+  // Build URL with session token + client context + pre-fill data
   const params = new URLSearchParams({
-    token:      session.access_token,
-    clientId:   clientId,
-    clientName: clientName,
-    advisorId:  session.user.id,
+    token:           session.access_token,
+    clientId:        clientId,
+    clientName:      clientName,
+    advisorId:       session.user.id,
+    primaryName:     primaryName,
+    spouseName:      spouseName,
+    advisorName:     advisorFullName,
+    advisorEmail:    advisorEmail,
+    filingStatus:    filingStatus,
+    ...(currentAge      !== null && { currentAge:      String(currentAge) }),
+    ...(spouseAge       !== null && { spouseCurrentAge: String(spouseAge) }),
+    ...(spouseDobOffset !== null && { spouseDobOffset:  String(spouseDobOffset) }),
   });
   const toolUrl = '/ipp-retirement-tool.html?' + params.toString();
 
@@ -3337,7 +3385,7 @@ function updateIAStatus(expiresAt) {
 
 function openIANewClientModal() {
   // Clear fields
-  ['ia-nc-first','ia-nc-last','ia-nc-spouse-first','ia-nc-spouse-last','ia-nc-dob'].forEach(id => {
+  ['ia-nc-first','ia-nc-last','ia-nc-spouse-first','ia-nc-spouse-last','ia-nc-dob','ia-nc-spouse-dob'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -3347,6 +3395,8 @@ function openIANewClientModal() {
   if (chk) chk.checked = false;
   const err = document.getElementById('ia-nc-error');
   if (err) err.style.display = 'none';
+  const preview = document.getElementById('ia-nc-age-preview');
+  if (preview) preview.textContent = '';
   const modal = document.getElementById('ia-new-client-modal');
   if (modal) { modal.style.display = 'flex'; }
   setTimeout(() => document.getElementById('ia-nc-first')?.focus(), 100);
@@ -3365,9 +3415,17 @@ async function submitIANewClient() {
   const btn    = document.getElementById('ia-nc-submit');
 
   // Validate
+  const dob = document.getElementById('ia-nc-dob')?.value;
+
   if (!first || !last) {
     errEl.textContent = 'First and last name are required.';
     errEl.style.display = 'block';
+    return;
+  }
+  if (!dob) {
+    errEl.textContent = 'Client date of birth is required.';
+    errEl.style.display = 'block';
+    document.getElementById('ia-nc-dob')?.focus();
     return;
   }
   if (!srDone) {
@@ -3394,6 +3452,7 @@ async function submitIANewClient() {
     spouse_first_name:            document.getElementById('ia-nc-spouse-first')?.value.trim() || null,
     spouse_last_name:             document.getElementById('ia-nc-spouse-last')?.value.trim()  || null,
     dob:                          document.getElementById('ia-nc-dob')?.value || null,
+    spouse_dob:                   document.getElementById('ia-nc-spouse-dob')?.value || null,
     filing_status:                document.getElementById('ia-nc-filing')?.value || null,
     status:                       'prospect',
     advisor_id:                   session.user.id,
@@ -3441,6 +3500,42 @@ async function submitIANewClient() {
 
 // ── End IA Quick Add Client Modal ────────────────────────────────────────────
 
+
+// ── Age calculation helpers for IA quick-add modal ──────────────────────────
+
+function calcAgeFromDob(dobStr) {
+  if (!dobStr) return null;
+  const dob  = new Date(dobStr);
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const m = today.getMonth() - dob.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
+  return age;
+}
+
+function updateIAAgePreview() {
+  const clientDob  = document.getElementById('ia-nc-dob')?.value;
+  const spouseDob  = document.getElementById('ia-nc-spouse-dob')?.value;
+  const preview    = document.getElementById('ia-nc-age-preview');
+  if (!preview) return;
+
+  const clientAge = calcAgeFromDob(clientDob);
+  const spouseAge = calcAgeFromDob(spouseDob);
+
+  const lines = [];
+  if (clientAge !== null) lines.push(`Client: age <strong style="color:#F5F2EC">${clientAge}</strong>`);
+  if (spouseAge !== null) lines.push(`Spouse: age <strong style="color:#F5F2EC">${spouseAge}</strong>`);
+  preview.innerHTML = lines.join('<br>');
+}
+
+// Attach listeners after DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('ia-nc-dob')       ?.addEventListener('change', updateIAAgePreview);
+  document.getElementById('ia-nc-spouse-dob')?.addEventListener('change', updateIAAgePreview);
+});
+
+// ── End age helpers ──────────────────────────────────────────────────────────
+
 </script>
 
   <!-- ── IA Quick Add Client Modal ── -->
@@ -3484,10 +3579,10 @@ async function submitIANewClient() {
       </div>
 
       <!-- DOB + Filing Status row -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
         <div>
-          <label style="display:block;font-size:11px;color:#8DAFC8;letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px;">Date of Birth</label>
-          <input id="ia-nc-dob" type="date" style="width:100%;background:#0B1928;border:1px solid rgba(255,255,255,.1);border-radius:7px;padding:9px 12px;font-size:14px;color:#F5F2EC;outline:none;font-family:inherit;color-scheme:dark;">
+          <label style="display:block;font-size:11px;color:#8DAFC8;letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px;">Client Date of Birth <span style="color:#C47A7A;">*</span></label>
+          <input id="ia-nc-dob" type="date" required style="width:100%;background:#0B1928;border:1px solid rgba(255,255,255,.1);border-radius:7px;padding:9px 12px;font-size:14px;color:#F5F2EC;outline:none;font-family:inherit;color-scheme:dark;">
         </div>
         <div>
           <label style="display:block;font-size:11px;color:#8DAFC8;letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px;">Filing Status</label>
@@ -3496,6 +3591,17 @@ async function submitIANewClient() {
             <option value="married">Married Filing Jointly</option>
             <option value="single">Single</option>
           </select>
+        </div>
+      </div>
+
+      <!-- Spouse DOB row (shown only when relevant, but always present) -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+        <div>
+          <label style="display:block;font-size:11px;color:#8DAFC8;letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px;">Spouse Date of Birth <span style="color:rgba(141,175,200,.5);font-size:10px;text-transform:none;">(optional)</span></label>
+          <input id="ia-nc-spouse-dob" type="date" style="width:100%;background:#0B1928;border:1px solid rgba(255,255,255,.1);border-radius:7px;padding:9px 12px;font-size:14px;color:#F5F2EC;outline:none;font-family:inherit;color-scheme:dark;">
+        </div>
+        <div style="display:flex;align-items:flex-end;padding-bottom:2px;">
+          <div id="ia-nc-age-preview" style="font-size:12px;color:#8DAFC8;line-height:1.7;"></div>
         </div>
       </div>
 
