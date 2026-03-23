@@ -1000,7 +1000,28 @@ function projectArc(inputs) {
     const isAnyLtcEvent = row.ltcEvent || row.spouseLtcEvent;
 
     if (row.gap < 0) {
-      const needed = Math.abs(row.gap);
+      // Estimate ordinary income tax on guaranteed sources (SS + pension + part-time)
+      // These sources generate a tax bill that gets apportioned away AFTER the gap-fill.
+      // Without accounting for this, bars end up below the expense line by the tax amount.
+      // We add this estimated tax to "needed" so portfolio draws cover it upfront.
+      const guaranteedOrdGross = (row.sources.ss ? Math.min((row.sources.ss||0)*0.85 + (row.sources.pension||0) + (row.sources.parttime||0) + (row.sources.annuity||0), (row.sources.ss||0)*0.85 + (row.sources.pension||0) + (row.sources.parttime||0) + (row.sources.annuity||0)) : (row.sources.pension||0) + (row.sources.parttime||0) + (row.sources.annuity||0));
+      const guaranteedOrdAGI = Math.max(0, guaranteedOrdGross - stdDed);
+      const ordBktsEst = (isMFJeff ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025)
+        .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
+      let estGuaranteedTax = 0;
+      let prev_g = 0;
+      for (const b of ordBktsEst) {
+        if (guaranteedOrdAGI <= prev_g) break;
+        estGuaranteedTax += (Math.min(guaranteedOrdAGI, b.limit) - prev_g) * b.rate;
+        if (guaranteedOrdAGI <= b.limit) break;
+        prev_g = b.limit;
+      }
+      // Also estimate state tax on guaranteed sources
+      const estGuaranteedStateTax = calcStateTax(row.sources, stateCode, inflFactor,
+        (customStateRate !== '' && customStateRate !== undefined ? parseFloat(customStateRate) : undefined),
+        stressAdder);
+
+      const needed = Math.abs(row.gap) + estGuaranteedTax + estGuaranteedStateTax;
       let remaining = needed;
       // Track how much of the draw is attributable to LTC vs baseline gap
       const baselineGapAmt = Math.max(0, baseGapWithoutLtc !== null ? -baseGapWithoutLtc : needed);
@@ -1238,6 +1259,11 @@ function projectArc(inputs) {
       });
       row.totalIncome = Math.max(0, row.totalIncome - totalAllInTax);
     }
+
+    // Net spendable income = after-tax total, minus non-spendable capital events
+    // This is what the bars sum to — used in the Number Table
+    row.netIncome = Object.values(row.chartSources || row.sources)
+      .reduce((s, v) => s + (v || 0), 0);
 
     // chartSources: bars show all spendable income.
     // Only strip one-time capital reallocation draws (ETA premium, Roth conversion,
