@@ -448,13 +448,15 @@ function calcAnnualTax(sources, filingStatus, inflFactor, stressAdder = 0) {
   if (taxable > 0) {
     const ltcgBase = ordinaryAGI; // LTCG stacks on top of ordinary
     let ltcgPrev = 0;
+    let taxableRemaining = taxable; // track unprocessed LTCG as we walk brackets
     for (const b of ltcgBrackets) {
+      if (taxableRemaining <= 0) break;
       if (ltcgBase >= b.limit) { ltcgPrev = b.limit; continue; }
       const spaceInBracket = b.limit - Math.max(ltcgBase, ltcgPrev);
-      const ltcgInBracket = Math.min(taxable, spaceInBracket);
+      const ltcgInBracket = Math.min(taxableRemaining, spaceInBracket);
       ltcgTax += ltcgInBracket * b.rate;
+      taxableRemaining -= ltcgInBracket; // consume processed portion
       ltcgPrev = b.limit;
-      if (ltcgInBracket >= taxable) break;
     }
   }
 
@@ -942,7 +944,56 @@ function projectArc(inputs) {
       + (row.rothConversionAmount || 0)
       + (row.ltcFundingAmount || 0);
     row.spendableIncome = row.totalIncome - nonSpendableEvents;
-    row.gap = row.spendableIncome - expenses;
+
+    // Pre-estimate tax on all current income to determine TRUE after-tax gap
+    // Without this, years where gross income > expenses but net income < expenses
+    // never trigger the gap-fill, leaving bars below the expense line.
+    const preEstTax = (() => {
+      const isMFJ_pre = effectiveStatus === 'mfj';
+      const ss_pre = row.sources.ss || 0;
+      const rmd_pre = row.sources.rmd || 0;
+      const pen_pre = row.sources.pension || 0;
+      const pt_pre  = row.sources.parttime || 0;
+      const ann_pre = row.sources.annuity || 0;
+      const tax_pre = row.sources.taxable || 0;
+      // SS taxability — use 85% conservatively since any gap-fill draw will push
+      // provisional income above the 85% threshold in virtually all planning scenarios
+      const ssTax_pre = ss_pre * 0.85;
+      const ordGross_pre = ssTax_pre + pen_pre + rmd_pre + pt_pre + ann_pre;
+      const ordAGI_pre = Math.max(0, ordGross_pre - (isMFJ_pre ? STD_DEDUCTION_MFJ : STD_DEDUCTION_SINGLE) * inflFactor);
+      // Ordinary tax
+      const ordBkts_pre = (isMFJ_pre ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025)
+        .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
+      let ordTax_pre = 0; let prev_pre = 0;
+      for (const b of ordBkts_pre) {
+        if (ordAGI_pre <= prev_pre) break;
+        ordTax_pre += (Math.min(ordAGI_pre, b.limit) - prev_pre) * b.rate;
+        if (ordAGI_pre <= b.limit) break;
+        prev_pre = b.limit;
+      }
+      // LTCG tax on taxable
+      let ltcgTax_pre = 0;
+      if (tax_pre > 0) {
+        const ltcgBkts_pre = (isMFJ_pre ? LTCG_MFJ_2025 : LTCG_SINGLE_2025)
+          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
+        let ltcgPrev_pre = 0; let taxRemain_pre = tax_pre;
+        for (const b of ltcgBkts_pre) {
+          if (taxRemain_pre <= 0) break;
+          if (ordAGI_pre >= b.limit) { ltcgPrev_pre = b.limit; continue; }
+          const space_pre = b.limit - Math.max(ordAGI_pre, ltcgPrev_pre);
+          const inBkt_pre = Math.min(taxRemain_pre, space_pre);
+          ltcgTax_pre += inBkt_pre * b.rate;
+          taxRemain_pre -= inBkt_pre;
+          ltcgPrev_pre = b.limit;
+        }
+      }
+      return ordTax_pre + ltcgTax_pre;
+    })();
+
+    // Use after-tax gap: if gross surplus minus pre-estimated tax is still negative,
+    // we need additional draws to cover both expenses and the tax burden
+    const grossGap = row.spendableIncome - expenses;
+    row.gap = grossGap - preEstTax; // true after-tax gap
 
     // ── Shared gross-up utilities — hoisted outside gap block so IRMAA fill can also use them ──
     const isMFJeff = effectiveStatus === 'mfj';
@@ -1004,7 +1055,18 @@ function projectArc(inputs) {
       // These sources generate a tax bill that gets apportioned away AFTER the gap-fill.
       // Without accounting for this, bars end up below the expense line by the tax amount.
       // We add this estimated tax to "needed" so portfolio draws cover it upfront.
-      const guaranteedOrdGross = (row.sources.ss ? Math.min((row.sources.ss||0)*0.85 + (row.sources.pension||0) + (row.sources.parttime||0) + (row.sources.annuity||0), (row.sources.ss||0)*0.85 + (row.sources.pension||0) + (row.sources.parttime||0) + (row.sources.annuity||0)) : (row.sources.pension||0) + (row.sources.parttime||0) + (row.sources.annuity||0));
+      // Estimate tax on ALL income already in sources before portfolio draws:
+      // SS (taxable portion) + pension + RMD + parttime + annuity
+      // RMD must be included because it's mandatory ordinary income generating real tax
+      const ssTaxablePortion = (() => {
+        const ss = row.sources.ss || 0;
+        const rmd = row.sources.rmd || 0;
+        const prov = ss * 0.5 + (row.sources.pension||0) + rmd + (row.sources.parttime||0) + (row.sources.annuity||0);
+        const t2 = (isMFJeff ? 44000 : 34000) * inflFactor;
+        const t1 = (isMFJeff ? 32000 : 25000) * inflFactor;
+        return prov > t2 ? ss * 0.85 : prov > t1 ? ss * 0.50 : 0;
+      })();
+      const guaranteedOrdGross = ssTaxablePortion + (row.sources.pension||0) + (row.sources.rmd||0) + (row.sources.parttime||0) + (row.sources.annuity||0);
       const guaranteedOrdAGI = Math.max(0, guaranteedOrdGross - stdDed);
       const ordBktsEst = (isMFJeff ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025)
         .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
@@ -1021,6 +1083,7 @@ function projectArc(inputs) {
         (customStateRate !== '' && customStateRate !== undefined ? parseFloat(customStateRate) : undefined),
         stressAdder);
 
+      row._estGuarTax = estGuaranteedTax + estGuaranteedStateTax;
       const needed = Math.abs(row.gap) + estGuaranteedTax + estGuaranteedStateTax;
       let remaining = needed;
       // Track how much of the draw is attributable to LTC vs baseline gap
@@ -1700,6 +1763,25 @@ function ArcChart({ data, view, insuredData, uninsuredData, sorrEnabled }) {
               );
             })()}
           </g>
+        );
+      })}
+
+      {/* Surplus labels — shown on bars when income significantly exceeds expenses */}
+      {data.map((d, i) => {
+        const cs = d.chartSources || d.sources || {};
+        const barTotal = Object.values(cs).reduce((s,v)=>s+(v||0),0);
+        const surplus = barTotal - (d.totalExpense || 0);
+        if (surplus < 500) return null; // only label meaningful surpluses
+        const barTopY = yScale(Math.min(barTotal, maxVal));
+        const fmt = surplus >= 1000000
+          ? '+$' + (surplus/1000000).toFixed(1) + 'M'
+          : '+$' + Math.round(surplus/1000) + 'K';
+        return (
+          <text key={i} x={xScale(i)} y={Math.max(PAD.t + 12, barTopY - 4)}
+            textAnchor="middle" fill="rgba(200,169,110,.7)"
+            fontSize="8" fontFamily="DM Sans" fontWeight="600">
+            {fmt}
+          </text>
         );
       })}
 
