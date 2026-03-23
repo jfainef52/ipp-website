@@ -1191,7 +1191,9 @@ function projectArc(inputs) {
     // grossUp tax ≈ grossUp × allInRate, already baked into the re-run of calcAnnualTax implicitly
     // via the income stack. We approximate by adding overageTax to the base federal tax.
     row.federalTax = taxResult.totalTax + (row.rothConversionOverageTax || 0);
+    row.baseFederalTax = taxResult.totalTax; // excludes overage — matches grossIncome denominator
     row.stateTax   = stateTax + (row.rothConversionOverage || 0) * stateEffRate;
+    row.baseStateTax = stateTax; // excludes overage — matches grossIncome denominator
     row.estimatedTax = row.federalTax + row.stateTax;
 
     // Capture gross income (pre-tax, excludes overage gross-up draw which is a tax-covering draw not spendable income)
@@ -2486,7 +2488,7 @@ function App() {
   const retireStateTax = retireData ? (retireData.stateTax || 0) : 0;
   const retireGross = retireData ? (retireData.grossIncome || 0) : 1;
   const allInEffectiveRate = retireData
-    ? ((retireData.federalTax||0) + (retireData.stateTax||0) + (retireData.irmaa||0)) / retireGross
+    ? ((retireData.baseFederalTax||retireData.federalTax||0) + (retireData.baseStateTax||retireData.stateTax||0) + (retireData.irmaa||0)) / retireGross
     : 0;
   const allInMarginalRate = retireData ? (retireData.allInMarginalRate || 0) : 0;
   const fedMarginalRate = retireData ? (retireData.marginalFedRate || 0) : 0;
@@ -5691,7 +5693,7 @@ function App() {
               const stateMarginal   = stateExempt ? 0 : stateRate;
               const trueMarginal    = fedMarginal + stateMarginal;
               // EFFECTIVE = (fed tax dollars + state tax + IRMAA) / gross income — blended average
-              const fedTax = fedTaxDollars > 0 ? fedTaxDollars : (grossInc * fedEffective);
+              const fedTax = fedTaxDollars || 0; // actual tax dollars — 0 means no federal tax
               const allInEffective  = grossInc > 0 ? (fedTax + stateTax + irmaaAmt) / grossInc : 0;
               const irmaaPct        = grossInc > 0 ? (irmaaAmt / grossInc * 100) : 0;
               const taxableSources  = [
@@ -5754,7 +5756,7 @@ function App() {
                   <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:6,marginBottom:10,paddingBottom:10,borderBottom:'1px solid rgba(255,255,255,.06)'}}>
                     {[
                       { label:'Fed Marginal',  value:(fedMarginal*100).toFixed(0)+'%',  color:'#C47A7A' },
-                      { label:'Fed Effective', value:(fedEffective*100).toFixed(1)+'%', color:'#C8A96E' },
+                      { label:'Fed Effective', value:grossInc>0?((fedTax/grossInc)*100).toFixed(1)+'%':'0.0%', color:'#C8A96E' },
                       { label: stateInfo?.name||'State',
                         value: stateExempt ? '—' : (stateMarginal*100).toFixed(2)+'%',
                         color:'#C8A030',
@@ -5810,7 +5812,7 @@ function App() {
                     fedMarginal={fedMarginalRate}
                     stateRate={retireData.stateTaxRate||0}
                     fedEffective={retireData.effectiveTaxRate||0}
-                    fedTaxDollars={retireData.federalTax||0}
+                    fedTaxDollars={retireData.baseFederalTax||retireData.federalTax||0}
                     stateTax={retireData.stateTax||0}
                     grossInc={retireGross}
                     irmaaAmt={retireData.irmaa||0}
@@ -5826,7 +5828,7 @@ function App() {
                       fedMarginal={peakFedMarginalRate}
                       stateRate={peakMarginalRow.stateTaxRate||0}
                       fedEffective={peakMarginalRow.effectiveTaxRate||0}
-                      fedTaxDollars={peakMarginalRow.federalTax||0}
+                      fedTaxDollars={peakMarginalRow.baseFederalTax||peakMarginalRow.federalTax||0}
                       stateTax={peakMarginalRow.stateTax||0}
                       grossInc={peakMarginalRow.grossIncome||peakMarginalRow.totalIncome||1}
                       irmaaAmt={peakMarginalRow.irmaa||0}
