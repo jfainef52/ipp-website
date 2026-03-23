@@ -1154,7 +1154,22 @@ function projectArc(inputs) {
     const stateEffRate = (customStateRate !== '' && customStateRate !== undefined)
       ? Math.min(parseFloat(customStateRate) / 100 + stressAdder, 0.99)
       : Math.min((STATE_TAX_DATA[stateCode]?.rate || 0) + stressAdder, 0.99);
-    row.allInMarginalRate = Math.min(taxResult.marginalRate + stateEffRate, 0.99);
+    // All-in marginal = highest of (ordinary marginal, LTCG marginal) + state
+    // When taxable draws exist and LTCG rate > ordinary rate, LTCG is the binding rate
+    const ltcgMarginalRate = (() => {
+      if (!row.sources.taxable) return 0;
+      const ltcgBkts = (effectiveStatus === 'mfj' ? LTCG_MFJ_2025 : LTCG_SINGLE_2025)
+        .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
+      const stackBase = taxResult.ordinaryAGI || 0;
+      let ltcgMarg = ltcgBkts[0].rate;
+      for (const b of ltcgBkts) {
+        if (stackBase < b.limit) { ltcgMarg = b.rate; break; }
+      }
+      return ltcgMarg;
+    })();
+    const bindingFedMarginal = Math.max(taxResult.marginalRate, ltcgMarginalRate);
+    row.allInMarginalRate = Math.min(bindingFedMarginal + stateEffRate, 0.99);
+    row.ltcgMarginalRate = ltcgMarginalRate; // stored for display
     row.stateTaxRate = stateEffRate;
     row.ordinaryTax = taxResult.ordinaryTax;
     row.ltcgTax = taxResult.ltcgTax;
@@ -4347,7 +4362,7 @@ function App() {
       <div className="desktop-only-grid" style={{display:'grid',gridTemplateColumns:'300px 1fr',minHeight:'calc(100vh - 69px)'}}>
 
         {/* ── LEFT: Inputs ── */}
-        <div className="left-panel" style={{background:'#0B1928',borderRight:'1px solid rgba(255,255,255,.06)',padding:'16px 14px',overflowY:'auto',maxHeight:'calc(100vh - 69px)'}}>
+        <div className="left-panel" style={{background:'#0B1928',borderRight:'1px solid rgba(255,255,255,.06)',padding:'16px 14px 70px 14px',overflowY:'auto',maxHeight:'calc(100vh - 69px)'}}>
           {/* Client Info Panel */}
           {/* Filing Status Toggle */}
           <div style={{marginBottom:10,padding:'10px 12px',background:'rgba(200,169,110,.06)',border:'1px solid rgba(200,169,110,.18)',borderRadius:10}}>
@@ -5572,7 +5587,7 @@ function App() {
         </div>
 
         {/* ── RIGHT: Results ── */}
-        <div className="right-panel" style={{overflowY:'auto',maxHeight:'calc(100vh - 69px)',padding:'20px 24px'}}>
+        <div className="right-panel" style={{overflowY:'auto',maxHeight:'calc(100vh - 69px)',padding:'20px 24px 70px 24px'}}>
 
           {/* SORR active warning banner */}
           {inputs.sorrEnabled && (
@@ -5690,9 +5705,9 @@ function App() {
             const RateBox = ({ title, fedMarginal, stateRate, fedEffective, fedTaxDollars, stateTax, grossInc, irmaaAmt, magi, sources, peakAge, deltaVsY1, accentColor, stateInfo, tooltipLines }) => {
               const [showTip, setShowTip] = React.useState(false);
               const stateExempt = stateInfo?.treatment === 'none' || stateInfo?.treatment === 'exempt';
-              // TRUE marginal = federal bracket rate + state marginal rate on the same dollar
-              const stateMarginal   = stateExempt ? 0 : stateRate;
-              const trueMarginal    = fedMarginal + stateMarginal;
+              // All-in marginal already includes state — display as-is
+              const stateMarginal   = 0; // already baked into fedMarginal (which is allInMarginalRate)
+              const trueMarginal    = fedMarginal; // = allInMarginalRate passed in
               // EFFECTIVE = (fed tax dollars + state tax + IRMAA) / gross income — blended average
               const fedTax = fedTaxDollars || 0; // actual tax dollars — 0 means no federal tax
               const allInEffective  = grossInc > 0 ? (fedTax + stateTax + irmaaAmt) / grossInc : 0;
@@ -5739,10 +5754,10 @@ function App() {
                     <span style={{fontSize:36,fontWeight:700,fontFamily:"'Cormorant Garamond',serif",color:accentColor,lineHeight:1}}>
                       {(trueMarginal*100).toFixed(1)}%
                     </span>
-                    <span style={{fontSize:12,color:'#8DAFC8'}}>marginal rate</span>
+                    <span style={{fontSize:12,color:'#8DAFC8'}}>all-in marginal</span>
                   </div>
                   <div style={{fontSize:12,color:'#7A9BB0',marginBottom:8}}>
-                    Fed {(fedMarginal*100).toFixed(0)}% bracket · {stateInfo?.name||'State'} {stateExempt ? '✓ exempt' : (stateMarginal*100).toFixed(2)+'%'}
+                    All-in: ord + LTCG + state{stateExempt ? ' (IL ✓ exempt)' : ''}
                   </div>
 
                   {/* SECONDARY: all-in effective — clearly labeled as blended */}
@@ -5809,8 +5824,8 @@ function App() {
               <div style={{marginBottom:12}}>
                 <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
                   <RateBox
-                    title="Marginal Rate · Year 1"
-                    fedMarginal={fedMarginalRate}
+                    title="All-In Marginal · Year 1"
+                    fedMarginal={allInMarginalRate}
                     stateRate={retireData.stateTaxRate||0}
                     fedEffective={retireData.effectiveTaxRate||0}
                     fedTaxDollars={retireData.baseFederalTax||retireData.federalTax||0}
@@ -5825,8 +5840,8 @@ function App() {
                   />
                   {peakMarginalRow && (
                     <RateBox
-                      title="Peak Marginal Rate"
-                      fedMarginal={peakFedMarginalRate}
+                      title="Peak All-In Marginal"
+                      fedMarginal={peakMarginalRate}
                       stateRate={peakMarginalRow.stateTaxRate||0}
                       fedEffective={peakMarginalRow.effectiveTaxRate||0}
                       fedTaxDollars={peakMarginalRow.baseFederalTax||peakMarginalRow.federalTax||0}
