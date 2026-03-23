@@ -1582,6 +1582,252 @@ function NumInput({ value, onChange, placeholder, prefix, suffix }) {
 }
 
 // ── Arc SVG Chart ──
+
+// ── ScenarioSummaryModal ──
+function ScenarioSummaryModal({ inputs, onClose }) {
+  const fmt$ = (v, suffix='') => v > 0 ? '$' + Math.round(v).toLocaleString() + suffix : '—';
+  const fmtK = (v) => v > 0 ? '$' + Math.round(v/1000) + 'K' : '—';
+  const fmtPct = (v) => v > 0 ? v + '%' : '—';
+  const fmtMo = (v) => v > 0 ? '$' + Math.round(v).toLocaleString() + '/mo' : '—';
+  const fmtYr = (v) => v > 0 ? '$' + Math.round(v).toLocaleString() + '/yr' : '—';
+  const na = (v, fmt) => v > 0 ? fmt(v) : '—';
+
+  const isMarried = inputs.filingStatus === 'mfj';
+  const arch = inputs.architectureEnabled;
+  const hasLtc = inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
+  const hasSpouseLtc = isMarried && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
+  const totalPortfolio = (inputs.traditionalBalance||0) + (inputs.rothBalance||0) + (inputs.taxableBalance||0) + (inputs.spouseTraditionalBalance||0);
+
+  const Row = ({label, value, color}) => (
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',padding:'3px 0',borderBottom:'1px solid rgba(255,255,255,.03)'}}>
+      <span style={{fontSize:11,color:'#9EB8CC',flex:1,paddingRight:8}}>{label}</span>
+      <span style={{fontSize:12,fontWeight:500,color:color||'#EDE8DE',whiteSpace:'nowrap'}}>{value}</span>
+    </div>
+  );
+
+  const Section = ({title, color, children}) => (
+    <div style={{background:'#0E1628',border:'1px solid rgba(255,255,255,.07)',borderTop:`2px solid ${color||'#C8A96E'}`,padding:'14px 16px',breakInside:'avoid'}}>
+      <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:9,fontWeight:700,letterSpacing:'.18em',textTransform:'uppercase',color:color||'#C8A96E',marginBottom:10,paddingBottom:7,borderBottom:'1px solid rgba(200,169,110,.12)'}}>{title}</div>
+      {children}
+    </div>
+  );
+
+  const Badge = ({label, on}) => (
+    <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:9,fontWeight:700,letterSpacing:'.1em',textTransform:'uppercase',padding:'2px 7px',borderRadius:2,background:on?'rgba(196,106,106,.15)':'rgba(255,255,255,.05)',border:on?'1px solid rgba(196,106,106,.3)':'1px solid rgba(255,255,255,.1)',color:on?'#C47A7A':'#5A6E88'}}>{label}</span>
+  );
+
+  const sorrSchedule = ['-18%','+ 4%','-14%','+ 5%','-10%'];
+
+  return (
+    <div style={{position:'fixed',inset:0,zIndex:9999,background:'rgba(0,0,0,.85)',display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'20px',overflowY:'auto'}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div id="scenario-summary-print" style={{width:900,background:'#0B1220',padding:'0 0 32px',fontFamily:"'Barlow',sans-serif"}}>
+
+        {/* HEADER */}
+        <div style={{padding:'28px 36px 20px',borderBottom:'1px solid rgba(200,169,110,.15)',marginBottom:20,display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+          <div>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:10,fontWeight:600,letterSpacing:'.2em',textTransform:'uppercase',color:'#C8A96E',marginBottom:6,display:'flex',alignItems:'center',gap:10}}>
+              <span style={{display:'block',width:24,height:1,background:'#C8A96E'}}></span>IncomeArchitect™ Modeler
+            </div>
+            <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:32,fontWeight:300,color:'#EDE8DE',lineHeight:1.1,marginBottom:8}}>
+              {inputs.primaryName||'Client'}{isMarried && inputs.spouseName ? <> &amp; {inputs.spouseName}</> : ''}
+              <span style={{fontStyle:'italic',color:'#C8A96E'}}> — Scenario Summary</span>
+            </div>
+            <div style={{fontSize:12,color:'#9EB8CC',lineHeight:1.7}}>
+              {isMarried ? 'Married Filing Jointly' : 'Single'} &nbsp;·&nbsp; {inputs.stateCode||'IL'}
+              {inputs.advisorName ? <> &nbsp;·&nbsp; Prepared by: {inputs.advisorName}</> : ''}
+              &nbsp;·&nbsp; Generated {new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}
+            </div>
+          </div>
+          <div style={{textAlign:'right'}}>
+            <div style={{display:'inline-flex',alignItems:'center',gap:10,marginBottom:8}}>
+              <div style={{width:32,height:32,border:'1.5px solid #C8A96E',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,fontSize:12,color:'#C8A96E'}}>IP</div>
+              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:10,fontWeight:600,letterSpacing:'.1em',textTransform:'uppercase',color:'#9EB8CC',lineHeight:1.3,textAlign:'left'}}>Integrated<br/>Planning Partners</div>
+            </div>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:9,fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',background:'rgba(200,169,110,.1)',border:'1px solid rgba(200,169,110,.2)',color:'#C8A96E',padding:'3px 10px',display:'inline-block'}}>
+              {arch ? 'Architecture ON' : 'Status Quo'}
+            </div>
+          </div>
+        </div>
+
+        {/* GRID */}
+        <div style={{padding:'0 36px',display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10}}>
+
+          {/* CLIENT PROFILE */}
+          <Section title="Client Profile" color="#C8A96E">
+            <Row label="Primary Client" value={inputs.primaryName||'—'}/>
+            <Row label="Current Age" value={inputs.currentAge} color="#C8A96E"/>
+            <Row label="Retirement Age" value={inputs.retireAge}/>
+            <Row label="FRA" value={inputs.fra}/>
+            <Row label="Plan to Age" value={inputs.planToAge}/>
+            {isMarried && <><Row label="Spouse" value={inputs.spouseName||'—'}/>
+            <Row label="Spouse Age" value={inputs.spouseCurrentAge} color="#C8A96E"/>
+            <Row label="Spouse FRA" value={inputs.spouseFra}/></>}
+            <Row label="Filing Status" value={isMarried ? 'Married (MFJ)' : 'Single'}/>
+            <Row label="State" value={inputs.stateCode||'—'}/>
+          </Section>
+
+          {/* PORTFOLIO */}
+          <Section title="Portfolio Balances" color="#C8A96E">
+            <Row label="Traditional IRA / 401(k)" value={fmtK(inputs.traditionalBalance)} color="#C47A7A"/>
+            <Row label="Roth IRA" value={fmtK(inputs.rothBalance)} color="#7BAF84"/>
+            <Row label="Taxable Brokerage" value={fmtK(inputs.taxableBalance)} color="#C8A030"/>
+            {isMarried && <Row label="Spouse Traditional IRA" value={fmtK(inputs.spouseTraditionalBalance||0)} color="#C47A7A"/>}
+            <div style={{height:6}}/>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',padding:'5px 0',borderTop:'1px solid rgba(200,169,110,.15)',marginTop:2}}>
+              <span style={{fontSize:11,fontWeight:600,color:'#EDE8DE'}}>Total Portfolio</span>
+              <span style={{fontSize:14,fontWeight:600,color:'#C8A96E'}}>{fmtK(totalPortfolio)}</span>
+            </div>
+            <div style={{height:6}}/>
+            <Row label="Primary Trad. Contribution" value={inputs.annualTradContribution > 0 ? fmtYr(inputs.annualTradContribution) : '—'}/>
+            {isMarried && <Row label="Spouse Trad. Contribution" value={inputs.annualSpouseTradContribution > 0 ? fmtYr(inputs.annualSpouseTradContribution) : '—'}/>}
+            <Row label="Taxable Contribution" value={inputs.annualTaxableContribution > 0 ? fmtYr(inputs.annualTaxableContribution) : '—'}/>
+          </Section>
+
+          {/* ASSUMPTIONS */}
+          <Section title="Projection Assumptions" color="#C8A96E">
+            <Row label="Portfolio Return" value={inputs.portfolioReturn + '%'} color="#C8A96E"/>
+            <Row label="Inflation Rate" value={inputs.inflation + '%'}/>
+            <Row label="LTC Care Inflation" value={(inputs.ltcCareInflationRate||4) + '%'}/>
+            <Row label="Tax Rate Stress Adder" value={inputs.taxRateStressAdder > 0 ? '+' + inputs.taxRateStressAdder + '%' : '0%'}/>
+            <Row label="State Tax Treatment" value={inputs.stateCode === 'IL' ? 'IL — Exempt' : inputs.stateCode||'—'} color="#4A9B7A"/>
+            <div style={{height:8}}/>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:9,fontWeight:700,letterSpacing:'.18em',textTransform:'uppercase',color:'#C8A96E',marginBottom:7,paddingTop:4,borderTop:'1px solid rgba(200,169,110,.12)'}}>Scenario Toggles</div>
+            <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
+              <Badge label="Architecture" on={inputs.architectureEnabled}/>
+              <Badge label="SORR" on={inputs.sorrEnabled}/>
+              <Badge label="Health Events" on={inputs.ltcEventEnabled||inputs.spouseLtcEventEnabled}/>
+              <Badge label="Exp. Shocks" on={inputs.expenseShockEnabled}/>
+            </div>
+          </Section>
+
+          {/* INCOME SOURCES */}
+          <Section title="Guaranteed Income Sources" color="#5B8FA8" style={{gridColumn:'span 2'}}>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0 20px'}}>
+              <div>
+                <Row label="Social Security — Primary" value={fmtMo(inputs.ssMonthly)} color="#5B8FA8"/>
+                <Row label="SS Claim Age" value={inputs.ssClaimAge + ' (FRA)'}/>
+                {isMarried && <><Row label="Social Security — Spouse" value={fmtMo(inputs.spouseSsMonthly)} color="#5B8FA8"/>
+                <Row label="Spouse SS Claim Age" value={(inputs.spouseSsClaimAge||67) + ' (FRA)'}/></>}
+              </div>
+              <div>
+                <Row label="Pension" value={inputs.pensionMonthly > 0 ? fmtMo(inputs.pensionMonthly) : '—'} color="#5B8FA8"/>
+                {inputs.pensionMonthly > 0 && <Row label="Pension Start / Type" value={(inputs.pensionStartAge) + ' · ' + (inputs.pensionType === 'single' ? 'Single Life' : 'Joint')}/>}
+                <Row label="Part-Time Income" value={inputs.partTimeMonthly > 0 ? fmtMo(inputs.partTimeMonthly) + ' to ' + inputs.partTimeEndAge : '—'}/>
+                <Row label="Non-Qual Annuity" value={inputs.nonQualAnnuityMonthly > 0 ? fmtMo(inputs.nonQualAnnuityMonthly) : '—'}/>
+              </div>
+            </div>
+          </Section>
+
+          {/* EXPENSES */}
+          <Section title="Living Expenses" color="#C8A96E">
+            <Row label="Fixed Expenses" value={fmtMo(inputs.fixedExpenses)} color="#C8A96E"/>
+            <Row label="Lifestyle Expenses" value={fmtMo(inputs.lifestyleExpenses)}/>
+            <div style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderTop:'1px solid rgba(200,169,110,.12)',marginTop:4}}>
+              <span style={{fontSize:11,fontWeight:600,color:'#EDE8DE'}}>Total Monthly</span>
+              <span style={{fontSize:13,fontWeight:600,color:'#C8A96E'}}>{fmtMo((inputs.fixedExpenses||0)+(inputs.lifestyleExpenses||0))}</span>
+            </div>
+            {inputs.expenseShockEnabled && inputs.expenseShockAmount > 0 && <>
+              <div style={{height:6}}/>
+              <Row label="Expense Shock" value={fmtK(inputs.expenseShockAmount)} color="#C8A030"/>
+              <Row label="Shock Frequency" value={'Every ' + (inputs.expenseShockFrequency||8) + ' yrs'}/>
+            </>}
+          </Section>
+
+          {/* ARCHITECTURE LAYER 1 */}
+          {arch && (
+            <Section title="Architecture — L1 · Roth Conversion" color="#7BAF84">
+              <Row label="Conversion Amount / yr" value={fmtYr(inputs.rothConversionAmount)} color="#7BAF84"/>
+              <Row label="Conversion Start Age" value={inputs.rothConversionAge}/>
+              <Row label="Bank Financing (ETA)" value={inputs.rothConversionFinanced > 0 ? fmtYr(inputs.rothConversionFinanced) : '—'} color="#7BAF84"/>
+              <Row label="Roth Annuity Income" value={fmtMo(inputs.rothAnnuityMonthly)} color="#7BAF84"/>
+              <Row label="Roth Annuity Start Age" value={inputs.rothAnnuityStartAge}/>
+            </Section>
+          )}
+
+          {/* ARCHITECTURE LAYER 2 */}
+          {arch && (
+            <Section title="Architecture — L2 · LTC & Legacy" color="#C47A7A">
+              <Row label="Primary LTC Net Amount" value={fmtK(inputs.ltcNetAmount)} color="#C47A7A"/>
+              <Row label="Primary Funding Age" value={inputs.ltcFundingAge}/>
+              {isMarried && <><Row label="Spouse LTC Net Amount" value={fmtK(inputs.spouseLtcNetAmount||0)} color="#C47A7A"/>
+              <Row label="Spouse Funding Age" value={inputs.spouseLtcFundingAge||'—'}/></>}
+            </Section>
+          )}
+
+          {/* ARCHITECTURE LAYER 3 */}
+          {arch && (
+            <Section title="Architecture — L3 · ETA (Tax Elimination)" color="#A8C5D8">
+              <Row label="ETA Funding Amount" value={fmtK(inputs.etaFundingAmount)} color="#A8C5D8"/>
+              <Row label="ETA Funding Age" value={inputs.etaFundingAge}/>
+              <Row label="ETA Annual Income" value={fmtYr(inputs.etaAnnualIncome)} color="#A8C5D8"/>
+              <Row label="ETA Income Start Age" value={inputs.etaStartAge}/>
+              <Row label="ETA COLA Rate" value={fmtPct(inputs.etaColaRate)}/>
+            </Section>
+          )}
+
+          {/* HEALTH EVENTS */}
+          {(hasLtc || hasSpouseLtc) && (
+            <Section title="Health Event Modeling" color="#C47A7A" style={{gridColumn: arch ? 'span 3' : 'span 2'}}>
+              <div style={{display:'grid',gridTemplateColumns:hasLtc && hasSpouseLtc ? '1fr 1fr' : '1fr',gap:'0 20px'}}>
+                {hasLtc && <div>
+                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:9,fontWeight:700,letterSpacing:'.15em',textTransform:'uppercase',color:'#C47A7A',marginBottom:6}}>Primary Care Event</div>
+                  <Row label="Event Age" value={'Age ' + inputs.ltcEventAge} color="#C47A7A"/>
+                  <Row label="Monthly Care Cost" value={fmtMo(inputs.ltcMonthlyCost)} color="#C47A7A"/>
+                  <Row label="Duration" value={inputs.ltcDuration + ' years'}/>
+                  <Row label="Monthly Benefit (L2)" value={fmtMo(inputs.ltcMonthlyBenefit||0)} color="#4A9B7A"/>
+                </div>}
+                {hasSpouseLtc && <div>
+                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:9,fontWeight:700,letterSpacing:'.15em',textTransform:'uppercase',color:'#C47A7A',marginBottom:6}}>Spouse Care Event</div>
+                  <Row label="Event Age" value={'Age ' + inputs.spouseLtcEventAge} color="#C47A7A"/>
+                  <Row label="Monthly Care Cost" value={fmtMo(inputs.spouseLtcMonthlyCost)} color="#C47A7A"/>
+                  <Row label="Duration" value={(inputs.spouseLtcDuration||3) + ' years'}/>
+                  <Row label="Monthly Benefit (L2)" value={fmtMo(inputs.spouseLtcMonthlyBenefit||0)} color="#4A9B7A"/>
+                </div>}
+              </div>
+            </Section>
+          )}
+
+          {/* SORR */}
+          {inputs.sorrEnabled && (
+            <Section title="SORR Stress Schedule" color="#C47A7A">
+              {[['Year 1 (Age ' + inputs.retireAge + ')', '-18%', '#C47A7A'],
+                ['Year 2 (Age ' + (inputs.retireAge+1) + ')', '+ 4%', '#4A9B7A'],
+                ['Year 3 (Age ' + (inputs.retireAge+2) + ')', '-14%', '#C47A7A'],
+                ['Year 4 (Age ' + (inputs.retireAge+3) + ')', '+ 5%', '#4A9B7A'],
+                ['Year 5 (Age ' + (inputs.retireAge+4) + ')', '-10%', '#C47A7A']].map(([l,v,c]) =>
+                <Row key={l} label={l} value={v} color={c}/>
+              )}
+              <Row label="Years 6+" value={'Random (' + inputs.portfolioReturn + '% mean)'}/>
+            </Section>
+          )}
+
+        </div>
+
+        {/* FOOTER */}
+        <div style={{padding:'16px 36px 0',marginTop:20,borderTop:'1px solid rgba(200,169,110,.15)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <div style={{fontSize:10,color:'#4A5568',lineHeight:1.6}}>
+            For conceptual and educational purposes only. Not financial, legal, tax, or investment advice.<br/>
+            All projections are hypothetical illustrations based on assumptions entered above.
+          </div>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:10,letterSpacing:'.08em',textTransform:'uppercase',color:'#4A5568',textAlign:'right'}}>
+            IncomeArchitect™ Modeler<br/>Integrated Planning Partners © {new Date().getFullYear()}
+          </div>
+        </div>
+
+        {/* ACTION BUTTONS */}
+        <div className="no-print" style={{padding:'20px 36px 0',display:'flex',gap:10,justifyContent:'flex-end'}}>
+          <button onClick={()=>window.print()} style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,fontWeight:700,letterSpacing:'.1em',textTransform:'uppercase',background:'#C8A96E',color:'#0B1220',border:'none',padding:'10px 20px',cursor:'pointer'}}>
+            🖨 Print / Save PDF
+          </button>
+          <button onClick={onClose} style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,fontWeight:700,letterSpacing:'.1em',textTransform:'uppercase',background:'transparent',color:'#9EB8CC',border:'1px solid rgba(255,255,255,.15)',padding:'10px 20px',cursor:'pointer'}}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ArcChart({ data, view, insuredData, uninsuredData, sorrEnabled }) {
   const svgRef = useRef(null);
   const W = 720;
@@ -2505,6 +2751,7 @@ function App() {
   const [saveStatus,    setSaveStatus]    = React.useState('');   // 'saving' | 'saved' | 'error'
   const [scenarios,     setScenarios]     = React.useState([]);   // list of named saves
   const [showSaveAs,    setShowSaveAs]    = React.useState(false);
+  const [showSummary,   setShowSummary]   = React.useState(false);
   const [saveAsName,    setSaveAsName]    = React.useState('');
   const [activeScenario, setActiveScenario] = React.useState(null);  // { id, name } of currently loaded named scenario
   const [recoveryData,  setRecoveryData]  = React.useState(null); // autosave to offer recovery
@@ -3402,6 +3649,11 @@ function App() {
   .takeaway-box { border-left-color: #C8A96E; background: #FBF5E8; }
   .explain-box { border-left-color: #2A9D8F; background: #E8F6F4; }
   .warn-box { border-left-color: #C0392B; background: #FBF0F0; }
+  @media print {
+    body > *:not([id="scenario-summary-print"]) { display: none !important; }
+    body { background: #0B1220 !important; margin: 0 !important; }
+    .no-print { display: none !important; }
+  }
 </style>
 </head>
 <body>
@@ -4425,6 +4677,9 @@ function App() {
         </div>
       )}
 
+      {/* Scenario Summary Modal */}
+      {showSummary && <ScenarioSummaryModal inputs={{...inputs, primaryName: clientInfo.primaryName, spouseName: clientInfo.spouseName, advisorName: clientInfo.advisorName}} onClose={()=>setShowSummary(false)}/>}
+
       {/* Mobile / small-screen warning banner */}
       <div className="mobile-warning" style={{
         display:'none', // overridden by CSS media query below 768px
@@ -4528,6 +4783,17 @@ function App() {
             </div>
           ))}
 
+          <button
+            onClick={()=>setShowSummary(true)}
+            style={{
+              padding:'8px 16px',borderRadius:7,fontSize:13,fontWeight:600,
+              fontFamily:"'DM Sans',sans-serif",cursor:'pointer',
+              background:'rgba(91,143,168,.12)',border:'1px solid rgba(91,143,168,.35)',
+              color:'#8DAFC8',letterSpacing:'.05em',display:'flex',alignItems:'center',gap:7,
+              transition:'all .2s',
+            }}>
+            <span style={{fontSize:15}}>📋</span> Scenario Summary
+          </button>
           <button
             onClick={()=>{ setReportSent(false); setReportError(''); setReportModal(true); }}
             style={{
