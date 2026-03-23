@@ -6089,10 +6089,10 @@ function App() {
 
             {view === 'visual' ? (
               <>
-                <Legend insuredData={inputs.architectureEnabled ? yearsInsured : null} data={yearsWithLtc}/>
+                <Legend insuredData={inputs.architectureEnabled && yearsInsured ? yearsInsured : null} data={yearsWithLtc}/>
                 <ArcChart
-                  data={inputs.architectureEnabled && yearsInsured ? (yearsUninsured || yearsWithLtc) : yearsWithLtc}
-                  uninsuredData={inputs.architectureEnabled && yearsInsured ? yearsWithLtc : null}
+                  data={yearsWithLtc}
+                  uninsuredData={inputs.architectureEnabled && yearsInsured ? yearsUninsured : null}
                   view={view}
                   insuredData={inputs.architectureEnabled && yearsInsured ? yearsInsured : null}
                   sorrEnabled={inputs.sorrEnabled}/>
