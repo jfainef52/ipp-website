@@ -901,6 +901,8 @@ function projectArc(inputs) {
     // Expenses
     let expenses = (fixedExpenses + lifestyleExpenses) * 12 * inflFactor;
     row.baseExpense = expenses; // living expenses only — before any care event is added
+    row.fixedExpenses = fixedExpenses * 12 * inflFactor;       // for Debits tab display
+    row.lifestyleExpenses = lifestyleExpenses * 12 * inflFactor; // for Debits tab display
 
     // LTC event — net cost after any Layer 2 benefit coverage
     if (ltcEventAge > 0 && age >= ltcEventAge && age < ltcEventAge + ltcDuration) {
@@ -1114,7 +1116,7 @@ function projectArc(inputs) {
         row.sources.taxable = (row.sources.taxable || 0) + actualGross;
         row.totalIncome += actualGross;
         // Only attribute gross-up tax to LTC for the LTC-driven portion of this draw
-        if (isAnyLtcEvent && ltcRemaining > 0 && !ltcInsured) {
+        if (isAnyLtcEvent && ltcRemaining > 0 && !ltcInsured && archLtcNetAmount === 0) {
           const ltcShare = Math.min(actualNet, ltcRemaining) / Math.max(actualNet, 0.01);
           row.ltcGrossUpTax = (row.ltcGrossUpTax || 0) + actualTax * ltcShare;
           row.ltcPortfolioDraw = (row.ltcPortfolioDraw || 0) + actualGross * ltcShare;
@@ -1149,7 +1151,7 @@ function projectArc(inputs) {
         const actualNet = actualGross - actualTax;
         row.sources.rmd = (row.sources.rmd || 0) + actualGross;
         row.totalIncome += actualGross;
-        if (isAnyLtcEvent && ltcRemaining > 0 && !ltcInsured) {
+        if (isAnyLtcEvent && ltcRemaining > 0 && !ltcInsured && archLtcNetAmount === 0) {
           const ltcShare = Math.min(actualNet, ltcRemaining) / Math.max(actualNet, 0.01);
           row.ltcGrossUpTax = (row.ltcGrossUpTax || 0) + actualTax * ltcShare;
           row.ltcPortfolioDraw = (row.ltcPortfolioDraw || 0) + actualGross * ltcShare;
