@@ -6090,13 +6090,22 @@ function App() {
 
             {view === 'visual' ? (
               <>
-                <Legend insuredData={inputs.architectureEnabled && yearsInsured ? yearsInsured : null} data={yearsWithLtc}/>
-                <ArcChart
-                  data={yearsWithLtc}
-                  uninsuredData={inputs.architectureEnabled && yearsInsured ? yearsUninsured : null}
-                  view={view}
-                  insuredData={inputs.architectureEnabled && yearsInsured ? yearsInsured : null}
-                  sorrEnabled={inputs.sorrEnabled}/>
+                {(() => {
+                  // For arch mode chart: prefer primary LTC comparison data; fall back to spouse-only
+                  const archInsured   = inputs.architectureEnabled ? (yearsInsured   || yearsSpouseInsured   || null) : null;
+                  const archUninsured = inputs.architectureEnabled ? (yearsUninsured || yearsSpouseUninsured || null) : null;
+                  return (
+                    <>
+                      <Legend insuredData={archInsured} data={yearsWithLtc}/>
+                      <ArcChart
+                        data={yearsWithLtc}
+                        uninsuredData={archInsured ? archUninsured : null}
+                        view={view}
+                        insuredData={archInsured}
+                        sorrEnabled={inputs.sorrEnabled}/>
+                    </>
+                  );
+                })()}
                 {exhaustionYear && (
                   <div style={{
                     marginTop:8,
