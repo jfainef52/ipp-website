@@ -1799,25 +1799,6 @@ function ArcChart({ data, view, insuredData, uninsuredData, sorrEnabled }) {
         );
       })}
 
-      {/* Surplus labels — shown on bars when income significantly exceeds expenses */}
-      {data.map((d, i) => {
-        const cs = d.chartSources || d.sources || {};
-        const barTotal = Object.values(cs).reduce((s,v)=>s+(v||0),0);
-        const surplus = barTotal - (d.totalExpense || 0);
-        if (surplus < 500) return null; // only label meaningful surpluses
-        const barTopY = yScale(Math.min(barTotal, maxVal));
-        const fmt = surplus >= 1000000
-          ? '+$' + (surplus/1000000).toFixed(1) + 'M'
-          : '+$' + Math.round(surplus/1000) + 'K';
-        return (
-          <text key={i} x={xScale(i)} y={Math.max(PAD.t + 12, barTopY - 4)}
-            textAnchor="middle" fill="rgba(200,169,110,.7)"
-            fontSize="8" fontFamily="DM Sans" fontWeight="600">
-            {fmt}
-          </text>
-        );
-      })}
-
       {/* Expense line — Uninsured (with LTC costs hitting portfolio) */}
       <path d={expensePath} fill="none" stroke="url(#grad-expense)" strokeWidth="2"
         strokeDasharray="2000" strokeDashoffset="0" filter="url(#glow)"
