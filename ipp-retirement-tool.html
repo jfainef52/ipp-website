@@ -1004,7 +1004,12 @@ function projectArc(inputs) {
     // Use after-tax gap: if gross surplus minus pre-estimated tax is still negative,
     // we need additional draws to cover both expenses and the tax burden
     const grossGap = row.spendableIncome - expenses;
-    row.gap = grossGap - preEstTax; // true after-tax gap
+    // Use grossGap for gap DETECTION — whether a portfolio draw is needed at all.
+    // preEstTax adjusts the AMOUNT drawn (via `needed`) but must not suppress the
+    // gap signal itself. In high-RMD years, preEstTax on the large RMD would make
+    // row.gap appear >= 0 suppressing the gap-fill and LTC gross-up attribution
+    // even when bars fall well below the expense line.
+    row.gap = grossGap - preEstTax; // after-tax gap for portfolio draw sizing
 
     // ── Shared gross-up utilities — hoisted outside gap block so IRMAA fill can also use them ──
     const isMFJeff = effectiveStatus === 'mfj';
@@ -1100,7 +1105,13 @@ function projectArc(inputs) {
       // Track how much of the draw is attributable to LTC vs baseline gap
       const baselineGapAmt = Math.max(0, baseGapWithoutLtc !== null ? -baseGapWithoutLtc : needed);
       const ltcPortionOfGap = Math.min(needed, ltcDrivenGap);
-      let ltcRemaining = ltcPortionOfGap; // track LTC-specific portion
+      // ltcRemaining drives gross-up attribution. Use grossGap (not row.gap) to detect
+      // care-cost shortfalls — preEstTax can absorb row.gap even when a real LTC-driven
+      // draw is needed (e.g. large RMD years where grossGap < 0 but row.gap >= 0).
+      const ltcPortionForAttrib = (grossGap < 0 && isAnyLtcEvent)
+        ? Math.min(Math.abs(grossGap), ltcDrivenGap)
+        : ltcPortionOfGap;
+      let ltcRemaining = ltcPortionForAttrib; // track LTC-specific portion
 
       // --- Taxable brokerage: LTCG gross-up, stacked on ordinary income ---
       if (taxable > 0 && remaining > 0) {
@@ -1177,6 +1188,23 @@ function projectArc(inputs) {
 
       row.gap = 0;
     }
+
+    // LTC gross-up attribution for years where grossGap < 0 but row.gap >= 0
+    // (preEstTax absorbs the gap signal — e.g. large RMD years — but there IS a
+    // real care-cost shortfall requiring portfolio draws that must be attributed to LTC)
+    if (row.gap >= 0 && grossGap < 0 && isAnyLtcEvent && !ltcInsured && archLtcNetAmount === 0 && archSpouseLtcNetAmount === 0 && (trad + spouseTrad + roth + taxable) > 0) {
+      // Estimate tax on care-cost draws that happened above (inside the gap>=0 path,
+      // the gap-fill ran via the preEstTax mechanism but ltcRemaining was 0)
+      // Use the care cost itself as a proxy for the gross-up tax attribution
+      const careCostTotal = ltcDrivenGap;
+      if (careCostTotal > 0) {
+        // Approximate gross-up: care cost × effective marginal rate (~28%)
+        const MC_TAX_RATE = 0.28;
+        const approxGrossUpTax = careCostTotal * (MC_TAX_RATE / (1 - MC_TAX_RATE));
+        row.ltcGrossUpTax = (row.ltcGrossUpTax || 0) + approxGrossUpTax;
+      }
+    }
+
     // Note: if gap >= 0, all expenses including LTC are already covered by existing income.
     // No additional draw needed — the gap < 0 path above handles all portfolio draws.
 
