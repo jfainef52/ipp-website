@@ -2570,7 +2570,10 @@ function App() {
   const { years: yearsWithLtc, confidence: confidenceWithLtc } = (hasLtcEvent || hasSpouseLtcEvent)
     ? projectArc({
         ...baseProjectionInputs,
-        ltcInsured: false,
+        // When Architecture is ON, Layer 2 policy covers care costs — pass ltcInsured=true
+        // so the bars show the protected scenario (no portfolio spike for care)
+        ltcInsured: inputs.architectureEnabled ? hasLtcEvent : false,
+        spouseLtcInsured: inputs.architectureEnabled ? hasSpouseLtcEvent : false,
         ltcEventAge: hasLtcEvent ? inputs.ltcEventAge : 0,
         spouseLtcEventAge: hasSpouseLtcEvent ? inputs.spouseLtcEventAge : 0,
       })
@@ -2612,6 +2615,17 @@ function App() {
     : { years: null };
   const { years: yearsInsured } = showLtcComparison
     ? projectArc({ ...primaryOnlyBase, ltcInsured: true })
+    : { years: null };
+
+  // Combined uninsured — both events active, no insurance, arch=false
+  // Used as the chart's uninsuredData so BOTH care event bands + expense spikes show
+  const { years: yearsBothUninsured } = (showLtcComparison || showSpouseLtcComparison)
+    ? projectArc({
+        ...ltcPortfolioBase,
+        ltcInsured: false, spouseLtcInsured: false,
+        ltcEventAge: showLtcComparison ? inputs.ltcEventAge : 0,
+        spouseLtcEventAge: showSpouseLtcComparison ? inputs.spouseLtcEventAge : 0,
+      })
     : { years: null };
 
   // MC scores: uninsured = full plan with BOTH events uninsured (= main ring score when arch OFF)
@@ -6091,15 +6105,16 @@ function App() {
             {view === 'visual' ? (
               <>
                 {(() => {
-                  // For arch mode chart: prefer primary LTC comparison data; fall back to spouse-only
-                  const archInsured   = inputs.architectureEnabled ? (yearsInsured   || yearsSpouseInsured   || null) : null;
-                  const archUninsured = inputs.architectureEnabled ? (yearsUninsured || yearsSpouseUninsured || null) : null;
+                  // archInsured: any insured dataset triggers archMode (protected expense line)
+                  // archUninsured: yearsBothUninsured shows ALL care event bands + spikes
+                  const archInsured   = inputs.architectureEnabled ? (yearsInsured || yearsSpouseInsured || null) : null;
+                  const archUninsured = inputs.architectureEnabled && archInsured ? (yearsBothUninsured || null) : null;
                   return (
                     <>
                       <Legend insuredData={archInsured} data={yearsWithLtc}/>
                       <ArcChart
                         data={yearsWithLtc}
-                        uninsuredData={archInsured ? archUninsured : null}
+                        uninsuredData={archUninsured}
                         view={view}
                         insuredData={archInsured}
                         sorrEnabled={inputs.sorrEnabled}/>
