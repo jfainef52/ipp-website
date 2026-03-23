@@ -6112,6 +6112,9 @@ function App() {
                   // archUninsured: yearsBothUninsured shows ALL care event bands + spikes
                   const archInsured   = inputs.architectureEnabled ? (yearsInsured || yearsSpouseInsured || null) : null;
                   const archUninsured = inputs.architectureEnabled && archInsured ? (yearsBothUninsured || null) : null;
+                  const _spBands = (archUninsured||[]).filter(y=>y.spouseLtcEvent).map(y=>y.age);
+                  const _primBands = (archUninsured||[]).filter(y=>y.ltcEvent).map(y=>y.age);
+                  console.log('[ARCH CHART DEBUG] arch='+inputs.architectureEnabled+' archInsured='+(archInsured?'YES':'NULL')+' archUninsured='+(archUninsured?archUninsured.length+'yrs':'NULL')+' showLtc='+showLtcComparison+' showSpLtc='+showSpouseLtcComparison+' yearsInsured='+(yearsInsured?'YES':'null')+' yearsSpouseInsured='+(yearsSpouseInsured?'YES':'null')+' yearsBothUninsured='+(yearsBothUninsured?'YES':'null')+' primaryBands=['+_primBands+'] spouseBands=['+_spBands+']');
                   return (
                     <>
                       <Legend insuredData={archInsured} data={yearsWithLtc}/>
