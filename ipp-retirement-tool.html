@@ -2575,6 +2575,14 @@ function App() {
         spouseLtcEventAge: hasSpouseLtcEvent ? inputs.spouseLtcEventAge : 0,
       })
     : { years: yearsClean, confidence: confidenceClean };
+  // DEBUG
+  if (yearsWithLtc && yearsWithLtc.length > 0) {
+    const _y = yearsWithLtc[0];
+    const _cs = _y.chartSources || _y.sources || {};
+    console.log('[yearsWithLtc debug] arch='+inputs.architectureEnabled+' length='+yearsWithLtc.length+' age'+_y.age+'_sources='+JSON.stringify(Object.fromEntries(Object.entries(_cs).filter(([k,v])=>(v||0)>100).map(([k,v])=>[k,Math.round(v/1000)+'K']))));
+    const _y74 = yearsWithLtc.find(y=>y.age===74);
+    if (_y74) { const _cs74 = _y74.chartSources||_y74.sources||{}; console.log('[yearsWithLtc debug] age74 eta='+Math.round((_cs74.eta||0)/1000)+'K roth='+Math.round((_cs74.roth||0)/1000)+'K'); }
+  }
 
   // Main confidence ring: when architecture OFF + health events ON, show uninsured MC score
   // When architecture ON, show full architecture score (confidenceClean with arch layers)
