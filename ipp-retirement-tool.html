@@ -2709,9 +2709,10 @@ function App() {
             </select>
           )}
 
-          {/* Save button — only shown when a named scenario is loaded */}
-          {activeScenario && !showSaveAs && (
-            <button onClick={() => saveScenario(activeScenario.name)}
+          {/* Save button — always visible */}
+          {/* If named scenario active: saves directly. If not: opens Save As prompt to get a name first */}
+          {!showSaveAs && (
+            <button onClick={() => activeScenario ? saveScenario(activeScenario.name) : setShowSaveAs(true)}
               style={{padding:'5px 14px',borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer',
                       background:'rgba(29,158,117,.15)',border:'1px solid rgba(29,158,117,.4)',color:'#5DCAA5',
                       display:'flex',alignItems:'center',gap:5}}>
@@ -2719,7 +2720,7 @@ function App() {
             </button>
           )}
 
-          {/* Active scenario name indicator */}
+          {/* Active scenario name indicator — only when a named scenario is loaded */}
           {activeScenario && !showSaveAs && (
             <span style={{fontSize:11,color:'#8DAFC8',fontStyle:'italic',maxWidth:140,
                           overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}
