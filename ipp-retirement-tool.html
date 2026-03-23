@@ -208,10 +208,14 @@ function seededRandom(seed) {
   };
 }
 
-function runMonteCarlo(startBalance, annualWithdraw, years, trials=1000, mean=0.065, inflation=0.028, ssIncome=0, fixedStreams=[], totalExpensesY1=0, ltcShockYear=-1, ltcShockAnnual=0, ltcShockDuration=0, spouseLtcShockYear=-1, spouseLtcShockAnnual=0, spouseLtcShockDuration=0, ltcCareInflation=0.04, expenseShockAmount=0, expenseShockFrequency=8) {
+function runMonteCarlo(startBalance, annualWithdraw, years, trials=1000, mean=0.065, inflation=0.028, ssIncome=0, fixedStreams=[], totalExpensesY1=0, ltcShockYear=-1, ltcShockAnnual=0, ltcShockDuration=0, spouseLtcShockYear=-1, spouseLtcShockAnnual=0, spouseLtcShockDuration=0, ltcCareInflation=0.04, expenseShockAmount=0, expenseShockFrequency=8, sorrSchedule=null) {
   // ltcShockAnnual / spouseLtcShockAnnual: today's-dollar NET care costs.
   // MC grosses up by 1/(1-MC_TAX_RATE) and inflates to care-year dollars.
   // netDraw also grossed up — withdrawing $X net from IRA requires ~$X/(1-0.28) gross.
+  // sorrSchedule: when provided (SORR ON), every trial uses these fixed returns for the
+  // first N years before switching to random. This ensures the MC score honestly reflects
+  // the full sequence-of-returns stress shown on the chart — not just a partially-penalized
+  // starting balance with random returns thereafter.
   const MC_TAX_RATE = 0.28;
   let successes = 0;
   const stddev = 0.12;
@@ -234,14 +238,19 @@ function runMonteCarlo(startBalance, annualWithdraw, years, trials=1000, mean=0.
     + (expenseShockAmount * 0.0017)
     + (expenseShockFrequency * 53)
     + streams.reduce((a, s) => a + s.annual * 0.003 + s.yearOffset * 17, 0)
+    + (sorrSchedule ? sorrSchedule.reduce((a, r, i) => a + r * (i+1) * 31337, 0) : 0)
   ) ^ 0xDEADBEEF;
   const rand = seededRandom(seedVal);
+  const sorrYears = sorrSchedule ? sorrSchedule.length : 0;
 
   for (let t = 0; t < trials; t++) {
     let bal = startBalance;
     let failed = false;
     for (let y = 0; y < years; y++) {
-      const r = mean + stddev * (Math.sqrt(-2*Math.log(rand())) * Math.cos(2*Math.PI*rand()));
+      // Use fixed SORR return for first N years of every trial, then random
+      const r = (y < sorrYears)
+        ? sorrSchedule[y]
+        : mean + stddev * (Math.sqrt(-2*Math.log(rand())) * Math.cos(2*Math.PI*rand()));
       const inflFactor = Math.pow(1 + inflation, y);
       const expensesThisYear = totalExpensesY1 * inflFactor;
       const ssThisYear = ssIncome * inflFactor;
@@ -1372,10 +1381,29 @@ function projectArc(inputs) {
   // a short tail (e.g. 8 years) where even a depleted portfolio usually survives,
   // making insured vs uninsured look nearly identical — which is wrong.
   const mcStartAge = retireAge;
-  const mcStartBalance = years[0] ? years[0].totalPortfolio : (traditionalBalance + rothBalance + taxableBalance);
+  // Use BOY balance: accumulated portfolio AT retirement before any SORR or draws.
+  // years[0].totalPortfolio is EOY after year-1 return + draws — inconsistent when SORR
+  // is on (partially penalizes year 1 but ignores years 2-5). Use reconstructed pre-retirement
+  // accumulated balance so the MC starts from the same point regardless of SORR toggle.
+  const _preRetYrs = retireAge - currentAge;
+  const _gf = Math.pow(1 + portfolioReturn, _preRetYrs);
+  const _cFV = (r, c, n) => r > 0 ? c * ((Math.pow(1+r,n)-1)/r) * (1+r) : c * n;
+  const mcStartBalance = (
+    traditionalBalance * _gf
+    + _cFV(portfolioReturn, annualTradContribution || 0, _preRetYrs)
+    + rothBalance * _gf
+    + taxableBalance * _gf
+    + _cFV(portfolioReturn, annualTaxableContribution || 0, _preRetYrs)
+    + (spouseTraditionalBalance || 0) * _gf
+    + _cFV(portfolioReturn, annualSpouseTradContribution || 0, _preRetYrs)
+  );
   const mcYears = planToAge - retireAge;
   const ssAtMcStart = ssIncomeY1; // MC starts at retirement — no inflation offset needed
   const expensesAtMcStart = totalExpensesY1;
+  // When SORR is ON, pass the fixed schedule so every MC trial faces the same bad early
+  // returns shown on the chart — score is fully consistent with the visual stress test.
+  const _SORR = [-0.18, 0.04, -0.14, 0.05, -0.10];
+  const mcSorrSchedule = sorrEnabled ? _SORR : null;
 
   // Build fixed income streams — each stream has a yearOffset (years after MC start age
   // when it begins). Pension is always immediate (started at retirement).
@@ -1439,7 +1467,8 @@ function projectArc(inputs) {
     spouseLtcDuration,
     ltcCareInflationRate,
     expenseShockEnabled ? (expenseShockAmount || 50000) : 0,
-    expenseShockEnabled ? (expenseShockFrequency || 8) : 0
+    expenseShockEnabled ? (expenseShockFrequency || 8) : 0,
+    mcSorrSchedule
   );
 
   return { years, confidence, fixedStreams, mcStartAge };
