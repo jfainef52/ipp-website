@@ -1126,44 +1126,42 @@ function projectArc(inputs) {
       }
 
       // --- Traditional / IRA: ordinary income gross-up ---
+      const ordBracketsEff = (isMFJeff ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025)
+        .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
+      const adjOrdAGI = baseOrdAGI + (row.sources.taxable || 0) * 0.15;
+
+      // --- Draw from primary traditional ---
       if (remaining > 0 && trad > 0) {
-        const ordBracketsEff = (isMFJeff ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025)
-          .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
-        // Start ordinary bracket walk at baseOrdAGI + any taxable gross-up already added
-        const adjOrdAGI = baseOrdAGI + (row.sources.taxable || 0) * 0.15;
         const netToDraw = Math.min(remaining, trad);
         const { grossDraw, taxOnDraw } = grossUpIterative(netToDraw, ordBracketsEff, adjOrdAGI);
-        // If grossDraw > trad, the account can't cover both net needed AND tax.
-        // Draw the entire remaining balance — the client gets whatever net remains after tax.
-        // This ensures trad is fully exhausted rather than leaving a residual.
         const actualGross = Math.min(trad, grossDraw);
         const taxProportion = grossDraw > 0 ? taxOnDraw / grossDraw : 0;
         const actualTax = actualGross * taxProportion;
         const actualNet = actualGross - actualTax;
         row.sources.rmd = (row.sources.rmd || 0) + actualGross;
         row.totalIncome += actualGross;
-        // Only attribute gross-up tax to LTC for the LTC-driven portion of this draw
         if (isAnyLtcEvent && ltcRemaining > 0 && !ltcInsured) {
           const ltcShare = Math.min(actualNet, ltcRemaining) / Math.max(actualNet, 0.01);
           row.ltcGrossUpTax = (row.ltcGrossUpTax || 0) + actualTax * ltcShare;
           row.ltcPortfolioDraw = (row.ltcPortfolioDraw || 0) + actualGross * ltcShare;
           ltcRemaining -= Math.min(actualNet, ltcRemaining);
         }
-        trad = Math.max(0, trad - actualGross); // trad reaches $0 when grossDraw >= trad
+        trad = Math.max(0, trad - actualGross);
         remaining -= actualNet;
-        // If trad is now $0 but gap still open, also drain spouseTrad
-        if (remaining > 0 && spouseTrad > 0) {
-          const netToDrawSp = Math.min(remaining, spouseTrad);
-          const { grossDraw: grossSp, taxOnDraw: taxSp } = grossUpIterative(netToDrawSp, ordBracketsEff, adjOrdAGI);
-          const actualGrossSp = Math.min(spouseTrad, grossSp);
-          const taxPropSp = grossSp > 0 ? taxSp / grossSp : 0;
-          const actualTaxSp = actualGrossSp * taxPropSp;
-          const actualNetSp = actualGrossSp - actualTaxSp;
-          row.sources.rmd = (row.sources.rmd || 0) + actualGrossSp;
-          row.totalIncome += actualGrossSp;
-          spouseTrad = Math.max(0, spouseTrad - actualGrossSp);
-          remaining -= actualNetSp;
-        }
+      }
+
+      // --- Draw from spouse traditional (runs whether or not primary trad was available) ---
+      if (remaining > 0 && spouseTrad > 0) {
+        const netToDrawSp = Math.min(remaining, spouseTrad);
+        const { grossDraw: grossSp, taxOnDraw: taxSp } = grossUpIterative(netToDrawSp, ordBracketsEff, adjOrdAGI);
+        const actualGrossSp = Math.min(spouseTrad, grossSp);
+        const taxPropSp = grossSp > 0 ? taxSp / grossSp : 0;
+        const actualTaxSp = actualGrossSp * taxPropSp;
+        const actualNetSp = actualGrossSp - actualTaxSp;
+        row.sources.rmd = (row.sources.rmd || 0) + actualGrossSp;
+        row.totalIncome += actualGrossSp;
+        spouseTrad = Math.max(0, spouseTrad - actualGrossSp);
+        remaining -= actualNetSp;
       }
 
       row.gap = 0;
@@ -1355,24 +1353,9 @@ function projectArc(inputs) {
       if (row.chartSources.rmd === 0) delete row.chartSources.rmd;
     }
 
-    // Cap bar total at totalExpense unless income genuinely exceeds expenses
-    // (i.e. mandatory RMDs push income above what's needed for spending).
-    // Gross-up draws are slightly larger than net needed — scale back proportionally
-    // so bars show net spendable rather than gross draw amounts.
-    const _barTotalRaw = Object.values(row.chartSources).reduce((s,v) => s+(v||0), 0);
-    const _expense = row.totalExpense || 0;
-    // Only cap if the excess comes from gross-up (not genuine RMD surplus)
-    // A genuine RMD surplus = RMD alone > expense; gross-up surplus = small overage
-    const _rmdGross = (row.sources.rmd || 0);
-    const _guaranteedIncome = (row.sources.ss||0) + (row.sources.pension||0) + (row.sources.roth||0) + (row.sources.eta||0) + (row.sources.parttime||0) + (row.sources.annuity||0);
-    const _isRmdSurplus = _rmdGross > 0 && (_guaranteedIncome + _rmdGross) > _expense;
-    if (!_isRmdSurplus && _barTotalRaw > _expense * 1.001 && _expense > 0) {
-      // Scale all sources proportionally to meet expense line exactly
-      const _scale = _expense / _barTotalRaw;
-      Object.keys(row.chartSources).forEach(k => {
-        row.chartSources[k] = (row.chartSources[k] || 0) * _scale;
-      });
-    }
+    // chartSources shows actual after-tax spendable income per source.
+    // Bars exceeding the expense line = surplus income (reinvested or held).
+    // Bars below the expense line = genuine income shortfall.
     years.push(row);
   }
 
