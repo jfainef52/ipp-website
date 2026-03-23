@@ -1584,7 +1584,35 @@ function NumInput({ value, onChange, placeholder, prefix, suffix }) {
 // ── Arc SVG Chart ──
 
 // ── ScenarioSummaryModal ──
-function ScenarioSummaryModal({ inputs, onClose }) {
+function ScenarioSummaryModal({ inputs, years, onClose }) {
+  // Compute L1/L2 tax exposure using the same preRetMarginalRate approach as the projection
+  const _mfj = inputs.filingStatus === 'mfj';
+  const _br = _mfj
+    ? [{l:23200,r:.10},{l:94300,r:.12},{l:201050,r:.22},{l:383900,r:.24},{l:487450,r:.32},{l:731200,r:.35},{l:Infinity,r:.37}]
+    : [{l:11600,r:.10},{l:47150,r:.12},{l:100525,r:.22},{l:191950,r:.24},{l:243725,r:.32},{l:609350,r:.35},{l:Infinity,r:.37}];
+  const _taxableInc = Math.max(0, (inputs.householdIncome||0) - (_mfj ? 29200 : 14600));
+  const preRetRate = (_br.find(b => _taxableInc <= b.l) || _br[_br.length-1]).r;
+
+  // L1: Roth conversion — bank finances part of tax, IRA funds the rest as a gross-up
+  const l1ConvAmt   = inputs.rothConversionAmount || 0;
+  const l1Financed  = Math.min(inputs.rothConversionFinanced || 0, l1ConvAmt);
+  const l1TaxTotal  = l1ConvAmt * preRetRate;
+  const l1TaxIRAFunded = Math.max(0, l1TaxTotal - l1Financed); // gross-up from IRA
+  const l1GrossIRA  = l1ConvAmt + l1TaxIRAFunded; // total IRA draw = conversion + unfinanced tax
+
+  // L2 Primary: gross-up from IRA to net policy premium after tax (+early penalty if < 59.5)
+  const l2EarlyPenalty  = (inputs.ltcFundingAge||0) < 59.5 ? 0.10 : 0;
+  const l2NetAmt        = inputs.ltcNetAmount || 0;
+  const l2GrossIRA      = l2NetAmt > 0 ? l2NetAmt / Math.max(0.01, 1 - preRetRate - l2EarlyPenalty) : 0;
+  const l2Tax           = l2GrossIRA * preRetRate;
+  const l2Penalty       = l2GrossIRA * l2EarlyPenalty;
+
+  // L2 Spouse: same mechanics
+  const l2SpEarlyPenalty = (inputs.spouseLtcFundingAge||0) < 59.5 ? 0.10 : 0;
+  const l2SpNetAmt       = inputs.spouseLtcNetAmount || 0;
+  const l2SpGrossIRA     = l2SpNetAmt > 0 ? l2SpNetAmt / Math.max(0.01, 1 - preRetRate - l2SpEarlyPenalty) : 0;
+  const l2SpTax          = l2SpGrossIRA * preRetRate;
+  const l2SpPenalty      = l2SpGrossIRA * l2SpEarlyPenalty;
   const fmt$ = (v, suffix='') => v > 0 ? '$' + Math.round(v).toLocaleString() + suffix : '—';
   const fmtK = (v) => v > 0 ? '$' + Math.round(v/1000) + 'K' : '—';
   const fmtPct = (v) => v > 0 ? v + '%' : '—';
@@ -1600,8 +1628,8 @@ function ScenarioSummaryModal({ inputs, onClose }) {
 
   const Row = ({label, value, color}) => (
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',padding:'3px 0',borderBottom:'1px solid rgba(255,255,255,.03)'}}>
-      <span style={{fontSize:11,color:'#9EB8CC',flex:1,paddingRight:8}}>{label}</span>
-      <span style={{fontSize:12,fontWeight:500,color:color||'#EDE8DE',whiteSpace:'nowrap'}}>{value}</span>
+      <span style={{fontSize:13,color:'#9EB8CC',flex:1,paddingRight:8}}>{label}</span>
+      <span style={{fontSize:14,fontWeight:500,color:color||'#EDE8DE',whiteSpace:'nowrap'}}>{value}</span>
     </div>
   );
 
@@ -1741,6 +1769,15 @@ function ScenarioSummaryModal({ inputs, onClose }) {
               <Row label="Bank Financing (ETA)" value={inputs.rothConversionFinanced > 0 ? fmtYr(inputs.rothConversionFinanced) : '—'} color="#7BAF84"/>
               <Row label="Roth Annuity Income" value={fmtMo(inputs.rothAnnuityMonthly)} color="#7BAF84"/>
               <Row label="Roth Annuity Start Age" value={inputs.rothAnnuityStartAge}/>
+              {l1ConvAmt > 0 && <>
+                <div style={{height:6}}/>
+                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:9,fontWeight:700,letterSpacing:'.15em',textTransform:'uppercase',color:'rgba(123,175,132,.7)',marginBottom:5,paddingTop:6,borderTop:'1px solid rgba(123,175,132,.15)'}}>Tax Exposure on Conversion Draw</div>
+                <Row label="Est. Marginal Rate" value={Math.round(preRetRate*100)+'%'} color="#C8A030"/>
+                <Row label="Total Tax on Conversion" value={fmtYr(Math.round(l1TaxTotal))} color="#C47A7A"/>
+                <Row label="Tax Financed by Bank" value={l1Financed > 0 ? fmtYr(Math.round(l1Financed)) : '—'} color="#7BAF84"/>
+                <Row label="Unfinanced Tax (IRA gross-up)" value={l1TaxIRAFunded > 0 ? fmtYr(Math.round(l1TaxIRAFunded)) : '—'} color="#C47A7A"/>
+                <Row label="Total IRA Draw / yr" value={fmtYr(Math.round(l1GrossIRA))} color="#C47A7A"/>
+              </>}
             </Section>
           )}
 
@@ -1749,8 +1786,22 @@ function ScenarioSummaryModal({ inputs, onClose }) {
             <Section title="Architecture — L2 · LTC & Legacy" color="#C47A7A">
               <Row label="Primary LTC Net Amount" value={fmtK(inputs.ltcNetAmount)} color="#C47A7A"/>
               <Row label="Primary Funding Age" value={inputs.ltcFundingAge}/>
-              {isMarried && <><Row label="Spouse LTC Net Amount" value={fmtK(inputs.spouseLtcNetAmount||0)} color="#C47A7A"/>
-              <Row label="Spouse Funding Age" value={inputs.spouseLtcFundingAge||'—'}/></>}
+              {l2GrossIRA > 0 && <>
+                <Row label="Gross IRA Draw (primary)" value={fmt$(Math.round(l2GrossIRA))} color="#C47A7A"/>
+                <Row label="Tax on Draw (primary)" value={fmt$(Math.round(l2Tax))} color="#C47A7A"/>
+                {l2Penalty > 0 && <Row label="Early Withdrawal Penalty" value={fmt$(Math.round(l2Penalty))} color="#C8A030"/>}
+              </>}
+              {isMarried && <>
+                <div style={{height:4}}/>
+                <Row label="Spouse LTC Net Amount" value={fmtK(inputs.spouseLtcNetAmount||0)} color="#C47A7A"/>
+                <Row label="Spouse Funding Age" value={inputs.spouseLtcFundingAge||'—'}/>
+                {l2SpGrossIRA > 0 && <>
+                  <Row label="Gross IRA Draw (spouse)" value={fmt$(Math.round(l2SpGrossIRA))} color="#C47A7A"/>
+                  <Row label="Tax on Draw (spouse)" value={fmt$(Math.round(l2SpTax))} color="#C47A7A"/>
+                  {l2SpPenalty > 0 && <Row label="Spouse Early Penalty" value={fmt$(Math.round(l2SpPenalty))} color="#C8A030"/>}
+                </>}
+              </>}
+              {(l2GrossIRA > 0 || l2SpGrossIRA > 0) && <Row label="Total Gross IRA Required" value={fmt$(Math.round(l2GrossIRA+l2SpGrossIRA))} color="#C47A7A"/>}
             </Section>
           )}
 
