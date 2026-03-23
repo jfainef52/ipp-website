@@ -1663,15 +1663,17 @@ function ScenarioSummaryModal({ inputs, onClose }) {
             </div>
           </div>
           <div style={{textAlign:'right',display:'flex',flexDirection:'column',alignItems:'flex-end',gap:8}}>
-            <img src={LOGO} style={{height:52,width:'auto'}} alt="Integrated Planning Partners"/>
+            <img src={LOGO} style={{height:80,width:'auto'}} alt="Integrated Planning Partners"/>
             <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:9,fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',background:'rgba(200,169,110,.1)',border:'1px solid rgba(200,169,110,.2)',color:'#C8A96E',padding:'3px 10px'}}>
               {arch ? 'Architecture ON' : 'Status Quo'}
             </span>
           </div>
         </div>
 
-        {/* 4-COLUMN LANDSCAPE BODY */}
-        <div style={{padding:'18px 40px',display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:10}}>
+        {/* TWO-PAGE LANDSCAPE BODY */}
+
+        {/* ═══ PAGE 1: Profile · Portfolio · Income · Expenses · Assumptions ═══ */}
+        <div className="summary-page" style={{padding:'16px 40px 20px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
 
           {/* ── COL 1: Profile + Assumptions + Expenses ── */}
           <div style={{display:'flex',flexDirection:'column',gap:10}}>
@@ -1761,6 +1763,22 @@ function ScenarioSummaryModal({ inputs, onClose }) {
             </div>}
           </div>
 
+        </div>{/* end page 1 */}
+
+        {/* ═══ PAGE 2: Architecture Layers · Health Events ═══ */}
+        <div className="summary-page" style={{padding:'16px 40px 20px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+
+          {/* ── PAGE 2 HEADER (print only) ── */}
+          <div className="page2-header" style={{display:'none',gridColumn:'span 2',borderBottom:'1px solid rgba(200,169,110,.15)',paddingBottom:14,marginBottom:4,alignItems:'center',justifyContent:'space-between'}}>
+            <div>
+              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:10,fontWeight:600,letterSpacing:'.2em',textTransform:'uppercase',color:'#C8A96E',marginBottom:3,display:'flex',alignItems:'center',gap:10}}>
+                <span style={{display:'block',width:24,height:1,background:'#C8A96E'}}></span>IncomeArchitect™ Modeler — Scenario Summary (cont.)
+              </div>
+              <div style={{fontSize:12,color:'#9EB8CC'}}>{inputs.primaryName||'Client'}{isMarried && inputs.spouseName ? <> &amp; {inputs.spouseName}</> : ''} &nbsp;·&nbsp; {new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}</div>
+            </div>
+            <img src={LOGO} style={{height:52,width:'auto'}} alt="IPP"/>
+          </div>
+
           {/* ── COL 3: L1 + L3 ── */}
           <div style={{display:'flex',flexDirection:'column',gap:10}}>
             {arch && <div style={{...card('#7BAF84')}}>
@@ -1838,7 +1856,7 @@ function ScenarioSummaryModal({ inputs, onClose }) {
               <Row label="Contributions End Age (Trad.)" value={inputs.tradContributionEndAge||'—'}/>
             </div>
           </div>
-        </div>
+        </div>{/* end page 2 */}
 
         {/* FOOTER */}
         <div style={{padding:'10px 40px 14px',borderTop:'1px solid rgba(200,169,110,.12)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
@@ -3692,6 +3710,10 @@ function App() {
     body > *:not([id="scenario-summary-print"]) { display: none !important; }
     body { background: #0B1220 !important; margin: 0 !important; }
     .no-print { display: none !important; }
+    #scenario-summary-print { width: 100% !important; }
+    .summary-page { page-break-after: always; page-break-inside: avoid; }
+    .summary-page:last-of-type { page-break-after: auto; }
+    .page2-header { display: flex !important; }
   }
 </style>
 </head>
