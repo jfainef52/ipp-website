@@ -1133,6 +1133,9 @@ function projectArc(inputs) {
         const adjOrdAGI = baseOrdAGI + (row.sources.taxable || 0) * 0.15;
         const netToDraw = Math.min(remaining, trad);
         const { grossDraw, taxOnDraw } = grossUpIterative(netToDraw, ordBracketsEff, adjOrdAGI);
+        // If grossDraw > trad, the account can't cover both net needed AND tax.
+        // Draw the entire remaining balance — the client gets whatever net remains after tax.
+        // This ensures trad is fully exhausted rather than leaving a residual.
         const actualGross = Math.min(trad, grossDraw);
         const taxProportion = grossDraw > 0 ? taxOnDraw / grossDraw : 0;
         const actualTax = actualGross * taxProportion;
@@ -1146,8 +1149,21 @@ function projectArc(inputs) {
           row.ltcPortfolioDraw = (row.ltcPortfolioDraw || 0) + actualGross * ltcShare;
           ltcRemaining -= Math.min(actualNet, ltcRemaining);
         }
-        trad = Math.max(0, trad - actualGross);
+        trad = Math.max(0, trad - actualGross); // trad reaches $0 when grossDraw >= trad
         remaining -= actualNet;
+        // If trad is now $0 but gap still open, also drain spouseTrad
+        if (remaining > 0 && spouseTrad > 0) {
+          const netToDrawSp = Math.min(remaining, spouseTrad);
+          const { grossDraw: grossSp, taxOnDraw: taxSp } = grossUpIterative(netToDrawSp, ordBracketsEff, adjOrdAGI);
+          const actualGrossSp = Math.min(spouseTrad, grossSp);
+          const taxPropSp = grossSp > 0 ? taxSp / grossSp : 0;
+          const actualTaxSp = actualGrossSp * taxPropSp;
+          const actualNetSp = actualGrossSp - actualTaxSp;
+          row.sources.rmd = (row.sources.rmd || 0) + actualGrossSp;
+          row.totalIncome += actualGrossSp;
+          spouseTrad = Math.max(0, spouseTrad - actualGrossSp);
+          remaining -= actualNetSp;
+        }
       }
 
       row.gap = 0;
@@ -1328,10 +1344,8 @@ function projectArc(inputs) {
     row.netIncome = Object.values(row.chartSources || row.sources)
       .reduce((s, v) => s + (v || 0), 0);
 
-    // chartSources: bars show all spendable income.
-    // Only strip one-time capital reallocation draws (ETA premium, Roth conversion,
-    // LTC/spouse policy premiums) — these are portfolio movements, not income.
-    // Everything else including RMDs and care gap-fill draws stays in the bars.
+    // chartSources: bars show spendable after-tax income.
+    // Strip one-time capital reallocation draws (ETA premium, Roth conversion, LTC premiums).
     const _nonSpend = (row.etaFundingAmount || 0)
       + (row.rothConversionAmount || 0) + (row.rothConversionOverage || 0)
       + (row.ltcFundingAmount || 0) + (row.spouseLtcFundingAmount || 0);
@@ -1339,6 +1353,25 @@ function projectArc(inputs) {
     if (_nonSpend > 0 && row.chartSources.rmd) {
       row.chartSources.rmd = Math.max(0, row.chartSources.rmd - _nonSpend);
       if (row.chartSources.rmd === 0) delete row.chartSources.rmd;
+    }
+
+    // Cap bar total at totalExpense unless income genuinely exceeds expenses
+    // (i.e. mandatory RMDs push income above what's needed for spending).
+    // Gross-up draws are slightly larger than net needed — scale back proportionally
+    // so bars show net spendable rather than gross draw amounts.
+    const _barTotalRaw = Object.values(row.chartSources).reduce((s,v) => s+(v||0), 0);
+    const _expense = row.totalExpense || 0;
+    // Only cap if the excess comes from gross-up (not genuine RMD surplus)
+    // A genuine RMD surplus = RMD alone > expense; gross-up surplus = small overage
+    const _rmdGross = (row.sources.rmd || 0);
+    const _guaranteedIncome = (row.sources.ss||0) + (row.sources.pension||0) + (row.sources.roth||0) + (row.sources.eta||0) + (row.sources.parttime||0) + (row.sources.annuity||0);
+    const _isRmdSurplus = _rmdGross > 0 && (_guaranteedIncome + _rmdGross) > _expense;
+    if (!_isRmdSurplus && _barTotalRaw > _expense * 1.001 && _expense > 0) {
+      // Scale all sources proportionally to meet expense line exactly
+      const _scale = _expense / _barTotalRaw;
+      Object.keys(row.chartSources).forEach(k => {
+        row.chartSources[k] = (row.chartSources[k] || 0) * _scale;
+      });
     }
     years.push(row);
   }
