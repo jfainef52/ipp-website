@@ -2617,6 +2617,9 @@ function App() {
     ? projectArc({ ...primaryOnlyBase, ltcInsured: true })
     : { years: null };
 
+  // showSpouseLtcComparison must be declared before yearsBothUninsured
+  const showSpouseLtcComparison = isMarried && inputs.spouseLtcEventEnabled && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
+
   // Combined uninsured — both events active, no insurance, arch=false
   // Used as the chart's uninsuredData so BOTH care event bands + expense spikes show
   const { years: yearsBothUninsured } = (showLtcComparison || showSpouseLtcComparison)
@@ -2639,7 +2642,7 @@ function App() {
     : { confidence: null };
 
   // Spouse LTC comparison
-  const showSpouseLtcComparison = isMarried && inputs.spouseLtcEventEnabled && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
+  // showSpouseLtcComparison moved above yearsBothUninsured
   const spouseOnlyBase = { ...ltcPortfolioBase, ltcEventAge: 0 };
   const { years: yearsSpouseUninsured } = showSpouseLtcComparison
     ? projectArc({ ...spouseOnlyBase, spouseLtcInsured: false })
