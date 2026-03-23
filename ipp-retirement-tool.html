@@ -1600,6 +1600,16 @@ function ScenarioSummaryModal({ inputs, years, onClose }) {
   const l1TaxIRAFunded = Math.max(0, l1TaxTotal - l1Financed); // gross-up from IRA
   const l1GrossIRA  = l1ConvAmt + l1TaxIRAFunded; // total IRA draw = conversion + unfinanced tax
 
+  // Inflated care costs at time of event (using ltcCareInflationRate from retirement age)
+  const _careInflRate = (inputs.ltcCareInflationRate || 4) / 100;
+  const _retireAge = inputs.retireAge || 65;
+  const ltcInflatedMonthly = inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0
+    ? Math.round(inputs.ltcMonthlyCost * Math.pow(1 + _careInflRate, (inputs.ltcEventAge - _retireAge)))
+    : 0;
+  const spLtcInflatedMonthly = inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0
+    ? Math.round(inputs.spouseLtcMonthlyCost * Math.pow(1 + _careInflRate, (inputs.spouseLtcEventAge - _retireAge)))
+    : 0;
+
   // L2 Primary: gross-up from IRA to net policy premium after tax (+early penalty if < 59.5)
   const l2EarlyPenalty  = (inputs.ltcFundingAge||0) < 59.5 ? 0.10 : 0;
   const l2NetAmt        = inputs.ltcNetAmount || 0;
@@ -1823,16 +1833,18 @@ function ScenarioSummaryModal({ inputs, years, onClose }) {
                 {hasLtc && <div>
                   <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:9,fontWeight:700,letterSpacing:'.15em',textTransform:'uppercase',color:'#C47A7A',marginBottom:6}}>Primary Care Event</div>
                   <Row label="Event Age" value={'Age ' + inputs.ltcEventAge} color="#C47A7A"/>
-                  <Row label="Monthly Care Cost" value={fmtMo(inputs.ltcMonthlyCost)} color="#C47A7A"/>
+                  <Row label="Monthly Care Cost (today)" value={fmtMo(inputs.ltcMonthlyCost)} color="#C47A7A"/>
+                  {ltcInflatedMonthly > 0 && ltcInflatedMonthly !== inputs.ltcMonthlyCost && <Row label={'Monthly Cost at Age ' + inputs.ltcEventAge + ' (' + (inputs.ltcCareInflationRate||4) + '% inflation)'} value={fmtMo(ltcInflatedMonthly)} color="#C8A030"/>}
                   <Row label="Duration" value={inputs.ltcDuration + ' years'}/>
-                  <Row label="Monthly Benefit (L2)" value={fmtMo(inputs.ltcMonthlyBenefit||0)} color="#4A9B7A"/>
+                  <Row label="L2 Coverage (Arch ON)" value="Full care cost covered" color="#4A9B7A"/>
                 </div>}
                 {hasSpouseLtc && <div>
                   <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:9,fontWeight:700,letterSpacing:'.15em',textTransform:'uppercase',color:'#C47A7A',marginBottom:6}}>Spouse Care Event</div>
                   <Row label="Event Age" value={'Age ' + inputs.spouseLtcEventAge} color="#C47A7A"/>
-                  <Row label="Monthly Care Cost" value={fmtMo(inputs.spouseLtcMonthlyCost)} color="#C47A7A"/>
+                  <Row label="Monthly Care Cost (today)" value={fmtMo(inputs.spouseLtcMonthlyCost)} color="#C47A7A"/>
+                  {spLtcInflatedMonthly > 0 && spLtcInflatedMonthly !== inputs.spouseLtcMonthlyCost && <Row label={'Monthly Cost at Age ' + inputs.spouseLtcEventAge + ' (' + (inputs.ltcCareInflationRate||4) + '% inflation)'} value={fmtMo(spLtcInflatedMonthly)} color="#C8A030"/>}
                   <Row label="Duration" value={(inputs.spouseLtcDuration||3) + ' years'}/>
-                  <Row label="Monthly Benefit (L2)" value={fmtMo(inputs.spouseLtcMonthlyBenefit||0)} color="#4A9B7A"/>
+                  <Row label="L2 Coverage (Arch ON)" value="Full care cost covered" color="#4A9B7A"/>
                 </div>}
               </div>
             </Section>
