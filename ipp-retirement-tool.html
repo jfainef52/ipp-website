@@ -2875,7 +2875,6 @@ function App() {
   const [saveStatus,    setSaveStatus]    = React.useState('');   // 'saving' | 'saved' | 'error'
   const [scenarios,     setScenarios]     = React.useState([]);   // list of named saves
   const [showSaveAs,    setShowSaveAs]    = React.useState(false);
-  const [showSummary,   setShowSummary]   = React.useState(false);
   const [saveAsName,    setSaveAsName]    = React.useState('');
   const [activeScenario, setActiveScenario] = React.useState(null);  // { id, name } of currently loaded named scenario
   const [recoveryData,  setRecoveryData]  = React.useState(null); // autosave to offer recovery
@@ -4912,7 +4911,7 @@ function App() {
           ))}
 
           <button
-            onClick={()=>openScenarioSummary(inputs, clientInfo)}
+            onClick={()=>window.openScenarioSummary(inputs, clientInfo)}
             style={{
               padding:'8px 16px',borderRadius:7,fontSize:13,fontWeight:600,
               fontFamily:"'DM Sans',sans-serif",cursor:'pointer',
