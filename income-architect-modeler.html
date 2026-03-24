@@ -26,10 +26,10 @@ body{background:var(--navy);color:var(--off-white);font-family:'Barlow',sans-ser
 .nav-links a{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--warm);text-decoration:none;transition:color .2s;}
 .nav-links a:hover,.nav-links a.active{color:var(--gold);}
 .nav-ctas{display:flex;align-items:center;gap:10px;}
-.btn-nav-outline{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--off-white);border:1px solid rgba(255,255,255,.2);padding:8px 16px;text-decoration:none;transition:all .2s;}
-.btn-nav-outline:hover{border-color:var(--gold);color:var(--gold);}
-.btn-nav-gold{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--navy);background:var(--gold);padding:9px 18px;text-decoration:none;transition:background .2s;}
-.btn-nav-gold:hover{background:var(--gold2);}
+.btn-nav-outline{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--off-white) !important;border:1px solid rgba(255,255,255,.2);padding:8px 16px;text-decoration:none;transition:all .2s;}
+.btn-nav-outline:hover{border-color:var(--gold);color:var(--gold) !important;}
+.btn-nav-gold{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700 !important;letter-spacing:.1em;text-transform:uppercase;color:var(--navy) !important;background:var(--gold);padding:9px 18px;text-decoration:none;transition:background .2s;}
+.btn-nav-gold:hover{background:var(--gold2);color:var(--navy) !important;}
 
 /* HERO */
 .hero{min-height:100vh;display:grid;grid-template-columns:1fr 1fr;gap:0;align-items:stretch;padding-top:68px;}
@@ -210,9 +210,8 @@ footer{background:var(--navy);border-top:1px solid rgba(42,63,88,.8);padding:56p
     <a href="/income-architect-modeler.html" class="active"><span style="text-transform:none;">IncomeArchitect™ Modeler</span></a>
     <a href="/about.html">About Us</a>
     <a href="/contact.html">Contact Us</a>
-  </div>
-  <div class="nav-ctas">
-    <a href="/advisor-dashboard.html" class="btn-nav-outline">Advisor Portal</a>
+    <a href="/index.html#book">Architecture of Retirement</a>
+    <a href="/advisor-dashboard.html" class="btn-nav-outline" style="color:var(--gold);border-color:var(--gold-dim);">Advisor Portal</a>
     <a href="/structure-review.html" class="btn-nav-gold">Begin Your Review</a>
   </div>
 </nav>
@@ -496,11 +495,11 @@ footer{background:var(--navy);border-top:1px solid rgba(42,63,88,.8);padding:56p
       <div style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:300;color:var(--off-white);line-height:1.3;">Ready to see your retirement income picture?<br><em style="font-style:italic;color:var(--gold);">We'd welcome the conversation.</em></div>
     </div>
     <div style="display:flex;flex-direction:column;gap:12px;">
-      <a href="mailto:support@emailipp.com" style="display:flex;align-items:center;gap:10px;text-decoration:none;">
+      <a href="/cdn-cgi/l/email-protection#6c1f191c1c031e182c09010d0500051c1c420f0301" style="display:flex;align-items:center;gap:10px;text-decoration:none;">
         <div style="width:32px;height:32px;border:1px solid var(--gold);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C8A96E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
         </div>
-        <span style="font-family:'Barlow Condensed',sans-serif;font-size:13px;letter-spacing:.05em;color:var(--off-white);">support@emailipp.com</span>
+        <span style="font-family:'Barlow Condensed',sans-serif;font-size:13px;letter-spacing:.05em;color:var(--off-white);"><span class="__cf_email__" data-cfemail="1d6e686d6d726f695d78707c7471746d6d337e7270">[email&#160;protected]</span></span>
       </a>
       <a href="tel:7733189608" style="display:flex;align-items:center;gap:10px;text-decoration:none;">
         <div style="width:32px;height:32px;border:1px solid var(--gold);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
@@ -574,19 +573,15 @@ footer{background:var(--navy);border-top:1px solid rgba(42,63,88,.8);padding:56p
     <a href="/structure-review.html"><span style="text-transform:none;">StructureReview™</span></a>
     <a href="/incomearc.html"><span style="text-transform:none;">IncomeArc™</span></a>
     <a href="/income-architect-modeler.html"><span style="text-transform:none;">IncomeArchitect™ Modeler</span></a>
+    <a href="/index.html#book">Architecture of Retirement</a>
     <a href="/about.html">About Us</a>
+    <a href="/contact.html">Contact Us</a>
     <a href="/contact.html">Contact Us</a>
     <a href="/advisor-dashboard.html">Advisor Portal</a>
   </div>
   <div class="footer-bottom">
     <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:8px;">
-      <a href="mailto:support@emailipp.com" style="color:var(--warm);text-decoration:none;font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:.08em;">support@emailipp.com</a>
+      <a href="/cdn-cgi/l/email-protection#80f3f5f0f0eff2f4c0e5ede1e9ece9f0f0aee3efed" style="color:var(--warm);text-decoration:none;font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:.08em;"><span class="__cf_email__" data-cfemail="20535550504f525460454d41494c4950500e434f4d">[email&#160;protected]</span></a>
       <a href="tel:7733189608" style="color:var(--warm);text-decoration:none;font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:.08em;">773-318-9608</a>
     </div>
-    <div>© 2026 Integrated Planning Partners. IncomeArc™, IncomeArchitect™, and StructureReview™ are trademarks of Integrated Planning Partners.</div>
-    <div>For informational purposes only. Not financial, tax, legal, or investment advice. Past performance does not guarantee future results.</div>
-  </div>
-</footer>
-
-</body>
-</html>
+    <div>© 2026 Integrated Planning Partners. IncomeArc™, IncomeAr
