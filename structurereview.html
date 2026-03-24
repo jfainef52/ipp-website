@@ -943,11 +943,55 @@ function QuestionScreen({question:questionProp,answer,onAnswer,onNext,onBack,ste
 
 // ── Welcome ──
 function WelcomeScreen({onStart}) {
+  const [videoEnded, setVideoEnded] = React.useState(false);
+  const [skipped, setSkipped] = React.useState(false);
+  const highlighted = videoEnded || skipped;
+
+  React.useEffect(() => {
+    // Listen for YouTube iframe API messages
+    const onMessage = (e) => {
+      try {
+        const data = typeof e.data === "string" ? JSON.parse(e.data) : e.data;
+        if (data && data.event === "onStateChange" && data.info === 0) {
+          setVideoEnded(true);
+        }
+      } catch(_) {}
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
+
   return (
     <div style={{minHeight:"100vh",background:"#0E1824",display:"flex",flexDirection:"column",justifyContent:"center",padding:"36px 24px",position:"relative",overflow:"hidden",fontFamily:"'DM Sans',sans-serif"}}>
       <div style={{position:"absolute",top:-80,right:-80,width:440,height:440,borderRadius:"50%",background:"radial-gradient(circle,rgba(200,169,110,.07) 0%,transparent 65%)",pointerEvents:"none"}}/>
       <div style={{position:"absolute",bottom:-80,left:-80,width:360,height:360,borderRadius:"50%",background:"radial-gradient(circle,rgba(95,168,160,.05) 0%,transparent 65%)",pointerEvents:"none"}}/>
-      <div style={{animation:"fadeUp .45s ease both",maxWidth:400}}>
+
+      {/* Two-column layout on desktop, stacked on mobile */}
+      <div style={{display:"flex",flexDirection:"row",flexWrap:"wrap",gap:48,alignItems:"center",justifyContent:"center",maxWidth:900,margin:"0 auto",width:"100%"}}>
+
+        {/* ── LEFT: welcome video ── */}
+        <div style={{flex:"1 1 280px",maxWidth:300,animation:"fadeUp .45s ease .1s both",display:"flex",flexDirection:"column",alignItems:"center",gap:12}}>
+          <div style={{fontSize:10,fontWeight:600,letterSpacing:".16em",textTransform:"uppercase",color:"#C8A96E",marginBottom:2}}>Why This Step Changes Everything</div>
+          {/* Shorts-style portrait video container */}
+          <div style={{width:"100%",position:"relative",paddingTop:"177.78%",borderRadius:14,overflow:"hidden",border:"1px solid rgba(200,169,110,.2)",boxShadow:"0 8px 40px rgba(0,0,0,.5)"}}>
+            <iframe
+              src="https://www.youtube.com/embed/bOmryl2_BtM?enablejsapi=1&rel=0&modestbranding=1"
+              title="Welcome from Jeffrey Faine"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",border:"none"}}
+            />
+          </div>
+          <button
+            onClick={()=>setSkipped(true)}
+            style={{fontSize:12,color:"#6E8299",background:"none",border:"none",cursor:"pointer",textDecoration:"underline",textDecorationColor:"rgba(110,130,153,.4)",padding:"2px 0"}}
+          >
+            Skip video
+          </button>
+        </div>
+
+        {/* ── RIGHT: content ── */}
+        <div style={{animation:"fadeUp .45s ease both",flex:"1 1 320px",maxWidth:420}}>
         <div style={{marginBottom:16}} dangerouslySetInnerHTML={{__html:`<svg id="Layer_1" style="height:44px;width:auto;display:block;" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="875 1789 3260 1462">
   <!-- Generator: Adobe Illustrator 30.0.0, SVG Export Plug-In . SVG Version: 2.1.1 Build 123)  -->
   <defs>
@@ -1003,8 +1047,18 @@ function WelcomeScreen({onStart}) {
             <div><span style={{fontSize:13,fontWeight:600,color:"#F5F2EC"}}>{l}</span><span style={{fontSize:13,color:"#6E8299"}}> — {d}</span></div>
           </div>
         ))}
-        <button onClick={onStart} style={{width:"100%",marginTop:24,padding:"16px",background:"#C8A96E",color:"#0E1824",borderRadius:11,fontSize:15,fontWeight:700,letterSpacing:".03em"}}>Begin StructureReview™</button>
-      </div>
+        <div style={{position:"relative",marginTop:24}}>
+          {highlighted && (
+            <div style={{position:"absolute",inset:-4,borderRadius:15,background:"rgba(200,169,110,.18)",border:"2px solid rgba(200,169,110,.6)",animation:"fadeIn .4s ease both",pointerEvents:"none",zIndex:0}}/>
+          )}
+          <button onClick={onStart} style={{position:"relative",zIndex:1,width:"100%",padding:"16px",background: highlighted ? "#D4B87A" : "#C8A96E",color:"#0E1824",borderRadius:11,fontSize:15,fontWeight:700,letterSpacing:".03em",transition:"background .3s ease",boxShadow: highlighted ? "0 0 24px rgba(200,169,110,.45)" : "none"}}>
+            {highlighted ? "✓ Ready — Begin StructureReview™" : "Begin StructureReview™"}
+          </button>
+        </div>
+        </div>{/* end right column */}
+
+      </div>{/* end two-column wrapper */}
+
       <div style={{marginTop:32,textAlign:"center"}}>
         <p style={{fontSize:10,color:"#3A5268"}}>Powered by Integrated Planning Partners</p>
       </div>
