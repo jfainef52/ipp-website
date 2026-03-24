@@ -988,6 +988,14 @@ function WelcomeScreen({onStart}) {
           >
             Skip video
           </button>
+          {/* Mobile-only scroll hint */}
+          <div style={{display:"block",textAlign:"center"}}>
+            <style>{`@media(min-width:700px){.mobile-scroll-hint{display:none!important;}}`}</style>
+            <div className="mobile-scroll-hint" style={{marginTop:6,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+              <span style={{fontSize:12,color:"#6E8299",letterSpacing:".04em"}}>Continue Below</span>
+              <span style={{color:"#C8A96E",fontSize:16,animation:"fadeUp .6s ease infinite alternate"}}>↓</span>
+            </div>
+          </div>
         </div>
 
         {/* ── RIGHT: content ── */}
