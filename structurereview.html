@@ -948,17 +948,25 @@ function WelcomeScreen({onStart}) {
   const highlighted = videoEnded || skipped;
 
   React.useEffect(() => {
-    // Listen for YouTube iframe API messages
+    // Listen for Vimeo player messages
     const onMessage = (e) => {
       try {
         const data = typeof e.data === "string" ? JSON.parse(e.data) : e.data;
-        if (data && data.event === "onStateChange" && data.info === 0) {
+        if (data && data.event === "finish") {
           setVideoEnded(true);
         }
       } catch(_) {}
     };
     window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
+    // Tell Vimeo iframe to send events
+    const sendReady = () => {
+      const iframe = document.querySelector("iframe[src*='vimeo']");
+      if (iframe) {
+        iframe.contentWindow.postMessage(JSON.stringify({method:"addEventListener",value:"finish"}), "https://player.vimeo.com");
+      }
+    };
+    const t = setTimeout(sendReady, 2000);
+    return () => { window.removeEventListener("message", onMessage); clearTimeout(t); };
   }, []);
 
   return (
@@ -975,9 +983,9 @@ function WelcomeScreen({onStart}) {
           {/* Shorts-style portrait video container */}
           <div style={{width:"100%",position:"relative",paddingTop:"177.78%",borderRadius:14,overflow:"hidden",border:"1px solid rgba(200,169,110,.2)",boxShadow:"0 8px 40px rgba(0,0,0,.5)"}}>
             <iframe
-              src="https://www.youtube.com/embed/bOmryl2_BtM?enablejsapi=1&rel=0&modestbranding=1"
+              src="https://player.vimeo.com/video/1176751373?badge=0&autopause=0&player_id=0&app_id=58479"
               title="Welcome from Jeffrey Faine"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allow="autoplay; fullscreen; picture-in-picture"
               allowFullScreen
               style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",border:"none"}}
             />
