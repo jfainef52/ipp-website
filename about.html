@@ -37,7 +37,7 @@
   nav {
     position: fixed;
     top: 0; left: 0; right: 0;
-    z-index: 100;
+    z-index: 200;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -54,14 +54,23 @@
     text-decoration: none;
   }
 
-  .nav-links {
+  .nav-logo-sub {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    color: var(--gold);
+    text-transform: uppercase;
+  }
+
+  .nav-right {
     display: flex;
     align-items: center;
-    gap: 36px;
+    gap: 20px;
     list-style: none;
   }
 
-  .nav-links a {
+  .nav-right a {
     font-family: 'Barlow Condensed', sans-serif;
     font-size: 11px;
     font-weight: 500;
@@ -70,11 +79,12 @@
     color: var(--warm);
     text-decoration: none;
     transition: color 0.2s;
+    white-space: nowrap;
   }
 
-  .nav-links a:hover { color: var(--gold); }
-  .nav-links a.active { color: var(--gold); }
-  .nav-links a span { text-transform: none; }
+  .nav-right a:hover { color: var(--gold); }
+  .nav-right a.active { color: var(--gold); }
+  .nav-right a span { text-transform: none; }
 
   .nav-advisor {
     color: var(--gold) !important;
@@ -103,6 +113,71 @@
   }
 
   .nav-cta:hover { background: var(--gold2) !important; color: var(--navy) !important; }
+
+  .nav-menu-btn {
+    display: flex; flex-direction: column; justify-content: center;
+    align-items: center; gap: 5px; width: 36px; height: 36px;
+    cursor: pointer; background: none; border: 1px solid var(--border);
+    border-radius: 2px; padding: 0; transition: border-color 0.2s; flex-shrink: 0;
+  }
+  .nav-menu-btn:hover { border-color: var(--gold-dim); }
+  .nav-menu-btn span { display: block; width: 16px; height: 1px; background: var(--warm); transition: background 0.2s; font-size: 0; }
+  .nav-menu-btn:hover span { background: var(--gold); }
+
+  .drawer-overlay {
+    position: fixed; inset: 0; background: rgba(10,20,34,0.6);
+    z-index: 300; opacity: 0; pointer-events: none;
+    transition: opacity 0.3s ease; backdrop-filter: blur(2px);
+  }
+  .drawer-overlay.open { opacity: 1; pointer-events: all; }
+
+  .drawer {
+    position: fixed; top: 0; right: 0; width: 320px; height: 100vh;
+    background: var(--navy2); border-left: 1px solid var(--border);
+    z-index: 400; transform: translateX(100%);
+    transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+    display: flex; flex-direction: column; overflow-y: auto;
+  }
+  .drawer.open { transform: translateX(0); }
+
+  .drawer-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 28px; height: 68px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .drawer-label {
+    font-family: 'Barlow Condensed', sans-serif; font-size: 9px;
+    font-weight: 500; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold);
+  }
+  .drawer-close {
+    display: flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; cursor: pointer; background: none;
+    border: 1px solid var(--border); border-radius: 2px; color: var(--warm);
+    font-size: 16px; line-height: 1; transition: border-color 0.2s, color 0.2s;
+  }
+  .drawer-close:hover { border-color: var(--gold-dim); color: var(--gold); }
+
+  .drawer-nav {
+    display: flex; flex-direction: column; padding: 36px 28px; gap: 0; flex: 1;
+  }
+  .drawer-nav a {
+    font-family: 'Barlow Condensed', sans-serif; font-size: 12px; font-weight: 500;
+    letter-spacing: 0.16em; text-transform: uppercase; color: var(--warm);
+    text-decoration: none; padding: 16px 0;
+    border-bottom: 1px solid rgba(42,63,88,0.5);
+    transition: color 0.2s, padding-left 0.2s;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .drawer-nav a span { text-transform: none; }
+  .drawer-nav a::before { content: ''; display: block; width: 0; height: 1px; background: var(--gold); transition: width 0.2s; flex-shrink: 0; }
+  .drawer-nav a:hover { color: var(--gold); padding-left: 4px; }
+  .drawer-nav a:hover::before { width: 16px; }
+  .drawer-nav a:last-child { border-bottom: none; }
+
+  .drawer-footer {
+    padding: 28px; border-top: 1px solid var(--border);
+    font-family: 'Barlow Condensed', sans-serif; font-size: 9px;
+    font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gray);
+  }
 
   /* ── PAGE HEADER ── */
   .page-header {
@@ -587,7 +662,9 @@
   /* ── RESPONSIVE ── */
   @media (max-width: 900px) {
     nav { padding: 0 24px; }
-    .nav-links { display: none; }
+    nav { padding: 0 20px; }
+    .nav-right { gap: 12px; }
+    .nav-right li:not(:last-child):not(:nth-last-child(2)):not(:nth-last-child(3)) { display: none; }
     .page-header { padding: 110px 24px 60px; }
     .section-inner { padding: 72px 24px; }
     .manifesto-inner { padding: 72px 24px; grid-template-columns: 1fr; gap: 40px; }
@@ -947,19 +1024,36 @@ document.addEventListener('DOMContentLoaded', function() {
   </g>
   <rect class="st0" x="2011.69" y="1828.72" width="15.92" height="1342.55"/>
 </svg></a>
+    <div class="nav-logo-sub">Built for Planning. Designed for Execution.</div>
   </div>
-    <ul class="nav-links">
-    <li><a href="index.html#what-we-do">What We Do</a></li>
-    <li><a href="index.html#structure-review"><span style="text-transform:none;">StructureReview™</span></a></li>
+  <ul class="nav-right">
     <li><a href="incomearc.html"><span style="text-transform:none;">IncomeArc™</span></a></li>
     <li><a href="income-architect-modeler.html"><span style="text-transform:none;">IncomeArchitect™ Modeler</span></a></li>
-    <li><a href="about.html">About Us</a></li>
-    <li><a href="index.html#contact">Contact Us</a></li>
     <li><a href="index.html#book">Architecture of Retirement</a></li>
     <li><a href="advisor-portal.html" class="nav-advisor">Advisor Portal</a></li>
     <li><a href="https://structurereview.integratedplanningpartners.com/structurereview.html" class="nav-cta">Begin Your Review</a></li>
+    <li><button class="nav-menu-btn" onclick="openDrawer()" aria-label="Open menu"><span></span><span></span><span></span></button></li>
   </ul>
 </nav>
+
+<!-- ── DRAWER OVERLAY ── -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+
+<!-- ── DRAWER PANEL ── -->
+<div class="drawer" id="drawer">
+  <div class="drawer-header">
+    <span class="drawer-label">Menu</span>
+    <button class="drawer-close" onclick="closeDrawer()" aria-label="Close menu">&#215;</button>
+  </div>
+  <nav class="drawer-nav">
+    <a href="index.html#structure-review"><span style="text-transform:none;">StructureReview™</span></a>
+    <a href="resources.html">Resources</a>
+    <a href="about.html" class="active">About Us</a>
+    <a href="index.html#contact">Contact Us</a>
+    <a href="index.html#book">Architecture of Retirement</a>
+  </nav>
+  <div class="drawer-footer">Integrated Planning Partners</div>
+</div>
 
 <!-- ── PAGE HEADER ── -->
 <section class="page-header">
@@ -1354,6 +1448,19 @@ document.addEventListener('DOMContentLoaded', function() {
       if (!isOpen) item.classList.add('open');
     });
   });
+</script>
+<script>
+  function openDrawer() {
+    document.getElementById('drawer').classList.add('open');
+    document.getElementById('drawerOverlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeDrawer() {
+    document.getElementById('drawer').classList.remove('open');
+    document.getElementById('drawerOverlay').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+  document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeDrawer(); });
 </script>
 </body>
 </html>
