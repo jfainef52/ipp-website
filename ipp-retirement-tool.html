@@ -625,12 +625,12 @@ function calcStateTax(sources, stateCode, inflFactor, customRate, stressAdder = 
     case 'partial':
       // Most partial states: SS exempt, qualified plan (IRA/pension) at 80% inclusion,
       // annuity gain (exclusion already applied) at 100%, part-time fully taxable.
-      stateOrdinary = (pension + rmd) * 0.80 + annuity + parttime + taxable * 0.15;
+      stateOrdinary = (pension + rmd) * 0.80 + annuity + parttime + taxable * taxableGainRatio;
       break;
     case 'full':
     default:
       // All retirement income taxed; SS at 85%, annuity gain at 100% (exclusion already applied)
-      stateOrdinary = pension + rmd + annuity + parttime + ss * 0.85 + taxable * 0.15;
+      stateOrdinary = pension + rmd + annuity + parttime + ss * 0.85 + taxable * taxableGainRatio;
       break;
   }
 
@@ -686,11 +686,16 @@ function calcAnnualTax(sources, filingStatus, inflFactor, stressAdder = 0) {
   const rmd       = sources.rmd       || 0;
   const parttime  = sources.parttime  || 0;
   const annuity   = sources.annuity   || 0; // taxable gain portion only (exclusion ratio already applied at booking)
-  const taxable   = sources.taxable   || 0; // assume 100% LTCG (conservative simplification)
+  const taxable   = sources.taxable   || 0; // gross draw from taxable brokerage
+  // gainRatio: fraction of taxable draw that is capital gain (vs. tax-free basis return)
+  // Passed through sources.taxableGainRatio; defaults to 1.0 if not set (conservative)
+  const taxableGainRatio = (sources.taxableGainRatio !== undefined) ? Math.max(0, Math.min(1, sources.taxableGainRatio)) : 1.0;
+  const taxableGain = taxable * taxableGainRatio; // only this portion is subject to LTCG tax
   // Roth is tax-free — no impact. Non-qual annuity tax-free return-of-basis in sources.annuityTaxFree (not taxed).
 
   // SS taxability: up to 85% included in ordinary income
-  const provisionalIncome = (ss * 0.5) + pension + rmd + parttime + annuity + taxable;
+  // Only the gain portion of taxable draws counts toward SS provisional income
+  const provisionalIncome = (ss * 0.5) + pension + rmd + parttime + annuity + taxableGain;
   let ssTaxable = 0;
   if (provisionalIncome > (isMFJ ? 44000 : 34000) * inflFactor) {
     ssTaxable = Math.min(ss * 0.85, 0.85 * ss);
@@ -711,12 +716,12 @@ function calcAnnualTax(sources, filingStatus, inflFactor, stressAdder = 0) {
     prev = b.limit;
   }
 
-  // LTCG tax on taxable portfolio draw — stacked on top of ordinary income
+  // LTCG tax on taxable portfolio draw — only gain portion is taxable
   let ltcgTax = 0;
-  if (taxable > 0) {
+  if (taxableGain > 0) {
     const ltcgBase = ordinaryAGI; // LTCG stacks on top of ordinary
     let ltcgPrev = 0;
-    let taxableRemaining = taxable; // track unprocessed LTCG as we walk brackets
+    let taxableRemaining = taxableGain; // only the gain fraction — basis returns tax-free
     for (const b of ltcgBrackets) {
       if (taxableRemaining <= 0) break;
       if (ltcgBase >= b.limit) { ltcgPrev = b.limit; continue; }
@@ -730,6 +735,7 @@ function calcAnnualTax(sources, filingStatus, inflFactor, stressAdder = 0) {
 
   const totalTax = ordinaryTax + ltcgTax;
   const effectiveRate = (ordinaryGross + taxable) > 0 ? totalTax / (ordinaryGross + taxable) : 0;
+  // Note: effectiveRate uses full taxable draw (not just gain) as denominator — correct,
 
   // Marginal rate = rate of the bracket where the last dollar of ordinary income falls
   let marginalRate = brackets[0].rate;
@@ -796,6 +802,7 @@ function projectArc(inputs) {
     tradContributionEndAge = 0,
     annualTaxableContribution = 0,
     taxableContributionEndAge = 0,
+    taxableBasisPct = 40,
     annualSpouseTradContribution = 0,
     spouseTradContributionEndAge = 0,
   } = inputs;
@@ -834,6 +841,9 @@ function projectArc(inputs) {
   let trad = traditionalBalance;
   let roth = rothBalance;
   let taxable = taxableBalance;
+  // Track cost basis separately. Gain ratio = (taxable - taxableBasis) / taxable.
+  // Basis stays flat through growth; draws reduce it proportionally; reinvestment adds at 100% basis.
+  let taxableBasis = taxableBalance * Math.min(Math.max((taxableBasisPct || 40) / 100, 0), 1);
   let spouseTrad = (filingStatus === 'mfj') ? (spouseTraditionalBalance || 0) : 0;
 
   // Pre-retirement marginal rate — from householdIncome. Falls back to 0.24 if not set.
@@ -877,6 +887,7 @@ function projectArc(inputs) {
       // Grow existing balance then add contribution (end-of-year)
       trad    = trad    * (1 + portfolioReturn) + tradContrib;
       taxable = taxable * (1 + portfolioReturn) + taxableContrib;
+      taxableBasis += taxableContrib; // contributions are after-tax — 100% basis
       roth    = roth    * (1 + portfolioReturn);
       spouseTrad = spouseTrad * (1 + portfolioReturn) + spouseTradContrib;
     }
@@ -1146,8 +1157,11 @@ function projectArc(inputs) {
     const taxableDrawEnd = taxableDrawdownEndAge || planToAge;
     if (archAnnualTaxableDrawdown > 0 && age >= taxableDrawStart && age <= taxableDrawEnd && taxable > 0) {
       const draw = Math.min(archAnnualTaxableDrawdown, taxable);
+      const stratGainRatio = taxable > 0 ? Math.max(0, Math.min(1, (taxable - taxableBasis) / taxable)) : 1;
       row.sources.taxable = (row.sources.taxable || 0) + draw;
+      row.sources.taxableGainRatio = stratGainRatio; // strategic draw ratio
       row.totalIncome += draw;
+      if (taxable > 0) taxableBasis = Math.max(0, taxableBasis * (1 - draw / taxable));
       taxable = Math.max(0, taxable - draw);
       row.strategicTaxableDraw = draw;
     }
@@ -1246,12 +1260,14 @@ function projectArc(inputs) {
         if (ordAGI_pre <= b.limit) break;
         prev_pre = b.limit;
       }
-      // LTCG tax on taxable
+      // LTCG tax on taxable — gain portion only
+      const taxGainRatio_pre = (row.sources.taxableGainRatio !== undefined) ? row.sources.taxableGainRatio : 1.0;
+      const taxGain_pre = tax_pre * taxGainRatio_pre;
       let ltcgTax_pre = 0;
-      if (tax_pre > 0) {
+      if (taxGain_pre > 0) {
         const ltcgBkts_pre = (isMFJ_pre ? LTCG_MFJ_2025 : LTCG_SINGLE_2025)
           .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
-        let ltcgPrev_pre = 0; let taxRemain_pre = tax_pre;
+        let ltcgPrev_pre = 0; let taxRemain_pre = taxGain_pre;
         for (const b of ltcgBkts_pre) {
           if (taxRemain_pre <= 0) break;
           if (ordAGI_pre >= b.limit) { ltcgPrev_pre = b.limit; continue; }
@@ -1377,18 +1393,31 @@ function projectArc(inputs) {
         : ltcPortionOfGap;
       let ltcRemaining = ltcPortionForAttrib; // track LTC-specific portion
 
-      // --- Taxable brokerage: LTCG gross-up, stacked on ordinary income ---
+      // --- Taxable brokerage: LTCG gross-up on gain portion only ---
+      // gainRatio = fraction of each dollar withdrawn that is taxable gain (vs. tax-free basis return)
+      // Only the gain fraction needs gross-up through LTCG brackets; basis portion is tax-free.
       if (taxable > 0 && remaining > 0) {
+        const gainRatio = taxable > 0 ? Math.max(0, Math.min(1, (taxable - taxableBasis) / taxable)) : 1;
         const ltcgBracketsEff = (isMFJeff ? LTCG_MFJ_2025 : LTCG_SINGLE_2025)
           .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
-        // LTCG stacks on top of ordinary income — start bracket walk at baseOrdAGI
+        // For gross-up: only scale by gainRatio since basis returns tax-free
+        // net = basis_portion + gain_net → need to solve for gross draw accounting for tax on gain only
         const netToDraw = Math.min(remaining, taxable * 0.9);
-        const { grossDraw, taxOnDraw } = grossUpIterative(netToDraw, ltcgBracketsEff, baseOrdAGI);
+        // Effective gross-up: only gain fraction is taxable; basis fraction has 0 tax
+        // We compute gross-up on the full net but apply tax rate scaled by gainRatio
+        const ltcgBracketsScaled = ltcgBracketsEff.map(b => ({ limit: b.limit, rate: b.rate * gainRatio }));
+        const { grossDraw, taxOnDraw } = grossUpIterative(netToDraw, ltcgBracketsScaled, baseOrdAGI);
         const actualGross = Math.min(taxable, grossDraw);
         const taxProportion = grossDraw > 0 ? taxOnDraw / grossDraw : 0;
         const actualTax = actualGross * taxProportion;
         const actualNet = actualGross - actualTax;
         row.sources.taxable = (row.sources.taxable || 0) + actualGross;
+        // Store weighted-average gain ratio across all taxable draws this year
+        const prevTaxDraw = (row.sources.taxable || 0) - actualGross;
+        const prevRatio = row.sources.taxableGainRatio || gainRatio;
+        row.sources.taxableGainRatio = prevTaxDraw > 0
+          ? (prevRatio * prevTaxDraw + gainRatio * actualGross) / (prevTaxDraw + actualGross)
+          : gainRatio;
         row.totalIncome += actualGross;
         // Only attribute gross-up tax to LTC for the LTC-driven portion of this draw
         if (isAnyLtcEvent && ltcRemaining > 0 && !ltcInsured && archLtcNetAmount === 0) {
@@ -1397,6 +1426,8 @@ function projectArc(inputs) {
           row.ltcPortfolioDraw = (row.ltcPortfolioDraw || 0) + actualGross * ltcShare;
           ltcRemaining -= Math.min(actualNet, ltcRemaining);
         }
+        // Reduce basis proportionally — basis comes back tax-free, only gain is LTCG
+        if (taxable > 0) taxableBasis = Math.max(0, taxableBasis * (1 - actualGross / taxable));
         taxable = Math.max(0, taxable - actualGross);
         remaining -= actualNet;
       }
@@ -1478,9 +1509,7 @@ function projectArc(inputs) {
     trad = trad * (1 + yearReturn);
     spouseTrad = spouseTrad * (1 + yearReturn);
 
-    // Portfolio snapshot
-    row.totalPortfolio = trad + roth + taxable + spouseTrad;
-    row.trad = trad; row.roth = roth; row.taxable = taxable; row.spouseTrad = spouseTrad;
+    // Portfolio snapshot deferred — will be taken after surplus reinvestment below
 
     // IRMAA MAGI — only taxable sources count. Tax-free sources (Roth, ETA policy loans,
     // LTC benefit proceeds, Roth annuity) are explicitly excluded — they do not appear
@@ -1493,7 +1522,7 @@ function projectArc(inputs) {
       + (row.sources.pension||0)
       + (row.sources.parttime||0)
       + (row.sources.annuity||0)       // gain portion only (exclusion already applied)
-      + (row.sources.taxable||0)*0.85; // conservative — treat most of taxable as gain
+      + (row.sources.taxable||0) * (row.sources.taxableGainRatio !== undefined ? row.sources.taxableGainRatio : 1.0); // gain portion only
     row.magi = magi;
     magiHistory[age] = magi; // store for IRMAA lookback in future years
 
@@ -1656,8 +1685,29 @@ function projectArc(inputs) {
       if (row.chartSources.rmd === 0) delete row.chartSources.rmd;
     }
 
+    // ── Surplus Reinvestment ──
+    // sources are already after-tax net at this point (tax apportioned above).
+    // row.totalIncome is after-tax. Non-spendable capital events (ETA funding, Roth conversion,
+    // LTC premiums) are excluded — they are IRA-to-policy transfers, never household cash.
+    // Surplus is added to taxable brokerage, then portfolio snapshot is taken so balances
+    // correctly reflect the reinvestment. End-of-year growth already ran above, so surplus
+    // earns growth starting next year (conservative — equivalent to end-of-year deposit).
+    const netSpendable = row.totalIncome - _nonSpend;
+    const surplusToReinvest = Math.max(0, netSpendable - row.totalExpense);
+    if (surplusToReinvest > 0) {
+      taxableBasis += surplusToReinvest; // after-tax cash — 100% basis on reinvestment
+      taxable += surplusToReinvest;
+      row.surplusReinvested = surplusToReinvest;
+    }
+
+    // Portfolio snapshot — taken AFTER surplus reinvestment so balances reflect reinvested cash
+    row.taxableBasis = taxableBasis;
+    row.taxableGainPct = taxable > 0 ? Math.max(0, Math.min(1, (taxable - taxableBasis) / taxable)) : 0;
+    row.totalPortfolio = trad + roth + taxable + spouseTrad;
+    row.trad = trad; row.roth = roth; row.taxable = taxable; row.spouseTrad = spouseTrad;
+
     // chartSources shows actual after-tax spendable income per source.
-    // Bars exceeding the expense line = surplus income (reinvested or held).
+    // Bars exceeding the expense line = surplus income reinvested into taxable brokerage.
     // Bars below the expense line = genuine income shortfall.
     years.push(row);
   }
@@ -2263,7 +2313,7 @@ function DataTable({ data }) {
       <table style={{width:'100%',borderCollapse:'collapse',fontSize:13,fontFamily:'DM Sans'}}>
         <thead>
           <tr>
-            {['Age','Soc Sec','Pension','Roth Ann.','NQ Ann.','ETA (L3)','RMD/Trad','Roth IRA','Taxable','Part-Time','Gross In','Fed Tax','State Tax','Eff. Rate','MAGI','Net Income','Expenses','IRMAA','Portfolio'].map(h=>(
+            {['Age','Soc Sec','Pension','Roth Ann.','NQ Ann.','ETA (L3)','RMD/Trad','Roth IRA','Taxable','Part-Time','Gross In','Fed Tax','State Tax','Eff. Rate','MAGI','Net Income','Expenses','IRMAA','Surplus→Taxable','Portfolio'].map(h=>(
               <th key={h} style={{padding:'6px 8px',textAlign:'right',color: h==='Net Income'?'#C8A96E': h==='Fed Tax'||h==='State Tax'||h==='Eff. Rate'?'#C47A7A': h==='MAGI'?'#9B7EC8':'#9EB8CC',fontWeight:500,letterSpacing:'.04em',fontSize:14,borderBottom:'1px solid rgba(255,255,255,.06)',whiteSpace:'nowrap'}}>
                 {h}
               </th>
@@ -2296,6 +2346,7 @@ function DataTable({ data }) {
               <td style={{padding:'5px 8px',textAlign:'right',color:'#F5F2EC',fontWeight:600}}>{fmt$(d.totalIncome)}</td>
               <td style={{padding:'5px 8px',textAlign:'right',color:'#C47A7A'}}>{fmt$(d.totalExpense)}</td>
               <td title={d.irmaa>0?`IRMAA based on age ${d.irmaaMagiYear} MAGI ($${Math.round((d.irmaaMagi||0)/1000)}K) — 2-yr lookback`:'No IRMAA'} style={{padding:'5px 8px',textAlign:'right',color: d.irmaa>0?'#E8943A':'#2A4060',cursor:d.irmaa>0?'help':'default'}}>{d.irmaa>0?'$'+d.irmaa.toLocaleString():'-'}</td>
+              <td title="After-tax net surplus reinvested into taxable brokerage" style={{padding:'5px 8px',textAlign:'right',color:(d.surplusReinvested||0)>0?'#4A9B7A':'#2A4060'}}>{(d.surplusReinvested||0)>0?fmt$(d.surplusReinvested):'-'}</td>
               <td style={{padding:'5px 8px',textAlign:'right',color:'#9EB8CC'}}>{fmtM(d.totalPortfolio)}</td>
             </tr>
           ))}
@@ -2320,6 +2371,7 @@ function DataTable({ data }) {
             <td style={{padding:'5px 8px',textAlign:'right',color:'#F5F2EC',fontWeight:700}}>{fmtM(data.reduce((s,d)=>s+(d.totalIncome||0),0))}</td>
             <td style={{padding:'5px 8px',textAlign:'right',color:'#C47A7A',fontWeight:700}}>{fmtM(data.reduce((s,d)=>s+(d.totalExpense||0),0))}</td>
             <td style={{padding:'5px 8px',textAlign:'right',color:'#E8943A',fontWeight:700}}>{fmtM(data.reduce((s,d)=>s+(d.irmaa||0),0))}</td>
+            <td style={{padding:'5px 8px',textAlign:'right',color:'#4A9B7A',fontWeight:700}}>{fmtM(data.reduce((s,d)=>s+(d.surplusReinvested||0),0))}</td>
             <td style={{padding:'5px 8px',textAlign:'right',color:'#9EB8CC'}}>—</td>
           </tr>
         </tfoot>
@@ -2392,7 +2444,7 @@ function BalancesTable({ data }) {
       <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
         <thead>
           <tr>
-            {['Age','Trad / IRA','Roth IRA','Taxable','Sp. Trad','Total Portfolio','Coverage'].map(h=>(
+            {['Age','Trad / IRA','Roth IRA','Taxable','Taxable Gain %','Sp. Trad','Total Portfolio','Surplus Reinvested','Coverage'].map(h=>(
               <th key={h} style={th}>{h}</th>
             ))}
           </tr>
@@ -2404,8 +2456,10 @@ function BalancesTable({ data }) {
               <td style={td('#C47A7A')}>{fmt$(d.trad||0)}</td>
               <td style={td('#7BAF84')}>{fmt$(d.roth||0)}</td>
               <td style={td('#C8A030')}>{fmt$(d.taxable||0)}</td>
+              <td title="Unrealized gain as % of taxable balance — only this fraction is subject to LTCG tax" style={td('#C8A030')}>{(d.taxable||0)>0?Math.round((d.taxableGainPct||0)*100)+'%':'—'}</td>
               <td style={td('#5B8FA8')}>{(d.spouseTrad||0)>0?fmt$(d.spouseTrad):'—'}</td>
               <td style={{...td('#DDD6C4'),fontWeight:700}}>{fmt$(d.totalPortfolio||0)}</td>
+              <td title="After-tax net income reinvested into taxable brokerage this year" style={td((d.surplusReinvested||0)>0?'#4A9B7A':null)}>{(d.surplusReinvested||0)>0?fmt$(d.surplusReinvested):'—'}</td>
               <td title="Portfolio ÷ Annual Gross Income — years of income the portfolio could cover" style={td('#8DAFC8')}>{d.totalPortfolio>0&&d.grossIncome>0?(Math.round((d.totalPortfolio/(d.grossIncome||1))*10)/10).toFixed(1)+'x':'—'}</td>
             </tr>
           ))}
@@ -2794,7 +2848,7 @@ function App() {
     pensionMonthly: 0, pensionStartAge: 65, pensionType: 'single', pensionSurvivorPct: 50,
     spousePensionMonthly: 0, spousePensionStartAge: 65,
     primaryDeathAge: 0,
-    traditionalBalance: 1000000, rothBalance: 0, taxableBalance: 0,
+    traditionalBalance: 1000000, rothBalance: 0, taxableBalance: 0, taxableBasisPct: 40,
     spouseTraditionalBalance: 0,
     rothAnnuityMonthly: 0, rothAnnuityStartAge: 70,
     etaAnnualIncome: 0, etaStartAge: 70, etaFundingDraw: 0, etaColaRate: 3,
@@ -5333,6 +5387,51 @@ function App() {
               <Field label="Taxable / Brokerage" hint="Today's balance">
                 <NumInput value={inputs.taxableBalance} onChange={v=>set('taxableBalance',v)} prefix="$"/>
               </Field>
+              {/* Cost basis slider — always shown so it's not missed; dollars display when balance > 0 */}
+              {(() => {
+                const pct = inputs.taxableBasisPct || 40;
+                const gainPct = 100 - pct;
+                const bal = inputs.taxableBalance || 0;
+                const basisDollars = Math.round(bal * pct / 100);
+                const gainDollars  = Math.round(bal * gainPct / 100);
+                return (
+                  <div style={{marginTop:8,padding:'12px 14px',background:'rgba(200,169,110,.05)',border:'1px solid rgba(200,169,110,.18)',borderRadius:8}}>
+                    <div style={{fontSize:12,fontWeight:700,color:'#C8A96E',letterSpacing:'.07em',textTransform:'uppercase',marginBottom:5}}>
+                      Taxable Account — Cost Basis %
+                    </div>
+                    <div style={{fontSize:12,color:'#8DAFC8',lineHeight:1.55,marginBottom:10}}>
+                      What fraction is your original investment vs. gains? Rough estimate is fine — basis returns tax-free; only gains are taxed at LTCG rates.
+                    </div>
+                    <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
+                      <span style={{fontSize:12,color:'#8DAFC8',whiteSpace:'nowrap'}}>0%</span>
+                      <input
+                        type="range" min={0} max={100} step={5}
+                        value={pct}
+                        onChange={e=>set('taxableBasisPct', Number(e.target.value))}
+                        style={{flex:1,accentColor:'#C8A96E',cursor:'pointer'}}
+                      />
+                      <span style={{fontSize:12,color:'#8DAFC8',whiteSpace:'nowrap'}}>100%</span>
+                    </div>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,textAlign:'center'}}>
+                      <div>
+                        <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:2}}>Original Investment</div>
+                        <div style={{fontSize:16,fontWeight:700,color:'#4A9B7A',fontFamily:"'Cormorant Garamond',serif"}}>{pct}%</div>
+                        <div style={{fontSize:11,color:'#6A8A9A'}}>{bal>0?'$'+Math.round(basisDollars/1000)+'K — tax-free return':'tax-free on withdrawal'}</div>
+                      </div>
+                      <div style={{borderLeft:'1px solid rgba(255,255,255,.06)',borderRight:'1px solid rgba(255,255,255,.06)'}}>
+                        <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:2}}>Unrealized Gains</div>
+                        <div style={{fontSize:16,fontWeight:700,color:'#C8A030',fontFamily:"'Cormorant Garamond',serif"}}>{gainPct}%</div>
+                        <div style={{fontSize:11,color:'#6A8A9A'}}>{bal>0?'$'+Math.round(gainDollars/1000)+'K — LTCG rates apply':'LTCG rates apply'}</div>
+                      </div>
+                      <div>
+                        <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:2}}>LTCG Rate Range</div>
+                        <div style={{fontSize:16,fontWeight:700,color:'#C8A96E',fontFamily:"'Cormorant Garamond',serif"}}>0–20%</div>
+                        <div style={{fontSize:11,color:'#6A8A9A'}}>stacked on ordinary income</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Primary contributions — only show if pre-retirement */}
               {inputs.currentAge < inputs.retireAge && (
