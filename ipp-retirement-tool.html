@@ -808,6 +808,11 @@ function projectArc(inputs) {
     ? [-0.18, 0.04, -0.14, 0.05, -0.10]
     : null;
 
+  // Guard against invalid inputs that would crash the projection loop
+  if (!retireAge || !planToAge || retireAge >= planToAge || currentAge > retireAge) {
+    return { years: [], confidence: 0, fixedStreams: [], mcStartAge: retireAge || 65 };
+  }
+
   const years = [];
 
   // ── Architecture toggle — when disabled, zero out all IncomeArc™ layers ──
@@ -4921,18 +4926,20 @@ function App() {
 
             <Section title="Basic Info" collapsed={sections.basic} onToggle={()=>toggleSection('basic')}>
               <Field label="Current Age"><NumInput value={inputs.currentAge} onChange={v=>{
-                set('currentAge', v);
-                if(inputs.filingStatus === 'mfj') set('spouseDobOffset', v - inputs.spouseCurrentAge);
+                const age = v || 0;
+                set('currentAge', age);
+                if(inputs.filingStatus === 'mfj' && inputs.spouseCurrentAge) set('spouseDobOffset', age - (inputs.spouseCurrentAge || 0));
               }} suffix="yrs"/></Field>
               {inputs.filingStatus === 'mfj' && (
                 <Field label="Spouse's Current Age" hint="Required for accurate MFJ calculations">
                   <NumInput value={inputs.spouseCurrentAge || ''} onChange={v=>{
-                    set('spouseCurrentAge', v);
-                    set('spouseDobOffset', inputs.currentAge - v);
+                    const spAge = v || 0;
+                    set('spouseCurrentAge', spAge);
+                    if(spAge > 0) set('spouseDobOffset', (inputs.currentAge || 0) - spAge);
                   }} suffix="yrs"/>
                 </Field>
               )}
-              <Field label="Retirement Age"><NumInput value={inputs.retireAge} onChange={v=>set('retireAge',v)} suffix="yrs"/></Field>
+              <Field label="Retirement Age"><NumInput value={inputs.retireAge} onChange={v=>set('retireAge', v || 0)} suffix="yrs"/></Field>
               <Field label="Plan Through Age (Primary)"><NumInput value={inputs.planToAge} onChange={v=>set('planToAge',v)} suffix="yrs"/></Field>
               <Field label="Pre-Retirement Household Income" hint="Combined gross income before retirement — sets marginal rate for Layer 1 &amp; 2 funding gross-up">
                 <NumInput value={inputs.householdIncome} onChange={v=>set('householdIncome',v)} prefix="$" suffix="/yr"/>
