@@ -804,6 +804,7 @@ function projectArc(inputs) {
     portfolioReturn = 0.065,
     inflation = 0.028,
     sorrEnabled = false,
+    sorrMode = 'early', // 'early' = yrs 0-4 | 'mid' = flat 0-4 then SORR 5-9 | 'late' = flat 0-9 then SORR 10-14
     expenseShockEnabled = false,
     expenseShockAmount = 50000,
     expenseShockFrequency = 8,
@@ -820,9 +821,27 @@ function projectArc(inputs) {
   // Pattern: 3 negative years skewed to early retirement, 2 weak recovery years
   // Year 1: -18%, Year 2: +4%, Year 3: -14%, Year 4: +5%, Year 5: -10%
   // Year 6+ resumes normal portfolioReturn assumption
-  const SORR_SCHEDULE = sorrEnabled
-    ? [-0.18, 0.04, -0.14, 0.05, -0.10]
-    : null;
+  // SORR schedule — three modes:
+  // 'early': stress years 0-4 (classic early-retirement sequence risk)
+  // 'mid':   flat return years 0-4, then stress years 5-9 (deferred: "survived 5 good years")
+  // 'late':  flat return years 0-9, then stress years 10-14 (deferred: "survived 10 good years")
+  // Flat years use exactly portfolioReturn (no MC variance) — deterministic good-luck period.
+  const _SORR_STRESS = [-0.18, 0.04, -0.14, 0.05, -0.10];
+  const SORR_SCHEDULE = sorrEnabled ? (() => {
+    if (sorrMode === 'mid') {
+      // 5 flat years at portfolioReturn, then 5 stress years
+      return [portfolioReturn, portfolioReturn, portfolioReturn, portfolioReturn, portfolioReturn,
+              ..._SORR_STRESS];
+    } else if (sorrMode === 'late') {
+      // 10 flat years at portfolioReturn, then 5 stress years
+      return [portfolioReturn, portfolioReturn, portfolioReturn, portfolioReturn, portfolioReturn,
+              portfolioReturn, portfolioReturn, portfolioReturn, portfolioReturn, portfolioReturn,
+              ..._SORR_STRESS];
+    } else {
+      // 'early' — classic: stress years 0-4
+      return _SORR_STRESS;
+    }
+  })() : null;
 
   // Guard against invalid inputs that would crash the projection loop
   if (!retireAge || !planToAge || retireAge >= planToAge || currentAge > retireAge) {
@@ -1755,8 +1774,8 @@ function projectArc(inputs) {
   const expensesAtMcStart = totalExpensesY1;
   // When SORR is ON, pass the fixed schedule so every MC trial faces the same bad early
   // returns shown on the chart — score is fully consistent with the visual stress test.
-  const _SORR = [-0.18, 0.04, -0.14, 0.05, -0.10];
-  const mcSorrSchedule = sorrEnabled ? _SORR : null;
+  // MC uses same schedule as deterministic projection — consistent stress window
+  const mcSorrSchedule = sorrEnabled ? SORR_SCHEDULE : null;
 
   // Build fixed income streams — each stream has a yearOffset (years after MC start age
   // when it begins). Pension is always immediate (started at retirement).
@@ -1921,7 +1940,7 @@ function ScenarioSummaryModal({ inputs, onClose }) {
 
 
 
-function ArcChart({ data, view, insuredData, uninsuredData, sorrEnabled }) {
+function ArcChart({ data, view, insuredData, uninsuredData, sorrEnabled, sorrMode }) {
   const svgRef = useRef(null);
   const W = 720;
   const MAIN_H = 240, IRMAA_H = 48, IRMAA_GAP = 10, AGE_H = 20;
@@ -2132,14 +2151,30 @@ function ArcChart({ data, view, insuredData, uninsuredData, sorrEnabled }) {
               </g>
             )}
             {/* SORR year overlay — shade the first 5 retirement years, only when SORR active */}
-            {sorrEnabled && d.yearReturn !== undefined && i < 5 && (() => {
+            {sorrEnabled && d.yearReturn !== undefined && (() => {
+              const mode = sorrMode || 'early';
+              const flatEnd = mode === 'late' ? 10 : mode === 'mid' ? 5 : 0;
+              const stressStart = flatEnd;
+              const stressEnd = stressStart + 5;
+              const inFlat   = i >= 0 && i < flatEnd;
+              const inStress = i >= stressStart && i < stressEnd;
+              if (!inFlat && !inStress) return null;
+              if (inFlat) {
+                // Flat/lucky years — subtle teal overlay, no return label
+                return (
+                  <g>
+                    <rect x={xScale(i)-barW/2-1} y={PAD.t} width={barW+2} height={chartH}
+                      fill="rgba(58,140,158,.07)" rx="1"/>
+                    {i === 0 && <text x={xScale(i)} y={PAD.t+13} textAnchor="middle"
+                      fill="#3A8C9E" fontSize="8" fontFamily="DM Sans" fontWeight="700">flat</text>}
+                  </g>
+                );
+              }
               const isNeg = d.yearReturn < 0;
-              const fillCol = isNeg ? 'rgba(196,106,106,.13)' : 'rgba(74,155,122,.08)';
-              const strokeCol = isNeg ? 'rgba(196,106,106,.35)' : 'rgba(74,155,122,.25)';
               return (
                 <g>
                   <rect x={xScale(i)-barW/2-1} y={PAD.t} width={barW+2} height={chartH}
-                    fill={fillCol} rx="1"/>
+                    fill={isNeg ? 'rgba(196,106,106,.13)' : 'rgba(74,155,122,.08)'} rx="1"/>
                   <text x={xScale(i)} y={PAD.t+13} textAnchor="middle"
                     fill={isNeg ? '#C47A7A' : '#4A9B7A'} fontSize="10" fontFamily="DM Sans" fontWeight="700">
                     {d.yearReturn > 0 ? '+' : ''}{(d.yearReturn*100).toFixed(0)}%
@@ -2881,7 +2916,7 @@ function App() {
     annualTradDrawdown: 0, tradDrawdownStartAge: 0, tradDrawdownEndAge: 0,
     annualTaxableDrawdown: 0, taxableDrawdownStartAge: 0, taxableDrawdownEndAge: 0,
     annualRothDrawdown: 0, rothDrawdownStartAge: 0, rothDrawdownEndAge: 0,
-    portfolioReturn: 6.5, inflation: 2.8, sorrEnabled: false,
+    portfolioReturn: 6.5, inflation: 2.8, sorrEnabled: false, sorrMode: 'early',
     annualTradContribution: 0, tradContributionEndAge: 65,
     annualTaxableContribution: 0, taxableContributionEndAge: 65,
     annualSpouseTradContribution: 0, spouseTradContributionEndAge: 65,
@@ -5118,38 +5153,85 @@ function App() {
                     }}/>
                   </div>
                   <span style={{fontSize:13,color: inputs.sorrEnabled ? '#C47A7A' : '#8DAFC8', fontWeight: inputs.sorrEnabled ? 700 : 400}}>
-                    {inputs.sorrEnabled ? 'SORR Stress Active' : 'Off — using base return assumption'}
+                    {inputs.sorrEnabled
+                      ? `SORR Active — ${inputs.sorrMode==='mid'?'Deferred 5yr':inputs.sorrMode==='late'?'Deferred 10yr':'Immediate'}`
+                      : 'Off — using base return assumption'}
                   </span>
                 </div>
 
                 {/* Return schedule table — shown when enabled */}
-                {inputs.sorrEnabled && (
-                  <div style={{background:'rgba(196,106,106,.06)',border:'1px solid rgba(196,106,106,.2)',borderRadius:8,padding:'10px 12px'}}>
-                    <div style={{fontSize:11,fontWeight:700,color:'#C47A7A',letterSpacing:'.07em',textTransform:'uppercase',marginBottom:8}}>
-                      Return Override Schedule
-                    </div>
-                    <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:6,marginBottom:10}}>
-                      {[
-                        { yr:'Yr 1', ret:-18, label:'Crash' },
-                        { yr:'Yr 2', ret:+4,  label:'Partial' },
-                        { yr:'Yr 3', ret:-14, label:'Relapse' },
-                        { yr:'Yr 4', ret:+5,  label:'Partial' },
-                        { yr:'Yr 5', ret:-10, label:'Drag' },
-                      ].map(s => (
-                        <div key={s.yr} style={{textAlign:'center',padding:'6px 4px',background:'rgba(0,0,0,.15)',borderRadius:6,border:`1px solid ${s.ret < 0 ? 'rgba(196,106,106,.25)' : 'rgba(74,155,122,.2)'}`}}>
-                          <div style={{fontSize:11,color:'#8DAFC8',marginBottom:2}}>{s.yr}</div>
-                          <div style={{fontSize:15,fontWeight:700,fontFamily:"'Cormorant Garamond',serif",color: s.ret < 0 ? '#C47A7A' : '#4A9B7A'}}>
-                            {s.ret > 0 ? '+' : ''}{s.ret}%
-                          </div>
-                          <div style={{fontSize:10,color:'#8DAFC8',marginTop:1}}>{s.label}</div>
+                {inputs.sorrEnabled && (() => {
+                  const mode = inputs.sorrMode || 'early';
+                  const flatEnd = mode === 'late' ? 10 : mode === 'mid' ? 5 : 0;
+                  const stressLabels = ['Crash','Partial','Relapse','Partial','Drag'];
+                  const stressRets   = [-18, +4, -14, +5, -10];
+                  const pr = inputs.portfolioReturn;
+                  const cumulativeDrag = (((1-0.18)*(1+0.04)*(1-0.14)*(1+0.05)*(1-0.10)-1)*100).toFixed(1);
+
+                  return (
+                    <div style={{marginBottom:10}}>
+                      {/* Mode selector — only shown when SORR is active */}
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6,marginBottom:10}}>
+                        {[
+                          { id:'early', label:'Immediate',  sub:'Stress yrs 1–5' },
+                          { id:'mid',   label:'Deferred 5', sub:'Stress yrs 6–10' },
+                          { id:'late',  label:'Deferred 10',sub:'Stress yrs 11–15' },
+                        ].map(opt => (
+                          <button key={opt.id}
+                            onClick={() => set('sorrMode', opt.id)}
+                            style={{
+                              padding:'7px 6px', borderRadius:6, fontSize:12, fontWeight:500,
+                              fontFamily:"'DM Sans',sans-serif", cursor:'pointer',
+                              background: mode===opt.id ? 'rgba(196,106,106,.18)' : 'rgba(255,255,255,.04)',
+                              border: mode===opt.id ? '1px solid rgba(196,106,106,.5)' : '1px solid rgba(255,255,255,.08)',
+                              color: mode===opt.id ? '#C47A7A' : '#9EB8CC',
+                              textAlign:'center',
+                            }}>
+                            <div style={{fontWeight:700}}>{opt.label}</div>
+                            <div style={{fontSize:10,opacity:.7,marginTop:1}}>{opt.sub}</div>
+                          </button>
+                        ))}
+                      </div>
+
+                      <div style={{background:'rgba(196,106,106,.06)',border:'1px solid rgba(196,106,106,.2)',borderRadius:8,padding:'10px 12px'}}>
+                        <div style={{fontSize:11,fontWeight:700,color:'#C47A7A',letterSpacing:'.07em',textTransform:'uppercase',marginBottom:8}}>
+                          Return Override Schedule — {mode==='early'?'Immediate':mode==='mid'?'Deferred 5yr':'Deferred 10yr'}
                         </div>
-                      ))}
+
+                        {/* Flat years — shown for mid and late modes */}
+                        {flatEnd > 0 && (
+                          <div style={{marginBottom:8}}>
+                            <div style={{fontSize:10,color:'#3A8C9E',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:5}}>
+                              Years 1–{flatEnd} — Flat Return (no stress)
+                            </div>
+                            <div style={{padding:'7px 10px',background:'rgba(58,140,158,.08)',border:'1px solid rgba(58,140,158,.2)',borderRadius:6,fontSize:13,color:'#8DAFC8',lineHeight:1.5}}>
+                              Exactly <strong style={{color:'#DDD6C4'}}>{pr}%</strong> each year — no MC variance, no sequence risk. Models a client who has already survived {flatEnd} years of good returns before stress arrives.
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Stress years */}
+                        <div style={{fontSize:10,color:'#C47A7A',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:6}}>
+                          Years {flatEnd+1}–{flatEnd+5} — Sequence Stress
+                        </div>
+                        <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:6,marginBottom:10}}>
+                          {stressRets.map((ret, idx) => (
+                            <div key={idx} style={{textAlign:'center',padding:'6px 4px',background:'rgba(0,0,0,.15)',borderRadius:6,border:`1px solid ${ret < 0 ? 'rgba(196,106,106,.25)' : 'rgba(74,155,122,.2)'}`}}>
+                              <div style={{fontSize:10,color:'#8DAFC8',marginBottom:2}}>Yr {flatEnd+idx+1}</div>
+                              <div style={{fontSize:15,fontWeight:700,fontFamily:"'Cormorant Garamond',serif",color: ret < 0 ? '#C47A7A' : '#4A9B7A'}}>
+                                {ret > 0 ? '+' : ''}{ret}%
+                              </div>
+                              <div style={{fontSize:10,color:'#8DAFC8',marginTop:1}}>{stressLabels[idx]}</div>
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{fontSize:12,color:'#8DAFC8',lineHeight:1.55}}>
+                          Year {flatEnd+6}+ resumes <strong style={{color:'#DDD6C4'}}>{pr}%</strong> base assumption. Stress drag: <strong style={{color:'#C47A7A'}}>{cumulativeDrag}%</strong> cumulative over the 5 stress years.
+                        </div>
+                      </div>
                     </div>
-                    <div style={{fontSize:12,color:'#8DAFC8',lineHeight:1.55}}>
-                      Year 6+ resumes your <strong style={{color:'#DDD6C4'}}>{inputs.portfolioReturn}%</strong> base return assumption. Cumulative 5-year drag: <strong style={{color:'#C47A7A'}}>−{(((1-0.18)*(1+0.04)*(1-0.14)*(1+0.05)*(1-0.10)-1)*100).toFixed(1)}%</strong> vs a flat-return scenario.
-                    </div>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             </Section>
 
@@ -6194,7 +6276,15 @@ function App() {
                   Sequence of Returns Risk — Stress Scenario Active
                 </div>
                 <div style={{fontSize:13,color:'#DDD6C4',lineHeight:1.6}}>
-                  Returns overridden for first 5 retirement years: <strong style={{color:'#C47A7A'}}>−18%, +4%, −14%, +5%, −10%</strong>. This illustrates how early negative returns — while withdrawals are ongoing — can permanently impair portfolio longevity far beyond what average-return projections suggest. Compare portfolio balance at age 90 vs the base scenario.
+                  {(() => {
+                    const mode = inputs.sorrMode || 'early';
+                    const flatEnd = mode === 'late' ? 10 : mode === 'mid' ? 5 : 0;
+                    const window = `years ${flatEnd+1}–${flatEnd+5} of retirement`;
+                    const prefix = flatEnd > 0
+                      ? `After ${flatEnd} years of flat ${inputs.portfolioReturn}% returns, `
+                      : '';
+                    return <span>{prefix}Sequence stress applies in {window}: <strong style={{color:'#C47A7A'}}>−18%, +4%, −14%, +5%, −10%</strong>. {flatEnd > 0 ? 'This models a client who avoided early sequence risk but faces a mid-retirement correction — equally damaging because withdrawals have been ongoing.' : 'Early negative returns while withdrawals are ongoing permanently impair portfolio longevity.'} Compare portfolio balance at age 90 vs the base scenario.</span>;
+                  })()}
                 </div>
               </div>
             </div>
@@ -6514,7 +6604,7 @@ function App() {
                     </div>
                   </div>
                 )}
-                <ConfidenceRing score={confidence} note={inputs.sorrEnabled && inputs.architectureEnabled ? 'Reflects randomized returns; chart shows deterministic stress scenario' : inputs.sorrEnabled ? 'SORR schedule applied in all 1,000 trials' : null}/>
+                <ConfidenceRing score={confidence} note={inputs.sorrEnabled && inputs.architectureEnabled ? 'Reflects randomized returns; chart shows deterministic stress scenario' : inputs.sorrEnabled ? `SORR ${inputs.sorrMode==='mid'?'deferred 5yr':inputs.sorrMode==='late'?'deferred 10yr':'immediate'} — applied in all 1,000 trials` : null}/>
               </div>
             </div>
 
@@ -6533,7 +6623,8 @@ function App() {
                         uninsuredData={archUninsured}
                         view={view}
                         insuredData={archInsured}
-                        sorrEnabled={inputs.sorrEnabled}/>
+                        sorrEnabled={inputs.sorrEnabled}
+                        sorrMode={inputs.sorrMode || 'early'}/>
                     </>
                   );
                 })()}
