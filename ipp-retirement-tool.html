@@ -378,7 +378,8 @@ const COLORS = {
   ss:        { fill: '#3A8C9E', label: 'Social Security',     tax: 'partial'    },
   pension:   { fill: '#5B8FA8', label: 'Pension',             tax: 'ordinary'   },
   rmd:       { fill: '#C47A7A', label: 'Traditional QP (incl. RMD)', tax: 'ordinary' },
-  roth:      { fill: '#52C98A', label: 'Roth / Tax-Free (L1 + IRA)',  tax: 'free'       },
+  roth:      { fill: '#52C98A', label: 'Roth Annuity (Layer 1)',       tax: 'free'       },
+  rothIRA:   { fill: '#E8A97A', label: 'Roth IRA (Balance Draw)',      tax: 'free'       },
   taxable:   { fill: '#C8A030', label: 'Taxable Portfolio',   tax: 'favorable'  },
   annuity:   { fill: '#9B7EC8', label: 'Non-Qual Annuity (Gain)', tax: 'partial' },
   parttime:  { fill: '#6E9BC8', label: 'Part-Time Income',    tax: 'ordinary'   },
@@ -1178,7 +1179,7 @@ function projectArc(inputs) {
     const rothDrawEnd = rothDrawdownEndAge || planToAge;
     if (archAnnualRothDrawdown > 0 && age >= rothDrawStart && age <= rothDrawEnd && roth > 0) {
       const draw = Math.min(archAnnualRothDrawdown, roth);
-      row.sources.roth = (row.sources.roth || 0) + draw;
+      row.sources.rothIRA = (row.sources.rothIRA || 0) + draw;
       row.totalIncome += draw;
       roth = Math.max(0, roth - draw);
       row.strategicRothDraw = draw;
@@ -1440,10 +1441,10 @@ function projectArc(inputs) {
         remaining -= actualNet;
       }
 
-      // --- Roth / tax-free: no gross-up needed ---
+      // --- Roth IRA balance draw (variable, no gross-up needed) ---
       if (remaining > 0 && roth > 0) {
         const draw = Math.min(roth, remaining);
-        row.sources.roth = (row.sources.roth || 0) + draw;
+        row.sources.rothIRA = (row.sources.rothIRA || 0) + draw;
         row.totalIncome += draw;
         if (isAnyLtcEvent && ltcRemaining > 0) ltcRemaining -= Math.min(draw, ltcRemaining);
         roth = Math.max(0, roth - draw);
@@ -1555,7 +1556,7 @@ function projectArc(inputs) {
       let irmaaRemaining = row.irmaa;
       if (roth > 0 && irmaaRemaining > 0) {
         const draw = Math.min(roth, irmaaRemaining);
-        row.sources.roth = (row.sources.roth || 0) + draw;
+        row.sources.rothIRA = (row.sources.rothIRA || 0) + draw;
         row.totalIncome += draw;
         roth = Math.max(0, roth - draw);
         irmaaRemaining -= draw;
@@ -1793,6 +1794,34 @@ function projectArc(inputs) {
     fixedStreams.push({ yearOffset: offset, annual: archEtaAnnualIncome });
   }
 
+  // ── RMD net income stream into MC ──
+  // RMDs are forced distributions from traditional accounts — they are mandatory income,
+  // not a portfolio draw chosen by the simulation. The MC engine models survival by drawing
+  // from bal to cover shortfalls, but it never models RMDs as income. This means:
+  //   1. In RMD surplus years (RMD > expenses after SS/pension), the surplus reinvestment
+  //      never fires in the MC, understating portfolio growth.
+  //   2. The MC implicitly assumes the full trad balance is always available, but in reality
+  //      RMDs have been drawn, taxed, and partially reinvested into taxable each year.
+  // Fix: compute average annual net-after-tax RMD income from the deterministic projection
+  // (years array, already computed above) and add it as a fixed stream starting at age 73.
+  // This is conservative — we use the average of years 73-80 to avoid late-life RMD spikes
+  // that are driven by high balances only achievable when the portfolio survives.
+  const _rmdYears = years.filter(y => y.age >= 73 && y.age <= 80 && (y.sources?.rmd || 0) > 0);
+  const _avgNetRmd = _rmdYears.length > 0
+    ? _rmdYears.reduce((s, y) => s + (y.sources.rmd || 0), 0) / _rmdYears.length
+    : 0;
+  if (_avgNetRmd > 0) {
+    const rmdOffset = Math.max(0, 73 - retireAge);
+    // Check if we already have a stream at this offset to avoid double-counting
+    const existingAtOffset = fixedStreams.find(s => s.yearOffset === rmdOffset);
+    if (!existingAtOffset) {
+      fixedStreams.push({ yearOffset: rmdOffset, annual: _avgNetRmd });
+    } else {
+      // Add RMD income on top of existing stream at same offset
+      existingAtOffset.annual += _avgNetRmd;
+    }
+  }
+
   // LTC shock: pass today's-dollar NET care cost. MC handles inflation + gross-up.
   // Do NOT use ltcPortfolioDraw — it is 0 when RMDs cover care costs in the
   // deterministic run, causing MC to see no shock on large portfolios.
@@ -1998,7 +2027,7 @@ function ArcChart({ data, view, insuredData, uninsuredData, sorrEnabled }) {
     return segs.length > 0 ? segs.join(' M ') : null;
   })() : null;
 
-  const sourceKeys = ['ss','pension','annuity','qualAnnuity','parttime','roth','eta','taxable','rmd'];
+  const sourceKeys = ['ss','pension','annuity','qualAnnuity','parttime','roth','rothIRA','eta','taxable','rmd'];
 
   const fmt = v => v >= 1000000 ? `$${(v/1000000).toFixed(1)}M` : v >= 1000 ? `$${Math.round(v/1000)}K` : `$${Math.round(v)}`;
 
@@ -2343,7 +2372,7 @@ function DataTable({ data }) {
               <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.annuity.fill}}>{d.nonQualAnnuityIncome>0?fmt$(d.nonQualAnnuityIncome):'—'}</td>
               <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.eta.fill}}>{d.etaIncome>0?fmt$(d.etaIncome):'—'}</td>
               <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.rmd.fill}}>{fmt$(d.sources.rmd||0)}</td>
-              <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.roth.fill}}>{fmt$(d.sources.roth||0)}</td>
+              <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.rothIRA.fill}}>{(d.sources.rothIRA||0)>0?fmt$(d.sources.rothIRA):'—'}</td>
               <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.taxable.fill}}>{fmt$(d.sources.taxable||0)}</td>
               <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.parttime.fill}}>{fmt$(d.sources.parttime||0)}</td>
               <td style={{padding:'5px 8px',textAlign:'right',color:'#8DAFC8'}}>{fmt$(d.grossIncome||d.totalIncome)}</td>
@@ -2368,7 +2397,7 @@ function DataTable({ data }) {
             <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.annuity.fill,fontWeight:700}}>{fmtM(data.reduce((s,d)=>s+(d.nonQualAnnuityIncome||0),0))}</td>
             <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.eta.fill,fontWeight:700}}>{fmtM(data.reduce((s,d)=>s+(d.etaIncome||0),0))}</td>
             <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.rmd.fill,fontWeight:700}}>{fmtM(data.reduce((s,d)=>s+(d.sources.rmd||0),0))}</td>
-            <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.roth.fill,fontWeight:700}}>{fmtM(data.reduce((s,d)=>s+(d.sources.roth||0),0))}</td>
+            <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.rothIRA.fill,fontWeight:700}}>{fmtM(data.reduce((s,d)=>s+(d.sources.rothIRA||0),0))}</td>
             <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.taxable.fill,fontWeight:700}}>{fmtM(data.reduce((s,d)=>s+(d.sources.taxable||0),0))}</td>
             <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.parttime.fill,fontWeight:700}}>{fmtM(data.reduce((s,d)=>s+(d.sources.parttime||0),0))}</td>
             <td style={{padding:'5px 8px',textAlign:'right',color:'#8DAFC8',fontWeight:700}}>{fmtM(data.reduce((s,d)=>s+(d.grossIncome||d.totalIncome||0),0))}</td>
@@ -2506,7 +2535,7 @@ function CreditsTable({ data }) {
                 <td style={td(COLORS.annuity.fill)}>{fmt$(d.nonQualAnnuityIncome||0)}</td>
                 <td style={td(COLORS.eta.fill)}>{fmt$(d.etaIncome||0)}</td>
                 <td style={td(COLORS.rmd.fill)}>{fmt$(src.rmd||0)}</td>
-                <td style={td('#52C98A')}>{fmt$(src.rothIRA||0)}</td>
+                <td style={td(COLORS.rothIRA.fill)}>{fmt$(src.rothIRA||0)}</td>
                 <td style={td(COLORS.taxable.fill)}>{fmt$(src.taxable||0)}</td>
                 <td style={td(COLORS.parttime.fill)}>{fmt$(src.parttime||0)}</td>
                 <td style={{...td('#4A9B7A'),fontWeight:600}}>{fmt$(d.grossIncome||0)}</td>
@@ -2524,7 +2553,7 @@ function CreditsTable({ data }) {
             <td style={{...td(COLORS.annuity.fill),fontWeight:700}}>{fmt$(data.reduce((s,d)=>s+(d.nonQualAnnuityIncome||0),0))}</td>
             <td style={{...td(COLORS.eta.fill),fontWeight:700}}>{fmt$(data.reduce((s,d)=>s+(d.etaIncome||0),0))}</td>
             <td style={{...td(COLORS.rmd.fill),fontWeight:700}}>{fmt$(data.reduce((s,d)=>s+(d.sources?.rmd||0),0))}</td>
-            <td style={{...td('#52C98A'),fontWeight:700}}>{fmt$(data.reduce((s,d)=>s+(d.sources?.rothIRA||0),0))}</td>
+            <td style={{...td(COLORS.rothIRA.fill),fontWeight:700}}>{fmt$(data.reduce((s,d)=>s+(d.sources?.rothIRA||0),0))}</td>
             <td style={{...td(COLORS.taxable.fill),fontWeight:700}}>{fmt$(data.reduce((s,d)=>s+(d.sources?.taxable||0),0))}</td>
             <td style={{...td(COLORS.parttime.fill),fontWeight:700}}>{fmt$(data.reduce((s,d)=>s+(d.sources?.parttime||0),0))}</td>
             <td style={{...td('#4A9B7A'),fontWeight:700}}>{fmt$(data.reduce((s,d)=>s+(d.grossIncome||0),0))}</td>
@@ -3017,7 +3046,7 @@ function App() {
   const retirementYears = years.filter(y => y.age >= inputs.retireAge);
   const totalGrossIncome = retirementYears.reduce((sum, y) => sum + (y.grossIncome||0), 0);
   const totalTaxFreeIncome = retirementYears.reduce((sum, y) =>
-    sum + (y.sources.roth||0) + (y.sources.eta||0) + (y.sources.annuityTaxFree||0), 0);
+    sum + (y.sources.roth||0) + (y.sources.rothIRA||0) + (y.sources.eta||0) + (y.sources.annuityTaxFree||0), 0);
   const totalNetIncome = totalGrossIncome - totalEstTax - totalIrmaa;
   // All-in marginal rate for year 1 of retirement (most useful single number)
   const retireStateTax = retireData ? (retireData.stateTax || 0) : 0;
