@@ -375,10 +375,10 @@ const GS = `
 
 // ── Color palette for income sources ──
 const COLORS = {
-  ss:        { fill: '#4A9B7A', label: 'Social Security',     tax: 'partial'    },
+  ss:        { fill: '#3A8C9E', label: 'Social Security',     tax: 'partial'    },
   pension:   { fill: '#5B8FA8', label: 'Pension',             tax: 'ordinary'   },
   rmd:       { fill: '#C47A7A', label: 'Traditional QP (incl. RMD)', tax: 'ordinary' },
-  roth:      { fill: '#7BAF84', label: 'Roth / Tax-Free (L1 + IRA)',  tax: 'free'       },
+  roth:      { fill: '#52C98A', label: 'Roth / Tax-Free (L1 + IRA)',  tax: 'free'       },
   taxable:   { fill: '#C8A030', label: 'Taxable Portfolio',   tax: 'favorable'  },
   annuity:   { fill: '#9B7EC8', label: 'Non-Qual Annuity (Gain)', tax: 'partial' },
   parttime:  { fill: '#6E9BC8', label: 'Part-Time Income',    tax: 'ordinary'   },
@@ -393,7 +393,7 @@ const TAX_BADGES = {
   ordinary: { label: 'Ordinary Income',   color: '#C47A7A' },
   partial:  { label: 'Partially Taxable', color: '#C8A030' },
   favorable:{ label: 'Favorable Rate',    color: '#7BAF84' },
-  free:     { label: 'Tax-Free',          color: '#4A9B7A' },
+  free:     { label: 'Tax-Free',          color: '#52C98A' },
 };
 
 // ── IRMAA thresholds 2025 (per person surcharge) ──
@@ -514,9 +514,17 @@ function runMonteCarlo(startBalance, annualWithdraw, years, trials=1000, mean=0.
       const expensesThisYear = totalExpensesY1 * inflFactor;
       const ssThisYear = ssIncome * inflFactor;
       const fixedThisYear = streams.reduce((sum, s) => sum + (y >= s.yearOffset ? s.annual : 0), 0);
-      // Gross up net shortfall — IRA draw needs to cover both expense and tax on the draw
-      const netShortfall = Math.max(0, expensesThisYear - ssThisYear - fixedThisYear);
-      const grossDraw = netShortfall / (1 - MC_TAX_RATE);
+      // Net surplus or shortfall — income sources vs expenses
+      // When guaranteed income (SS + fixed streams) exceeds expenses, the after-tax surplus
+      // is reinvested into the portfolio balance, exactly mirroring the deterministic projection.
+      const netCoveredByGuaranteed = ssThisYear + fixedThisYear;
+      const netShortfall = Math.max(0, expensesThisYear - netCoveredByGuaranteed);
+      const netSurplus   = Math.max(0, netCoveredByGuaranteed - expensesThisYear);
+      // Gross up shortfall — IRA draw needs to cover both expense and tax on the draw
+      const grossDraw = netShortfall > 0 ? netShortfall / (1 - MC_TAX_RATE) : 0;
+      // After-tax surplus: guaranteed income already net of tax at MC_TAX_RATE approximation.
+      // Surplus is reinvested at 100% basis — no additional tax on deposit, earns full return next year.
+      const surplusReinvest = netSurplus * (1 - MC_TAX_RATE); // approximate after-tax net of surplus
       // Primary care cost: inflate using care-specific inflation rate to event-year dollars, then gross up
       const ltcCareInflFactor = Math.pow(1 + ltcCareInflation, y);
       const ltcShock = (ltcShockYear >= 0 && y >= ltcShockYear && y < ltcShockYear + ltcShockDuration)
@@ -527,7 +535,7 @@ function runMonteCarlo(startBalance, annualWithdraw, years, trials=1000, mean=0.
       // Expense shock — recurring unplanned expense every N years, inflation-adjusted, grossed up
       const expShock = (expenseShockAmount > 0 && expenseShockFrequency > 0 && y % expenseShockFrequency === 0)
         ? (expenseShockAmount * inflFactor) / (1 - MC_TAX_RATE) : 0;
-      bal = bal * (1 + r) - grossDraw - ltcShock - spouseLtcShock - expShock;
+      bal = bal * (1 + r) - grossDraw + surplusReinvest - ltcShock - spouseLtcShock - expShock;
       if (bal <= 0) { failed = true; break; }
     }
     if (!failed) successes++;
@@ -2101,7 +2109,7 @@ function ArcChart({ data, view, insuredData, uninsuredData, sorrEnabled }) {
                 <line x1={xScale(i)} x2={xScale(i)} y1={PAD.t} y2={PAD.t+chartH}
                   stroke="rgba(123,175,132,.6)" strokeWidth="2" strokeDasharray="4,3"/>
                 <text x={xScale(i)+4} y={PAD.t+26} textAnchor="start"
-                  fill="#7BAF84" fontSize="9" fontFamily="DM Sans" fontWeight="700">
+                  fill="#52C98A" fontSize="9" fontFamily="DM Sans" fontWeight="700">
                   ✦ ROTH
                 </text>
               </g>
@@ -2326,12 +2334,12 @@ function DataTable({ data }) {
               <td style={{padding:'5px 8px',textAlign:'right',color:'#C8A96E',fontWeight:600}}>
                 {d.age}
                 {d.etaFundingEvent && <span title={`ETA funding — $${Math.round((d.etaFundingAmount||0)/1000)}K IRA repositioned`} style={{color:'#A8C5D8',marginLeft:3,cursor:'help'}}>⚡</span>}
-                {d.rothConversionEvent && <span title={`Roth conversion — $${Math.round((d.rothConversionAmount||0)/1000)}K converted${d.rothConversionOverage>0?' | Tax: $'+Math.round((d.rothConversionOverageTax||0)/1000)+'K − $'+Math.round(((d.rothConversionAmount||0)*(d.rothConversionMarginalRate||0)-(d.rothConversionOverageTax||0))/1000)+'K financed = $'+Math.round((d.rothConversionOverageTax||0)/1000)+'K overage → $'+Math.round((d.rothConversionOverage||0)/1000)+'K gross-up draw':''}`} style={{color:'#7BAF84',marginLeft:3,cursor:'help'}}>✦</span>}
+                {d.rothConversionEvent && <span title={`Roth conversion — $${Math.round((d.rothConversionAmount||0)/1000)}K converted${d.rothConversionOverage>0?' | Tax: $'+Math.round((d.rothConversionOverageTax||0)/1000)+'K − $'+Math.round(((d.rothConversionAmount||0)*(d.rothConversionMarginalRate||0)-(d.rothConversionOverageTax||0))/1000)+'K financed = $'+Math.round((d.rothConversionOverageTax||0)/1000)+'K overage → $'+Math.round((d.rothConversionOverage||0)/1000)+'K gross-up draw':''}`} style={{color:'#52C98A',marginLeft:3,cursor:'help'}}>✦</span>}
                 {d.ltcFundingEvent && <span title={`LTC policy funding — $${Math.round((d.ltcFundingAmount||0)/1000)}K IRA draw`} style={{color:'#9B7EC8',marginLeft:3,cursor:'help'}}>♥</span>}
               </td>
               <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.ss.fill}}>{fmt$(d.sources.ss||0)}</td>
               <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.pension.fill}}>{fmt$(d.sources.pension||0)}</td>
-              <td style={{padding:'5px 8px',textAlign:'right',color:'#4A9B7A'}}>{d.rothAnnuityIncome>0?fmt$(d.rothAnnuityIncome):'—'}</td>
+              <td style={{padding:'5px 8px',textAlign:'right',color:'#52C98A'}}>{d.rothAnnuityIncome>0?fmt$(d.rothAnnuityIncome):'—'}</td>
               <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.annuity.fill}}>{d.nonQualAnnuityIncome>0?fmt$(d.nonQualAnnuityIncome):'—'}</td>
               <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.eta.fill}}>{d.etaIncome>0?fmt$(d.etaIncome):'—'}</td>
               <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.rmd.fill}}>{fmt$(d.sources.rmd||0)}</td>
@@ -2356,7 +2364,7 @@ function DataTable({ data }) {
             <td style={{padding:'5px 8px',textAlign:'center',color:'#C8A96E',fontWeight:700,fontSize:11,letterSpacing:'.06em'}}>TOTAL</td>
             <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.ss.fill,fontWeight:700}}>{fmtM(data.reduce((s,d)=>s+(d.sources.ss||0),0))}</td>
             <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.pension.fill,fontWeight:700}}>{fmtM(data.reduce((s,d)=>s+(d.sources.pension||0),0))}</td>
-            <td style={{padding:'5px 8px',textAlign:'right',color:'#4A9B7A',fontWeight:700}}>{fmtM(data.reduce((s,d)=>s+(d.rothAnnuityIncome||0),0))}</td>
+            <td style={{padding:'5px 8px',textAlign:'right',color:'#52C98A',fontWeight:700}}>{fmtM(data.reduce((s,d)=>s+(d.rothAnnuityIncome||0),0))}</td>
             <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.annuity.fill,fontWeight:700}}>{fmtM(data.reduce((s,d)=>s+(d.nonQualAnnuityIncome||0),0))}</td>
             <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.eta.fill,fontWeight:700}}>{fmtM(data.reduce((s,d)=>s+(d.etaIncome||0),0))}</td>
             <td style={{padding:'5px 8px',textAlign:'right',color:COLORS.rmd.fill,fontWeight:700}}>{fmtM(data.reduce((s,d)=>s+(d.sources.rmd||0),0))}</td>
@@ -2454,7 +2462,7 @@ function BalancesTable({ data }) {
             <tr key={d.age} style={{background: d.age%2===0?'rgba(255,255,255,.02)':'transparent'}}>
               <td style={{...td(),textAlign:'center',fontWeight:700,color:'#8DAFC8'}}>{d.age}</td>
               <td style={td('#C47A7A')}>{fmt$(d.trad||0)}</td>
-              <td style={td('#7BAF84')}>{fmt$(d.roth||0)}</td>
+              <td style={td('#52C98A')}>{fmt$(d.roth||0)}</td>
               <td style={td('#C8A030')}>{fmt$(d.taxable||0)}</td>
               <td title="Unrealized gain as % of taxable balance — only this fraction is subject to LTCG tax" style={td('#C8A030')}>{(d.taxable||0)>0?Math.round((d.taxableGainPct||0)*100)+'%':'—'}</td>
               <td style={td('#5B8FA8')}>{(d.spouseTrad||0)>0?fmt$(d.spouseTrad):'—'}</td>
@@ -2498,7 +2506,7 @@ function CreditsTable({ data }) {
                 <td style={td(COLORS.annuity.fill)}>{fmt$(d.nonQualAnnuityIncome||0)}</td>
                 <td style={td(COLORS.eta.fill)}>{fmt$(d.etaIncome||0)}</td>
                 <td style={td(COLORS.rmd.fill)}>{fmt$(src.rmd||0)}</td>
-                <td style={td('#7BAF84')}>{fmt$(src.rothIRA||0)}</td>
+                <td style={td('#52C98A')}>{fmt$(src.rothIRA||0)}</td>
                 <td style={td(COLORS.taxable.fill)}>{fmt$(src.taxable||0)}</td>
                 <td style={td(COLORS.parttime.fill)}>{fmt$(src.parttime||0)}</td>
                 <td style={{...td('#4A9B7A'),fontWeight:600}}>{fmt$(d.grossIncome||0)}</td>
@@ -2516,7 +2524,7 @@ function CreditsTable({ data }) {
             <td style={{...td(COLORS.annuity.fill),fontWeight:700}}>{fmt$(data.reduce((s,d)=>s+(d.nonQualAnnuityIncome||0),0))}</td>
             <td style={{...td(COLORS.eta.fill),fontWeight:700}}>{fmt$(data.reduce((s,d)=>s+(d.etaIncome||0),0))}</td>
             <td style={{...td(COLORS.rmd.fill),fontWeight:700}}>{fmt$(data.reduce((s,d)=>s+(d.sources?.rmd||0),0))}</td>
-            <td style={{...td('#7BAF84'),fontWeight:700}}>{fmt$(data.reduce((s,d)=>s+(d.sources?.rothIRA||0),0))}</td>
+            <td style={{...td('#52C98A'),fontWeight:700}}>{fmt$(data.reduce((s,d)=>s+(d.sources?.rothIRA||0),0))}</td>
             <td style={{...td(COLORS.taxable.fill),fontWeight:700}}>{fmt$(data.reduce((s,d)=>s+(d.sources?.taxable||0),0))}</td>
             <td style={{...td(COLORS.parttime.fill),fontWeight:700}}>{fmt$(data.reduce((s,d)=>s+(d.sources?.parttime||0),0))}</td>
             <td style={{...td('#4A9B7A'),fontWeight:700}}>{fmt$(data.reduce((s,d)=>s+(d.grossIncome||0),0))}</td>
@@ -2571,7 +2579,7 @@ function DebitsTable({ data, inputs }) {
                 <td style={td(fedTax>0?'#7A4A4A':null)}>{fmt$(fedTax)}</td>
                 <td style={td(stateTax>0?'#C8A030':null)}>{fmt$(stateTax)}</td>
                 <td style={td(ltcGrossUp>0?'#C47A7A':null)}>{fmt$(ltcGrossUp)}</td>
-                <td style={td(l1Prem>0?'#7BAF84':null)}>{fmt$(l1Prem)}</td>
+                <td style={td(l1Prem>0?'#52C98A':null)}>{fmt$(l1Prem)}</td>
                 <td style={td(l2Prem>0?'#4A9B7A':null)}>{fmt$(l2Prem)}</td>
                 <td style={td(spL2Prem>0?'#4A9B7A':null)}>{fmt$(spL2Prem)}</td>
                 <td style={td(l3Prem>0?'#A8C5D8':null)}>{fmt$(l3Prem)}</td>
@@ -5542,7 +5550,7 @@ function App() {
 
               {/* ── Roth Annuity Conversion Event (Layer 1) ── */}
               <div style={{marginBottom:14,paddingBottom:14,borderBottom:'1px solid rgba(255,255,255,.06)'}}>
-                <div style={{fontSize:14,fontWeight:700,color:'#7BAF84',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:4}}>
+                <div style={{fontSize:14,fontWeight:700,color:'#52C98A',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:4}}>
                   Layer 1 — Roth Annuity Funding
                 </div>
                 <div style={{fontSize:13,color:'#8DAFC8',marginBottom:10,lineHeight:1.55}}>
@@ -5910,7 +5918,7 @@ function App() {
 
               {/* Roth draws */}
               <div>
-                <div style={{fontSize:14,fontWeight:700,color:'#7BAF84',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8}}>
+                <div style={{fontSize:14,fontWeight:700,color:'#52C98A',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8}}>
                   Roth Annuity / Tax-Free Draw
                 </div>
                 <div style={{fontSize:14,color:'#8DAFC8',marginBottom:8,lineHeight:1.5}}>
