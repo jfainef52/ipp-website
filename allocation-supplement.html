@@ -1261,7 +1261,10 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
     <div id="section-complete">
       <div class="complete-icon">&#10003;</div>
       <div class="complete-title">Supplement <em>Complete</em></div>
-      <div class="complete-desc">The allocation supplement has been saved. The algorithm is running and the client summary is being prepared for DocuSign signature.</div>
+      <div class="complete-desc">The allocation supplement has been saved and the algorithm is ready to run.</div>
+      <div id="docusign-status" style="font-size:13px;color:var(--gold);margin:12px 0 20px;font-family:'Barlow',sans-serif;">
+        &#9203; Sending signature request to client via DocuSign…
+      </div>
       <div class="complete-actions">
         <button class="btn-primary" id="btn-view-allocation" onclick="viewAllocation()">View Allocation Results &#8594;</button>
         <button class="btn-secondary" onclick="window.location.href='advisor-dashboard.html'">Return to Dashboard</button>
@@ -1831,9 +1834,11 @@ async function completeSuplement(){
   const {error} = await sb.upsertSupplement(data);
   if(error){ setAutosaveStatus('error'); alert('Save failed. Please try again.'); return; }
   setAutosaveStatus('saved');
-  // Show completion screen
+
+  // Show completion screen immediately
   document.querySelectorAll('.form-section').forEach(s=>s.classList.remove('active'));
   document.getElementById('section-complete').classList.add('active');
+
   // Update client pipeline stage
   if(window._clientId){
     fetch(SUPABASE_URL+'/rest/v1/clients?id=eq.'+window._clientId,{
@@ -1842,6 +1847,47 @@ async function completeSuplement(){
       body:JSON.stringify({pipeline_stage:'supplement_complete',allocation_supplement_id:window._supplementId})
     });
   }
+
+  // Fire DocuSign signature request
+  if(window._clientId && window._supplementId){
+    setDocuSignStatus('sending');
+    try {
+      const session = JSON.parse(localStorage.getItem(SESSION_KEY)||'{}');
+      const res = await fetch(SUPABASE_URL+'/functions/v1/send-docusign', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer '+(session?.access_token||SUPABASE_KEY)
+        },
+        body: JSON.stringify({
+          supplement_id: window._supplementId,
+          client_id: window._clientId
+        })
+      });
+      const result = await res.json();
+      if(result.success){
+        setDocuSignStatus('sent', result.message);
+      } else {
+        setDocuSignStatus('error', result.error || 'DocuSign send failed');
+      }
+    } catch(e){
+      setDocuSignStatus('error', 'Could not reach DocuSign service');
+    }
+  }
+}
+
+function setDocuSignStatus(state, msg){
+  const el = document.getElementById('docusign-status');
+  if(!el) return;
+  const icons = { sending:'⏳', sent:'✉️', error:'⚠️' };
+  const colors = { sending:'var(--gold)', sent:'var(--success)', error:'var(--error)' };
+  const msgs = {
+    sending: 'Sending signature request to client via DocuSign…',
+    sent: msg || 'Signature request sent successfully.',
+    error: msg || 'DocuSign send failed — check logs or send manually.'
+  };
+  el.style.color = colors[state];
+  el.innerHTML = `${icons[state]} ${msgs[state]}`;
 }
 
 function viewAllocation(){
