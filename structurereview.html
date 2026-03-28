@@ -1649,6 +1649,78 @@ function CompletionScreen({onReport,onAdvisor,answers,report}) {
       }
       // ── End checklist email ───────────────────────────────────
 
+      // ── Save to Supabase ─────────────────────────────────────
+      // Runs silently — email delivery is not blocked by Supabase
+      try {
+        const SUPABASE_URL = 'https://piixgvxrasddphklgazh.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_acvdk0hBniaB6qOD8_k8XQ_9R6FNbP_';
+        const sbHdrs = { 'Content-Type':'application/json', 'apikey':SUPABASE_KEY, 'Authorization':'Bearer '+SUPABASE_KEY };
+
+        let clientId = null;
+        if (answers.email) {
+          const lookup = await fetch(
+            SUPABASE_URL+'/rest/v1/clients?email=eq.'+encodeURIComponent(answers.email)+'&select=id,pipeline_stage&limit=1',
+            { headers: sbHdrs }
+          );
+          const existing = await lookup.json();
+          if (existing?.length > 0) {
+            clientId = existing[0].id;
+          } else {
+            const create = await fetch(SUPABASE_URL+'/rest/v1/clients', {
+              method:'POST',
+              headers: { ...sbHdrs, 'Prefer':'return=representation' },
+              body: JSON.stringify({
+                first_name:  answers.first_name || '',
+                last_name:   answers.last_name  || '',
+                email:       answers.email,
+                phone:       answers.phone      || null,
+                dob:         answers.dob        || null,
+                state:       answers.state      || null,
+                filing_status: answers.marital === 'married' ? 'mfj' : 'single',
+                spouse_first_name: answers.spouse_first_name || null,
+                spouse_last_name:  answers.spouse_last_name  || null,
+                status:        'prospect',
+                pipeline_stage:'structure_review',
+                referral_source: answers.how_heard || null,
+              })
+            });
+            const newClient = await create.json();
+            clientId = Array.isArray(newClient) ? newClient[0]?.id : newClient?.id;
+          }
+        }
+
+        if (clientId) {
+          const srPayload = {
+            client_id:    clientId,
+            submitted_at: new Date().toISOString(),
+            answers: answers,
+            tracks:  report.tracks || [],
+            flags:   report.flags  || [],
+            planning_tracks: (report.tracks||[]).join(','),
+            status: 'submitted',
+          };
+          await fetch(SUPABASE_URL+'/rest/v1/structure_reviews', {
+            method:'POST',
+            headers: { ...sbHdrs, 'Prefer':'return=minimal' },
+            body: JSON.stringify(srPayload)
+          });
+          await fetch(SUPABASE_URL+'/rest/v1/clients?id=eq.'+clientId, {
+            method:'PATCH',
+            headers: { ...sbHdrs, 'Prefer':'return=minimal' },
+            body: JSON.stringify({
+              pipeline_stage: 'structure_review',
+              structure_review_submitted_at: new Date().toISOString(),
+              first_name:  answers.first_name || undefined,
+              last_name:   answers.last_name  || undefined,
+              phone:       answers.phone      || undefined,
+            })
+          });
+        }
+      } catch(sbErr) {
+        console.warn('Supabase SR save failed (non-critical):', sbErr);
+      }
+      // ── End Supabase save ────────────────────────────────────────
+
       setSent(true);
     } catch(e) {
       console.error("EmailJS error:",e);
@@ -1948,3 +2020,13 @@ function App() {
   if(view==="advisor") return (<AdvisorBrief answers={answers} report={report} onBack={start}/>);
   if(view==="flow"&&currentQ)return(
     <QuestionScreen question={currentQ} answer={answers[current
+Q.id]} onAnswer={handleAnswer} onNext={next} step={step} total={sequence.length} progress={((step+1)/sequence.length)*100}/>
+  );
+  return null;
+}
+
+ReactDOM.render(<App/>, document.getElementById('root'));
+</script>
+
+</body>
+</html>
