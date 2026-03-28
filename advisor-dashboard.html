@@ -663,7 +663,59 @@ const supabase = (() => {
   }
 
   /* ── CLIENT LIST ── */
-  .client-table {
+  .pipeline-track {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+  .pipeline-step {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 3px;
+    background: var(--navy3);
+    border: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .pipeline-step.done {
+    background: rgba(123,175,132,0.08);
+    border-color: rgba(123,175,132,0.25);
+  }
+  .pipeline-step.current {
+    background: rgba(200,169,110,0.08);
+    border-color: rgba(200,169,110,0.3);
+  }
+  .pipeline-step-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    background: var(--border);
+  }
+  .pipeline-step.done .pipeline-step-dot { background: var(--success); }
+  .pipeline-step.current .pipeline-step-dot { background: var(--gold); }
+  .pipeline-step-label { color: var(--gray); flex: 1; }
+  .pipeline-step.done .pipeline-step-label { color: var(--success); }
+  .pipeline-step.current .pipeline-step-label { color: var(--gold); }
+  .pipeline-step-date { font-size: 11px; color: var(--gray); }
+  .pipeline-action-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 18px;
+    background: rgba(200,169,110,0.1);
+    border: 1px solid rgba(200,169,110,0.35);
+    border-radius: 3px;
+    color: var(--gold);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+    cursor: pointer; transition: background 0.2s; text-decoration: none;
+  }
+  .pipeline-action-btn:hover { background: rgba(200,169,110,0.18); }
+  .pipeline-action-btn.green {
+    background: rgba(123,175,132,0.1); border-color: rgba(123,175,132,0.35); color: var(--success);
+  }
+  .pipeline-action-btn.green:hover { background: rgba(123,175,132,0.18); }
+  .pipeline-action-btn.disabled {
+    opacity: 0.4; cursor: not-allowed; pointer-events: none;
+  }
     width: 100%;
     border-collapse: collapse;
   }
@@ -2786,7 +2838,7 @@ async function openClientDetail(clientId) {
 
   const { data: c, error } = await sb
     .from('clients')
-    .select('*,advisor:advisor_id(id,first_name,last_name,firm_name),client_programs(*),policies(*),client_notes(*,author:author_id(first_name,last_name))')
+    .select('*,advisor:advisor_id(id,first_name,last_name,firm_name),client_programs(*),policies(*),client_notes(*,author:author_id(first_name,last_name)),structure_reviews(id)')
     .eq('id', clientId)
     .single();
 
@@ -2797,6 +2849,10 @@ async function openClientDetail(clientId) {
 
   // Store current client ID for note submission
   window._currentClientId = clientId;
+
+  // Get most recent structure review ID if exists
+  const srRecords = c.structure_reviews || [];
+  c.structure_review_id = srRecords.length ? srRecords[srRecords.length - 1].id : null;
 
   const name = c.first_name + ' ' + c.last_name;
   const STATUS_LABELS = { prospect:'Prospect', active:'Active', closed:'Closed' };
@@ -2858,6 +2914,64 @@ async function openClientDetail(clientId) {
       </div>`).join('') :
     '<div style="font-size:13px;color:var(--gray);font-style:italic;">No policies on file.</div>';
 
+  // ── Pipeline section ────────────────────────────────────────
+  const stage = c.pipeline_stage || 'prospect';
+  const STAGES = ['prospect','structure_review','supplement','modeler','presentation','implementation'];
+  const STAGE_LABELS = {
+    prospect:         'Prospect',
+    structure_review: 'StructureReview™ Submitted',
+    supplement:       'Allocation Supplement',
+    supplement_complete: 'Supplement Complete',
+    modeler:          'Allocation Modeler',
+    presentation:     'Client Presentation',
+    implementation:   'Implementation'
+  };
+  const stageOrder = ['prospect','structure_review','supplement','supplement_complete','modeler','presentation','implementation'];
+  const currentStageIdx = stageOrder.indexOf(stage);
+
+  const pipelineSteps = stageOrder.map((s, i) => {
+    const isDone    = i < currentStageIdx;
+    const isCurrent = i === currentStageIdx;
+    const cls = isDone ? 'done' : isCurrent ? 'current' : '';
+    return `<div class="pipeline-step ${cls}">
+      <div class="pipeline-step-dot"></div>
+      <div class="pipeline-step-label">${STAGE_LABELS[s] || s}</div>
+    </div>`;
+  }).join('');
+
+  // Determine next action button
+  let actionBtn = '';
+  const srId = c.structure_review_id || '';
+  if (stage === 'prospect') {
+    actionBtn = `<span style="font-size:12px;color:var(--gray);font-style:italic;">Waiting for StructureReview™ submission</span>`;
+  } else if (stage === 'structure_review') {
+    actionBtn = `<a class="pipeline-action-btn" href="allocation-supplement.html?client_id=${c.id}${srId ? '&sr_id='+srId : ''}" target="_blank">
+      Begin Allocation Supplement &#8594;
+    </a>`;
+  } else if (stage === 'supplement' || stage === 'supplement_complete') {
+    const supplementId = c.allocation_supplement_id || '';
+    actionBtn = `
+      <a class="pipeline-action-btn" href="allocation-supplement.html?client_id=${c.id}${srId ? '&sr_id='+srId : ''}" target="_blank" style="margin-right:8px;">
+        ${stage === 'supplement' ? 'Continue Supplement &#8594;' : 'Review Supplement &#8594;'}
+      </a>
+      ${stage === 'supplement_complete' ? `<a class="pipeline-action-btn green" href="allocation-modeler.html?client_id=${c.id}${supplementId ? '&supplement_id='+supplementId : ''}" target="_blank">
+        View Allocation Results &#8594;
+      </a>` : ''}`;
+  } else if (stage === 'modeler') {
+    const supplementId = c.allocation_supplement_id || '';
+    actionBtn = `<a class="pipeline-action-btn green" href="allocation-modeler.html?client_id=${c.id}${supplementId ? '&supplement_id='+supplementId : ''}" target="_blank">
+      Open Allocation Modeler &#8594;
+    </a>`;
+  } else if (stage === 'presentation') {
+    actionBtn = `<span style="font-size:12px;color:var(--success);">&#10003; Presentation stage — see IncomeArchitect™ Modeler</span>`;
+  } else if (stage === 'implementation') {
+    actionBtn = `<span style="font-size:12px;color:var(--success);">&#10003; In implementation</span>`;
+  }
+
+  const pipelineHtml = `
+    <div class="pipeline-track">${pipelineSteps}</div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">${actionBtn}</div>`;
+
   document.getElementById('detail-body').innerHTML = `
     <div class="detail-section">
       <div class="detail-section-title">Client Information</div>
@@ -2886,6 +3000,11 @@ async function openClientDetail(clientId) {
     <div class="detail-section">
       <div class="detail-section-title">Policies</div>
       ${policiesHtml}
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">IncomeArc™ Pipeline</div>
+      ${pipelineHtml}
     </div>
 
     <div class="detail-section">
