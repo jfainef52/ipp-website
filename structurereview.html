@@ -46,7 +46,7 @@
   .nav-links a {
     font-family: 'Barlow Condensed', sans-serif;
     font-size: 10.5px; font-weight: 500;
-    letter-spacing: 0.14em; text-transform: uppercase;
+    letter-spacing: 0.14em; text-transform: none;
     color: var(--warm); text-decoration: none; transition: color 0.2s;
   }
   .nav-links a:hover { color: var(--gold); }
@@ -137,60 +137,39 @@ html, body { background: #0E1824; min-height: 100vh; height: 100%; }
 <body>
 <nav>
   <div class="nav-logo">
-    <a href="https://www.integratedplanningpartners.com" style="display:block;line-height:0;"><svg id="Layer_1" style="height:52px;width:116px;display:block;" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="875 1789 3260 1462">
-  <!-- Generator: Adobe Illustrator 30.0.0, SVG Export Plug-In . SVG Version: 2.1.1 Build 123)  -->
-  
-  <g>
-    <rect fill="#C8A96E" x="914.76" y="2074.65" width="228.09" height="228.09"/>
-    <rect fill="#C8A96E" x="1226.07" y="2697.25" width="228.09" height="228.09"/>
-    <path fill="#C8A96E" d="M1564.58,2074.65h-338.52v228.09h566.61c0-125.97-102.12-228.09-228.09-228.09Z"/>
-    <path fill="#C8A96E" d="M1226.07,2614.05h338.52c125.97,0,228.09-102.12,228.09-228.09h-566.61v228.09Z"/>
-    <rect fill="#C8A96E" x="914.76" y="2385.95" width="228.09" height="539.39"/>
-  </g>
-  <g>
-    <rect fill="#C8A96E" x="2246.63" y="1965.47" width="36.35" height="254.46"/>
-    <path fill="#C8A96E" d="M2385.48,2120.69c0-14.05,2.49-25.8,7.45-35.25,4.97-9.45,12.06-16.6,21.27-21.45s19.99-7.27,32.35-7.27c16.47,0,29.26,4.73,38.35,14.17,9.09,9.45,13.63,23.51,13.63,42.17v106.87h34.9v-110.87c0-18.9-3.4-34.53-10.18-46.89-6.79-12.36-16.17-21.56-28.17-27.63-12-6.05-25.87-9.09-41.62-9.09-17.45,0-32.72,3.52-45.8,10.54-9.77,5.25-17.64,12.06-23.63,20.41v-29.14h-33.44v192.66h34.9v-99.24Z"/>
-    <path fill="#C8A96E" d="M2599.59,2161.76c0,19.39,5.33,34.3,15.99,44.72,10.66,10.42,25.68,15.63,45.07,15.63,8,0,15.69-1.1,23.08-3.27,7.39-2.18,13.75-5.57,19.08-10.18l-10.9-25.08c-7.27,6.06-16.36,9.09-27.26,9.09-9.7,0-17.15-2.79-22.36-8.36-5.21-5.58-7.81-13.57-7.81-24v-104.33h55.25v-28.72h-55.25v-42.17h-34.9v42.17h-32.72v28.72h32.72v105.78Z"/>
-    <path fill="#C8A96E" d="M2766.26,2209.39c15.63,8.49,33.74,12.73,54.34,12.73,15.99,0,30.47-2.66,43.44-8,12.96-5.33,23.81-13.09,32.53-23.27l-19.27-22.54c-7.03,7.76-15.21,13.58-24.53,17.45-9.34,3.87-19.69,5.81-31.08,5.81-13.81,0-26.05-2.79-36.72-8.36-10.67-5.57-18.96-13.39-24.9-23.44-4.38-7.42-7.12-15.6-8.27-24.54h156.39c.24-1.69.42-3.51.55-5.46.12-1.93.18-3.63.18-5.08,0-19.87-4.06-37.26-12.18-52.17-8.12-14.9-19.33-26.47-33.63-34.71-14.3-8.24-30.78-12.36-49.44-12.36s-34.96,4.19-49.62,12.54c-14.67,8.36-26.17,19.93-34.54,34.71-8.36,14.79-12.54,31.75-12.54,50.9s4.3,36.11,12.9,50.89c8.6,14.78,20.72,26.42,36.35,34.9ZM2759.17,2085.97c5.33-9.81,12.72-17.44,22.18-22.89,9.45-5.46,20.23-8.18,32.35-8.18s23.2,2.72,32.53,8.18c9.33,5.45,16.66,13.02,21.99,22.72,4.04,7.34,6.46,15.47,7.3,24.35h-123.8c1.02-8.82,3.49-16.88,7.45-24.17Z"/>
-    <path fill="#C8A96E" d="M2983.64,2200.12c14.66,7.88,31.32,11.81,49.98,11.81,16.48,0,31.5-3.45,45.07-10.36,9.48-4.82,17.54-11.43,24.36-19.62v15.44c0,21.81-5.33,38.04-15.99,48.71-10.67,10.66-27.39,15.99-50.17,15.99-14.3,0-27.99-2.25-41.07-6.72-13.09-4.49-24.12-10.61-33.08-18.36l-16.72,26.9c10.42,9.21,23.93,16.3,40.53,21.27,16.6,4.96,33.74,7.45,51.44,7.45,32.72,0,57.56-8,74.52-23.99,16.96-16,25.44-40.96,25.44-74.89v-166.49h-33.08v29.56c-7.16-9.18-15.87-16.32-26.17-21.38-13.57-6.67-28.6-10-45.07-10-18.67,0-35.32,3.88-49.98,11.64-14.67,7.76-26.3,18.6-34.9,32.53-8.6,13.94-12.9,30.23-12.9,48.89s4.3,34.66,12.9,48.71c8.6,14.06,20.23,25.03,34.9,32.9ZM2979.64,2085.8c5.69-9.45,13.57-16.78,23.63-22,10.05-5.21,21.5-7.82,34.35-7.82s24.23,2.61,34.17,7.82c9.94,5.21,17.75,12.54,23.45,22,5.69,9.45,8.54,20.35,8.54,32.71s-2.85,23.27-8.54,32.71c-5.7,9.45-13.51,16.85-23.45,22.18-9.94,5.33-21.33,7.99-34.17,7.99s-24.3-2.66-34.35-7.99c-10.06-5.33-17.94-12.73-23.63-22.18-5.7-9.45-8.54-20.35-8.54-32.71s2.85-23.27,8.54-32.71Z"/>
-    <path fill="#C8A96E" d="M3235.72,2123.96c0-21.08,5.45-37.2,16.36-48.35,10.9-11.14,25.68-16.72,44.35-16.72h3.82c1.33,0,2.73.13,4.18.37v-33.81c-18.42,0-33.93,3.52-46.53,10.54-10.4,5.8-18.18,13.88-23.63,23.96v-32.69h-33.44v192.66h34.9v-95.97Z"/>
-    <path fill="#C8A96E" d="M3393.12,2109.06c-19.15,0-34.35,2.54-45.62,7.63-11.27,5.09-19.39,11.88-24.36,20.36-4.97,8.49-7.45,17.93-7.45,28.35s2.91,20.66,8.72,29.26c5.82,8.6,14.11,15.33,24.9,20.17,10.78,4.86,23.32,7.28,37.62,7.28,17.69,0,32.35-3.33,43.98-10,8.2-4.7,14.56-10.63,19.26-17.68v25.5h33.08v-116.32c0-26.41-7.15-46.04-21.45-58.89-14.3-12.85-34.66-19.27-61.07-19.27-15.27,0-29.87,2.12-43.8,6.36-13.94,4.25-25.87,10.36-35.81,18.36l14.54,26.17c7.51-6.3,16.72-11.33,27.62-15.09,10.91-3.76,22.05-5.64,33.44-5.64,17.2,0,30.11,4.06,38.71,12.18,8.6,8.13,12.9,19.58,12.9,34.36v6.9h-55.25ZM3448.38,2161.04c-4.36,11.15-11.45,19.63-21.27,25.44-9.81,5.81-21.27,8.72-34.35,8.72s-23.75-2.85-31.26-8.54c-7.52-5.69-11.27-13.27-11.27-22.72,0-8.24,3.03-15.27,9.09-21.08,6.05-5.81,17.81-8.72,35.26-8.72h53.8v26.9Z"/>
-    <path fill="#C8A96E" d="M3549.43,2161.76c0,19.39,5.33,34.3,15.99,44.72,10.66,10.42,25.68,15.63,45.07,15.63,8,0,15.69-1.1,23.08-3.27,7.39-2.18,13.75-5.57,19.08-10.18l-10.9-25.08c-7.27,6.06-16.36,9.09-27.26,9.09-9.7,0-17.15-2.79-22.36-8.36-5.21-5.58-7.81-13.57-7.81-24v-104.33h55.25v-28.72h-55.25v-42.17h-34.9v42.17h-32.72v28.72h32.72v105.78Z"/>
-    <path fill="#C8A96E" d="M3812.97,2037.81c-14.3-8.24-30.78-12.36-49.44-12.36s-34.96,4.19-49.62,12.54c-14.67,8.36-26.17,19.93-34.54,34.71-8.36,14.79-12.54,31.75-12.54,50.9s4.3,36.11,12.9,50.89c8.6,14.78,20.72,26.42,36.35,34.9,15.63,8.49,33.74,12.73,54.34,12.73,15.99,0,30.47-2.66,43.44-8,12.96-5.33,23.81-13.09,32.53-23.27l-19.27-22.54c-7.03,7.76-15.21,13.58-24.53,17.45-9.34,3.87-19.69,5.81-31.08,5.81-13.81,0-26.05-2.79-36.72-8.36-10.67-5.57-18.96-13.39-24.9-23.44-4.38-7.42-7.12-15.6-8.27-24.54h156.39c.24-1.69.42-3.51.55-5.46.12-1.93.18-3.63.18-5.08,0-19.87-4.06-37.26-12.18-52.17-8.12-14.9-19.33-26.47-33.63-34.71ZM3701.56,2110.15c1.02-8.82,3.49-16.88,7.45-24.17,5.33-9.81,12.72-17.44,22.18-22.89,9.45-5.46,20.23-8.18,32.35-8.18s23.2,2.72,32.53,8.18c9.33,5.45,16.66,13.02,21.99,22.72,4.04,7.34,6.46,15.47,7.3,24.35h-123.8Z"/>
-    <path fill="#C8A96E" d="M4050.34,1950.21v106.5c-6.55-8.47-14.24-15.34-23.27-20.35-13.09-7.27-27.75-10.91-43.98-10.91-18.66,0-35.32,4.13-49.98,12.36-14.66,8.24-26.24,19.69-34.71,34.36-8.49,14.66-12.72,31.81-12.72,51.44s4.24,36.84,12.72,51.62c8.48,14.78,20.05,26.3,34.71,34.53,14.66,8.24,31.32,12.36,49.98,12.36,16.72,0,31.63-3.7,44.71-11.09,9.43-5.33,17.39-12.58,23.99-21.62v30.53h33.44v-269.72h-34.89ZM4042.16,2159.41c-5.7,10.31-13.45,18.24-23.26,23.81-9.81,5.58-20.78,8.36-32.9,8.36s-23.39-2.79-33.08-8.36c-9.7-5.57-17.45-13.5-23.26-23.81-5.82-10.3-8.73-22.23-8.73-35.8s2.91-25.75,8.73-35.81c5.81-10.05,13.57-17.87,23.26-23.44,9.69-5.57,20.72-8.36,33.08-8.36s23.08,2.79,32.9,8.36c9.81,5.57,17.57,13.39,23.26,23.44,5.69,10.06,8.54,22,8.54,35.81s-2.85,25.5-8.54,35.8Z"/>
-    <path fill="#C8A96E" d="M2402.93,2389.86c-15.76-7.03-34.78-10.54-57.07-10.54h-99.24v254.46h36.35v-77.06h62.89c22.29,0,41.31-3.58,57.07-10.72,15.75-7.15,27.87-17.32,36.35-30.54,8.48-13.21,12.73-29.02,12.73-47.44s-4.24-34.29-12.73-47.62c-8.48-13.33-20.6-23.5-36.35-30.54ZM2397.66,2510.18c-12,9.94-29.63,14.9-52.89,14.9h-61.79v-114.14h61.79c23.26,0,40.89,4.97,52.89,14.9,12,9.94,18,23.99,18,42.17s-6,32.23-18,42.17Z"/>
-    <rect fill="#C8A96E" x="2500.35" y="2364.05" width="34.9" height="269.72"/>
-    <path fill="#C8A96E" d="M2717.72,2608.27v25.5h33.08v-116.32c0-26.41-7.15-46.04-21.45-58.89-14.3-12.85-34.66-19.27-61.07-19.27-15.27,0-29.87,2.12-43.8,6.36-13.94,4.25-25.87,10.36-35.81,18.36l14.54,26.17c7.51-6.3,16.72-11.33,27.62-15.09,10.91-3.76,22.05-5.64,33.44-5.64,17.2,0,30.11,4.06,38.71,12.18,8.6,8.13,12.9,19.58,12.9,34.36v6.9h-55.25c-19.15,0-34.35,2.54-45.62,7.63-11.27,5.09-19.39,11.88-24.36,20.36-4.97,8.49-7.45,17.93-7.45,28.35s2.91,20.66,8.72,29.26c5.82,8.6,14.11,15.33,24.9,20.17,10.78,4.86,23.32,7.28,37.62,7.28,17.69,0,32.35-3.33,43.98-10,8.2-4.7,14.56-10.63,19.26-17.68ZM2694.64,2600.33c-9.81,5.81-21.27,8.72-34.35,8.72s-23.75-2.85-31.26-8.54c-7.52-5.69-11.27-13.27-11.27-22.72,0-8.24,3.03-15.27,9.09-21.08,6.05-5.81,17.81-8.72,35.26-8.72h53.8v26.9c-4.36,11.15-11.45,19.63-21.27,25.44Z"/>
-    <path fill="#C8A96E" d="M2956.37,2448.38c-12-6.05-25.87-9.09-41.62-9.09-17.45,0-32.72,3.52-45.8,10.54-9.77,5.25-17.64,12.06-23.63,20.41v-29.14h-33.44v192.66h34.9v-99.24c0-14.05,2.49-25.8,7.45-35.25,4.97-9.45,12.06-16.6,21.27-21.45,9.21-4.85,19.99-7.27,32.35-7.27,16.47,0,29.26,4.73,38.35,14.17,9.09,9.45,13.63,23.51,13.63,42.17v106.87h34.9v-110.87c0-18.9-3.4-34.53-10.18-46.89-6.79-12.36-16.17-21.56-28.17-27.63Z"/>
-    <path fill="#C8A96E" d="M3238.63,2633.77v-110.87c0-18.9-3.4-34.53-10.18-46.89-6.79-12.36-16.17-21.56-28.17-27.63-12-6.05-25.87-9.09-41.62-9.09-17.45,0-32.72,3.52-45.8,10.54-9.77,5.25-17.64,12.06-23.63,20.41v-29.14h-33.44v192.66h34.9v-99.24c0-14.05,2.49-25.8,7.45-35.25,4.97-9.45,12.06-16.6,21.27-21.45,9.21-4.85,19.99-7.27,32.35-7.27,16.47,0,29.26,4.73,38.35,14.17,9.09,9.45,13.63,23.51,13.63,42.17v106.87h34.9Z"/>
-    <rect fill="#C8A96E" x="3299.7" y="2441.11" width="34.9" height="192.66"/>
-    <path fill="#C8A96E" d="M3334.05,2364.95c-4.49-4.23-10.12-6.36-16.9-6.36s-12.42,2.18-16.9,6.54c-4.49,4.36-6.73,9.82-6.73,16.36s2.24,11.64,6.73,16c4.48,4.36,10.12,6.55,16.9,6.55s12.73-2.24,17.09-6.73c4.36-4.48,6.54-9.99,6.54-16.54s-2.24-11.57-6.72-15.82Z"/>
-    <path fill="#C8A96E" d="M3541.97,2448.38c-12-6.05-25.87-9.09-41.62-9.09-17.45,0-32.72,3.52-45.8,10.54-9.77,5.25-17.64,12.06-23.63,20.41v-29.14h-33.44v192.66h34.9v-99.24c0-14.05,2.49-25.8,7.45-35.25,4.97-9.45,12.06-16.6,21.27-21.45,9.21-4.85,19.99-7.27,32.35-7.27,16.47,0,29.26,4.73,38.35,14.17,9.09,9.45,13.63,23.51,13.63,42.17v106.87h34.9v-110.87c0-18.9-3.4-34.53-10.18-46.89-6.79-12.36-16.17-21.56-28.17-27.63Z"/>
-    <path fill="#C8A96E" d="M3792.61,2470.67c-7.16-9.18-15.87-16.32-26.17-21.38-13.57-6.67-28.6-10-45.07-10-18.67,0-35.32,3.88-49.98,11.64-14.67,7.76-26.3,18.6-34.9,32.53-8.6,13.94-12.9,30.23-12.9,48.89s4.3,34.66,12.9,48.71c8.6,14.06,20.23,25.03,34.9,32.9,14.66,7.88,31.32,11.81,49.98,11.81,16.48,0,31.5-3.45,45.07-10.36,9.48-4.82,17.54-11.43,24.36-19.62v15.44c0,21.81-5.33,38.04-15.99,48.71-10.67,10.66-27.39,15.99-50.17,15.99-14.3,0-27.99-2.25-41.07-6.72-13.09-4.49-24.12-10.61-33.08-18.36l-16.72,26.9c10.42,9.21,23.93,16.3,40.53,21.27,16.6,4.96,33.74,7.45,51.44,7.45,32.72,0,57.56-8,74.52-23.99,16.96-16,25.44-40.96,25.44-74.89v-166.49h-33.08v29.56ZM3782.98,2565.06c-5.7,9.45-13.51,16.85-23.45,22.18-9.94,5.33-21.33,7.99-34.17,7.99s-24.3-2.66-34.35-7.99c-10.06-5.33-17.94-12.73-23.63-22.18-5.7-9.45-8.54-20.35-8.54-32.71s2.85-23.27,8.54-32.71c5.69-9.45,13.57-16.78,23.63-22,10.05-5.21,21.5-7.82,34.35-7.82s24.23,2.61,34.17,7.82c9.94,5.21,17.75,12.54,23.45,22,5.69,9.45,8.54,20.35,8.54,32.71s-2.85,23.27-8.54,32.71Z"/>
-    <path fill="#C8A96E" d="M2402.93,2803.7c-15.76-7.03-34.78-10.54-57.07-10.54h-99.24v254.46h36.35v-77.06h62.89c22.29,0,41.31-3.58,57.07-10.72,15.75-7.15,27.87-17.32,36.35-30.54,8.48-13.21,12.73-29.02,12.73-47.44s-4.24-34.29-12.73-47.62c-8.48-13.33-20.6-23.5-36.35-30.54ZM2397.66,2924.02c-12,9.94-29.63,14.9-52.89,14.9h-61.79v-114.14h61.79c23.26,0,40.89,4.97,52.89,14.9,12,9.94,18,23.99,18,42.17s-6,32.23-18,42.17Z"/>
-    <path fill="#C8A96E" d="M2565.05,2853.13c-15.27,0-29.87,2.12-43.8,6.36-13.94,4.25-25.87,10.36-35.81,18.36l14.54,26.17c7.51-6.3,16.72-11.33,27.62-15.09,10.91-3.76,22.05-5.64,33.44-5.64,17.2,0,30.11,4.06,38.71,12.18,8.6,8.13,12.9,19.58,12.9,34.36v6.9h-55.25c-19.15,0-34.35,2.54-45.62,7.63-11.27,5.09-19.39,11.88-24.36,20.36-4.97,8.49-7.45,17.93-7.45,28.35s2.91,20.66,8.72,29.26c5.82,8.6,14.11,15.33,24.9,20.17,10.78,4.86,23.32,7.28,37.62,7.28,17.69,0,32.35-3.33,43.98-10,8.2-4.7,14.56-10.63,19.26-17.68v25.5h33.08v-116.32c0-26.41-7.15-46.04-21.45-58.89-14.3-12.85-34.66-19.27-61.07-19.27ZM2612.67,2988.72c-4.36,11.15-11.45,19.63-21.27,25.44-9.81,5.81-21.27,8.72-34.35,8.72s-23.75-2.85-31.26-8.54c-7.52-5.69-11.27-13.27-11.27-22.72,0-8.24,3.03-15.27,9.09-21.08,6.05-5.81,17.81-8.72,35.26-8.72h53.8v26.9Z"/>
-    <path fill="#C8A96E" d="M2742.08,2887.64v-32.69h-33.44v192.66h34.9v-95.97c0-21.08,5.45-37.2,16.36-48.35,10.9-11.14,25.68-16.72,44.35-16.72h3.82c1.33,0,2.73.13,4.18.37v-33.81c-18.42,0-33.93,3.52-46.53,10.54-10.4,5.8-18.18,13.88-23.63,23.96Z"/>
-    <path fill="#C8A96E" d="M2929.65,3020.35c-9.7,0-17.15-2.79-22.36-8.36-5.21-5.58-7.81-13.57-7.81-24v-104.33h55.25v-28.72h-55.25v-42.17h-34.9v42.17h-32.72v28.72h32.72v105.78c0,19.39,5.33,34.3,15.99,44.72,10.66,10.42,25.68,15.63,45.07,15.63,8,0,15.69-1.1,23.08-3.27,7.39-2.18,13.75-5.57,19.08-10.18l-10.9-25.08c-7.27,6.06-16.36,9.09-27.26,9.09Z"/>
-    <path fill="#C8A96E" d="M3150.84,2862.22c-12-6.05-25.87-9.09-41.62-9.09-17.45,0-32.72,3.52-45.8,10.54-9.77,5.25-17.64,12.06-23.63,20.41v-29.14h-33.44v192.66h34.9v-99.24c0-14.05,2.49-25.8,7.45-35.25,4.97-9.45,12.06-16.6,21.27-21.45,9.21-4.85,19.99-7.27,32.35-7.27,16.47,0,29.26,4.73,38.35,14.17,9.09,9.45,13.63,23.51,13.63,42.17v106.87h34.9v-110.87c0-18.9-3.4-34.53-10.18-46.89-6.79-12.36-16.17-21.56-28.17-27.63Z"/>
-    <path fill="#C8A96E" d="M3378.57,2865.49c-14.3-8.24-30.78-12.36-49.44-12.36s-34.96,4.19-49.62,12.54c-14.67,8.36-26.17,19.93-34.54,34.71-8.36,14.79-12.54,31.75-12.54,50.9s4.3,36.11,12.9,50.89c8.6,14.78,20.72,26.42,36.35,34.9,15.63,8.49,33.74,12.73,54.34,12.73,15.99,0,30.47-2.66,43.44-8,12.96-5.33,23.81-13.09,32.53-23.27l-19.27-22.54c-7.03,7.76-15.21,13.58-24.53,17.45-9.34,3.87-19.69,5.81-31.08,5.81-13.81,0-26.05-2.79-36.72-8.36-10.67-5.57-18.96-13.39-24.9-23.44-4.38-7.42-7.12-15.6-8.27-24.54h156.39c.24-1.69.42-3.51.55-5.46.12-1.93.18-3.63.18-5.08,0-19.87-4.06-37.26-12.18-52.17-8.12-14.9-19.33-26.47-33.63-34.71ZM3267.16,2937.83c1.02-8.82,3.49-16.89,7.45-24.17,5.33-9.81,12.72-17.44,22.18-22.89,9.45-5.46,20.23-8.18,32.35-8.18s23.2,2.72,32.53,8.18c9.33,5.45,16.66,13.02,21.99,22.72,4.04,7.34,6.46,15.47,7.3,24.35h-123.8Z"/>
-    <path fill="#C8A96E" d="M3502.53,2887.64v-32.69h-33.44v192.66h34.9v-95.97c0-21.08,5.45-37.2,16.36-48.35,10.9-11.14,25.68-16.72,44.35-16.72h3.82c1.33,0,2.73.13,4.18.37v-33.81c-18.42,0-33.93,3.52-46.53,10.54-10.4,5.8-18.18,13.88-23.63,23.96Z"/>
-    <path fill="#C8A96E" d="M3728.45,2951.28c-7.15-3.64-15.09-6.48-23.81-8.55-8.73-2.06-17.45-3.75-26.17-5.08-8.72-1.33-16.66-2.97-23.81-4.91-7.15-1.94-12.97-4.67-17.45-8.18-4.49-3.51-6.72-8.54-6.72-15.09,0-7.75,3.75-14.11,11.27-19.08,7.51-4.96,18.9-7.45,34.17-7.45,9.45,0,18.9,1.09,28.35,3.27,9.45,2.18,18.54,6.17,27.26,12l14.91-27.63c-8.24-5.57-18.85-9.87-31.81-12.91-12.97-3.02-25.75-4.54-38.35-4.54-16.48,0-30.71,2.37-42.71,7.09-12,4.73-21.27,11.45-27.81,20.17-6.54,8.73-9.81,18.91-9.81,30.54s2.18,20.06,6.55,26.72c4.36,6.67,10.18,11.87,17.45,15.63,7.27,3.76,15.27,6.67,23.99,8.72,8.72,2.06,17.45,3.77,26.17,5.09,8.73,1.34,16.66,2.85,23.81,4.54,7.15,1.7,12.9,4.25,17.27,7.63,4.36,3.39,6.55,8.12,6.55,14.18,0,8.24-3.58,14.67-10.72,19.26-7.15,4.6-18.85,6.9-35.08,6.9-12.6,0-24.96-1.93-37.08-5.81-12.12-3.87-22.3-8.6-30.54-14.17l-14.54,27.62c8.24,6.31,19.57,11.64,33.99,16,14.42,4.36,29.63,6.55,45.62,6.55,17.2,0,31.99-2.37,44.35-7.09,12.36-4.73,21.93-11.33,28.72-19.81,6.78-8.48,10.18-18.53,10.18-30.17,0-10.91-2.25-19.63-6.73-26.17-4.49-6.54-10.3-11.63-17.45-15.26Z"/>
-  </g>
-  <rect fill="#C8A96E" x="2011.69" y="1828.72" width="15.92" height="1342.55"/>
-</svg></a>
-    <div class="nav-logo-sub">Built for Planning. Designed for Execution.</div>
+    <a href="https://www.integratedplanningpartners.com" style="display:flex;align-items:center;gap:10px;text-decoration:none;">
+      <img src="https://www.integratedplanningpartners.com/images/ipp-logo-mark.svg" alt="IPP" style="height:36px;width:auto;" onerror="this.style.display='none'">
+      <div>
+        <div style="font-family:'Cormorant Garamond',serif;font-size:15px;font-weight:400;color:var(--off-white);line-height:1.2;">Integrated Planning<br>Partners</div>
+        <div class="nav-logo-sub">Built for planning. Designed for execution.</div>
+      </div>
+    </a>
   </div>
-  <ul class="nav-links">
-    <li><a href="https://www.integratedplanningpartners.com/#what-we-do">What We Do</a></li>
-    <li><a href="https://www.integratedplanningpartners.com/#structure-review"><span>StructureReview™</span></a></li>
-    <li><a href="https://www.integratedplanningpartners.com/incomearc.html"><span>IncomeArc™</span></a></li>
-    <li><a href="https://www.integratedplanningpartners.com/income-architect-modeler.html"><span>IncomeArchitect™ Modeler</span></a></li>
-    <li><a href="https://www.integratedplanningpartners.com/about.html">About Us</a></li>
-    <li><a href="https://www.integratedplanningpartners.com/#contact">Contact Us</a></li>
-    <li><a href="https://www.integratedplanningpartners.com/#book">Architecture of Retirement</a></li>
+  <ul class="nav-right">
+    <li><a href="https://www.integratedplanningpartners.com/incomearc.html">IncomeArc&#8482;</a></li>
+    <li><a href="https://www.integratedplanningpartners.com/income-architect-modeler.html">IncomeArchitect&#8482; <span>Modeler</span></a></li>
+    <li><a href="https://www.integratedplanningpartners.com/index.html#book">Architecture of Retirement</a></li>
     <li><a href="https://www.integratedplanningpartners.com/advisor-portal.html" class="nav-advisor">Advisor Portal</a></li>
+    <li><a href="https://structurereview.integratedplanningpartners.com/structurereview.html" class="nav-cta">Begin Your Review</a></li>
+    <li>
+      <button class="nav-menu-btn" onclick="document.querySelector('.drawer').style.transform='translateX(0)';document.querySelector('.drawer-overlay').style.opacity='1';document.querySelector('.drawer-overlay').style.pointerEvents='auto';" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+    </li>
   </ul>
 </nav>
+<div class="drawer-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;opacity:0;pointer-events:none;transition:opacity 0.3s;" onclick="document.querySelector('.drawer').style.transform='translateX(100%)';this.style.opacity='0';this.style.pointerEvents='none';"></div>
+<div class="drawer">
+  <div class="drawer-nav">
+    <a href="https://www.integratedplanningpartners.com" style="font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);text-decoration:none;margin-bottom:28px;display:block;">Integrated Planning Partners</a>
+    <a href="https://www.integratedplanningpartners.com/incomearc.html" style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:400;color:var(--off-white);text-decoration:none;padding:14px 0;border-bottom:1px solid var(--border);display:block;">IncomeArc&#8482;</a>
+    <a href="https://www.integratedplanningpartners.com/income-architect-modeler.html" style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:400;color:var(--off-white);text-decoration:none;padding:14px 0;border-bottom:1px solid var(--border);display:block;">IncomeArchitect&#8482; Modeler</a>
+    <a href="https://www.integratedplanningpartners.com/index.html#book" style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:400;color:var(--off-white);text-decoration:none;padding:14px 0;border-bottom:1px solid var(--border);display:block;">Architecture of Retirement</a>
+    <a href="https://structurereview.integratedplanningpartners.com/structurereview.html" style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:400;color:var(--off-white);text-decoration:none;padding:14px 0;border-bottom:1px solid var(--border);display:block;">StructureReview&#8482;</a>
+    <a href="https://www.integratedplanningpartners.com/advisor-portal.html" style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:400;color:var(--gold);text-decoration:none;padding:14px 0;display:block;margin-top:8px;">Advisor Portal</a>
+  </div>
+  <button onclick="document.querySelector('.drawer').style.transform='translateX(100%)';document.querySelector('.drawer-overlay').style.opacity='0';document.querySelector('.drawer-overlay').style.pointerEvents='none';" style="position:absolute;top:20px;right:20px;background:none;border:none;color:var(--warm);font-size:20px;cursor:pointer;padding:8px;">&#10005;</button>
+</div>
 <div id="root"></div>
 <footer id="contact">
   <div class="footer-logo">
@@ -238,7 +217,7 @@ html, body { background: #0E1824; min-height: 100vh; height: 100%; }
     <span>Built for Planning. Designed for Execution.</span>
   </div>
   <div class="footer-contact">
-    <a href="/cdn-cgi/l/email-protection#87f4f2f7f7e8f5f3c7eee9f3e2e0f5e6f3e2e3f7ebe6e9e9eee9e0f7e6f5f3e9e2f5f4a9e4e8ea"><span class="__cf_email__" data-cfemail="c5b6b0b5b5aab7b185acabb1a0a2b7a4b1a0a1b5a9a4ababacaba2b5a4b7b1aba0b7b6eba6aaa8">[email&#160;protected]</span></a>
+    <a href="mailto:support@integratedplanningpartners.com" style="color:inherit;text-decoration:none;">support@integratedplanningpartners.com</a>
     <div><a href="tel:7733189608">773-318-9608</a></div>
     <div><a href="https://www.integratedplanningpartners.com">integratedplanningpartners.com</a></div>
   </div>
@@ -253,7 +232,7 @@ html, body { background: #0E1824; min-height: 100vh; height: 100%; }
     <a href="https://www.integratedplanningpartners.com/advisor-portal.html">Advisor Portal</a>
   </div>
   <div class="footer-bottom">
-    <div>© 2026 Integrated Planning Partners. IncomeArc™ and StructureReview™ are trademarks of Integrated Planning Partners.</div>
+    <div>© 2026 Integrated Planning Partners. IncomeArc™, IncomeArchitect™ Modeler, and StructureReview™ are trademarks of Integrated Planning Partners.</div>
     <div>For informational purposes only. Not financial, tax, legal, or investment advice.</div>
   </div>
 </footer>
@@ -1247,7 +1226,26 @@ function WelcomeScreen({onStart}) {
       .st0 {
         fill: #C8A96E;
       }
-    </style>
+    
+/* ── Nav — matches main IPP site ───────────────────────────────── */
+nav{position:fixed;top:0;left:0;right:0;z-index:200;display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:68px;background:rgba(14,28,46,.95);border-bottom:1px solid var(--border);backdrop-filter:blur(12px);}
+.nav-logo-sub{font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:500;letter-spacing:.18em;color:var(--gold);text-transform:uppercase;white-space:nowrap;}
+.nav-right{display:flex;align-items:center;gap:20px;list-style:none;margin:0;padding:0;}
+.nav-right a{font-family:'Barlow Condensed',sans-serif;font-size:10.5px;font-weight:500;letter-spacing:.14em;text-transform:none;color:var(--warm);text-decoration:none;transition:color .2s;white-space:nowrap;}
+.nav-right a:hover{color:var(--gold);}
+.nav-right a span{text-transform:none;}
+.nav-advisor{border:1px solid var(--gold-dim)!important;padding:7px 18px!important;border-radius:2px!important;color:var(--gold)!important;}
+.nav-advisor:hover{border-color:var(--gold)!important;background:rgba(200,169,110,.08)!important;}
+.nav-cta{font-family:'Barlow Condensed',sans-serif!important;font-size:11px!important;font-weight:600!important;letter-spacing:.08em!important;text-transform:none!important;background:var(--gold)!important;padding:9px 22px!important;border-radius:2px!important;color:var(--navy)!important;transition:background .2s!important;}
+.nav-cta:hover{background:var(--gold2)!important;}
+.nav-menu-btn{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:5px;width:36px;height:36px;cursor:pointer;background:none;border:1px solid var(--border);border-radius:2px;padding:0;flex-shrink:0;}
+.nav-menu-btn:hover{border-color:var(--gold-dim);}
+.nav-menu-btn span{display:block;width:16px;height:1px;background:var(--warm);}
+.nav-menu-btn:hover span{background:var(--gold);}
+.drawer{position:fixed;top:0;right:0;width:320px;height:100vh;background:var(--navy2);border-left:1px solid var(--border);z-index:400;transform:translateX(100%);transition:transform .35s cubic-bezier(.4,0,.2,1);overflow-y:auto;}
+.drawer-nav{display:flex;flex-direction:column;padding:36px 28px;}
+@media(max-width:900px){nav{padding:0 20px;}.nav-right li:not(:last-child):not(:nth-last-child(2)):not(:nth-last-child(3)){display:none;}}
+</style>
   </defs>
   <g>
     <rect class="st0" x="914.76" y="2074.65" width="228.09" height="228.09"/>
@@ -1649,78 +1647,29 @@ function CompletionScreen({onReport,onAdvisor,answers,report}) {
       }
       // ── End checklist email ───────────────────────────────────
 
-      // ── Save to Supabase ─────────────────────────────────────
-      // Runs silently — email delivery is not blocked by Supabase
+      // ── Save to Supabase ────────────────────────────────────────
       try {
         const SUPABASE_URL = 'https://piixgvxrasddphklgazh.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_acvdk0hBniaB6qOD8_k8XQ_9R6FNbP_';
-        const sbHdrs = { 'Content-Type':'application/json', 'apikey':SUPABASE_KEY, 'Authorization':'Bearer '+SUPABASE_KEY };
-
+        const sbHdrs = {'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY};
         let clientId = null;
         if (answers.email) {
-          const lookup = await fetch(
-            SUPABASE_URL+'/rest/v1/clients?email=eq.'+encodeURIComponent(answers.email)+'&select=id,pipeline_stage&limit=1',
-            { headers: sbHdrs }
-          );
+          const lookup = await fetch(SUPABASE_URL+'/rest/v1/clients?email=eq.'+encodeURIComponent(answers.email)+'&select=id&limit=1',{headers:sbHdrs});
           const existing = await lookup.json();
           if (existing?.length > 0) {
             clientId = existing[0].id;
           } else {
-            const create = await fetch(SUPABASE_URL+'/rest/v1/clients', {
-              method:'POST',
-              headers: { ...sbHdrs, 'Prefer':'return=representation' },
-              body: JSON.stringify({
-                first_name:  answers.first_name || '',
-                last_name:   answers.last_name  || '',
-                email:       answers.email,
-                phone:       answers.phone      || null,
-                dob:         answers.dob        || null,
-                state:       answers.state      || null,
-                filing_status: answers.marital === 'married' ? 'mfj' : 'single',
-                spouse_first_name: answers.spouse_first_name || null,
-                spouse_last_name:  answers.spouse_last_name  || null,
-                status:        'prospect',
-                pipeline_stage:'structure_review',
-                referral_source: answers.how_heard || null,
-              })
-            });
-            const newClient = await create.json();
-            clientId = Array.isArray(newClient) ? newClient[0]?.id : newClient?.id;
+            const create = await fetch(SUPABASE_URL+'/rest/v1/clients',{method:'POST',headers:{...sbHdrs,'Prefer':'return=representation'},body:JSON.stringify({first_name:answers.first_name||'',last_name:answers.last_name||'',email:answers.email,phone:answers.phone||null,dob:answers.dob||null,state:answers.state||null,filing_status:answers.marital==='married'?'mfj':'single',spouse_first_name:answers.spouse_first_name||null,spouse_last_name:answers.spouse_last_name||null,status:'prospect',pipeline_stage:'structure_review',referral_source:answers.how_heard||null})});
+            const nc = await create.json();
+            clientId = Array.isArray(nc)?nc[0]?.id:nc?.id;
           }
         }
-
         if (clientId) {
-          const srPayload = {
-            client_id:    clientId,
-            submitted_at: new Date().toISOString(),
-            answers: answers,
-            tracks:  report.tracks || [],
-            flags:   report.flags  || [],
-            planning_tracks: (report.tracks||[]).join(','),
-            status: 'submitted',
-          };
-          await fetch(SUPABASE_URL+'/rest/v1/structure_reviews', {
-            method:'POST',
-            headers: { ...sbHdrs, 'Prefer':'return=minimal' },
-            body: JSON.stringify(srPayload)
-          });
-          await fetch(SUPABASE_URL+'/rest/v1/clients?id=eq.'+clientId, {
-            method:'PATCH',
-            headers: { ...sbHdrs, 'Prefer':'return=minimal' },
-            body: JSON.stringify({
-              pipeline_stage: 'structure_review',
-              structure_review_submitted_at: new Date().toISOString(),
-              first_name:  answers.first_name || undefined,
-              last_name:   answers.last_name  || undefined,
-              phone:       answers.phone      || undefined,
-            })
-          });
+          await fetch(SUPABASE_URL+'/rest/v1/structure_reviews',{method:'POST',headers:{...sbHdrs,'Prefer':'return=minimal'},body:JSON.stringify({client_id:clientId,submitted_at:new Date().toISOString(),answers:answers,tracks:report.tracks||[],flags:report.flags||[],planning_tracks:(report.tracks||[]).join(','),status:'submitted'})});
+          await fetch(SUPABASE_URL+'/rest/v1/clients?id=eq.'+clientId,{method:'PATCH',headers:{...sbHdrs,'Prefer':'return=minimal'},body:JSON.stringify({pipeline_stage:'structure_review',structure_review_submitted_at:new Date().toISOString(),first_name:answers.first_name||undefined,last_name:answers.last_name||undefined,phone:answers.phone||undefined})});
         }
-      } catch(sbErr) {
-        console.warn('Supabase SR save failed (non-critical):', sbErr);
-      }
-      // ── End Supabase save ────────────────────────────────────────
-
+      } catch(sbErr){ console.warn('Supabase SR save failed:',sbErr); }
+      // ── End Supabase save ───────────────────────────────────────
       setSent(true);
     } catch(e) {
       console.error("EmailJS error:",e);
@@ -1826,7 +1775,7 @@ function ClientReport({answers,report,onBack}) {
             </div>
           </div>
           <button onClick={onBack} style={{width:"100%",padding:"13px",background:"rgba(255,255,255,.05)",color:"#6E8299",borderRadius:10,fontSize:13,border:"1px solid rgba(255,255,255,.08)",marginBottom:16}}>← Start Over</button>
-          <p style={{fontSize:10,color:"#2A4060",lineHeight:1.5}}>For informational purposes only. Not financial, tax, or legal advice. IncomeArc™ and StructureReview™ are trademarks of Integrated Planning Partners. © 2026 Jeffrey Faine, CLU, RICP.</p>
+          <p style={{fontSize:10,color:"#2A4060",lineHeight:1.5}}>For informational purposes only. Not financial, tax, or legal advice. IncomeArc™, IncomeArchitect™ Modeler, and StructureReview™ are trademarks of Integrated Planning Partners. © 2026 Jeffrey Faine, CLU, RICP.</p>
         </div>
       </div>
     </div>
@@ -1965,7 +1914,7 @@ function AdvisorBrief({answers,report,onBack}) {
           </div>
 
           <button onClick={onBack} style={{width:"100%",marginTop:16,padding:"13px",background:"rgba(255,255,255,.04)",color:"#6E8299",borderRadius:10,fontSize:12,border:"1px solid rgba(255,255,255,.07)"}}>← Start Over</button>
-          <p style={{fontSize:10,color:"#1A3050",lineHeight:1.5,marginTop:16,marginBottom:8}}>Advisor brief — not for client distribution. IncomeArc™ and StructureReview™ are trademarks of Integrated Planning Partners. © 2026.</p>
+          <p style={{fontSize:10,color:"#1A3050",lineHeight:1.5,marginTop:16,marginBottom:8}}>Advisor brief — not for client distribution. IncomeArc™, IncomeArchitect™ Modeler, and StructureReview™ are trademarks of Integrated Planning Partners. © 2026.</p>
         </div>
       </div>
     </div>
