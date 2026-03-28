@@ -1,0 +1,1913 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Allocation Supplement — Integrated Planning Partners</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Barlow+Condensed:wght@400;500;600;700&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+
+<style>
+/* ── Reset ─────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#F5F2EC;-webkit-font-smoothing:antialiased;}
+
+/* ── CSS Variables ─────────────────────────── */
+:root{
+  --navy:    #0E1C2E;
+  --navy2:   #162032;
+  --navy3:   #1E2E44;
+  --navy4:   #243550;
+  --gold:    #C8A96E;
+  --gold2:   #E0C080;
+  --gold-dim:#8A7040;
+  --white:   #F5F2EC;
+  --warm:    #C8BFA8;
+  --gray:    #6E8299;
+  --border:  #2A3F58;
+  --error:   #C47A7A;
+  --success: #7BAF84;
+}
+
+/* ── Lock overlay ──────────────────────────── */
+#lock-overlay{
+  display:none;position:fixed;inset:0;z-index:9999;
+  background:rgba(7,14,22,.97);
+  align-items:center;justify-content:center;flex-direction:column;gap:20px;
+}
+#lock-overlay.visible{display:flex;}
+.lock-icon{font-size:48px;opacity:.5;}
+.lock-title{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:300;color:var(--white);}
+.lock-sub{font-size:13px;color:var(--gray);text-align:center;max-width:340px;line-height:1.6;}
+.lock-form{display:flex;flex-direction:column;gap:10px;width:280px;margin-top:8px;}
+.lock-form input{
+  padding:10px 14px;background:var(--navy3);
+  border:1px solid var(--border);border-radius:3px;
+  color:var(--white);font-family:'Barlow',sans-serif;font-size:14px;outline:none;
+}
+.lock-form input:focus{border-color:var(--gold-dim);}
+.lock-btn{
+  padding:11px;background:var(--gold);color:var(--navy);
+  border:none;border-radius:3px;font-family:'Barlow Condensed',sans-serif;
+  font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;
+}
+.lock-btn:hover{background:var(--gold2);}
+.lock-err{font-size:12px;color:var(--error);text-align:center;min-height:16px;}
+
+/* ── Session warning banner ────────────────── */
+#session-warning{
+  display:none;position:fixed;top:0;left:0;right:0;z-index:9000;
+  background:rgba(196,122,122,.12);border-bottom:1px solid rgba(196,122,122,.3);
+  padding:10px 24px;align-items:center;justify-content:space-between;
+}
+#session-warning.visible{display:flex;}
+.sw-text{font-size:13px;color:#C47A7A;}
+.sw-text strong{font-weight:500;}
+.sw-btn{
+  padding:5px 14px;background:transparent;border:1px solid rgba(196,122,122,.4);
+  border-radius:3px;color:#C47A7A;font-family:'Barlow Condensed',sans-serif;
+  font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;
+}
+.sw-btn:hover{background:rgba(196,122,122,.1);}
+
+/* ── Top bar ───────────────────────────────── */
+.top-bar{
+  position:sticky;top:0;z-index:100;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 32px;height:56px;background:var(--navy);
+  border-bottom:1px solid var(--border);
+}
+.top-bar-left{display:flex;align-items:baseline;gap:14px;}
+.top-eyebrow{font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);}
+.top-title{font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:400;color:var(--white);}
+.top-title em{color:var(--gold);font-style:italic;}
+.top-bar-right{display:flex;align-items:center;gap:16px;}
+.session-timer{
+  font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:600;
+  letter-spacing:.1em;text-transform:uppercase;
+  padding:4px 10px;border-radius:3px;border:1px solid var(--border);color:var(--gray);
+  transition:color .3s,border-color .3s;
+}
+.session-timer.warn{color:#C8A96E;border-color:rgba(200,169,110,.4);}
+.session-timer.danger{color:#C47A7A;border-color:rgba(196,122,122,.4);}
+.autosave-status{font-size:11px;color:var(--gray);}
+.autosave-status.saving{color:var(--gold);}
+.autosave-status.saved{color:var(--success);}
+.autosave-status.error{color:var(--error);}
+.top-btn{
+  padding:6px 16px;border-radius:3px;font-family:'Barlow Condensed',sans-serif;
+  font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;
+  border:1px solid var(--border);color:var(--gray);background:transparent;transition:all .15s;
+}
+.top-btn:hover{color:var(--warm);border-color:var(--gray);}
+.top-btn.gold{border-color:rgba(200,169,110,.4);color:var(--gold);background:rgba(200,169,110,.07);}
+.top-btn.gold:hover{background:rgba(200,169,110,.14);}
+
+/* ── Layout ────────────────────────────────── */
+.page-body{display:flex;min-height:calc(100vh - 56px);}
+
+/* ── Sidebar nav ───────────────────────────── */
+.side-nav{
+  width:220px;flex-shrink:0;background:var(--navy2);
+  border-right:1px solid var(--border);
+  padding:24px 0;position:sticky;top:56px;
+  height:calc(100vh - 56px);overflow-y:auto;
+}
+.side-nav-section{
+  font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:700;
+  letter-spacing:.18em;text-transform:uppercase;color:var(--gold);
+  padding:0 20px;margin-bottom:8px;margin-top:20px;
+}
+.side-nav-section:first-child{margin-top:0;}
+.nav-step{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 20px;cursor:pointer;transition:background .15s;
+  border-left:2px solid transparent;
+}
+.nav-step:hover{background:var(--navy3);}
+.nav-step.active{background:var(--navy3);border-left-color:var(--gold);color:var(--white);}
+.nav-step.complete .step-dot{background:var(--success);border-color:var(--success);}
+.step-dot{
+  width:8px;height:8px;border-radius:50%;flex-shrink:0;
+  border:1px solid var(--border);background:transparent;transition:all .2s;
+}
+.nav-step.active .step-dot{border-color:var(--gold);background:var(--gold);}
+.step-label{font-size:12px;color:var(--gray);transition:color .15s;}
+.nav-step.active .step-label{color:var(--white);}
+.nav-step.complete .step-label{color:var(--success);}
+.side-progress{padding:20px;margin-top:auto;}
+.progress-label{
+  display:flex;justify-content:space-between;
+  font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:600;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--gray);margin-bottom:6px;
+}
+.progress-bar{height:3px;background:rgba(255,255,255,.07);border-radius:2px;}
+.progress-fill{height:3px;background:var(--gold);border-radius:2px;transition:width .4s ease;}
+
+/* ── Main content ──────────────────────────── */
+.main-content{flex:1;padding:32px 40px;max-width:820px;}
+
+/* ── Section header ────────────────────────── */
+.section-eyebrow{
+  font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:700;
+  letter-spacing:.22em;text-transform:uppercase;color:var(--gold);margin-bottom:6px;
+}
+.section-title{
+  font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:300;
+  color:var(--white);margin-bottom:6px;
+}
+.section-title em{color:var(--gold);font-style:italic;}
+.section-desc{font-size:13px;color:var(--gray);line-height:1.6;margin-bottom:28px;max-width:600px;}
+.section-rule{height:1px;background:var(--border);margin-bottom:28px;}
+
+/* ── Pre-filled banner ─────────────────────── */
+.prefill-banner{
+  background:rgba(200,169,110,.06);border:1px solid rgba(200,169,110,.2);
+  border-left:3px solid var(--gold);border-radius:0 4px 4px 0;
+  padding:12px 16px;margin-bottom:24px;font-size:12px;color:var(--warm);line-height:1.55;
+}
+.prefill-banner strong{color:var(--gold);font-weight:500;}
+
+/* ── Form groups ───────────────────────────── */
+.form-group{margin-bottom:28px;}
+.group-title{
+  font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;
+  letter-spacing:.2em;text-transform:uppercase;color:var(--gold);
+  margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);
+}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
+.form-row.cols3{grid-template-columns:1fr 1fr 1fr;}
+.form-row.cols1{grid-template-columns:1fr;}
+.form-field{}
+.form-field label{
+  display:block;font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:700;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--gray);margin-bottom:6px;
+}
+.form-field label .optional{
+  font-weight:400;text-transform:none;letter-spacing:0;color:rgba(110,130,153,.6);margin-left:4px;
+}
+.form-field label .prefilled{
+  color:rgba(200,169,110,.6);font-weight:400;text-transform:none;letter-spacing:0;margin-left:4px;
+}
+.form-field input,.form-field select,.form-field textarea{
+  width:100%;padding:9px 12px;
+  background:var(--navy3);border:1px solid var(--border);border-radius:3px;
+  color:var(--white);font-family:'Barlow',sans-serif;font-size:13px;font-weight:300;
+  outline:none;transition:border-color .2s;appearance:none;
+}
+.form-field input:focus,.form-field select:focus,.form-field textarea:focus{border-color:var(--gold-dim);}
+.form-field input::placeholder,.form-field textarea::placeholder{color:rgba(110,130,153,.5);}
+.form-field input.prefilled-val{border-color:rgba(200,169,110,.2);background:rgba(200,169,110,.04);}
+.form-field select option{background:var(--navy3);}
+.form-field textarea{resize:vertical;min-height:80px;line-height:1.6;}
+.form-field .field-hint{font-size:11px;color:rgba(110,130,153,.7);margin-top:4px;line-height:1.4;}
+.input-prefix{display:flex;}
+.input-prefix span{
+  padding:9px 11px;background:var(--navy4);border:1px solid var(--border);
+  border-right:none;border-radius:3px 0 0 3px;font-size:13px;color:var(--gray);flex-shrink:0;
+}
+.input-prefix input{border-radius:0 3px 3px 0;}
+
+/* ── Risk score questions ──────────────────── */
+.risk-question{
+  background:var(--navy3);border:1px solid var(--border);border-radius:4px;
+  padding:16px 18px;margin-bottom:12px;
+}
+.risk-q-text{font-size:13px;color:var(--warm);line-height:1.5;margin-bottom:12px;}
+.risk-options{display:flex;gap:8px;}
+.risk-opt{
+  flex:1;padding:8px 4px;text-align:center;cursor:pointer;
+  background:var(--navy4);border:1px solid var(--border);border-radius:3px;
+  font-size:12px;color:var(--gray);transition:all .15s;
+}
+.risk-opt:hover{border-color:var(--gold-dim);color:var(--warm);}
+.risk-opt.selected{background:rgba(200,169,110,.12);border-color:rgba(200,169,110,.5);color:var(--gold);}
+.risk-opt-label{display:block;font-size:10px;color:var(--gray);margin-top:2px;}
+
+/* ── Priority ranking ──────────────────────── */
+.priority-grid{display:flex;flex-direction:column;gap:8px;}
+.priority-item{
+  display:flex;align-items:center;gap:12px;
+  background:var(--navy3);border:1px solid var(--border);border-radius:4px;padding:12px 14px;
+}
+.priority-rank-sel{
+  width:52px;padding:6px 8px;background:var(--navy4);
+  border:1px solid var(--border);border-radius:3px;color:var(--gold);
+  font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;
+  text-align:center;outline:none;appearance:none;flex-shrink:0;
+}
+.priority-rank-sel:focus{border-color:var(--gold-dim);}
+.priority-item-label{font-size:13px;color:var(--warm);}
+.priority-item-desc{font-size:11px;color:var(--gray);line-height:1.4;}
+
+/* ── JSONB repeater (life policies, annuities, etc.) ── */
+.repeater{display:flex;flex-direction:column;gap:10px;margin-bottom:12px;}
+.repeater-item{
+  background:var(--navy3);border:1px solid var(--border);border-radius:4px;padding:14px 16px;position:relative;
+}
+.repeater-item-title{
+  font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:700;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--gold);margin-bottom:10px;
+}
+.repeater-remove{
+  position:absolute;top:10px;right:10px;
+  background:transparent;border:none;color:var(--gray);cursor:pointer;font-size:16px;line-height:1;
+  transition:color .15s;
+}
+.repeater-remove:hover{color:var(--error);}
+.add-item-btn{
+  display:flex;align-items:center;gap:8px;padding:9px 14px;
+  background:transparent;border:1px dashed var(--border);border-radius:3px;
+  color:var(--gray);font-family:'Barlow Condensed',sans-serif;font-size:11px;
+  font-weight:600;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:all .15s;
+}
+.add-item-btn:hover{border-color:var(--gold-dim);color:var(--gold);}
+
+/* ── Advisor-only section ──────────────────── */
+.advisor-only-section{
+  background:rgba(200,169,110,.04);border:1px solid rgba(200,169,110,.15);
+  border-radius:4px;padding:20px 22px;margin-top:8px;
+}
+.advisor-only-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:700;
+  letter-spacing:.16em;text-transform:uppercase;
+  background:rgba(200,169,110,.1);border:1px solid rgba(200,169,110,.3);
+  color:var(--gold);padding:3px 10px;border-radius:2px;margin-bottom:14px;
+}
+
+/* ── Section navigation ────────────────────── */
+.section-nav{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-top:36px;padding-top:24px;border-top:1px solid var(--border);
+}
+.btn-primary{
+  padding:11px 28px;background:var(--gold);color:var(--navy);
+  border:none;border-radius:3px;font-family:'Barlow Condensed',sans-serif;
+  font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:background .2s;
+}
+.btn-primary:hover{background:var(--gold2);}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed;}
+.btn-secondary{
+  padding:11px 22px;background:transparent;color:var(--gray);
+  border:1px solid var(--border);border-radius:3px;font-family:'Barlow Condensed',sans-serif;
+  font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:all .2s;
+}
+.btn-secondary:hover{color:var(--warm);border-color:var(--gray);}
+.btn-complete{
+  padding:13px 32px;background:rgba(123,175,132,.15);color:var(--success);
+  border:1px solid rgba(123,175,132,.4);border-radius:3px;
+  font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;
+  letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:all .2s;
+}
+.btn-complete:hover{background:rgba(123,175,132,.25);}
+
+/* ── Sections ──────────────────────────────── */
+.form-section{display:none;}
+.form-section.active{display:block;}
+
+/* ── Completion screen ─────────────────────── */
+#section-complete{
+  display:none;flex-direction:column;align-items:center;
+  justify-content:center;padding:60px 40px;text-align:center;
+}
+#section-complete.active{display:flex;}
+.complete-icon{font-size:52px;margin-bottom:20px;opacity:.8;}
+.complete-title{font-family:'Cormorant Garamond',serif;font-size:32px;font-weight:300;color:var(--white);margin-bottom:10px;}
+.complete-title em{color:var(--gold);font-style:italic;}
+.complete-desc{font-size:14px;color:var(--gray);line-height:1.65;max-width:480px;margin-bottom:32px;}
+.complete-actions{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;}
+
+/* ── Responsive ────────────────────────────── */
+@media(max-width:900px){
+  .side-nav{display:none;}
+  .main-content{padding:24px 20px;}
+  .form-row{grid-template-columns:1fr;}
+  .form-row.cols3{grid-template-columns:1fr 1fr;}
+}
+</style>
+</head>
+<body>
+
+<!-- ── Session warning banner ────────────────── -->
+<div id="session-warning">
+  <span class="sw-text">&#9888; Session expires in <strong id="warn-minutes">2</strong> minutes due to inactivity. Any unsaved changes are auto-saving.</span>
+  <button class="sw-btn" onclick="resetTimers()">Keep Session Active</button>
+</div>
+
+<!-- ── Lock overlay ───────────────────────────── -->
+<div id="lock-overlay">
+  <div class="lock-icon">&#128274;</div>
+  <div class="lock-title">Session Locked</div>
+  <div class="lock-sub">This session was locked to protect client information. Re-enter your password to resume exactly where you left off.</div>
+  <div class="lock-form">
+    <input type="password" id="lock-password" placeholder="Your password" onkeydown="if(event.key==='Enter')unlockSession()">
+    <button class="lock-btn" onclick="unlockSession()">Unlock Session</button>
+    <div class="lock-err" id="lock-err"></div>
+  </div>
+</div>
+
+<!-- ── Top bar ─────────────────────────────────── -->
+<div class="top-bar" id="top-bar" style="display:none;">
+  <div class="top-bar-left">
+    <span class="top-eyebrow">Integrated Planning Partners</span>
+    <span class="top-title">Allocation <em>Supplement</em></span>
+  </div>
+  <div class="top-bar-right">
+    <span class="autosave-status" id="autosave-status"></span>
+    <span class="session-timer" id="session-timer">&#9201; 90:00</span>
+    <button class="top-btn" onclick="window.location.href='advisor-dashboard.html'">&#8592; Dashboard</button>
+    <button class="top-btn gold" onclick="saveAndExit()">Save &amp; Exit</button>
+  </div>
+</div>
+
+<!-- ── Main app ────────────────────────────────── -->
+<div class="page-body" id="main-app" style="display:none;">
+
+  <!-- Sidebar -->
+  <nav class="side-nav">
+    <div class="side-nav-section">Supplement Sections</div>
+    <div class="nav-step active" onclick="goToSection(0)" id="nav-0">
+      <div class="step-dot"></div>
+      <div>
+        <div class="step-label">1 · Identity &amp; Context</div>
+      </div>
+    </div>
+    <div class="nav-step" onclick="goToSection(1)" id="nav-1">
+      <div class="step-dot"></div>
+      <div><div class="step-label">2 · Financial Position</div></div>
+    </div>
+    <div class="nav-step" onclick="goToSection(2)" id="nav-2">
+      <div class="step-dot"></div>
+      <div><div class="step-label">3 · Income Architecture</div></div>
+    </div>
+    <div class="nav-step" onclick="goToSection(3)" id="nav-3">
+      <div class="step-dot"></div>
+      <div><div class="step-label">4 · Expenses &amp; Cash Flow</div></div>
+    </div>
+    <div class="nav-step" onclick="goToSection(4)" id="nav-4">
+      <div class="step-dot"></div>
+      <div><div class="step-label">5 · Risk Profile</div></div>
+    </div>
+    <div class="nav-step" onclick="goToSection(5)" id="nav-5">
+      <div class="step-dot"></div>
+      <div><div class="step-label">6 · Protection Inventory</div></div>
+    </div>
+    <div class="nav-step" onclick="goToSection(6)" id="nav-6">
+      <div class="step-dot"></div>
+      <div><div class="step-label">7 · Goals Hierarchy</div></div>
+    </div>
+    <div class="nav-step" onclick="goToSection(7)" id="nav-7">
+      <div class="step-dot"></div>
+      <div><div class="step-label">8 · Advisor Observations</div></div>
+    </div>
+    <div style="flex:1;"></div>
+    <div class="side-progress">
+      <div class="progress-label">
+        <span>Completion</span>
+        <span id="progress-pct">0%</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main content -->
+  <div class="main-content">
+
+    <!-- ── SECTION 1: Identity ───────────────── -->
+    <div class="form-section active" id="section-0">
+      <div class="section-eyebrow">Section 1 of 8</div>
+      <div class="section-title">Identity &amp; <em>Context</em></div>
+      <div class="section-desc">Pre-populated from the StructureReview™. Confirm and fill any gaps before proceeding.</div>
+      <div class="section-rule"></div>
+
+      <div class="prefill-banner">
+        <strong>Pre-filled from StructureReview™.</strong> Review each field for accuracy. Fields marked <span style="color:var(--gold)">SR</span> came directly from the client's submission.
+      </div>
+
+      <div class="form-group">
+        <div class="group-title">Primary Client</div>
+        <div class="form-row cols3">
+          <div class="form-field">
+            <label>First Name <span class="prefilled">SR</span></label>
+            <input type="text" id="f_primary_first_name" class="prefilled-val" placeholder="First name">
+          </div>
+          <div class="form-field">
+            <label>Last Name <span class="prefilled">SR</span></label>
+            <input type="text" id="f_primary_last_name" class="prefilled-val" placeholder="Last name">
+          </div>
+          <div class="form-field">
+            <label>Date of Birth</label>
+            <input type="date" id="f_primary_dob">
+          </div>
+        </div>
+        <div class="form-row cols3">
+          <div class="form-field">
+            <label>Current Age</label>
+            <input type="number" id="f_primary_age" min="40" max="85" placeholder="e.g. 62">
+          </div>
+          <div class="form-field">
+            <label>Filing Status <span class="prefilled">SR</span></label>
+            <select id="f_filing_status" class="prefilled-val">
+              <option value="">Select…</option>
+              <option value="mfj">Married Filing Jointly</option>
+              <option value="single">Single</option>
+              <option value="mfs">Married Filing Separately</option>
+              <option value="widowed">Widowed</option>
+              <option value="divorced">Divorced</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label>State <span class="prefilled">SR</span></label>
+            <select id="f_state" class="prefilled-val">
+              <option value="">Select…</option>
+              <option>Alabama</option><option>Alaska</option><option>Arizona</option><option>Arkansas</option>
+              <option>California</option><option>Colorado</option><option>Connecticut</option><option>Delaware</option>
+              <option>Florida</option><option>Georgia</option><option>Hawaii</option><option>Idaho</option>
+              <option>Illinois</option><option>Indiana</option><option>Iowa</option><option>Kansas</option>
+              <option>Kentucky</option><option>Louisiana</option><option>Maine</option><option>Maryland</option>
+              <option>Massachusetts</option><option>Michigan</option><option>Minnesota</option><option>Mississippi</option>
+              <option>Missouri</option><option>Montana</option><option>Nebraska</option><option>Nevada</option>
+              <option>New Hampshire</option><option>New Jersey</option><option>New Mexico</option><option>New York</option>
+              <option>North Carolina</option><option>North Dakota</option><option>Ohio</option><option>Oklahoma</option>
+              <option>Oregon</option><option>Pennsylvania</option><option>Rhode Island</option><option>South Carolina</option>
+              <option>South Dakota</option><option>Tennessee</option><option>Texas</option><option>Utah</option>
+              <option>Vermont</option><option>Virginia</option><option>Washington</option><option>West Virginia</option>
+              <option>Wisconsin</option><option>Wyoming</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row cols3">
+          <div class="form-field">
+            <label>Target Retirement Age <span class="prefilled">SR</span></label>
+            <input type="number" id="f_target_retire_age" class="prefilled-val" min="50" max="80" placeholder="e.g. 65">
+          </div>
+          <div class="form-field">
+            <label>Years to Retirement</label>
+            <input type="number" id="f_years_to_retirement" min="0" max="30" placeholder="Auto-calc" readonly style="color:var(--gray);">
+          </div>
+          <div class="form-field">
+            <label>Email <span class="prefilled">SR</span></label>
+            <input type="email" id="f_client_email" class="prefilled-val" placeholder="client@email.com">
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group" id="spouse-section">
+        <div class="group-title">Spouse / Partner</div>
+        <div class="form-row cols3">
+          <div class="form-field">
+            <label>First Name <span class="prefilled">SR</span></label>
+            <input type="text" id="f_spouse_first_name" class="prefilled-val" placeholder="First name">
+          </div>
+          <div class="form-field">
+            <label>Last Name</label>
+            <input type="text" id="f_spouse_last_name" placeholder="Last name">
+          </div>
+          <div class="form-field">
+            <label>Date of Birth <span class="prefilled">SR</span></label>
+            <input type="date" id="f_spouse_dob" class="prefilled-val">
+          </div>
+        </div>
+        <div class="form-row cols3">
+          <div class="form-field">
+            <label>Spouse Age</label>
+            <input type="number" id="f_spouse_age" min="40" max="85" placeholder="e.g. 60">
+          </div>
+          <div class="form-field"></div>
+          <div class="form-field"></div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="group-title">Client's Own Words</div>
+        <div class="form-row cols1">
+          <div class="form-field">
+            <label>Retirement Vision <span class="prefilled">SR</span></label>
+            <textarea id="f_primary_goal_narrative" class="prefilled-val" rows="3" placeholder="What does a successful retirement look like to them?"></textarea>
+            <div class="field-hint">Verbatim from their StructureReview™ response. Shapes the goals hierarchy framing.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-nav">
+        <div></div>
+        <button class="btn-primary" onclick="goToSection(1)">Next: Financial Position &#8594;</button>
+      </div>
+    </div>
+
+    <!-- ── SECTION 2: Financial Position ────────── -->
+    <div class="form-section" id="section-1">
+      <div class="section-eyebrow">Section 2 of 8</div>
+      <div class="section-title">Financial <em>Position</em></div>
+      <div class="section-desc">Exact balances from most recent statements. These numbers drive the allocation algorithm directly — precision matters.</div>
+      <div class="section-rule"></div>
+
+      <div class="form-group">
+        <div class="group-title">Qualified Plan Balances</div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>Total Qualified Plan Balance</label>
+            <div class="input-prefix"><span>$</span><input type="number" id="f_qp_balance_total" min="0" step="1000" placeholder="e.g. 1500000"></div>
+            <div class="field-hint">Sum of all traditional/pre-tax qualified accounts</div>
+          </div>
+          <div class="form-field">
+            <label>Roth Balance (already tax-free) <span class="optional">optional</span></label>
+            <div class="input-prefix"><span>$</span><input type="number" id="f_qp_roth_balance" min="0" step="1000" placeholder="e.g. 0"></div>
+            <div class="field-hint">Roth IRA, Roth 401k — excluded from tax liability calc</div>
+          </div>
+        </div>
+        <div class="form-row cols1">
+          <div class="form-field">
+            <label>Account Types Held <span class="prefilled">SR</span></label>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;" id="acct-types">
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--warm);cursor:pointer;"><input type="checkbox" value="401k" class="acct-type-cb" style="width:auto;"> 401(k) / 403(b)</label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--warm);cursor:pointer;"><input type="checkbox" value="IRA" class="acct-type-cb" style="width:auto;"> Traditional IRA / Rollover IRA</label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--warm);cursor:pointer;"><input type="checkbox" value="Roth" class="acct-type-cb" style="width:auto;"> Roth IRA / Roth 401(k)</label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--warm);cursor:pointer;"><input type="checkbox" value="SEP" class="acct-type-cb" style="width:auto;"> SEP-IRA / SIMPLE IRA</label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--warm);cursor:pointer;"><input type="checkbox" value="TSP" class="acct-type-cb" style="width:auto;"> TSP</label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--warm);cursor:pointer;"><input type="checkbox" value="DB" class="acct-type-cb" style="width:auto;"> Defined Benefit / Cash Balance</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="group-title">Other Assets</div>
+        <div class="form-row cols3">
+          <div class="form-field">
+            <label>Taxable Investment Accounts <span class="optional">optional</span></label>
+            <div class="input-prefix"><span>$</span><input type="number" id="f_taxable_investment_balance" min="0" step="1000" placeholder="0"></div>
+          </div>
+          <div class="form-field">
+            <label>Primary Residence Value <span class="optional">optional</span></label>
+            <div class="input-prefix"><span>$</span><input type="number" id="f_primary_residence_value" min="0" step="10000" placeholder="0"></div>
+          </div>
+          <div class="form-field">
+            <label>Other Assets <span class="optional">optional</span></label>
+            <div class="input-prefix"><span>$</span><input type="number" id="f_other_assets_balance" min="0" step="1000" placeholder="0"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="group-title">Debt &amp; Obligations</div>
+        <div class="form-row cols3">
+          <div class="form-field">
+            <label>Mortgage Balance <span class="optional">optional</span></label>
+            <div class="input-prefix"><span>$</span><input type="number" id="f_mortgage_balance" min="0" step="1000" placeholder="0"></div>
+          </div>
+          <div class="form-field">
+            <label>Monthly Mortgage Payment <span class="optional">optional</span></label>
+            <div class="input-prefix"><span>$</span><input type="number" id="f_mortgage_monthly_payment" min="0" step="100" placeholder="0"></div>
+          </div>
+          <div class="form-field">
+            <label>Other Monthly Debt <span class="optional">optional</span></label>
+            <div class="input-prefix"><span>$</span><input type="number" id="f_other_debt_monthly" min="0" step="100" placeholder="0"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-nav">
+        <button class="btn-secondary" onclick="goToSection(0)">&#8592; Back</button>
+        <button class="btn-primary" onclick="goToSection(2)">Next: Income Architecture &#8594;</button>
+      </div>
+    </div>
+
+    <!-- ── SECTION 3: Income Architecture ───────── -->
+    <div class="form-section" id="section-2">
+      <div class="section-eyebrow">Section 3 of 8</div>
+      <div class="section-title">Income <em>Architecture</em></div>
+      <div class="section-desc">All guaranteed and semi-guaranteed income sources. These determine the income gap that Layer 1 must fund.</div>
+      <div class="section-rule"></div>
+
+      <div class="form-group">
+        <div class="group-title">Social Security</div>
+        <div class="form-row cols3">
+          <div class="form-field">
+            <label>Primary SS Monthly Benefit</label>
+            <div class="input-prefix"><span>$</span><input type="number" id="f_ss_primary_monthly" min="0" step="100" placeholder="e.g. 2500"></div>
+            <div class="field-hint">At intended claim age, from SS statement</div>
+          </div>
+          <div class="form-field">
+            <label>Primary Claim Age</label>
+            <input type="number" id="f_ss_primary_claim_age" min="62" max="70" placeholder="e.g. 67">
+          </div>
+          <div class="form-field">
+            <label>Current Household Income</label>
+            <div class="input-prefix"><span>$</span><input type="number" id="f_current_household_income" min="0" step="5000" placeholder="e.g. 150000"></div>
+          </div>
+        </div>
+        <div class="form-row cols3" id="spouse-ss-row">
+          <div class="form-field">
+            <label>Spouse SS Monthly Benefit <span class="optional">if applicable</span></label>
+            <div class="input-prefix"><span>$</span><input type="number" id="f_ss_spouse_monthly" min="0" step="100" placeholder="0"></div>
+          </div>
+          <div class="form-field">
+            <label>Spouse Claim Age <span class="optional">if applicable</span></label>
+            <input type="number" id="f_ss_spouse_claim_age" min="62" max="70" placeholder="e.g. 67">
+          </div>
+          <div class="form-field">
+            <label>Current Marginal Tax Rate</label>
+            <select id="f_current_marginal_rate">
+              <option value="">Select bracket…</option>
+              <option value="0.10">10%</option>
+              <option value="0.12">12%</option>
+              <option value="0.22">22%</option>
+              <option value="0.24">24%</option>
+              <option value="0.32">32%</option>
+              <option value="0.35">35%</option>
+              <option value="0.37">37%</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="group-title">Pension Income</div>
+        <div class="form-row cols3">
+          <div class="form-field">
+            <label>Pension Monthly Benefit <span class="optional">if applicable</span></label>
+            <div class="input-prefix"><span>$</span><input type="number" id="f_pension_monthly" min="0" step="100" placeholder="0"></div>
+          </div>
+          <div class="form-field">
+            <label>Pension Start Age</label>
+            <input type="number" id="f_pension_start_age" min="50" max="75" placeholder="e.g. 65">
+          </div>
+          <div class="form-field">
+            <label>Survivor Option</label>
+            <select id="f_pension_survivor_option">
+              <option value="">N/A or single</option>
+              <option value="single">Single life only</option>
+              <option value="50pct">50% survivor</option>
+              <option value="75pct">75% survivor</option>
+              <option value="100pct">100% survivor</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row cols3">
+          <div class="form-field">
+            <label>COLA Adjustment?</label>
+            <select id="f_pension_has_cola">
+              <option value="false">No COLA</option>
+              <option value="true">Yes — has COLA</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label>Spouse Pension Monthly <span class="optional">if applicable</span></label>
+            <div class="input-prefix"><span>$</span><input type="number" id="f_spouse_pension_monthly" min="0" step="100" placeholder="0"></div>
+          </div>
+          <div class="form-field">
+            <label>Spouse Pension Start Age</label>
+            <input type="number" id="f_spouse_pension_start_age" min="50" max="75" placeholder="e.g. 65">
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="group-title">Other Income Sources</div>
+        <div class="form-row cols3">
+          <div class="form-field">
+            <label>Other Guaranteed Monthly <span class="optional">rental, annuity, etc.</span></label>
+            <div class="input-prefix"><span>$</span><input type="number" id="f_other_guaranteed_monthly" min="0" step="100" placeholder="0"></div>
+          </div>
+          <div class="form-field">
+            <label>Part-Time Income Monthly <span class="optional">if applicable</span></label>
+            <div class="input-prefix"><span>$</span><input type="number" id="f_part_time_income_monthly" min="0" step="100" placeholder="0"></div>
+          </div>
+          <div class="form-field">
+            <label>Part-Time Ends at Age <span class="optional">if applicable</span></label>
+            <input type="number" id="f_part_time_end_age" min="60" max="80" placeholder="e.g. 68">
+          </div>
+        </div>
+        <div class="form-row cols1">
+          <div class="form-field">
+            <label>Other Guaranteed Income — Description <span class="optional">optional</span></label>
+            <input type="text" id="f_other_guaranteed_desc" placeholder="e.g. Rental property — $1,200/mo net, existing NQ annuity income…">
+          </div>
+        </div>
+      </div>
+
+      <div class="section-nav">
+        <button class="btn-secondary" onclick="goToSection(1)">&#8592; Back</button>
+        <button class="btn-primary" onclick="goToSection(3)">Next: Expenses &#8594;</button>
+      </div>
+    </div>
+
+    <!-- ── SECTION 4: Expenses ───────────────────── -->
+    <div class="form-section" id="section-3">
+      <div class="section-eyebrow">Section 4 of 8</div>
+      <div class="section-title">Expenses &amp; <em>Cash Flow</em></div>
+      <div class="section-desc">The essential vs. discretionary split drives the income gap calculation. Be as specific as possible — this is the most important input for Layer 1 sizing.</div>
+      <div class="section-rule"></div>
+
+      <div class="form-group">
+        <div class="group-title">Essential Monthly Expenses</div>
+        <div class="form-row cols3">
+          <div class="form-field">
+            <label>Housing (mortgage/rent/HOA)</label>
+            <div class="input-prefix"><span>$</span><input type="number" id="f_housing_monthly" min="0" step="100" placeholder="0" oninput="calcExpenses()"></div>
+          </div>
+          <div class="form-field">
+            <label>Healthcare &amp; Insurance</label>
+            <div class="input-prefix"><span>$</span><input type="number" id="f_healthcare_monthly" min="0" step="100" placeholder="0" oninput="calcExpenses()"></div>
+          </div>
+          <div class="form-field">
+            <label>Food &amp; Groceries</label>
+            <div class="input-prefix"><span>$</span><input type="number" id="f_food_monthly" min="0" step="100" placeholder="0" oninput="calcExpenses()"></div>
+          </div>
+        </div>
+        <div class="form-row cols3">
+          <div class="form-field">
+            <label>Transportation</label>
+            <div class="input-prefix"><span>$</span><input type="number" id="f_transport_monthly" min="0" step="50" placeholder="0" oninput="calcExpenses()"></div>
+          </div>
+          <div class="form-field">
+            <label>Other Insurance Premiums</label>
+            <div class="input-prefix"><span>$</span><input type="number" id="f_insurance_monthly" min="0" step="50" placeholder="0" oninput="calcExpenses()"></div>
+          </div>
+          <div class="form-field">
+            <label>Total Essential Monthly</label>
+            <div class="input-prefix"><span>$</span><input type="number" id="f_essential_monthly" min="0" step="100" placeholder="Auto-calculated" style="color:var(--gold);" oninput="calcExpenses()"></div>
+            <div class="field-hint">Auto-sums above, or enter directly</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="group-title">Discretionary Annual Expenses</div>
+        <div class="form-row cols3">
+          <div class="form-field">
+            <label>Travel &amp; Vacation</label>
+            <div class="input-prefix"><span>$</span><input type="number" id="f_travel_annual" min="0" step="500" placeholder="0" oninput="calcExpenses()"></div>
+          </div>
+          <div class="form-field">
+            <label>Dining &amp; Entertainment</label>
+            <div class="input-prefix"><span>$</span><input type="number" id="f_entertainment_annual" min="0" step="500" placeholder="0" oninput="calcExpenses()"></div>
+          </div>
+          <div class="form-field">
+            <label>Total Discretionary Annual</label>
+            <div class="input-prefix"><span>$</span><input type="number" id="f_discretionary_annual" min="0" step="500" placeholder="Auto-calculated" style="color:var(--gold);" oninput="calcExpenses()"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="group-title">Charitable &amp; Gifting</div>
+        <div class="form-row cols3">
+          <div class="form-field">
+            <label>Annual Charitable Giving</label>
+            <div class="input-prefix"><span>$</span><input type="number" id="f_charitable_annual" min="0" step="500" placeholder="0" oninput="calcExpenses()"></div>
+          </div>
+          <div class="form-field">
+            <label>Existing Pledge Total <span class="optional">if any</span></label>
+            <div class="input-prefix"><span>$</span><input type="number" id="f_charitable_pledge_total" min="0" step="1000" placeholder="0"></div>
+          </div>
+          <div class="form-field">
+            <label>Pledge Description <span class="optional">optional</span></label>
+            <input type="text" id="f_charitable_pledge_desc" placeholder="e.g. University capital campaign, 5yr pledge">
+          </div>
+        </div>
+      </div>
+
+      <!-- Income gap summary -->
+      <div style="background:rgba(200,169,110,.06);border:1px solid rgba(200,169,110,.2);border-radius:4px;padding:16px 20px;margin-bottom:24px;">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-bottom:10px;">Income Gap Calculation</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:16px;">
+          <div>
+            <div style="font-size:11px;color:var(--gray);margin-bottom:3px;">Total Annual Expenses</div>
+            <div style="font-size:18px;font-weight:500;color:var(--white);" id="gap-total-expenses">—</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--gray);margin-bottom:3px;">Annual Guaranteed Income</div>
+            <div style="font-size:18px;font-weight:500;color:var(--success);" id="gap-guaranteed">—</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--gray);margin-bottom:3px;">Annual Income Gap</div>
+            <div style="font-size:18px;font-weight:500;color:var(--error);" id="gap-amount">—</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--gray);margin-bottom:3px;">Gap as % of QP</div>
+            <div style="font-size:18px;font-weight:500;color:var(--gold);" id="gap-pct">—</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="group-title">Known Large Future Expenses <span style="font-weight:300;text-transform:none;letter-spacing:0;color:var(--gray);font-size:11px;margin-left:6px;">optional</span></div>
+        <div class="repeater" id="large-expenses-repeater"></div>
+        <button class="add-item-btn" onclick="addLargeExpense()">+ Add Known Large Expense</button>
+      </div>
+
+      <div class="form-row cols1">
+        <div class="form-field">
+          <label>Expense Notes <span class="optional">optional</span></label>
+          <textarea id="f_expense_notes" rows="2" placeholder="Any context on the expense picture — seasonal variation, planned lifestyle changes, known healthcare costs…"></textarea>
+        </div>
+      </div>
+
+      <div class="section-nav">
+        <button class="btn-secondary" onclick="goToSection(2)">&#8592; Back</button>
+        <button class="btn-primary" onclick="goToSection(4)">Next: Risk Profile &#8594;</button>
+      </div>
+    </div>
+
+    <!-- ── SECTION 5: Risk Profile ───────────────── -->
+    <div class="form-section" id="section-4">
+      <div class="section-eyebrow">Section 5 of 8</div>
+      <div class="section-title">Risk <em>Profile</em></div>
+      <div class="section-desc">Five advisor-guided questions scored 1–5. Total score maps to a named risk profile that feeds directly into the allocation algorithm. Read each question aloud and let the client respond naturally.</div>
+      <div class="section-rule"></div>
+
+      <div id="risk-questions">
+        <!-- Q1 -->
+        <div class="risk-question">
+          <div class="risk-q-text"><strong>1.</strong> If your investment portfolio dropped 25% in the first year of retirement, what would your instinct be?</div>
+          <div class="risk-options" id="rq1">
+            <div class="risk-opt" onclick="selectRisk('rq1',1,this)">1<span class="risk-opt-label">Sell immediately</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq1',2,this)">2<span class="risk-opt-label">Reduce risk</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq1',3,this)">3<span class="risk-opt-label">Hold steady</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq1',4,this)">4<span class="risk-opt-label">Stay the course</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq1',5,this)">5<span class="risk-opt-label">Buy more</span></div>
+          </div>
+        </div>
+        <!-- Q2 -->
+        <div class="risk-question">
+          <div class="risk-q-text"><strong>2.</strong> How important is it that your income in retirement is guaranteed and cannot decline — even if markets recover?</div>
+          <div class="risk-options" id="rq2">
+            <div class="risk-opt" onclick="selectRisk('rq2',1,this)">1<span class="risk-opt-label">Extremely important</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq2',2,this)">2<span class="risk-opt-label">Very important</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq2',3,this)">3<span class="risk-opt-label">Somewhat</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq2',4,this)">4<span class="risk-opt-label">Flexible</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq2',5,this)">5<span class="risk-opt-label">Not a priority</span></div>
+          </div>
+        </div>
+        <!-- Q3 -->
+        <div class="risk-question">
+          <div class="risk-q-text"><strong>3.</strong> Looking back, how would you describe your comfort level with investment risk during your working years?</div>
+          <div class="risk-options" id="rq3">
+            <div class="risk-opt" onclick="selectRisk('rq3',1,this)">1<span class="risk-opt-label">Very conservative</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq3',2,this)">2<span class="risk-opt-label">Conservative</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq3',3,this)">3<span class="risk-opt-label">Moderate</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq3',4,this)">4<span class="risk-opt-label">Moderate-growth</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq3',5,this)">5<span class="risk-opt-label">Growth-oriented</span></div>
+          </div>
+        </div>
+        <!-- Q4 -->
+        <div class="risk-question">
+          <div class="risk-q-text"><strong>4.</strong> If you had two options — Option A: guaranteed $5,000/month for life, or Option B: $4,000–$8,000/month depending on market performance — which appeals more?</div>
+          <div class="risk-options" id="rq4">
+            <div class="risk-opt" onclick="selectRisk('rq4',1,this)">1<span class="risk-opt-label">Strongly A</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq4',2,this)">2<span class="risk-opt-label">Lean A</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq4',3,this)">3<span class="risk-opt-label">Either equally</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq4',4,this)">4<span class="risk-opt-label">Lean B</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq4',5,this)">5<span class="risk-opt-label">Strongly B</span></div>
+          </div>
+        </div>
+        <!-- Q5 -->
+        <div class="risk-question">
+          <div class="risk-q-text"><strong>5.</strong> How would you feel about converting a significant portion of your IRA to a tax-free structure now — paying taxes today in exchange for zero taxes on that money forever?</div>
+          <div class="risk-options" id="rq5">
+            <div class="risk-opt" onclick="selectRisk('rq5',1,this)">1<span class="risk-opt-label">Very reluctant</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq5',2,this)">2<span class="risk-opt-label">Somewhat reluctant</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq5',3,this)">3<span class="risk-opt-label">Open to it</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq5',4,this)">4<span class="risk-opt-label">Favorable</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq5',5,this)">5<span class="risk-opt-label">Strongly in favor</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Risk score result -->
+      <div style="background:var(--navy3);border:1px solid var(--border);border-radius:4px;padding:16px 20px;margin:16px 0;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <div style="font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--gray);margin-bottom:4px;">Risk Score</div>
+            <div style="font-size:28px;font-weight:500;color:var(--white);" id="risk-score-display">— / 25</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--gray);margin-bottom:4px;">Risk Profile</div>
+            <div style="font-size:18px;font-weight:500;color:var(--gold);" id="risk-profile-display">Not yet scored</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-row cols1">
+        <div class="form-field">
+          <label>Risk Notes <span class="optional">advisor observations on risk conversation</span></label>
+          <textarea id="f_risk_notes" rows="2" placeholder="Any notable reactions, hesitation, prior investment experience, behavioral flags…"></textarea>
+        </div>
+      </div>
+
+      <div class="section-nav">
+        <button class="btn-secondary" onclick="goToSection(3)">&#8592; Back</button>
+        <button class="btn-primary" onclick="goToSection(5)">Next: Protection Inventory &#8594;</button>
+      </div>
+    </div>
+
+    <!-- ── SECTION 6: Protection Inventory ──────── -->
+    <div class="form-section" id="section-5">
+      <div class="section-eyebrow">Section 6 of 8</div>
+      <div class="section-title">Protection <em>Inventory</em></div>
+      <div class="section-desc">Every existing policy and protection structure. Understanding what's already in place prevents duplication and identifies true gaps.</div>
+      <div class="section-rule"></div>
+
+      <div class="form-group">
+        <div class="group-title">Long-Term Care</div>
+        <div class="form-row cols3">
+          <div class="form-field">
+            <label>LTC Coverage in Place?</label>
+            <select id="f_has_ltc_policy" onchange="toggleLtcFields()">
+              <option value="false">No coverage</option>
+              <option value="true">Yes — has LTC coverage</option>
+            </select>
+          </div>
+          <div class="form-field" id="ltc-type-field" style="display:none;">
+            <label>Policy Type</label>
+            <select id="f_ltc_policy_type">
+              <option value="standalone">Standalone LTC</option>
+              <option value="hybrid">Hybrid Life/LTC</option>
+              <option value="linked">Linked Benefit Annuity</option>
+            </select>
+          </div>
+          <div class="form-field" id="ltc-benefit-field" style="display:none;">
+            <label>Monthly Benefit</label>
+            <div class="input-prefix"><span>$</span><input type="number" id="f_ltc_monthly_benefit" min="0" step="500" placeholder="0"></div>
+          </div>
+        </div>
+        <div class="form-row cols3" id="ltc-detail-row" style="display:none;">
+          <div class="form-field">
+            <label>Benefit Period (years)</label>
+            <input type="number" id="f_ltc_benefit_period_years" min="1" max="10" step="0.5" placeholder="e.g. 3">
+          </div>
+          <div class="form-field">
+            <label>Elimination Period (days)</label>
+            <input type="number" id="f_ltc_elimination_days" min="0" max="365" placeholder="e.g. 90">
+          </div>
+          <div class="form-field">
+            <label>Inflation Rider?</label>
+            <select id="f_ltc_inflation_rider">
+              <option value="false">No inflation rider</option>
+              <option value="true">Yes — has inflation rider</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="group-title">Health Status &amp; LTC History</div>
+        <div class="form-row cols3">
+          <div class="form-field">
+            <label>Primary Client Health Status</label>
+            <select id="f_health_status_primary">
+              <option value="">Select…</option>
+              <option value="excellent">Excellent</option>
+              <option value="good">Good</option>
+              <option value="fair">Fair</option>
+              <option value="poor">Poor</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label>Family LTC History (Primary)?</label>
+            <select id="f_family_ltc_history">
+              <option value="false">No family LTC history</option>
+              <option value="true">Yes — family LTC history</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label>Health Conditions <span class="optional">brief, underwriting relevant</span></label>
+            <input type="text" id="f_health_conditions_primary" placeholder="e.g. Controlled hypertension, Type 2 diabetes…">
+          </div>
+        </div>
+        <div class="form-row cols3" id="spouse-health-row">
+          <div class="form-field">
+            <label>Spouse Health Status</label>
+            <select id="f_health_status_spouse">
+              <option value="">Select…</option>
+              <option value="excellent">Excellent</option>
+              <option value="good">Good</option>
+              <option value="fair">Fair</option>
+              <option value="poor">Poor</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label>Family LTC History (Spouse)?</label>
+            <select id="f_family_ltc_history_spouse">
+              <option value="false">No family LTC history</option>
+              <option value="true">Yes — family LTC history</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label>Spouse Health Conditions <span class="optional">optional</span></label>
+            <input type="text" id="f_health_conditions_spouse" placeholder="Brief description…">
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="group-title">Existing Life Insurance Policies</div>
+        <div class="repeater" id="life-policies-repeater"></div>
+        <button class="add-item-btn" onclick="addLifePolicy()">+ Add Life Insurance Policy</button>
+      </div>
+
+      <div class="form-group">
+        <div class="group-title">Existing Annuities</div>
+        <div class="repeater" id="annuities-repeater"></div>
+        <button class="add-item-btn" onclick="addAnnuity()">+ Add Existing Annuity</button>
+      </div>
+
+      <div class="section-nav">
+        <button class="btn-secondary" onclick="goToSection(4)">&#8592; Back</button>
+        <button class="btn-primary" onclick="goToSection(6)">Next: Goals Hierarchy &#8594;</button>
+      </div>
+    </div>
+
+    <!-- ── SECTION 7: Goals Hierarchy ───────────── -->
+    <div class="form-section" id="section-6">
+      <div class="section-eyebrow">Section 7 of 8</div>
+      <div class="section-title">Goals <em>Hierarchy</em></div>
+      <div class="section-desc">Ask the client to rank these five priorities from 1 (most important) to 5 (least). This forces a real decision rather than "all of the above." The ranking feeds the allocation algorithm and documents the client's stated priorities.</div>
+      <div class="section-rule"></div>
+
+      <div class="form-group">
+        <div class="group-title">Priority Ranking — 1 = Most Important, 5 = Least Important</div>
+        <div class="priority-grid">
+          <div class="priority-item">
+            <select class="priority-rank-sel" id="f_priority_income_security">
+              <option value="">—</option>
+              <option value="1">1st</option><option value="2">2nd</option>
+              <option value="3">3rd</option><option value="4">4th</option><option value="5">5th</option>
+            </select>
+            <div>
+              <div class="priority-item-label">Income Security</div>
+              <div class="priority-item-desc">Guaranteed income I cannot outlive, regardless of markets</div>
+            </div>
+          </div>
+          <div class="priority-item">
+            <select class="priority-rank-sel" id="f_priority_tax_efficiency">
+              <option value="">—</option>
+              <option value="1">1st</option><option value="2">2nd</option>
+              <option value="3">3rd</option><option value="4">4th</option><option value="5">5th</option>
+            </select>
+            <div>
+              <div class="priority-item-label">Tax Efficiency</div>
+              <div class="priority-item-desc">Minimizing the tax burden on my retirement income and estate</div>
+            </div>
+          </div>
+          <div class="priority-item">
+            <select class="priority-rank-sel" id="f_priority_care_protection">
+              <option value="">—</option>
+              <option value="1">1st</option><option value="2">2nd</option>
+              <option value="3">3rd</option><option value="4">4th</option><option value="5">5th</option>
+            </select>
+            <div>
+              <div class="priority-item-label">Care Protection</div>
+              <div class="priority-item-desc">Having a funded plan if I need long-term care — without depleting savings</div>
+            </div>
+          </div>
+          <div class="priority-item">
+            <select class="priority-rank-sel" id="f_priority_legacy">
+              <option value="">—</option>
+              <option value="1">1st</option><option value="2">2nd</option>
+              <option value="3">3rd</option><option value="4">4th</option><option value="5">5th</option>
+            </select>
+            <div>
+              <div class="priority-item-label">Legacy</div>
+              <div class="priority-item-desc">Leaving a meaningful, tax-efficient inheritance or charitable gift</div>
+            </div>
+          </div>
+          <div class="priority-item">
+            <select class="priority-rank-sel" id="f_priority_liquidity">
+              <option value="">—</option>
+              <option value="1">1st</option><option value="2">2nd</option>
+              <option value="3">3rd</option><option value="4">4th</option><option value="5">5th</option>
+            </select>
+            <div>
+              <div class="priority-item-label">Liquidity &amp; Flexibility</div>
+              <div class="priority-item-desc">Keeping accessible reserves — the ability to adapt to the unexpected</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="group-title">Legacy Specifics</div>
+        <div class="form-row cols3">
+          <div class="form-field">
+            <label>Legacy Importance</label>
+            <select id="f_legacy_importance">
+              <option value="">Select…</option>
+              <option value="1">1 — Nice to have if it happens</option>
+              <option value="2">2 — Important to me</option>
+              <option value="3">3 — Non-negotiable priority</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label>Legacy Target Amount <span class="optional">if stated</span></label>
+            <div class="input-prefix"><span>$</span><input type="number" id="f_legacy_target_amount" min="0" step="50000" placeholder="0"></div>
+          </div>
+          <div class="form-field">
+            <label>Beneficiaries <span class="optional">brief description</span></label>
+            <input type="text" id="f_legacy_beneficiaries" placeholder="e.g. Two adult children, charitable foundation">
+          </div>
+        </div>
+        <div class="form-row cols3">
+          <div class="form-field">
+            <label>Charitable Intent</label>
+            <select id="f_charitable_intent">
+              <option value="none">None / minimal</option>
+              <option value="annual-giving">Annual giving only</option>
+              <option value="major-gift">Major gift planned</option>
+              <option value="daf">Donor-advised fund</option>
+              <option value="charitable-trust">Charitable trust</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label>Estate Plan Status <span class="prefilled">SR</span></label>
+            <select id="f_estate_plan_status" class="prefilled-val">
+              <option value="">Select…</option>
+              <option value="current">Current — reviewed within 3 years</option>
+              <option value="outdated">Outdated — needs review</option>
+              <option value="basic">Basic documents only</option>
+              <option value="none">No estate plan</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label>SECURE Act Awareness?</label>
+            <select id="f_secure_act_awareness">
+              <option value="false">Not aware of 10-year rule</option>
+              <option value="true">Aware — has been discussed</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-nav">
+        <button class="btn-secondary" onclick="goToSection(5)">&#8592; Back</button>
+        <button class="btn-primary" onclick="goToSection(7)">Next: Advisor Observations &#8594;</button>
+      </div>
+    </div>
+
+    <!-- ── SECTION 8: Advisor Observations ──────── -->
+    <div class="form-section" id="section-7">
+      <div class="section-eyebrow">Section 8 of 8</div>
+      <div class="section-title">Advisor <em>Observations</em></div>
+      <div class="section-desc">This section is never shown to the client. It documents your professional judgment — behavioral observations, competitive dynamics, and implementation sequence recommendations.</div>
+      <div class="section-rule"></div>
+
+      <div class="advisor-only-section">
+        <div class="advisor-only-badge">&#128274; Advisor eyes only — excluded from client PDF</div>
+
+        <div class="form-row cols1">
+          <div class="form-field">
+            <label>Advisor Observations</label>
+            <textarea id="f_advisor_observations" rows="4" placeholder="Client demeanor, engagement level, specific concerns raised, emotional drivers, spouse dynamics, decision-making style…"></textarea>
+          </div>
+        </div>
+
+        <div class="form-row cols3">
+          <div class="form-field">
+            <label>Incumbent Advisor?</label>
+            <select id="f_incumbent_advisor_flag" onchange="toggleIncumbent()">
+              <option value="false">No existing advisor relationship</option>
+              <option value="true">Yes — has incumbent advisor</option>
+            </select>
+          </div>
+          <div class="form-field" id="incumbent-name-field" style="display:none;">
+            <label>Incumbent Advisor / Firm</label>
+            <input type="text" id="f_incumbent_advisor_name" placeholder="Name or firm">
+          </div>
+          <div class="form-field">
+            <label>Urgency Assessment</label>
+            <select id="f_urgency_assessment">
+              <option value="">Select…</option>
+              <option value="immediate">Immediate — act within 30 days</option>
+              <option value="near-term">Near-term — within 90 days</option>
+              <option value="planning-horizon">Planning horizon — 6–18 months</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row cols1" id="incumbent-notes-row" style="display:none;">
+          <div class="form-field">
+            <label>Incumbent Advisor Notes</label>
+            <textarea id="f_incumbent_advisor_notes" rows="2" placeholder="What the incumbent has in place, how entrenched the relationship is, likely objections…"></textarea>
+          </div>
+        </div>
+
+        <div class="form-row cols1">
+          <div class="form-field">
+            <label>Health / Underwriting Notes <span class="optional">confidential</span></label>
+            <textarea id="f_health_underwriting_notes" rows="2" placeholder="Any health observations relevant to underwriting that wouldn't appear in the standard intake…"></textarea>
+          </div>
+        </div>
+
+        <div class="form-row cols1">
+          <div class="form-field">
+            <label>Recommended Next Steps</label>
+            <textarea id="f_recommended_next_steps" rows="2" placeholder="e.g. Rush to L2 underwriting given health status, prioritize L3 before year-end for RMD bracket management, schedule family meeting to address beneficiary concerns…"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-nav">
+        <button class="btn-secondary" onclick="goToSection(6)">&#8592; Back</button>
+        <button class="btn-complete" onclick="completeSuplement()">&#10003; Complete Supplement &amp; Run Allocation</button>
+      </div>
+    </div>
+
+    <!-- ── COMPLETION SCREEN ──────────────────────── -->
+    <div id="section-complete">
+      <div class="complete-icon">&#10003;</div>
+      <div class="complete-title">Supplement <em>Complete</em></div>
+      <div class="complete-desc">The allocation supplement has been saved. The algorithm is running and the client summary is being prepared for DocuSign signature.</div>
+      <div class="complete-actions">
+        <button class="btn-primary" id="btn-view-allocation" onclick="viewAllocation()">View Allocation Results &#8594;</button>
+        <button class="btn-secondary" onclick="window.location.href='advisor-dashboard.html'">Return to Dashboard</button>
+      </div>
+    </div>
+
+  </div><!-- /main-content -->
+</div><!-- /page-body -->
+
+<!-- ── Auth loading screen ────────────────────── -->
+<div id="auth-loading" style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:16px;">
+  <div style="font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);">Integrated Planning Partners</div>
+  <div style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:300;color:var(--white);">Verifying access…</div>
+</div>
+
+<script>
+// ── Supabase client (same as portal) ─────────────────────────
+const SUPABASE_URL = 'https://piixgvxrasddphklgazh.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_acvdk0hBniaB6qOD8_k8XQ_9R6FNbP_';
+const SESSION_KEY  = 'ipp_sb_session';
+
+const sb = (() => {
+  const load  = () => { try { return JSON.parse(localStorage.getItem(SESSION_KEY)||'null'); } catch(e){return null;} };
+  const hdrs  = (extra={}) => { const s=load(); return {'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+(s?.access_token||SUPABASE_KEY),...extra}; };
+  return {
+    getSession(){ const s=load(); if(!s?.access_token)return null; if(s.expires_at&&Date.now()/1000>s.expires_at-60)return null; return s; },
+    async signInWithPassword(email,password){
+      const r=await fetch(SUPABASE_URL+'/auth/v1/token?grant_type=password',{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY},body:JSON.stringify({email,password})});
+      const d=await r.json();
+      if(!r.ok)return{error:d.error_description||'Invalid credentials'};
+      localStorage.setItem(SESSION_KEY,JSON.stringify(d));
+      return{data:d,error:null};
+    },
+    async getProfile(userId){
+      const r=await fetch(SUPABASE_URL+'/rest/v1/advisor_profiles?id=eq.'+userId+'&select=*',{headers:hdrs({'Accept':'application/vnd.pgrst.object+json'})});
+      if(!r.ok)return null;
+      return await r.json();
+    },
+    async upsertSupplement(data){
+      const supplementId = window._supplementId;
+      if(supplementId){
+        const r=await fetch(SUPABASE_URL+'/rest/v1/allocation_supplements?id=eq.'+supplementId,{method:'PATCH',headers:hdrs({'Prefer':'return=minimal'}),body:JSON.stringify(data)});
+        return{error:r.ok?null:'Save failed'};
+      } else {
+        const r=await fetch(SUPABASE_URL+'/rest/v1/allocation_supplements',{method:'POST',headers:hdrs({'Prefer':'return=representation'}),body:JSON.stringify(data)});
+        const d=await r.json();
+        if(!r.ok)return{error:'Save failed'};
+        window._supplementId = Array.isArray(d)?d[0]?.id:d?.id;
+        return{error:null};
+      }
+    },
+    async getSupplement(clientId){
+      const r=await fetch(SUPABASE_URL+'/rest/v1/allocation_supplements?client_id=eq.'+clientId+'&status=in.(in_progress,completed)&order=created_at.desc&limit=1',{headers:hdrs()});
+      if(!r.ok)return null;
+      const d=await r.json();
+      return d&&d.length?d[0]:null;
+    }
+  };
+})();
+
+// ── App state ─────────────────────────────────────────────────
+let currentSection = 0;
+let completedSections = new Set();
+let riskScores = {rq1:0,rq2:0,rq3:0,rq4:0,rq5:0};
+let saveTimer = null;
+let currentUser = null;
+let currentProfile = null;
+window._supplementId = null;
+window._clientId = null;
+window._structureReviewId = null;
+
+// ── Session timeout ───────────────────────────────────────────
+const INACTIVITY_WARN_MS  = 10 * 60 * 1000;  // 10 min → show warning
+const INACTIVITY_LOCK_MS  = 12 * 60 * 1000;  // 12 min → lock
+const HARD_CEILING_MS     = 90 * 60 * 1000;  // 90 min → lock regardless
+const HARD_CEILING_WARN_MS= 85 * 60 * 1000;  // 85 min → warn
+
+let lastActivity   = Date.now();
+let sessionStart   = Date.now();
+let inactivityTimer   = null;
+let inactivityWarnTimer = null;
+let hardCeilingTimer  = null;
+let hardCeilingWarnTimer = null;
+let timerInterval  = null;
+
+function resetTimers(){
+  lastActivity = Date.now();
+  clearTimeout(inactivityWarnTimer);
+  clearTimeout(inactivityTimer);
+  document.getElementById('session-warning').classList.remove('visible');
+
+  inactivityWarnTimer = setTimeout(()=>{
+    document.getElementById('session-warning').classList.add('visible');
+    document.getElementById('warn-minutes').textContent = '2';
+  }, INACTIVITY_WARN_MS);
+
+  inactivityTimer = setTimeout(()=>{
+    lockSession();
+  }, INACTIVITY_LOCK_MS);
+}
+
+function lockSession(){
+  autoSave(true);
+  document.getElementById('session-warning').classList.remove('visible');
+  document.getElementById('lock-overlay').classList.add('visible');
+}
+
+async function unlockSession(){
+  const pw  = document.getElementById('lock-password').value;
+  const err = document.getElementById('lock-err');
+  if(!pw){ err.textContent='Password required.'; return; }
+  err.textContent = '';
+  const session = sb.getSession();
+  if(!session){ window.location.href='advisor-portal.html'; return; }
+  // Re-authenticate
+  const email = currentUser?.email || '';
+  if(!email){ window.location.href='advisor-portal.html'; return; }
+  const res = await sb.signInWithPassword(email, pw);
+  if(res.error){ err.textContent='Incorrect password. Try again.'; return; }
+  document.getElementById('lock-password').value = '';
+  document.getElementById('lock-overlay').classList.remove('visible');
+  resetTimers();
+}
+
+function updateTimerDisplay(){
+  const elapsed = Date.now() - sessionStart;
+  const remaining = Math.max(0, HARD_CEILING_MS - elapsed);
+  const mins = Math.floor(remaining / 60000);
+  const secs = Math.floor((remaining % 60000) / 1000);
+  const el = document.getElementById('session-timer');
+  el.textContent = `⏱ ${mins}:${secs.toString().padStart(2,'0')}`;
+  if(remaining < 5*60*1000){ el.classList.add('danger'); el.classList.remove('warn'); }
+  else if(remaining < 15*60*1000){ el.classList.add('warn'); el.classList.remove('danger'); }
+  else { el.classList.remove('warn','danger'); }
+}
+
+function startSessionTimers(){
+  resetTimers();
+  hardCeilingWarnTimer = setTimeout(()=>{
+    const el = document.getElementById('session-warning');
+    document.getElementById('warn-minutes').textContent = '5';
+    el.querySelector('.sw-text').innerHTML = '&#9888; Session expires in <strong>5 minutes</strong> — hard security limit reached. Please wrap up and save.';
+    el.classList.add('visible');
+  }, HARD_CEILING_WARN_MS);
+  hardCeilingTimer = setTimeout(()=>{ lockSession(); }, HARD_CEILING_MS);
+  timerInterval = setInterval(updateTimerDisplay, 1000);
+  ['mousemove','keydown','click','scroll','input'].forEach(e=>document.addEventListener(e, resetTimers, {passive:true}));
+}
+
+// ── Auto-save ─────────────────────────────────────────────────
+function setAutosaveStatus(status){
+  const el = document.getElementById('autosave-status');
+  el.className = 'autosave-status ' + status;
+  const labels = {saving:'Saving…', saved:'✓ Saved', error:'Save error'};
+  el.textContent = labels[status] || '';
+}
+
+function scheduleAutoSave(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(()=>autoSave(), 2000);
+}
+
+async function autoSave(silent=false){
+  if(!currentUser || !window._clientId) return;
+  if(!silent) setAutosaveStatus('saving');
+  const data = collectFormData();
+  data.updated_at = new Date().toISOString();
+  const {error} = await sb.upsertSupplement(data);
+  if(!silent){
+    setAutosaveStatus(error?'error':'saved');
+    if(!error) setTimeout(()=>{ const el=document.getElementById('autosave-status'); if(el.textContent==='✓ Saved') el.textContent=''; }, 3000);
+  }
+}
+
+// ── Form data collection ──────────────────────────────────────
+function val(id){ const el=document.getElementById(id); return el?el.value.trim()||null:null; }
+function num(id){ const v=val(id); return v?parseFloat(v):null; }
+function bool(id){ const v=val(id); return v==='true'?true:v==='false'?false:null; }
+function intVal(id){ const v=val(id); return v?parseInt(v):null; }
+
+function collectFormData(){
+  const acctTypes = Array.from(document.querySelectorAll('.acct-type-cb:checked')).map(c=>c.value);
+  return {
+    client_id: window._clientId,
+    structure_review_id: window._structureReviewId,
+    completed_by: currentUser?.id,
+    status: 'in_progress',
+    // S1
+    primary_first_name: val('f_primary_first_name'),
+    primary_last_name:  val('f_primary_last_name'),
+    primary_dob:        val('f_primary_dob')||null,
+    primary_age:        intVal('f_primary_age'),
+    spouse_first_name:  val('f_spouse_first_name'),
+    spouse_last_name:   val('f_spouse_last_name'),
+    spouse_dob:         val('f_spouse_dob')||null,
+    spouse_age:         intVal('f_spouse_age'),
+    filing_status:      val('f_filing_status'),
+    state:              val('f_state'),
+    target_retire_age:  intVal('f_target_retire_age'),
+    years_to_retirement:intVal('f_years_to_retirement'),
+    primary_goal_narrative: val('f_primary_goal_narrative'),
+    // S2
+    qp_balance_total:           num('f_qp_balance_total'),
+    qp_roth_balance:            num('f_qp_roth_balance'),
+    qp_account_types:           acctTypes.length?acctTypes:null,
+    taxable_investment_balance: num('f_taxable_investment_balance'),
+    primary_residence_value:    num('f_primary_residence_value'),
+    other_assets_balance:       num('f_other_assets_balance'),
+    mortgage_balance:           num('f_mortgage_balance'),
+    mortgage_monthly_payment:   num('f_mortgage_monthly_payment'),
+    other_debt_monthly:         num('f_other_debt_monthly'),
+    // S3
+    ss_primary_monthly:       num('f_ss_primary_monthly'),
+    ss_primary_claim_age:     intVal('f_ss_primary_claim_age'),
+    ss_spouse_monthly:        num('f_ss_spouse_monthly'),
+    ss_spouse_claim_age:      intVal('f_ss_spouse_claim_age'),
+    current_household_income: num('f_current_household_income'),
+    current_marginal_rate:    num('f_current_marginal_rate'),
+    pension_monthly:          num('f_pension_monthly'),
+    pension_start_age:        intVal('f_pension_start_age'),
+    pension_has_cola:         bool('f_pension_has_cola'),
+    pension_survivor_option:  val('f_pension_survivor_option'),
+    spouse_pension_monthly:   num('f_spouse_pension_monthly'),
+    spouse_pension_start_age: intVal('f_spouse_pension_start_age'),
+    other_guaranteed_monthly: num('f_other_guaranteed_monthly'),
+    other_guaranteed_desc:    val('f_other_guaranteed_desc'),
+    part_time_income_monthly: num('f_part_time_income_monthly'),
+    part_time_end_age:        intVal('f_part_time_end_age'),
+    // S4
+    housing_monthly:          num('f_housing_monthly'),
+    healthcare_monthly:       num('f_healthcare_monthly'),
+    food_monthly:             num('f_food_monthly'),
+    transport_monthly:        num('f_transport_monthly'),
+    insurance_monthly:        num('f_insurance_monthly'),
+    essential_monthly:        num('f_essential_monthly'),
+    essential_annual:         (num('f_essential_monthly')||0)*12||null,
+    travel_annual:            num('f_travel_annual'),
+    entertainment_annual:     num('f_entertainment_annual'),
+    discretionary_annual:     num('f_discretionary_annual'),
+    charitable_annual:        num('f_charitable_annual'),
+    charitable_pledge_total:  num('f_charitable_pledge_total'),
+    charitable_pledge_desc:   val('f_charitable_pledge_desc'),
+    income_gap_annual:        num('f_income_gap_annual'),
+    expense_notes:            val('f_expense_notes'),
+    known_large_expenses:     collectLargeExpenses(),
+    // S5
+    risk_q1: riskScores.rq1||null,
+    risk_q2: riskScores.rq2||null,
+    risk_q3: riskScores.rq3||null,
+    risk_q4: riskScores.rq4||null,
+    risk_q5: riskScores.rq5||null,
+    risk_score_total: calcRiskScore()||null,
+    risk_profile: calcRiskProfile()||null,
+    risk_notes: val('f_risk_notes'),
+    // S6
+    has_ltc_policy:           bool('f_has_ltc_policy'),
+    ltc_policy_type:          val('f_ltc_policy_type'),
+    ltc_monthly_benefit:      num('f_ltc_monthly_benefit'),
+    ltc_benefit_period_years: num('f_ltc_benefit_period_years'),
+    ltc_elimination_days:     intVal('f_ltc_elimination_days'),
+    ltc_inflation_rider:      bool('f_ltc_inflation_rider'),
+    health_status_primary:    val('f_health_status_primary'),
+    health_conditions_primary:val('f_health_conditions_primary'),
+    family_ltc_history:       bool('f_family_ltc_history'),
+    health_status_spouse:     val('f_health_status_spouse'),
+    health_conditions_spouse: val('f_health_conditions_spouse'),
+    family_ltc_history_spouse:bool('f_family_ltc_history_spouse'),
+    existing_life_policies:   collectLifePolicies(),
+    existing_annuities:       collectAnnuities(),
+    // S7
+    priority_income_security: intVal('f_priority_income_security'),
+    priority_tax_efficiency:  intVal('f_priority_tax_efficiency'),
+    priority_care_protection: intVal('f_priority_care_protection'),
+    priority_legacy:          intVal('f_priority_legacy'),
+    priority_liquidity:       intVal('f_priority_liquidity'),
+    legacy_importance:        intVal('f_legacy_importance'),
+    legacy_target_amount:     num('f_legacy_target_amount'),
+    legacy_beneficiaries:     val('f_legacy_beneficiaries'),
+    charitable_intent:        val('f_charitable_intent'),
+    estate_plan_status:       val('f_estate_plan_status'),
+    secure_act_awareness:     bool('f_secure_act_awareness'),
+    // S8
+    advisor_observations:     val('f_advisor_observations'),
+    incumbent_advisor_flag:   bool('f_incumbent_advisor_flag'),
+    incumbent_advisor_name:   val('f_incumbent_advisor_name'),
+    incumbent_advisor_notes:  val('f_incumbent_advisor_notes'),
+    urgency_assessment:       val('f_urgency_assessment'),
+    health_underwriting_notes:val('f_health_underwriting_notes'),
+    recommended_next_steps:   val('f_recommended_next_steps'),
+  };
+}
+
+// ── Navigation ────────────────────────────────────────────────
+function goToSection(idx){
+  if(idx < 0 || idx > 7) return;
+  document.querySelectorAll('.form-section').forEach(s=>s.classList.remove('active'));
+  document.getElementById('section-complete').classList.remove('active');
+  document.getElementById('section-'+idx).classList.add('active');
+  document.querySelectorAll('.nav-step').forEach((n,i)=>{
+    n.classList.remove('active');
+    if(completedSections.has(i)) n.classList.add('complete');
+    else n.classList.remove('complete');
+  });
+  document.getElementById('nav-'+idx).classList.add('active');
+  completedSections.add(currentSection);
+  currentSection = idx;
+  updateProgress();
+  window.scrollTo({top:0,behavior:'smooth'});
+  scheduleAutoSave();
+}
+
+function updateProgress(){
+  const pct = Math.round((completedSections.size / 8) * 100);
+  document.getElementById('progress-pct').textContent = pct+'%';
+  document.getElementById('progress-fill').style.width = pct+'%';
+}
+
+// ── Risk scoring ──────────────────────────────────────────────
+function selectRisk(qid, score, el){
+  document.querySelectorAll('#'+qid+' .risk-opt').forEach(o=>o.classList.remove('selected'));
+  el.classList.add('selected');
+  riskScores[qid] = score;
+  updateRiskDisplay();
+  scheduleAutoSave();
+}
+
+function calcRiskScore(){
+  const vals = Object.values(riskScores).filter(v=>v>0);
+  if(vals.length < 5) return null;
+  return vals.reduce((a,b)=>a+b,0);
+}
+
+function calcRiskProfile(){
+  const score = calcRiskScore();
+  if(!score) return null;
+  if(score <= 9)  return 'Conservative';
+  if(score <= 13) return 'Moderate-Conservative';
+  if(score <= 17) return 'Moderate';
+  if(score <= 21) return 'Moderate-Growth';
+  return 'Growth';
+}
+
+function updateRiskDisplay(){
+  const score = calcRiskScore();
+  const profile = calcRiskProfile();
+  document.getElementById('risk-score-display').textContent = score ? score+' / 25' : '— / 25';
+  document.getElementById('risk-profile-display').textContent = profile || 'Not yet scored';
+}
+
+// ── Expense calculations ──────────────────────────────────────
+function calcExpenses(){
+  const h = num('f_housing_monthly')||0;
+  const hc= num('f_healthcare_monthly')||0;
+  const f = num('f_food_monthly')||0;
+  const t = num('f_transport_monthly')||0;
+  const i = num('f_insurance_monthly')||0;
+  const essMonthly = h+hc+f+t+i;
+  if(essMonthly > 0) document.getElementById('f_essential_monthly').value = essMonthly;
+
+  const tv= num('f_travel_annual')||0;
+  const en= num('f_entertainment_annual')||0;
+  const ch= num('f_charitable_annual')||0;
+  const discAnnual = tv+en+ch;
+  if(discAnnual > 0) document.getElementById('f_discretionary_annual').value = discAnnual;
+
+  const essential = (num('f_essential_monthly')||essMonthly)*12;
+  const total = essential + discAnnual;
+
+  const ssP = (num('f_ss_primary_monthly')||0)*12;
+  const ssS = (num('f_ss_spouse_monthly')||0)*12;
+  const pen = (num('f_pension_monthly')||0)*12;
+  const oth = (num('f_other_guaranteed_monthly')||0)*12;
+  const guaranteed = ssP+ssS+pen+oth;
+  const gap = Math.max(0, total - guaranteed);
+  const qp  = num('f_qp_balance_total')||0;
+
+  const fmt = v => v>0 ? '$'+Math.round(v).toLocaleString() : '—';
+  document.getElementById('gap-total-expenses').textContent = fmt(total);
+  document.getElementById('gap-guaranteed').textContent = fmt(guaranteed);
+  document.getElementById('gap-amount').textContent = gap>0 ? '$'+Math.round(gap).toLocaleString() : guaranteed>=total ? '$0 (covered)' : '—';
+  document.getElementById('gap-pct').textContent = qp>0&&gap>0 ? (gap/qp*100).toFixed(1)+'%' : '—';
+
+  // Write gap to hidden field
+  document.getElementById('f_income_gap_annual') && (document.getElementById('f_income_gap_annual').value = gap||'');
+  scheduleAutoSave();
+}
+
+// Add hidden income_gap field for collection
+document.addEventListener('DOMContentLoaded',()=>{
+  const h=document.createElement('input');h.type='hidden';h.id='f_income_gap_annual';document.body.appendChild(h);
+});
+
+// ── Years to retirement auto-calc ─────────────────────────────
+document.addEventListener('input', e=>{
+  if(['f_primary_age','f_target_retire_age'].includes(e.target?.id)){
+    const age=intVal('f_primary_age'), ret=intVal('f_target_retire_age');
+    if(age&&ret&&ret>age) document.getElementById('f_years_to_retirement').value=ret-age;
+  }
+  if(['f_ss_primary_monthly','f_ss_spouse_monthly','f_pension_monthly','f_other_guaranteed_monthly'].includes(e.target?.id)) calcExpenses();
+  scheduleAutoSave();
+});
+
+// ── Toggle UI helpers ─────────────────────────────────────────
+function toggleLtcFields(){
+  const show = document.getElementById('f_has_ltc_policy').value === 'true';
+  ['ltc-type-field','ltc-benefit-field','ltc-detail-row'].forEach(id=>{
+    document.getElementById(id).style.display = show?'':'none';
+  });
+}
+
+function toggleIncumbent(){
+  const show = document.getElementById('f_incumbent_advisor_flag').value === 'true';
+  document.getElementById('incumbent-name-field').style.display = show?'':'none';
+  document.getElementById('incumbent-notes-row').style.display = show?'':'none';
+}
+
+function toggleSpouseFields(show){
+  ['spouse-section','spouse-ss-row','spouse-health-row'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.style.display=show?'':'none';
+  });
+}
+
+// ── Repeater: Large expenses ──────────────────────────────────
+let largeExpenseCount = 0;
+function addLargeExpense(){
+  const idx = ++largeExpenseCount;
+  const div = document.createElement('div');
+  div.className='repeater-item'; div.id='le-'+idx;
+  div.innerHTML=`
+    <div class="repeater-item-title">Large Expense #${idx}</div>
+    <button class="repeater-remove" onclick="document.getElementById('le-${idx}').remove();scheduleAutoSave()">&#215;</button>
+    <div class="form-row cols3">
+      <div class="form-field"><label>Description</label><input type="text" id="le-desc-${idx}" placeholder="e.g. Help with home purchase, grandchildren education"></div>
+      <div class="form-field"><label>Amount</label><div class="input-prefix"><span>$</span><input type="number" id="le-amt-${idx}" min="0" step="5000" placeholder="0" oninput="scheduleAutoSave()"></div></div>
+      <div class="form-field"><label>Target Age</label><input type="number" id="le-age-${idx}" min="55" max="90" placeholder="e.g. 68" oninput="scheduleAutoSave()"></div>
+    </div>`;
+  document.getElementById('large-expenses-repeater').appendChild(div);
+}
+
+function collectLargeExpenses(){
+  const items=[]; document.querySelectorAll('[id^="le-desc-"]').forEach(el=>{
+    const idx=el.id.split('-')[2];
+    const desc=el.value.trim(), amt=parseFloat(document.getElementById('le-amt-'+idx)?.value)||0;
+    const age=parseInt(document.getElementById('le-age-'+idx)?.value)||null;
+    if(desc||amt) items.push({desc,amount:amt,target_age:age});
+  }); return items.length?items:null;
+}
+
+// ── Repeater: Life policies ───────────────────────────────────
+let lifePolicyCount = 0;
+function addLifePolicy(){
+  const idx = ++lifePolicyCount;
+  const div = document.createElement('div');
+  div.className='repeater-item'; div.id='lp-'+idx;
+  div.innerHTML=`
+    <div class="repeater-item-title">Policy #${idx}</div>
+    <button class="repeater-remove" onclick="document.getElementById('lp-${idx}').remove();scheduleAutoSave()">&#215;</button>
+    <div class="form-row cols3">
+      <div class="form-field"><label>Carrier</label><input type="text" id="lp-carrier-${idx}" placeholder="e.g. John Hancock"></div>
+      <div class="form-field"><label>Policy Type</label>
+        <select id="lp-type-${idx}"><option value="">Select…</option><option value="term">Term</option><option value="whole_life">Whole Life</option><option value="ul">Universal Life</option><option value="iul">IUL</option><option value="vul">VUL</option><option value="group">Group/Employer</option></select></div>
+      <div class="form-field"><label>Face Amount</label><div class="input-prefix"><span>$</span><input type="number" id="lp-face-${idx}" min="0" step="10000" placeholder="0"></div></div>
+    </div>
+    <div class="form-row cols3">
+      <div class="form-field"><label>Cash Surrender Value</label><div class="input-prefix"><span>$</span><input type="number" id="lp-csv-${idx}" min="0" step="1000" placeholder="0"></div></div>
+      <div class="form-field"><label>Annual Premium</label><div class="input-prefix"><span>$</span><input type="number" id="lp-premium-${idx}" min="0" step="500" placeholder="0"></div></div>
+      <div class="form-field"><label>Purpose / Notes</label><input type="text" id="lp-purpose-${idx}" placeholder="e.g. Legacy, key person, buy-sell"></div>
+    </div>`;
+  document.getElementById('life-policies-repeater').appendChild(div);
+}
+
+function collectLifePolicies(){
+  const items=[]; document.querySelectorAll('[id^="lp-carrier-"]').forEach(el=>{
+    const idx=el.id.split('-')[2];
+    items.push({carrier:el.value.trim()||null,type:document.getElementById('lp-type-'+idx)?.value||null,face_amount:parseFloat(document.getElementById('lp-face-'+idx)?.value)||null,csv:parseFloat(document.getElementById('lp-csv-'+idx)?.value)||null,annual_premium:parseFloat(document.getElementById('lp-premium-'+idx)?.value)||null,purpose:document.getElementById('lp-purpose-'+idx)?.value.trim()||null});
+  }); return items.length?items:null;
+}
+
+// ── Repeater: Annuities ───────────────────────────────────────
+let annuityCount = 0;
+function addAnnuity(){
+  const idx = ++annuityCount;
+  const div = document.createElement('div');
+  div.className='repeater-item'; div.id='an-'+idx;
+  div.innerHTML=`
+    <div class="repeater-item-title">Annuity #${idx}</div>
+    <button class="repeater-remove" onclick="document.getElementById('an-${idx}').remove();scheduleAutoSave()">&#215;</button>
+    <div class="form-row cols3">
+      <div class="form-field"><label>Carrier</label><input type="text" id="an-carrier-${idx}" placeholder="e.g. Pacific Life"></div>
+      <div class="form-field"><label>Annuity Type</label>
+        <select id="an-type-${idx}"><option value="">Select…</option><option value="fixed">Fixed</option><option value="fixed_indexed">Fixed Indexed (FIA)</option><option value="variable">Variable (VA)</option><option value="immediate">Immediate (SPIA)</option><option value="deferred_income">Deferred Income (DIA)</option></select></div>
+      <div class="form-field"><label>Current Value</label><div class="input-prefix"><span>$</span><input type="number" id="an-value-${idx}" min="0" step="1000" placeholder="0"></div></div>
+    </div>
+    <div class="form-row cols3">
+      <div class="form-field"><label>Surrender End Year <span class="optional">optional</span></label><input type="number" id="an-surr-${idx}" min="2024" max="2045" placeholder="e.g. 2027"></div>
+      <div class="form-field"><label>Income Rider?</label><select id="an-rider-${idx}"><option value="false">No income rider</option><option value="true">Yes — GLWB or similar</option></select></div>
+      <div class="form-field"><label>Monthly Income (if active)</label><div class="input-prefix"><span>$</span><input type="number" id="an-income-${idx}" min="0" step="100" placeholder="0"></div></div>
+    </div>`;
+  document.getElementById('annuities-repeater').appendChild(div);
+}
+
+function collectAnnuities(){
+  const items=[]; document.querySelectorAll('[id^="an-carrier-"]').forEach(el=>{
+    const idx=el.id.split('-')[2];
+    items.push({carrier:el.value.trim()||null,type:document.getElementById('an-type-'+idx)?.value||null,value:parseFloat(document.getElementById('an-value-'+idx)?.value)||null,surrender_end_year:parseInt(document.getElementById('an-surr-'+idx)?.value)||null,income_rider:document.getElementById('an-rider-'+idx)?.value==='true',monthly_income:parseFloat(document.getElementById('an-income-'+idx)?.value)||null});
+  }); return items.length?items:null;
+}
+
+// ── Save & complete ───────────────────────────────────────────
+function saveAndExit(){
+  autoSave(false).then(()=>{ window.location.href='advisor-dashboard.html'; });
+}
+
+async function completeSuplement(){
+  setAutosaveStatus('saving');
+  const data = collectFormData();
+  data.status = 'completed';
+  data.completed_at = new Date().toISOString();
+  const {error} = await sb.upsertSupplement(data);
+  if(error){ setAutosaveStatus('error'); alert('Save failed. Please try again.'); return; }
+  setAutosaveStatus('saved');
+  // Show completion screen
+  document.querySelectorAll('.form-section').forEach(s=>s.classList.remove('active'));
+  document.getElementById('section-complete').classList.add('active');
+  // Update client pipeline stage
+  if(window._clientId){
+    fetch(SUPABASE_URL+'/rest/v1/clients?id=eq.'+window._clientId,{
+      method:'PATCH',
+      headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+(JSON.parse(localStorage.getItem(SESSION_KEY)||'{}')?.access_token||SUPABASE_KEY),'Prefer':'return=minimal'},
+      body:JSON.stringify({pipeline_stage:'supplement_complete',allocation_supplement_id:window._supplementId})
+    });
+  }
+}
+
+function viewAllocation(){
+  if(window._supplementId){
+    window.location.href = 'allocation-modeler.html?supplement_id='+window._supplementId+'&client_id='+window._clientId;
+  }
+}
+
+// ── Pre-populate from StructureReview ────────────────────────
+function prefillFromSR(answers){
+  if(!answers) return;
+  const setVal=(id,v)=>{ const el=document.getElementById(id); if(el&&v) el.value=v; };
+  setVal('f_primary_first_name', answers.first_name);
+  setVal('f_primary_last_name',  answers.last_name);
+  setVal('f_primary_dob',        answers.dob);
+  setVal('f_client_email',       answers.email);
+  setVal('f_primary_goal_narrative', answers.retirement_vision);
+  setVal('f_target_retire_age',  answers.retire_age);
+  // Filing status mapping from SR marital answer
+  const filingMap = {married:'mfj', single:'single', divorced:'single', widowed:'widowed'};
+  if(answers.marital) setVal('f_filing_status', filingMap[answers.marital]||'');
+  // State
+  if(answers.state){
+    const stateLabels={alabama:'Alabama',alaska:'Alaska',arizona:'Arizona',arkansas:'Arkansas',california:'California',colorado:'Colorado',connecticut:'Connecticut',delaware:'Delaware',florida:'Florida',georgia:'Georgia',hawaii:'Hawaii',idaho:'Idaho',illinois:'Illinois',indiana:'Indiana',iowa:'Iowa',kansas:'Kansas',kentucky:'Kentucky',louisiana:'Louisiana',maine:'Maine',maryland:'Maryland',massachusetts:'Massachusetts',michigan:'Michigan',minnesota:'Minnesota',mississippi:'Mississippi',missouri:'Missouri',montana:'Montana',nebraska:'Nebraska',nevada:'Nevada',new_hampshire:'New Hampshire',new_jersey:'New Jersey',new_mexico:'New Mexico',new_york:'New York',north_carolina:'North Carolina',north_dakota:'North Dakota',ohio:'Ohio',oklahoma:'Oklahoma',oregon:'Oregon',pennsylvania:'Pennsylvania',rhode_island:'Rhode Island',south_carolina:'South Carolina',south_dakota:'South Dakota',tennessee:'Tennessee',texas:'Texas',utah:'Utah',vermont:'Vermont',virginia:'Virginia',washington:'Washington',west_virginia:'West Virginia',wisconsin:'Wisconsin',wyoming:'Wyoming'};
+    setVal('f_state', stateLabels[answers.state]||'');
+  }
+  // Spouse
+  setVal('f_spouse_first_name', answers.spouse_first_name);
+  setVal('f_spouse_dob', answers.spouse_dob);
+  // Estate plan
+  const estatePlanMap={ep_yes_current:'current',ep_yes_old:'outdated',ep_basic:'basic',ep_no:'none'};
+  if(answers.estate_plan) setVal('f_estate_plan_status', estatePlanMap[answers.estate_plan]||'');
+  // Show/hide spouse section
+  const noSpouse = ['single','divorced','widowed'].includes(answers.marital);
+  toggleSpouseFields(!noSpouse);
+  // Age calc
+  if(answers.dob){
+    const age=Math.floor((Date.now()-new Date(answers.dob))/(365.25*24*3600*1000));
+    if(age>0){ document.getElementById('f_primary_age').value=age; }
+    const ret=parseInt(answers.retire_age)||null;
+    if(ret&&age&&ret>age) document.getElementById('f_years_to_retirement').value=ret-age;
+  }
+}
+
+// ── Restore from saved supplement ────────────────────────────
+function restoreFromSupplement(s){
+  if(!s) return;
+  window._supplementId = s.id;
+  const setV=(id,v)=>{ const el=document.getElementById(id); if(el&&v!==null&&v!==undefined) el.value=v; };
+  // All text/number/select fields
+  const fields=['primary_first_name','primary_last_name','primary_dob','primary_age','spouse_first_name','spouse_last_name','spouse_dob','spouse_age','filing_status','state','target_retire_age','years_to_retirement','primary_goal_narrative','qp_balance_total','qp_roth_balance','taxable_investment_balance','primary_residence_value','other_assets_balance','mortgage_balance','mortgage_monthly_payment','other_debt_monthly','ss_primary_monthly','ss_primary_claim_age','ss_spouse_monthly','ss_spouse_claim_age','current_household_income','current_marginal_rate','pension_monthly','pension_start_age','pension_has_cola','pension_survivor_option','spouse_pension_monthly','spouse_pension_start_age','other_guaranteed_monthly','other_guaranteed_desc','part_time_income_monthly','part_time_end_age','housing_monthly','healthcare_monthly','food_monthly','transport_monthly','insurance_monthly','essential_monthly','travel_annual','entertainment_annual','discretionary_annual','charitable_annual','charitable_pledge_total','charitable_pledge_desc','expense_notes','risk_notes','has_ltc_policy','ltc_policy_type','ltc_monthly_benefit','ltc_benefit_period_years','ltc_elimination_days','ltc_inflation_rider','health_status_primary','health_conditions_primary','family_ltc_history','health_status_spouse','health_conditions_spouse','family_ltc_history_spouse','legacy_importance','legacy_target_amount','legacy_beneficiaries','charitable_intent','estate_plan_status','secure_act_awareness','advisor_observations','incumbent_advisor_flag','incumbent_advisor_name','incumbent_advisor_notes','urgency_assessment','health_underwriting_notes','recommended_next_steps','priority_income_security','priority_tax_efficiency','priority_care_protection','priority_legacy','priority_liquidity'];
+  fields.forEach(f=>{ if(s[f]!==null&&s[f]!==undefined) setV('f_'+f, s[f]); });
+  // Checkboxes for account types
+  if(s.qp_account_types) s.qp_account_types.forEach(v=>{ const cb=document.querySelector(`.acct-type-cb[value="${v}"]`); if(cb) cb.checked=true; });
+  // Risk scores
+  if(s.risk_q1) { riskScores.rq1=s.risk_q1; document.querySelectorAll('#rq1 .risk-opt')[s.risk_q1-1]?.classList.add('selected'); }
+  if(s.risk_q2) { riskScores.rq2=s.risk_q2; document.querySelectorAll('#rq2 .risk-opt')[s.risk_q2-1]?.classList.add('selected'); }
+  if(s.risk_q3) { riskScores.rq3=s.risk_q3; document.querySelectorAll('#rq3 .risk-opt')[s.risk_q3-1]?.classList.add('selected'); }
+  if(s.risk_q4) { riskScores.rq4=s.risk_q4; document.querySelectorAll('#rq4 .risk-opt')[s.risk_q4-1]?.classList.add('selected'); }
+  if(s.risk_q5) { riskScores.rq5=s.risk_q5; document.querySelectorAll('#rq5 .risk-opt')[s.risk_q5-1]?.classList.add('selected'); }
+  updateRiskDisplay();
+  toggleLtcFields();
+  toggleIncumbent();
+  calcExpenses();
+}
+
+// ── Init ──────────────────────────────────────────────────────
+async function init(){
+  // Auth check
+  const session = sb.getSession();
+  if(!session){ window.location.href='advisor-portal.html'; return; }
+  currentUser = { id: session.user?.id || session.sub, email: session.user?.email || session.email };
+  if(!currentUser.id){
+    // Parse from JWT
+    try{ const payload=JSON.parse(atob(session.access_token.split('.')[1])); currentUser.id=payload.sub; currentUser.email=payload.email; }catch(e){}
+  }
+
+  // Admin check
+  const profile = await sb.getProfile(currentUser.id);
+  if(!profile){ window.location.href='advisor-portal.html'; return; }
+  currentProfile = profile;
+  // Only allow admin (Jeffrey) or users with is_admin flag — adjust role check to match your schema
+  // For now we check if the advisor is you by email
+  const isAdmin = profile.email === 'jf@emailipp.com' || profile.role === 'admin';
+  // Remove this restriction if other advisors should access later
+  // if(!isAdmin){ window.location.href='advisor-dashboard.html'; return; }
+
+  // Get client_id from URL params
+  const params = new URLSearchParams(window.location.search);
+  window._clientId = params.get('client_id');
+  window._structureReviewId = params.get('sr_id');
+
+  if(!window._clientId){ window.location.href='advisor-dashboard.html'; return; }
+
+  // Check for existing in-progress supplement
+  const existing = await sb.getSupplement(window._clientId);
+  if(existing) restoreFromSupplement(existing);
+
+  // Check for SR answers to prefill
+  if(window._structureReviewId){
+    try{
+      const r=await fetch(SUPABASE_URL+'/rest/v1/structure_reviews?id=eq.'+window._structureReviewId+'&select=answers',{headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+session.access_token,'Accept':'application/vnd.pgrst.object+json'}});
+      if(r.ok){ const d=await r.json(); if(d.answers) prefillFromSR(d.answers); }
+    }catch(e){}
+  }
+
+  // Show app
+  document.getElementById('auth-loading').style.display='none';
+  document.getElementById('top-bar').style.display='flex';
+  document.getElementById('main-app').style.display='flex';
+  startSessionTimers();
+}
+
+init();
+</script>
+</body>
+</html>
