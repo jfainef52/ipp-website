@@ -1554,27 +1554,73 @@ function collectFormData(){
   };
 }
 
+// ── Section completion validation ─────────────────────────────
+// Each section defines the minimum fields required to be considered complete.
+// A field is satisfied if it has a non-empty value.
+// Risk section uses the riskScores object instead of field IDs.
+const SECTION_REQUIRED = [
+  // S1 — Identity: must have first name, last name, age, filing status
+  ['f_primary_first_name','f_primary_last_name','f_primary_age','f_filing_status'],
+  // S2 — Financial Position: must have QP balance total
+  ['f_qp_balance_total'],
+  // S3 — Income Architecture: must have SS monthly and claim age
+  ['f_ss_primary_monthly','f_ss_primary_claim_age'],
+  // S4 — Expenses: must have essential monthly total
+  ['f_essential_monthly'],
+  // S5 — Risk Profile: all 5 questions must be answered (checked via riskScores)
+  [],
+  // S6 — Protection Inventory: must have health status and LTC answer
+  ['f_health_status_primary','f_has_ltc_policy'],
+  // S7 — Goals Hierarchy: must have at least income security and tax priority ranked
+  ['f_priority_income_security','f_priority_tax_efficiency','f_priority_care_protection',
+   'f_priority_legacy','f_priority_liquidity'],
+  // S8 — Advisor Observations: must have urgency assessment
+  ['f_urgency_assessment'],
+];
+
+function isSectionComplete(idx){
+  const required = SECTION_REQUIRED[idx];
+  // Special case: risk section — all 5 questions must be scored
+  if(idx === 4){
+    return Object.values(riskScores).filter(v=>v>0).length === 5;
+  }
+  // All required fields must have a non-empty value
+  return required.every(id=>{
+    const el = document.getElementById(id);
+    if(!el) return false;
+    return el.value && el.value.trim() !== '';
+  });
+}
+
+function refreshSectionStates(){
+  document.querySelectorAll('.nav-step').forEach((n,i)=>{
+    n.classList.remove('active','complete','partial');
+    if(isSectionComplete(i)){
+      n.classList.add('complete');
+      completedSections.add(i);
+    } else {
+      completedSections.delete(i);
+    }
+  });
+  document.getElementById('nav-'+currentSection).classList.add('active');
+  updateProgress();
+}
+
 // ── Navigation ────────────────────────────────────────────────
 function goToSection(idx){
   if(idx < 0 || idx > 7) return;
   document.querySelectorAll('.form-section').forEach(s=>s.classList.remove('active'));
   document.getElementById('section-complete').classList.remove('active');
   document.getElementById('section-'+idx).classList.add('active');
-  document.querySelectorAll('.nav-step').forEach((n,i)=>{
-    n.classList.remove('active');
-    if(completedSections.has(i)) n.classList.add('complete');
-    else n.classList.remove('complete');
-  });
-  document.getElementById('nav-'+idx).classList.add('active');
-  completedSections.add(currentSection);
   currentSection = idx;
-  updateProgress();
+  refreshSectionStates();
   window.scrollTo({top:0,behavior:'smooth'});
   scheduleAutoSave();
 }
 
 function updateProgress(){
-  const pct = Math.round((completedSections.size / 8) * 100);
+  const completed = Array.from({length:8},(_,i)=>isSectionComplete(i)).filter(Boolean).length;
+  const pct = Math.round((completed / 8) * 100);
   document.getElementById('progress-pct').textContent = pct+'%';
   document.getElementById('progress-fill').style.width = pct+'%';
 }
@@ -1609,6 +1655,7 @@ function updateRiskDisplay(){
   const profile = calcRiskProfile();
   document.getElementById('risk-score-display').textContent = score ? score+' / 25' : '— / 25';
   document.getElementById('risk-profile-display').textContent = profile || 'Not yet scored';
+  refreshSectionStates();
 }
 
 // ── Expense calculations ──────────────────────────────────────
@@ -1661,6 +1708,7 @@ document.addEventListener('input', e=>{
     if(age&&ret&&ret>age) document.getElementById('f_years_to_retirement').value=ret-age;
   }
   if(['f_ss_primary_monthly','f_ss_spouse_monthly','f_pension_monthly','f_other_guaranteed_monthly'].includes(e.target?.id)) calcExpenses();
+  refreshSectionStates();
   scheduleAutoSave();
 });
 
