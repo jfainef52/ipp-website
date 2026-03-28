@@ -19,98 +19,24 @@
     --gray:      #6E8299;
     --border:    #2A3F58;
   }
-  nav {
-    position: fixed;
-    top: 0; left: 0; right: 0;
-    z-index: 1000;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 48px;
-    height: 68px;
-    background: rgba(14,28,46,0.97);
-    border-bottom: 1px solid var(--border);
-    backdrop-filter: blur(12px);
-  }
-  .nav-logo { display: flex; flex-direction: column; gap: 1px; flex-shrink: 0; min-width: 120px; }
-  .nav-logo-sub {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 9px; font-weight: 500;
-    letter-spacing: 0.18em; color: var(--gold);
-    text-transform: uppercase;
-  }
-  .nav-links {
-    display: flex; align-items: center;
-    gap: 24px; list-style: none;
-  }
-  .nav-links a {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 10.5px; font-weight: 500;
-    letter-spacing: 0.14em; text-transform: none;
-    color: var(--warm); text-decoration: none; transition: color 0.2s;
-  }
-  .nav-links a:hover { color: var(--gold); }
-  .nav-links a span { text-transform: none; }
-  .nav-advisor {
-    color: var(--gold) !important;
-    border: 1px solid var(--gold-dim);
-    padding: 7px 18px; border-radius: 2px;
-    transition: border-color 0.2s, background 0.2s !important;
-  }
-  .nav-advisor:hover {
-    border-color: var(--gold) !important;
-    background: rgba(200,169,110,0.08) !important;
-    color: var(--gold2) !important;
-  }
-  .nav-cta {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 11px; font-weight: 600;
-    letter-spacing: 0.08em; text-transform: none;
-    color: var(--navy) !important;
-    background: var(--gold);
-    padding: 9px 22px; border-radius: 2px;
-    transition: background 0.2s !important;
-  }
-  .nav-cta:hover { background: var(--gold2) !important; }
-  footer {
-    background: var(--navy2);
-    border-top: 1px solid var(--border);
-    padding: 48px;
-    display: flex; align-items: center;
-    justify-content: space-between;
-    gap: 32px; flex-wrap: wrap;
-  }
-  .footer-logo {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 20px; font-weight: 600; color: var(--off-white);
-  }
-  .footer-logo span {
-    display: block;
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 9px; font-weight: 500;
-    letter-spacing: 0.18em; color: var(--gold);
-    text-transform: uppercase; margin-top: 3px;
-  }
-  .footer-contact { text-align: center; font-size: 13px; color: var(--gray); line-height: 1.8; font-family: 'Barlow', sans-serif; }
-  .footer-contact a { color: var(--gold); text-decoration: none; }
-  .footer-links { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
-  .footer-links a {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 10px; font-weight: 500;
-    letter-spacing: 0.14em; text-transform: uppercase;
-    color: var(--gray); text-decoration: none; transition: color 0.2s;
-  }
-  .footer-links a:hover { color: var(--gold); }
-  .footer-bottom {
-    width: 100%; padding-top: 24px;
-    border-top: 1px solid var(--border);
-    font-size: 11px; color: var(--gray); font-family: 'Barlow', sans-serif;
-    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
-  }
-  #root { padding-top: 68px; }
-  @media (max-width: 900px) {
-    nav { padding: 0 24px; }
-    .nav-links { display: none; }
+  nav{position:fixed;top:0;left:0;right:0;z-index:200;display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:68px;background:rgba(14,28,46,.95);border-bottom:1px solid var(--border);backdrop-filter:blur(12px);}
+  .nav-logo{display:flex;flex-direction:row;align-items:center;gap:10px;flex-shrink:0;}
+  .nav-logo-sub{font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:500;letter-spacing:.18em;color:var(--gold);text-transform:uppercase;white-space:nowrap;}
+  .nav-right{display:flex;align-items:center;gap:20px;list-style:none;margin:0;padding:0;}
+  .nav-right a{font-family:'Barlow Condensed',sans-serif;font-size:10.5px;font-weight:500;letter-spacing:.14em;text-transform:none;color:var(--warm);text-decoration:none;transition:color .2s;white-space:nowrap;}
+  .nav-right a:hover{color:var(--gold);}
+  .nav-right a span{text-transform:none;}
+  .nav-advisor{border:1px solid var(--gold-dim)!important;padding:7px 18px!important;border-radius:2px!important;color:var(--gold)!important;}
+  .nav-advisor:hover{border-color:var(--gold)!important;background:rgba(200,169,110,.08)!important;}
+  .nav-cta{font-family:'Barlow Condensed',sans-serif!important;font-size:11px!important;font-weight:600!important;letter-spacing:.08em!important;text-transform:none!important;background:var(--gold)!important;padding:9px 22px!important;border-radius:2px!important;color:var(--navy)!important;transition:background .2s!important;}
+  .nav-cta:hover{background:var(--gold2)!important;color:var(--navy)!important;}
+  .nav-menu-btn{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:5px;width:36px;height:36px;cursor:pointer;background:none;border:1px solid var(--border);border-radius:2px;padding:0;flex-shrink:0;}
+  .nav-menu-btn:hover{border-color:var(--gold-dim);}
+  .nav-menu-btn span{display:block;width:16px;height:1px;background:var(--warm);}
+  .nav-menu-btn:hover span{background:var(--gold);}
+  .drawer{position:fixed;top:0;right:0;width:320px;height:100vh;background:var(--navy2);border-left:1px solid var(--border);z-index:400;transform:translateX(100%);transition:transform .35s cubic-bezier(.4,0,.2,1);overflow-y:auto;}
+  .drawer-nav{display:flex;flex-direction:column;padding:36px 28px;}
+  @media(max-width:900px){nav{padding:0 20px;}.nav-right li:not(:last-child):not(:nth-last-child(2)):not(:nth-last-child(3)){display:none;}}
     footer { padding: 36px 24px; }
     .footer-links { align-items: flex-start; }
   }
@@ -138,14 +64,11 @@ html, body { background: #0E1824; min-height: 100vh; height: 100%; }
 <nav>
   <div class="nav-logo">
     <a href="https://www.integratedplanningpartners.com" style="display:flex;align-items:center;gap:10px;text-decoration:none;">
-      <svg style="height:38px;width:auto;display:block;" viewBox="875 1789 3260 1462" xmlns="http://www.w3.org/2000/svg">
+      <svg style="height:38px;width:auto;display:block;flex-shrink:0;" viewBox="875 1789 850 1462" xmlns="http://www.w3.org/2000/svg">
         <g><rect fill="#C8A96E" x="914.76" y="2074.65" width="228.09" height="228.09"/><rect fill="#C8A96E" x="1226.07" y="2697.25" width="228.09" height="228.09"/><path fill="#C8A96E" d="M1564.58,2074.65h-338.52v228.09h566.61c0-125.97-102.12-228.09-228.09-228.09Z"/><path fill="#C8A96E" d="M1226.07,2614.05h338.52c125.97,0,228.09-102.12,228.09-228.09h-566.61v228.09Z"/><rect fill="#C8A96E" x="914.76" y="2385.95" width="228.09" height="539.39"/></g>
-        <g><rect fill="#C8A96E" x="1677.85" y="2074.65" width="228.09" height="693.39"/><rect fill="#C8A96E" x="1989.17" y="2551.04" width="228.09" height="216.99"/><path fill="#C8A96E" d="M2327.67,2074.65h-338.52v228.09h566.61c0-125.97-102.12-228.09-228.09-228.09Z"/><path fill="#C8A96E" d="M1989.17,2468.65h338.52c125.97,0,228.09-102.12,228.09-228.09h-566.61v228.09Z"/></g>
-        <g><path fill="#C8A96E" d="M2792.84,2768.04V2074.65h-228.09v921.48h921.48v-228.09h-693.39Z"/></g>
-        <g><path fill="#C8A96E" d="M3668.25,1789h-228.09v921.48h921.48v-228.09h-693.39v-693.39Z"/></g>
       </svg>
       <div>
-        <div style="font-family:'Cormorant Garamond',serif;font-size:15px;font-weight:400;color:var(--off-white);line-height:1.2;">Integrated Planning<br>Partners</div>
+        <div style="font-family:'Cormorant Garamond',serif;font-size:14px;font-weight:400;color:var(--off-white);line-height:1.2;">Integrated Planning<br>Partners</div>
         <div class="nav-logo-sub">Built for planning. Designed for execution.</div>
       </div>
     </a>
@@ -156,13 +79,21 @@ html, body { background: #0E1824; min-height: 100vh; height: 100%; }
     <li><a href="https://www.integratedplanningpartners.com/index.html#book">Architecture of Retirement</a></li>
     <li><a href="https://www.integratedplanningpartners.com/advisor-portal.html" class="nav-advisor">Advisor Portal</a></li>
     <li><a href="https://structurereview.integratedplanningpartners.com/structurereview.html" class="nav-cta">Begin Your Review</a></li>
-    <li>
-      <button class="nav-menu-btn" onclick="document.querySelector('.drawer').style.transform='translateX(0)';document.querySelector('.drawer-overlay').style.opacity='1';document.querySelector('.drawer-overlay').style.pointerEvents='auto';" aria-label="Menu">
-        <span></span><span></span><span></span>
-      </button>
-    </li>
+    <li><button class="nav-menu-btn" onclick="document.querySelector('.drawer').style.transform='translateX(0)';document.querySelector('.drawer-overlay').style.opacity='1';document.querySelector('.drawer-overlay').style.pointerEvents='auto';" aria-label="Menu"><span></span><span></span><span></span></button></li>
   </ul>
 </nav>
+<div class="drawer-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;opacity:0;pointer-events:none;transition:opacity 0.3s;" onclick="document.querySelector('.drawer').style.transform='translateX(100%)';this.style.opacity='0';this.style.pointerEvents='none';"></div>
+<div class="drawer" style="transform:translateX(100%);">
+  <div class="drawer-nav">
+    <a href="https://www.integratedplanningpartners.com" style="font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);text-decoration:none;margin-bottom:28px;display:block;">Integrated Planning Partners</a>
+    <a href="https://www.integratedplanningpartners.com/incomearc.html" style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:400;color:var(--off-white);text-decoration:none;padding:14px 0;border-bottom:1px solid var(--border);display:block;">IncomeArc&#8482;</a>
+    <a href="https://www.integratedplanningpartners.com/income-architect-modeler.html" style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:400;color:var(--off-white);text-decoration:none;padding:14px 0;border-bottom:1px solid var(--border);display:block;">IncomeArchitect&#8482; Modeler</a>
+    <a href="https://www.integratedplanningpartners.com/index.html#book" style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:400;color:var(--off-white);text-decoration:none;padding:14px 0;border-bottom:1px solid var(--border);display:block;">Architecture of Retirement</a>
+    <a href="https://structurereview.integratedplanningpartners.com/structurereview.html" style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:400;color:var(--off-white);text-decoration:none;padding:14px 0;border-bottom:1px solid var(--border);display:block;">StructureReview&#8482;</a>
+    <a href="https://www.integratedplanningpartners.com/advisor-portal.html" style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:400;color:var(--gold);text-decoration:none;padding:14px 0;display:block;margin-top:8px;">Advisor Portal</a>
+  </div>
+  <button onclick="document.querySelector('.drawer').style.transform='translateX(100%)';document.querySelector('.drawer-overlay').style.opacity='0';document.querySelector('.drawer-overlay').style.pointerEvents='none';" style="position:absolute;top:20px;right:20px;background:none;border:none;color:var(--warm);font-size:20px;cursor:pointer;padding:8px;">&#10005;</button>
+</div>
 <div class="drawer-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;opacity:0;pointer-events:none;transition:opacity 0.3s;" onclick="document.querySelector('.drawer').style.transform='translateX(100%)';this.style.opacity='0';this.style.pointerEvents='none';"></div>
 <div class="drawer" style="transform:translateX(100%);">
   <div class="drawer-nav">
