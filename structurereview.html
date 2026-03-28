@@ -2019,8 +2019,7 @@ function App() {
   if(view==="report") return (<ClientReport answers={answers} report={report} onBack={start}/>);
   if(view==="advisor") return (<AdvisorBrief answers={answers} report={report} onBack={start}/>);
   if(view==="flow"&&currentQ)return(
-    <QuestionScreen question={currentQ} answer={answers[current
-Q.id]} onAnswer={handleAnswer} onNext={next} step={step} total={sequence.length} progress={((step+1)/sequence.length)*100}/>
+    <QuestionScreen question={currentQ} answer={answers[currentQ.id]} onAnswer={handleAnswer} onNext={next} step={step} total={sequence.length} progress={((step+1)/sequence.length)*100}/>
   );
   return null;
 }
