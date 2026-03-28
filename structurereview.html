@@ -1544,83 +1544,110 @@ function CompletionScreen({onReport,onAdvisor,answers,report}) {
         console.error("Advisor email failed:", advisorRes.status, errText);
       }
 
-      // ── Save to Supabase ─────────────────────────────────────
-      // This runs silently — email delivery is not blocked by Supabase success/failure
-      try {
-        const SUPABASE_URL = 'https://piixgvxrasddphklgazh.supabase.co';
-        const SUPABASE_KEY = 'sb_publishable_acvdk0hBniaB6qOD8_k8XQ_9R6FNbP_';
-        const sbHdrs = { 'Content-Type':'application/json', 'apikey':SUPABASE_KEY, 'Authorization':'Bearer '+SUPABASE_KEY };
+      // ── Document checklist email ──────────────────────────────
+      // Fires after SR submission — gives client a list of documents
+      // to gather before their planning meeting with Jeffrey
+      if (answers.email) {
+        try {
+          const firstName = report.firstName || answers.first_name || 'there';
+          const checklistHtml = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head>'
+            + '<body style="margin:0;padding:0;background:#0E1824;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;">'
+            + '<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#0E1824;">'
+            + '<tr><td align="center" style="padding:32px 16px;">'
+            + '<table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">'
 
-        // 1. Look up or create client by email
-        let clientId = null;
-        if (answers.email) {
-          const lookup = await fetch(
-            SUPABASE_URL+'/rest/v1/clients?email=eq.'+encodeURIComponent(answers.email)+'&select=id,pipeline_stage&limit=1',
-            { headers: sbHdrs }
-          );
-          const existing = await lookup.json();
-          if (existing?.length > 0) {
-            clientId = existing[0].id;
-          } else {
-            // Create new client record
-            const create = await fetch(SUPABASE_URL+'/rest/v1/clients', {
-              method:'POST',
-              headers: { ...sbHdrs, 'Prefer':'return=representation' },
-              body: JSON.stringify({
-                first_name:  answers.first_name || '',
-                last_name:   answers.last_name  || '',
-                email:       answers.email,
-                phone:       answers.phone      || null,
-                dob:         answers.dob        || null,
-                state:       answers.state      || null,
-                filing_status: answers.marital === 'married' ? 'mfj' : 'single',
-                spouse_first_name: answers.spouse_first_name || null,
-                spouse_last_name:  answers.spouse_last_name  || null,
-                status:        'prospect',
-                pipeline_stage:'structure_review',
-                referral_source: answers.how_heard || null,
-              })
-            });
-            const newClient = await create.json();
-            clientId = Array.isArray(newClient) ? newClient[0]?.id : newClient?.id;
-          }
-        }
+            // Header
+            + '<tr><td style="background:#162032;border-bottom:2px solid #C8A96E;border-radius:10px 10px 0 0;padding:22px 28px;">'
+            + '<p style="margin:0 0 6px;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:#C8A96E;">Integrated Planning Partners</p>'
+            + '<p style="margin:0 0 4px;font-family:Georgia,serif;font-size:22px;font-weight:400;color:#F5F2EC;">Your Planning Meeting — Documents to Gather</p>'
+            + '<p style="margin:0;font-size:12px;color:#6E8299;">Jeffrey Faine, CLU, RICP® · 773-318-9608</p>'
+            + '</td></tr>'
 
-        // 2. Save structure_review record with full answers
-        if (clientId) {
-          const srPayload = {
-            client_id:    clientId,
-            submitted_at: new Date().toISOString(),
-            answers: answers,
-            tracks:  report.tracks || [],
-            flags:   report.flags  || [],
-            planning_tracks: (report.tracks||[]).join(','),
-            status: 'submitted',
-          };
-          await fetch(SUPABASE_URL+'/rest/v1/structure_reviews', {
-            method:'POST',
-            headers: { ...sbHdrs, 'Prefer':'return=minimal' },
-            body: JSON.stringify(srPayload)
-          });
+            // Intro
+            + '<tr><td style="background:#0F1D2E;padding:22px 28px 12px;">'
+            + '<p style="margin:0 0 12px;font-size:14px;line-height:1.7;color:#C8BFA8;">Hi ' + firstName + ',</p>'
+            + '<p style="margin:0 0 12px;font-size:13px;line-height:1.7;color:#8EA4B8;">Thank you for completing your StructureReview™. To make our planning conversation as productive as possible, please gather the documents below before our meeting. You don\'t need everything — just whatever you have access to. Having these on hand allows us to work with real numbers rather than estimates.</p>'
+            + '</td></tr>'
 
-          // 3. Update client pipeline_stage and SR submitted timestamp
-          await fetch(SUPABASE_URL+'/rest/v1/clients?id=eq.'+clientId, {
-            method:'PATCH',
-            headers: { ...sbHdrs, 'Prefer':'return=minimal' },
+            // Checklist sections
+            + '<tr><td style="background:#0F1D2E;padding:4px 28px 20px;">'
+            + '<p style="margin:0 0 12px;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#C8A96E;font-weight:600;">Retirement Accounts</p>'
+            + '<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#162032;border-radius:8px;overflow:hidden;">'
+            + '<tr><td style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px;color:#C8BFA8;">· Most recent 401(k), 403(b), or IRA statements</td></tr>'
+            + '<tr><td style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px;color:#C8BFA8;">· Pension summary plan description or benefit statement</td></tr>'
+            + '<tr><td style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px;color:#C8BFA8;">· Annuity contracts and most recent values</td></tr>'
+            + '<tr><td style="padding:12px 16px;font-size:13px;color:#C8BFA8;">· Social Security statement (ssa.gov/myaccount)</td></tr>'
+            + '</table></td></tr>'
+
+            + '<tr><td style="background:#0F1D2E;padding:4px 28px 20px;">'
+            + '<p style="margin:0 0 12px;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#C8A96E;font-weight:600;">Tax Returns</p>'
+            + '<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#162032;border-radius:8px;overflow:hidden;">'
+            + '<tr><td style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px;color:#C8BFA8;">· Most recent 2 years of federal tax returns (1040)</td></tr>'
+            + '<tr><td style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px;color:#C8BFA8;">· W-2s or 1099s from the past 2 years</td></tr>'
+            + '<tr><td style="padding:12px 16px;font-size:13px;color:#C8BFA8;">· Schedule C if self-employed or business owner</td></tr>'
+            + '</table></td></tr>'
+
+            + '<tr><td style="background:#0F1D2E;padding:4px 28px 20px;">'
+            + '<p style="margin:0 0 12px;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#C8A96E;font-weight:600;">Insurance & Protection</p>'
+            + '<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#162032;border-radius:8px;overflow:hidden;">'
+            + '<tr><td style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px;color:#C8BFA8;">· Life insurance policy summaries (face amount, cash value, premium)</td></tr>'
+            + '<tr><td style="padding:12px 16px;font-size:13px;color:#C8BFA8;">· Long-term care policy details (if you have one)</td></tr>'
+            + '</table></td></tr>'
+
+            + '<tr><td style="background:#0F1D2E;padding:4px 28px 20px;">'
+            + '<p style="margin:0 0 12px;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#C8A96E;font-weight:600;">Cash Flow & Expenses</p>'
+            + '<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#162032;border-radius:8px;overflow:hidden;">'
+            + '<tr><td style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px;color:#C8BFA8;">· Monthly expense breakdown (housing, food, healthcare, transport)</td></tr>'
+            + '<tr><td style="padding:12px 16px;font-size:13px;color:#C8BFA8;">· Mortgage statement (balance, rate, monthly payment)</td></tr>'
+            + '</table></td></tr>'
+
+            + '<tr><td style="background:#0F1D2E;padding:4px 28px 20px;">'
+            + '<p style="margin:0 0 12px;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#C8A96E;font-weight:600;">Estate & Legal (if applicable)</p>'
+            + '<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#162032;border-radius:8px;overflow:hidden;">'
+            + '<tr><td style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px;color:#C8BFA8;">· Will, trust documents, or summary of estate plan</td></tr>'
+            + '<tr><td style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px;color:#C8BFA8;">· Charitable giving pledges or donor-advised fund statements</td></tr>'
+            + '<tr><td style="padding:12px 16px;font-size:13px;color:#C8BFA8;">· Summary of any significant debts (other than mortgage)</td></tr>'
+            + '</table></td></tr>'
+
+            // Closing note
+            + '<tr><td style="background:#162032;border-top:1px solid rgba(200,169,110,.15);padding:20px 28px;">'
+            + '<p style="margin:0 0 10px;font-size:13px;line-height:1.7;color:#8EA4B8;">Bring what you have — don\'t let a missing document delay our conversation. We can work with estimates and fill in gaps as we go.</p>'
+            + '<p style="margin:0 0 4px;font-size:13px;color:#C8BFA8;font-weight:500;">Jeffrey Faine, CLU, RICP®</p>'
+            + '<p style="margin:0;font-size:12px;color:#6E8299;">Integrated Planning Partners · 773-318-9608 · jf@emailipp.com</p>'
+            + '</td></tr>'
+
+            // Footer
+            + '<tr><td style="background:#0A1520;border-radius:0 0 10px 10px;padding:14px 28px;">'
+            + '<p style="margin:0;font-size:10px;color:#2A3D50;">Integrated Planning Partners · StructureReview™ · Document Preparation Guide</p>'
+            + '</td></tr>'
+
+            + '</table></td></tr></table></body></html>';
+
+          await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              pipeline_stage: 'structure_review',
-              structure_review_submitted_at: new Date().toISOString(),
-              first_name:  answers.first_name || undefined,
-              last_name:   answers.last_name  || undefined,
-              phone:       answers.phone      || undefined,
+              service_id: EMAILJS_SERVICE_ID,
+              template_id: EMAILJS_TEMPLATE_CLIENT,
+              user_id: EMAILJS_PUBLIC_KEY,
+              template_params: {
+                to_email: answers.email,
+                to_name: firstName,
+                name: report.name || 'Client',
+                client_name: report.name,
+                tracks: 'Document Checklist',
+                vision: 'Planning Meeting Preparation',
+                retire_age: answers.retire_age || '',
+                subject: 'Documents to Gather Before Your Planning Meeting',
+                html_content: checklistHtml,
+              }
             })
           });
+        } catch(checklistErr) {
+          console.warn('Checklist email failed (non-critical):', checklistErr);
         }
-      } catch(sbErr) {
-        // Supabase save failure is non-blocking — EmailJS already sent
-        console.warn('Supabase SR save failed (non-critical):', sbErr);
       }
-      // ── End Supabase save ────────────────────────────────────
+      // ── End checklist email ───────────────────────────────────
 
       setSent(true);
     } catch(e) {
