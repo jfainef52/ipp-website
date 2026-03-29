@@ -2959,7 +2959,7 @@ html, body { background: #0E1824; min-height: 100vh; height: 100%; }
     <div>For informational purposes only. Not financial, tax, legal, or investment advice.</div>
   </div>
 </footer>
-<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script type="text/babel" data-cfasync="false">
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script type="text/babel" data-cfasync="false">
 const { useState, useEffect, useRef } = React;
 
 const GS = `
@@ -4910,9 +4910,9 @@ function App() {
   if(view==="report") return (<ClientReport answers={answers} report={report} onBack={start}/>);
   if(view==="advisor") return (<AdvisorBrief answers={answers} report={report} onBack={start}/>);
   if(view==="flow"&&currentQ)return(
-    <QuestionScreen question={currentQ} aner={answers[currentQ.id]} onAnswer={handleAnswer} onNext={next} onBack={()=>step>0&&setStep(s=>s-1)} stepNum={step+1} totalSteps={sequence.length||1} allAnswers={answers}/>
+    <QuestionScreen question={currentQ} answer={answers[currentQ.id]} onAnswer={handleAnswer} onNext={next} onBack={()=>step>0&&setStep(s=>s-1)} stepNum={step+1} totalSteps={sequence.length||1} allAnswers={answers}/>
   );
   return null;
 }
 
-ReactDOM.render(<App/>, document.getElementById('root'));s
+ReactDOM.render(<App/>, document.getElementById('root'));c
