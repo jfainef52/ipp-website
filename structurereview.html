@@ -4034,8 +4034,13 @@ function App() {
     setAnswers(na);
     // Rebuild sequence on universal questions AND any question that gates a conditional branch
     const rebuildTriggers = ["universal","has_qp","biz_has_partners","biz_buysell","biz_retirement_plan"];
-    if(currentQ.phase==="universal" || rebuildTriggers.includes(currentQ.id))
-      setSequence(buildSequence(na));
+    if(currentQ.phase==="universal" || rebuildTriggers.includes(currentQ.id)) {
+      const newSeq = buildSequence(na);
+      setSequence(newSeq);
+      // Keep step pointing at the same question ID in the new sequence
+      const newIdx = newSeq.findIndex(q => q.id === currentQ.id);
+      if (newIdx !== -1 && newIdx !== step) setStep(newIdx);
+    }
   };
 
   const next=()=>{
