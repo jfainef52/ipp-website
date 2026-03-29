@@ -2192,7 +2192,7 @@ function QuestionScreen({question:questionProp,answer,onAnswer,onNext,onBack,ste
               {isMotivation ? <span style={{color:"rgba(200,169,110,.7)"}}>Goals & Concerns</span> : "StructureReview™"}
             </div>
           </div>
-          {stepNum>1&&<button onClick={onBack} style={{color:"#6E8299",fontSize:12,fontWeight:500,display:"flex",alignItems:"center",gap:5}}>← Back</button>}
+          
         </div>
         <div style={{marginBottom:4}}>
           <div style={{display:"flex",justifyContent:"flex-end",marginBottom:5}}>
@@ -2258,12 +2258,21 @@ function QuestionScreen({question:questionProp,answer,onAnswer,onNext,onBack,ste
             Why are we asking this?
           </button>
         )}
-        <button ref={continueRef} onClick={()=>{if(question.type==="text"||question.type==="number")onAnswer(textVal||answer);onNext();}} disabled={!canContinue} style={{
-          width:"100%",padding:"15px",borderRadius:11,fontSize:14,fontWeight:700,letterSpacing:".03em",
-          background:canContinue?"#C8A96E":"rgba(255,255,255,.06)",
-          color:canContinue?"#0E1824":"#3A5268",
-          transition:"all .18s ease",
-        }}>{stepNum===totalSteps?"Complete Review →":"Continue →"}</button>
+        <div style={{display:"flex",gap:10,alignItems:"stretch"}}>
+          {stepNum>1&&(
+            <button onClick={onBack} style={{
+              padding:"15px 20px",borderRadius:11,fontSize:14,fontWeight:600,
+              background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.1)",
+              color:"#6E8299",flexShrink:0,display:"flex",alignItems:"center",gap:6
+            }}>← Back</button>
+          )}
+          <button ref={continueRef} onClick={()=>{if(question.type==="text"||question.type==="number")onAnswer(textVal||answer);onNext();}} disabled={!canContinue} style={{
+            flex:1,padding:"15px",borderRadius:11,fontSize:14,fontWeight:700,letterSpacing:".03em",
+            background:canContinue?"#C8A96E":"rgba(255,255,255,.06)",
+            color:canContinue?"#0E1824":"#3A5268",
+            transition:"all .18s ease",
+          }}>{stepNum===totalSteps?"Complete Review →":"Continue →"}</button>
+        </div>
       </div>
       {showWhy&&<WhyCard text={question.why} onClose={()=>setShowWhy(false)}/>}
     </div>
