@@ -4401,6 +4401,10 @@ function buildSequence(answers) {
   const skipAttorneyName = answers.has_attorney  !== "att_yes";
   // Skip referring advisor name if not referred by advisor
   const skipReferralName = answers.how_heard !== "hh_advisor";
+
+  // If advisor came via URL param (?a=), skip how_heard and referring_advisor_name
+  const hasAdvisorParam = !!(new URLSearchParams(window.location.search).get('a'));
+  const skipHowHeard = hasAdvisorParam;
   // Skip partner/buy-sell questions if no partners
   const skipPartners    = answers.biz_has_partners !== "bhp_yes";
   // Skip buy-sell funding if no buy-sell in place
@@ -4425,6 +4429,7 @@ function buildSequence(answers) {
     if (q.id==="advisor_name"           && skipAdvisorName)  return false;
     if (q.id==="attorney_name"          && skipAttorneyName) return false;
     if (q.id==="referring_advisor_name" && skipReferralName) return false;
+    if ((q.id==="how_heard" || q.id==="referring_advisor_name") && skipHowHeard) return false;
     if ((q.id==="biz_partner_count"||q.id==="biz_buysell"||q.id==="biz_buysell_funding") && skipPartners) return false;
     if (q.id==="le_type" && bizSaleRedundant) return false;
     // Skip minor/adult children questions if no children
