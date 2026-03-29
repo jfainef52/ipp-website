@@ -2822,11 +2822,12 @@ function buildSequence(answers) {
 
   const seen = new Set();
   return seq.filter(q => {
+    if (q.condition && !q.condition(answers)) return false;
     if (seen.has(q.id)) return false;
     if (q.phase==="qp" && q.id!=="has_qp" && skipQP) return false;
     if (q.id==="qp_roth_pct" && skipRothPct) return false;
     if (q.id==="concern_spouse"         && skipSpouse)       return false;
-    if ((q.id==="spouse_first_name"||q.id==="spouse_last_name"||q.id==="spouse_dob"||q.id==="spouse_health") && skipSpouse) return false;
+    if ((q.id==="spouse_first_name"||q.id==="spouse_last_name"||q.id==="spouse_dob"||q.id==="spouse_health"||q.id==="anniversary"||q.id==="spouse_employment"||q.id==="spouse_business"||q.id==="spouse_income"||q.id==="spouse_retirement_plan") && skipSpouse) return false;
     if (q.id==="retire_age"             && skipRetire)       return false;
     if (q.id==="cpa_name"               && skipCpaName)      return false;
     if (q.id==="advisor_name"           && skipAdvisorName)  return false;
