@@ -6029,20 +6029,52 @@ function CompletionScreen({onReport,onAdvisor,answers,report,advisorId,advisorCo
 
         + "</table></td></tr></table></body></html>";
 
-      // Send advisor copy
+      // Send advisor copy — route based on advisor assignment
+      // Determine primary recipient and cc
+      const SUPPORT_EMAIL = "support@integratedplanningpartners.com";
+      let advisorToEmail = SUPPORT_EMAIL;
+      let advisorCcEmail = "";
+
+      if (answers.how_heard === "hh_advisor") {
+        // Unknown advisor queue — only support
+        advisorToEmail = SUPPORT_EMAIL;
+      } else {
+        // Jeff's cases (organic, seminar, book, social, hh_jeff) OR advisor link
+        // Look up advisor email from Supabase
+        try {
+          const SB_URL = "https://piixgvxrasddphklgazh.supabase.co";
+          const SB_KEY = "sb_publishable_acvdk0hBniaB6qOD8_k8XQ_9R6FNbP_";
+          const code = new URLSearchParams(window.location.search).get("a") || "jeff-faine";
+          const advRes = await fetch(SB_URL + "/rest/v1/advisor_profiles?advisor_code=eq." + encodeURIComponent(code) + "&select=email&limit=1", {
+            headers:{"apikey":SB_KEY,"Accept":"application/json"}
+          });
+          const advData = await advRes.json();
+          if (advData && advData[0] && advData[0].email) {
+            advisorToEmail = advData[0].email;
+            advisorCcEmail = SUPPORT_EMAIL;
+          }
+        } catch(e) {
+          advisorToEmail = SUPPORT_EMAIL;
+        }
+      }
+
+      // Send to advisor (primary) + CC support
+      const advisorParams = {
+        to_email: advisorToEmail,
+        name: report.name||"Client",
+        email: answers.email||"",
+        reply_to: answers.email||"",
+        html_content: advisorHtml,
+      };
+      if (advisorCcEmail) advisorParams.cc_email = advisorCcEmail;
+
       const advisorRes = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
         method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({
           service_id: EMAILJS_SERVICE_ID,
           template_id: EMAILJS_TEMPLATE_ADVISOR,
           user_id: EMAILJS_PUBLIC_KEY,
-          template_params: {
-            to_email: "support@integratedplanningpartners.com",
-            name: report.name||"Client",
-            email: answers.email||"",
-            reply_to: answers.email||"",
-            html_content: advisorHtml,
-          }
+          template_params: advisorParams
         })
       });
       if (!advisorRes.ok) {
