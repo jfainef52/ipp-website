@@ -2830,7 +2830,7 @@ function buildSequence(answers) {
   return seq.filter(q => {
     if (q.condition && !q.condition(answers)) return false;
     if (seen.has(q.id)) return false;
-    if (q.phase==="qp" && q.id!=="has_qp" && skipQP) return false;
+    if (q.phase==="qp" && q.id!=="has_qp" && !q.id.startsWith("inherited_qp") && q.id!=="has_inherited_qp" && skipQP) return false;
     if (q.id==="qp_roth_pct" && skipRothPct) return false;
     if (q.id==="concern_spouse"         && skipSpouse)       return false;
     if ((q.id==="spouse_first_name"||q.id==="spouse_last_name"||q.id==="spouse_dob"||q.id==="spouse_health"||q.id==="anniversary"||q.id==="spouse_bio_sex"||q.id==="spouse_employment"||q.id==="spouse_business"||q.id==="spouse_income"||q.id==="spouse_retirement_plan") && skipSpouse) return false;
@@ -4033,7 +4033,7 @@ function App() {
 
     setAnswers(na);
     // Rebuild sequence on universal questions AND any question that gates a conditional branch
-    const rebuildTriggers = ["universal","has_qp","biz_has_partners","biz_buysell","biz_retirement_plan"];
+    const rebuildTriggers = ["universal","has_qp","has_inherited_qp","biz_has_partners","biz_buysell","biz_retirement_plan"];
     if(currentQ.phase==="universal" || rebuildTriggers.includes(currentQ.id)) {
       const newSeq = buildSequence(na);
       setSequence(newSeq);
