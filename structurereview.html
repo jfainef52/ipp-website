@@ -3794,7 +3794,7 @@ function ClientReport({answers,report,onBack}) {
     estate:{label:"Estate Planning",color:"#9B7EC8",desc:"At your asset level, how wealth transfers to the next generation matters. Estate tax exposure, beneficiary structure, and the tax character of inherited assets can all be meaningfully improved with the right approach."},
   };
   return (
-    <div style={{minHeight:"100vh",background:"#0E1824",fontFamily:"'DM Sans',sans-serif",paddingBottom:48}}>
+    <div style={{minHeight:"100vh",background:"#0E1824",fontFamily:"'DM Sans',sans-serif",paddingTop:88,paddingBottom:80}}>
       <div style={{maxWidth:520,margin:"0 auto"}}>
         <div style={{background:"#162032",borderBottom:"1px solid rgba(200,169,110,.2)",padding:"20px 22px"}}>
           <div style={{fontSize:9,letterSpacing:".18em",textTransform:"uppercase",color:"#C8A96E",marginBottom:7}}>StructureReview™ — Client Summary</div>
@@ -3899,7 +3899,7 @@ function AdvisorBrief({answers,report,onBack}) {
   if(answers.planning_urgency) motivSummary.push({label:"Planning urgency",val:urgencyMap[answers.planning_urgency]||answers.planning_urgency});
 
   return (
-    <div style={{minHeight:"100vh",background:"#090F18",fontFamily:"'DM Sans',sans-serif",paddingBottom:60}}>
+    <div style={{minHeight:"100vh",background:"#090F18",fontFamily:"'DM Sans',sans-serif",paddingTop:88,paddingBottom:80}}>
       <div style={{maxWidth:640,margin:"0 auto"}}>
         <div style={{background:"#111E2E",borderBottom:"2px solid rgba(200,169,110,.22)",padding:"18px 24px"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:10}}>
