@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StructureReview™ — Full Client Answers</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Barlow+Condensed:wght@300;400;500;600&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy:     #0B1220;
+    --navy2:    #0F1D2E;
+    --navy3:    #162032;
+    --gold:     #C8A96E;
+    --gold2:    #E0C080;
+    --gold-dim: rgba(200,169,110,0.3);
+    --warm:     #F5F2EC;
+    --gray:     #8EA4B8;
+    --border:   rgba(255,255,255,0.08);
+    --error:    #C47A7A;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--navy);
+    color: var(--warm);
+    font-family: 'Barlow', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+  }
+
+  /* ── NAV ── */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    height: 64px;
+    background: rgba(11,18,32,0.95);
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(12px);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 40px;
+  }
+  .nav-logo {
+    display: flex; align-items: center; gap: 10px;
+    text-decoration: none;
+  }
+  .nav-logo svg { height: 36px; width: auto; }
+  .nav-logo-text { font-family: 'Cormorant Garamond', serif; font-size: 14px; color: var(--warm); line-height: 1.2; }
+  .nav-logo-sub { font-family: 'Barlow Condensed', sans-serif; font-size: 8px; font-weight: 500; letter-spacing: .18em; color: var(--gold); text-transform: uppercase; }
+  .nav-badge {
+    font-family: 'Barlow Condensed', sans-serif; font-size: 9px; font-weight: 600;
+    letter-spacing: .2em; text-transform: uppercase;
+    color: var(--gold); border: 1px solid var(--gold-dim);
+    padding: 4px 12px; border-radius: 2px;
+  }
+
+  /* ── MAIN ── */
+  main { padding: 100px 40px 60px; max-width: 900px; margin: 0 auto; }
+
+  /* ── LOADING / ERROR ── */
+  #loading, #error {
+    text-align: center; padding: 80px 40px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--gray);
+  }
+  #error { color: var(--error); }
+  .spinner {
+    width: 32px; height: 32px; border: 1px solid var(--border);
+    border-top-color: var(--gold); border-radius: 50%;
+    animation: spin .8s linear infinite; margin: 0 auto 20px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── HEADER ── */
+  .report-header {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 32px; margin-bottom: 40px;
+  }
+  .report-eyebrow {
+    font-family: 'Barlow Condensed', sans-serif; font-size: 9px; font-weight: 600;
+    letter-spacing: .22em; text-transform: uppercase; color: var(--gold);
+    display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+  }
+  .report-eyebrow::before { content: ''; width: 20px; height: 1px; background: var(--gold); }
+  .report-name {
+    font-family: 'Cormorant Garamond', serif; font-size: 42px; font-weight: 300;
+    color: var(--warm); line-height: 1.1; margin-bottom: 8px;
+  }
+  .report-meta {
+    font-family: 'Barlow Condensed', sans-serif; font-size: 11px; font-weight: 400;
+    letter-spacing: .1em; color: var(--gray); text-transform: uppercase;
+    display: flex; gap: 24px; flex-wrap: wrap;
+  }
+  .report-meta span { display: flex; align-items: center; gap: 6px; }
+  .report-meta span::before { content: ''; width: 4px; height: 4px; border-radius: 50%; background: var(--gold-dim); }
+
+  /* ── SECTIONS ── */
+  .section {
+    margin-bottom: 40px;
+    animation: fadeUp .4s ease both;
+  }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+  .section:nth-child(2) { animation-delay: .05s; }
+  .section:nth-child(3) { animation-delay: .1s; }
+  .section:nth-child(4) { animation-delay: .15s; }
+  .section:nth-child(5) { animation-delay: .2s; }
+  .section:nth-child(6) { animation-delay: .25s; }
+  .section:nth-child(7) { animation-delay: .3s; }
+
+  .section-title {
+    font-family: 'Barlow Condensed', sans-serif; font-size: 9px; font-weight: 600;
+    letter-spacing: .22em; text-transform: uppercase; color: var(--gold);
+    margin-bottom: 16px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .answer-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 2px;
+    background: var(--border); border-radius: 6px; overflow: hidden;
+  }
+  .answer-row {
+    background: var(--navy2); padding: 14px 18px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .answer-row.full-width { grid-column: 1 / -1; }
+  .answer-label {
+    font-family: 'Barlow Condensed', sans-serif; font-size: 9px; font-weight: 500;
+    letter-spacing: .14em; text-transform: uppercase; color: var(--gray);
+  }
+  .answer-value {
+    font-family: 'Barlow', sans-serif; font-size: 13px; font-weight: 400;
+    color: var(--warm); line-height: 1.5;
+  }
+  .answer-value.empty { color: var(--gray); font-style: italic; }
+  .answer-value.highlight { color: var(--gold); font-weight: 500; }
+
+  /* ── LIFESTYLE CARDS ── */
+  .lifestyle-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+  }
+  .lifestyle-card {
+    background: var(--navy3); border: 1px solid var(--border);
+    border-radius: 6px; padding: 16px 18px;
+  }
+  .lifestyle-card-icon { font-size: 20px; margin-bottom: 8px; }
+  .lifestyle-card-label {
+    font-family: 'Barlow Condensed', sans-serif; font-size: 9px; font-weight: 500;
+    letter-spacing: .14em; text-transform: uppercase; color: var(--gray); margin-bottom: 4px;
+  }
+  .lifestyle-card-value {
+    font-family: 'Cormorant Garamond', serif; font-size: 18px; font-weight: 400;
+    color: var(--warm); line-height: 1.3;
+  }
+  .lifestyle-card-value.empty { font-size: 13px; font-family: 'Barlow', sans-serif; color: var(--gray); font-style: italic; }
+
+  /* ── FLAGS ── */
+  .flags-list { display: flex; flex-direction: column; gap: 8px; }
+  .flag {
+    padding: 14px 18px; border-radius: 4px;
+    border-left: 3px solid;
+    background: rgba(255,255,255,0.02);
+  }
+  .flag.high { border-color: #C47A7A; }
+  .flag.medium { border-color: #C8A030; }
+  .flag.low { border-color: var(--gray); }
+  .flag-priority {
+    font-family: 'Barlow Condensed', sans-serif; font-size: 9px; font-weight: 600;
+    letter-spacing: .14em; text-transform: uppercase; margin-bottom: 4px;
+  }
+  .flag.high .flag-priority { color: #C47A7A; }
+  .flag.medium .flag-priority { color: #C8A030; }
+  .flag.low .flag-priority { color: var(--gray); }
+  .flag-text { font-size: 12px; color: #C8BFA8; line-height: 1.55; }
+
+  /* ── FOOTER ── */
+  .page-footer {
+    margin-top: 60px; padding-top: 24px; border-top: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: 'Barlow Condensed', sans-serif; font-size: 10px;
+    letter-spacing: .1em; text-transform: uppercase; color: var(--gray);
+  }
+
+  @media (max-width: 640px) {
+    main { padding: 90px 20px 40px; }
+    .answer-grid { grid-template-columns: 1fr; }
+    .lifestyle-grid { grid-template-columns: 1fr 1fr; }
+    nav { padding: 0 20px; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="https://www.integratedplanningpartners.com" class="nav-logo">
+    <svg viewBox="875 1789 3260 1462" xmlns="http://www.w3.org/2000/svg">
+      <g><rect fill="#C8A96E" x="914.76" y="2074.65" width="228.09" height="228.09"/><rect fill="#C8A96E" x="1226.07" y="2697.25" width="228.09" height="228.09"/><path fill="#C8A96E" d="M1564.58,2074.65h-338.52v228.09h566.61c0-125.97-102.12-228.09-228.09-228.09Z"/><path fill="#C8A96E" d="M1226.07,2614.05h338.52c125.97,0,228.09-102.12,228.09-228.09h-566.61v228.09Z"/><rect fill="#C8A96E" x="914.76" y="2385.95" width="228.09" height="539.39"/><path fill="#C8A96E" d="M2011.69,1828.72h15.92v1342.55h-15.92z"/><path fill="#C8A96E" d="M2402.93,2389.86c-15.76-7.03-34.78-10.54-57.07-10.54h-99.24v254.46h36.35v-77.06h62.89c22.29,0,41.31-3.58,57.07-10.72,15.75-7.15,27.87-17.32,36.35-30.54,8.48-13.21,12.73-29.02,12.73-47.44s-4.24-34.29-12.73-47.62c-8.48-13.33-20.6-23.5-36.35-30.54Z"/></g>
+    </svg>
+    <div>
+      <div class="nav-logo-text">Integrated Planning<br>Partners</div>
+      <div class="nav-logo-sub">Built for planning. Designed for execution.</div>
+    </div>
+  </a>
+  <div class="nav-badge">StructureReview™ — Full Client Record</div>
+</nav>
+
+<main>
+  <div id="loading">
+    <div class="spinner"></div>
+    Loading client answers...
+  </div>
+  <div id="error" style="display:none;"></div>
+  <div id="content" style="display:none;"></div>
+</main>
+
+<script>
+const SB_URL = 'https://piixgvxrasddphklgazh.supabase.co';
+const SB_KEY = 'sb_publishable_acvdk0hBniaB6qOD8_k8XQ_9R6FNbP_';
+
+// Label maps for option IDs
+const LABELS = {
+  // Contact preference
+  cp_email: 'Email', cp_call: 'Phone call', cp_text: 'Text message', cp_any: 'Any — whatever is fastest',
+  // Bio sex
+  male: 'Male', female: 'Female', sp_male: 'Male', sp_female: 'Female',
+  // Health
+  sh_excellent: 'Excellent', sh_good: 'Good', sh_fair: 'Fair', sh_poor: 'Poor',
+  // Tobacco
+  tb_no: 'No', tb_yes_current: 'Yes — currently', tb_yes_former: 'Former user',
+  // Insurance
+  id_no: 'No', id_yes: 'Yes',
+  // Marital
+  married: 'Married or partnered', single: 'Single', divorced: 'Divorced', widowed: 'Widowed',
+  // Children
+  ch_none: 'No children', ch_1: '1', ch_2: '2', ch_3: '3', ch_4: '4', ch_5plus: '5 or more',
+  // Employment
+  employed: 'Employed full-time', part_time: 'Part-time', self_employed: 'Self-employed / business owner',
+  retired: 'Retired', not_working: 'Not currently working',
+  sp_emp_full: 'Full-time', sp_emp_part: 'Part-time', sp_emp_self: 'Self-employed / business owner',
+  sp_emp_retired: 'Retired', sp_emp_not: 'Not working',
+  sp_biz_yes: 'Yes', sp_biz_no: 'No',
+  sp_inc_under50: 'Under $50,000', sp_inc_50_100: '$50,000–$100,000', sp_inc_100_200: '$100,000–$200,000',
+  sp_inc_200_500: '$200,000–$500,000', sp_inc_over500: 'Over $500,000',
+  sp_rp_yes_active: 'Yes — contributing', sp_rp_yes_not: 'Yes — not contributing',
+  sp_rp_no: 'No employer plan', sp_rp_pension: 'Pension / defined benefit',
+  // Primary asset
+  pa_qp: 'Qualified retirement accounts', pa_real_estate: 'Real estate', pa_business: 'Business equity',
+  pa_investment: 'Investment accounts', pa_mixed: 'Mixed / roughly equal',
+  // Net worth
+  nw_under500: 'Under $500,000', nw_500_1m: '$500,000–$1M', nw_1_3m: '$1M–$3M',
+  nw_3_5m: '$3M–$5M', nw_over5m: 'Over $5M',
+  // Has CPA/advisor/attorney
+  cpa_yes: 'Yes', cpa_no: 'No',
+  adv_yes: 'Yes', adv_no: 'No',
+  att_yes: 'Yes', att_no: 'No',
+  // How heard
+  hh_jeff: 'Working with Jeff Faine', hh_advisor: 'Referred by another IPP advisor',
+  hh_seminar: 'Attended a seminar', hh_book: 'Read Architecture of Retirement',
+  hh_social: 'Social media or internet search', hh_other: 'Other',
+  // Event horizon
+  business_sale: 'Selling a business', real_estate_sale: 'Selling real estate',
+  equity_event: 'Equity compensation event', retirement: 'Retiring / stepping back',
+  nothing: 'No major event anticipated',
+  // QP
+  hqp_401k: '401(k)', hqp_403b: '403(b)', hqp_ira_trad: 'Traditional IRA',
+  hqp_sep: 'SEP IRA', hqp_simple: 'SIMPLE IRA', hqp_pension: 'Pension',
+  hqp_roth: 'Roth IRA / Roth 401(k)', hqp_none: 'None',
+  // QP balance
+  qpb_under250: 'Under $250,000', qpb_250_500: '$250,000–$500,000',
+  qpb_500_1m: '$500,000–$1M', qpb_1_2m: '$1M–$2M', qpb_2_3m: '$2M–$3M',
+  qpb_over3m: 'Over $3M',
+  // Roth pct
+  rp_none: 'None — all pre-tax', rp_small: 'Less than 25%', rp_quarter: 'About 25%',
+  rp_half: 'About 50%', rp_most: 'More than 75%', rp_all: 'All Roth',
+  // RMD
+  rmd_yes: 'Yes — strategy in place', rmd_partial: 'Somewhat — thought about it',
+  rmd_no: 'Not on my radar',
+  // Beneficiary
+  qpb_spouse: 'Spouse', qpb_children: 'Children', qpb_mixed: 'Mix of family members',
+  qpb_trust: 'Trust or estate', qpb_charity: 'Charity',
+  // Inherited QP
+  inh_yes: 'Yes', inh_no: 'No',
+  inh_recent: 'Within the last 1–2 years', inh_mid: '3–6 years ago', inh_older: 'More than 6 years ago',
+  inh_bal_small: 'Under $250,000', inh_bal_mid: '$250,000–$500,000',
+  inh_bal_large: '$500,000–$1M', inh_bal_xlarge: 'Over $1M',
+  inh_dist_yes: 'Yes — taking distributions', inh_dist_no: 'Not yet', inh_dist_unsure: 'Unsure of rules',
+  // Estate
+  ep_yes_full: 'Yes — complete plan', ep_yes_partial: 'Partial — some documents',
+  ep_no: 'No estate plan', ep_old: 'Yes — but needs updating',
+  ec_survivor: 'Survivor income for spouse', ec_equalize: 'Equal distribution among children',
+  ec_charity: 'Charitable giving', ec_business: 'Business succession',
+  ec_tax: 'Estate tax reduction', ec_none: 'No specific concerns',
+  // Income
+  ig_yes: 'Yes — income will cover expenses', ig_partial: 'Partially — will need to supplement',
+  ig_no: 'No — will need significant income from savings',
+  cp_yes: 'Yes — plan in place', cp_no: 'No plan', cp_partial: 'Partial — thinking about it',
+  li_yes: 'Yes', li_no: 'No',
+  // Advisor present
+  ap_self: 'On my own', ap_advisor: 'With my advisor',
+  // LE
+  le_biz: 'Business sale', le_real_estate: 'Real estate sale', le_equity: 'Equity / stock event',
+  le_other: 'Other',
+  le_yes: 'Yes — closed', le_no: 'Not yet',
+  le_under500: 'Under $500K', le_500_1m: '$500K–$1M', le_1_3m: '$1M–$3M', le_over3m: 'Over $3M',
+  le_pay_tax: 'Pay the taxes and invest the rest', le_defer: 'Looking for deferral strategies',
+  le_unsure: 'Unsure — need guidance',
+};
+
+function label(val) {
+  if (!val) return null;
+  if (Array.isArray(val)) return val.map(v => LABELS[v] || v).join(', ');
+  return LABELS[val] || val;
+}
+
+function fmt(val, fallback) {
+  const l = label(val);
+  return l || fallback || null;
+}
+
+function fmtDate(d) {
+  if (!d) return null;
+  try {
+    const dt = new Date(d + 'T12:00:00');
+    return dt.toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'});
+  } catch { return d; }
+}
+
+function calcAge(dob) {
+  if (!dob) return null;
+  const d = new Date(dob + 'T12:00:00');
+  if (isNaN(d)) return null;
+  const now = new Date();
+  let age = now.getFullYear() - d.getFullYear();
+  if (now.getMonth() < d.getMonth() || (now.getMonth() === d.getMonth() && now.getDate() < d.getDate())) age--;
+  return age;
+}
+
+function calcYearsMarried(d) {
+  if (!d) return null;
+  const dt = new Date(d + 'T12:00:00');
+  if (isNaN(dt)) return null;
+  const now = new Date();
+  let y = now.getFullYear() - dt.getFullYear();
+  if (now.getMonth() < dt.getMonth() || (now.getMonth() === dt.getMonth() && now.getDate() < dt.getDate())) y--;
+  return y >= 0 ? y : null;
+}
+
+function row(label, value, opts = {}) {
+  if (!value && !opts.showEmpty) return '';
+  const cls = ['answer-row'];
+  if (opts.fullWidth) cls.push('full-width');
+  const valCls = ['answer-value'];
+  if (!value) valCls.push('empty');
+  if (opts.highlight) valCls.push('highlight');
+  return `<div class="${cls.join(' ')}">
+    <div class="answer-label">${label}</div>
+    <div class="${valCls.join(' ')}">${value || '—'}</div>
+  </div>`;
+}
+
+function section(title, html) {
+  if (!html.trim()) return '';
+  return `<div class="section">
+    <div class="section-title">${title}</div>
+    ${html}
+  </div>`;
+}
+
+function grid(rows) {
+  return `<div class="answer-grid">${rows}</div>`;
+}
+
+function renderAnswers(sr, client) {
+  const a = sr.answers || {};
+  const age = calcAge(a.dob);
+  const spouseAge = calcAge(a.spouse_dob);
+  const yearsMarried = calcYearsMarried(a.anniversary);
+  const hasSpouse = a.marital === 'married' || a.marital === 'partnered';
+
+  const submittedAt = sr.submitted_at
+    ? new Date(sr.submitted_at).toLocaleDateString('en-US', {month:'long',day:'numeric',year:'numeric', hour:'2-digit', minute:'2-digit'})
+    : '';
+
+  let html = '';
+
+  // ── Header ──────────────────────────────────────────────────────
+  html += `<div class="report-header">
+    <div class="report-eyebrow">StructureReview™ — Complete Client Record</div>
+    <div class="report-name">${a.first_name || ''} ${a.last_name || ''}</div>
+    <div class="report-meta">
+      ${age !== null ? `<span>Age ${age}</span>` : ''}
+      ${a.state ? `<span>${a.state}</span>` : ''}
+      ${submittedAt ? `<span>Submitted ${submittedAt}</span>` : ''}
+      ${sr.planning_tracks ? `<span>Tracks: ${sr.planning_tracks}</span>` : ''}
+    </div>
+  </div>`;
+
+  // ── 1. Personal ──────────────────────────────────────────────────
+  let personal = grid(
+    row('Email', a.email, {highlight: true}) +
+    row('Phone', a.phone) +
+    row('Contact Preference', fmt(a.contact_preference)) +
+    row('Date of Birth', fmtDate(a.dob) + (age !== null ? ` (Age ${age})` : '')) +
+    row('Biological Sex', fmt(a.bio_sex)) +
+    row('State', a.state) +
+    row('Marital Status', fmt(a.marital)) +
+    (hasSpouse ? row('Spouse', `${a.spouse_first_name || ''} ${a.spouse_last_name || ''}`.trim()) : '') +
+    (hasSpouse && a.spouse_dob ? row('Spouse DOB', fmtDate(a.spouse_dob) + (spouseAge !== null ? ` (Age ${spouseAge})` : '')) : '') +
+    (hasSpouse && a.anniversary ? row('Wedding Anniversary', fmtDate(a.anniversary) + (yearsMarried !== null ? ` — Married ${yearsMarried} years` : ''), {highlight: true}) : '') +
+    row('Children', fmt(a.children_count)) +
+    (a.minor_children_count && a.minor_children_count !== 'ch_none' ? row('Minor Children', fmt(a.minor_children_count)) : '') +
+    (a.adult_children_count && a.adult_children_count !== 'ch_none' ? row('Adult Children', fmt(a.adult_children_count)) : '')
+  );
+  html += section('Personal', personal);
+
+  // ── 2. Health & Underwriting ─────────────────────────────────────
+  let health = grid(
+    row('Health Status', fmt(a.health_status)) +
+    row('Tobacco / Nicotine', fmt(a.tobacco)) +
+    row('Insurance Declined / Rated', fmt(a.insurance_declined)) +
+    (hasSpouse ? row('Spouse Health', fmt(a.spouse_health)) : '') +
+    (hasSpouse && a.spouse_bio_sex ? row('Spouse Biological Sex', fmt(a.spouse_bio_sex)) : '')
+  );
+  html += section('Health & Underwriting', health);
+
+  // ── 3. Employment ────────────────────────────────────────────────
+  let employment = grid(
+    row('Employment Status', fmt(a.employment)) +
+    (hasSpouse ? row('Spouse Employment', fmt(a.spouse_employment)) : '') +
+    (hasSpouse && a.spouse_business ? row('Spouse Business Owner', fmt(a.spouse_business)) : '') +
+    (hasSpouse && a.spouse_income ? row('Spouse Annual Income', fmt(a.spouse_income)) : '') +
+    (hasSpouse && a.spouse_retirement_plan ? row('Spouse Retirement Plan', fmt(a.spouse_retirement_plan)) : '')
+  );
+  html += section('Employment', employment);
+
+  // ── 4. Financial Picture ─────────────────────────────────────────
+  let financial = grid(
+    row('Primary Asset', fmt(a.primary_asset)) +
+    row('Estimated Net Worth', fmt(a.net_worth)) +
+    row('Qualified Plan Accounts', Array.isArray(a.has_qp) ? a.has_qp.map(v => LABELS[v]||v).join(', ') : fmt(a.has_qp)) +
+    row('QP Balance', fmt(a.qp_balance)) +
+    row('Roth Percentage', fmt(a.qp_roth_pct)) +
+    row('QP Beneficiary', fmt(a.qp_beneficiary))
+  );
+  html += section('Financial Picture', financial);
+
+  // ── 5. RMD & Inherited QP ────────────────────────────────────────
+  const age73 = age !== null ? (age >= 73 ? 'Currently in RMD years' : `RMDs begin in ${73 - age} year${73-age===1?'':'s'}`) : null;
+  let rmd = grid(
+    (age73 ? row('RMD Timeline', age73, {highlight: age !== null && age >= 73}) : '') +
+    row('RMD Planning', fmt(a.rmd_status)) +
+    row('Inherited Qualified Plan', fmt(a.has_inherited_qp), {showEmpty: true}) +
+    (a.has_inherited_qp === 'inh_yes' ? row('When Inherited', fmt(a.inherited_qp_timing)) : '') +
+    (a.has_inherited_qp === 'inh_yes' ? row('Inherited Balance', fmt(a.inherited_qp_balance)) : '') +
+    (a.has_inherited_qp === 'inh_yes' ? row('Taking Distributions', fmt(a.inherited_qp_distributions)) : '')
+  );
+  html += section('RMDs & Inherited Plans', rmd);
+
+  // ── 6. Planning Areas ────────────────────────────────────────────
+  let planning = grid(
+    row('Estate Plan', fmt(a.estate_plan)) +
+    row('Estate Concerns', Array.isArray(a.estate_concern) ? a.estate_concern.map(v => LABELS[v]||v).join(', ') : fmt(a.estate_concern)) +
+    row('Income Gap in Retirement', fmt(a.income_gap)) +
+    row('Long-Term Care Plan', fmt(a.care_plan)) +
+    row('Life Insurance', fmt(a.life_insurance)) +
+    row('Upcoming Financial Event', fmt(a.event_horizon)) +
+    row('Retirement Vision', a.retirement_vision, {fullWidth: true}) +
+    row('Open Concerns', a.open_concerns, {fullWidth: true})
+  );
+  html += section('Planning Areas', planning);
+
+  // ── 7. Professional Team ─────────────────────────────────────────
+  let team = grid(
+    row('Has CPA / Tax Advisor', fmt(a.has_cpa)) +
+    row('CPA Name', a.cpa_name) +
+    row('Has Financial Advisor', fmt(a.has_advisor)) +
+    row('Advisor Name', a.advisor_name) +
+    row('Has Estate Attorney', fmt(a.has_attorney)) +
+    row('Attorney Name', a.attorney_name)
+  );
+  html += section('Professional Team', team);
+
+  // ── 8. Business ──────────────────────────────────────────────────
+  if (a.biz_structure) {
+    let biz = grid(
+      row('Business Structure', fmt(a.biz_structure)) +
+      row('Annual Compensation', fmt(a.biz_compensation)) +
+      row('Number of Employees', fmt(a.biz_employees)) +
+      row('Retirement Plan Type', fmt(a.biz_retirement_plan)) +
+      row('Business Partners', fmt(a.biz_has_partners)) +
+      row('Partner Count', fmt(a.biz_partner_count)) +
+      row('Buy-Sell Agreement', fmt(a.biz_buysell)) +
+      row('Buy-Sell Funding', fmt(a.biz_buysell_funding)) +
+      row('Planning Priorities', Array.isArray(a.biz_priorities) ? a.biz_priorities.map(v => LABELS[v]||v).join(', ') : fmt(a.biz_priorities), {fullWidth: true})
+    );
+    html += section('Business', biz);
+  }
+
+  // ── 9. Liquidity Event ───────────────────────────────────────────
+  if (a.le_type) {
+    let le = grid(
+      row('Event Type', fmt(a.le_type)) +
+      row('Transaction Status', fmt(a.le_timing)) +
+      row('Tax Obligation', fmt(a.le_size)) +
+      row('Current Plan', fmt(a.le_plan))
+    );
+    html += section('Liquidity Event', le);
+  }
+
+  // ── 10. How Heard / Routing ──────────────────────────────────────
+  let routing = grid(
+    row('How They Heard', fmt(a.how_heard)) +
+    row('Referring Advisor', a.referring_advisor_name) +
+    row('Completed With', fmt(a.advisor_present)) +
+    row('SR Advisor Code', sr.sr_advisor_code || a.sr_advisor_code)
+  );
+  html += section('Source & Routing', routing);
+
+  // ── 11. Lifestyle ────────────────────────────────────────────────
+  const lifestyle = [
+    { icon: '🎵', label: 'Favorite Musician / Band', key: 'ls_musician' },
+    { icon: '✈️', label: 'Favorite Vacation Spot', key: 'ls_vacation' },
+    { icon: '🎯', label: 'Hobbies & Passions', key: 'ls_hobbies' },
+    { icon: '🏆', label: 'Favorite Sports Team', key: 'ls_sports_team' },
+    { icon: '🍽️', label: 'Favorite Local Restaurant', key: 'ls_restaurant' },
+    { icon: '🎉', label: 'Upcoming Milestone', key: 'ls_milestone' },
+  ];
+  const hasLifestyle = lifestyle.some(l => a[l.key]);
+  if (hasLifestyle) {
+    const cards = lifestyle.map(l => `
+      <div class="lifestyle-card">
+        <div class="lifestyle-card-icon">${l.icon}</div>
+        <div class="lifestyle-card-label">${l.label}</div>
+        <div class="lifestyle-card-value${a[l.key] ? '' : ' empty'}">${a[l.key] || 'Not provided'}</div>
+      </div>
+    `).join('');
+    html += `<div class="section">
+      <div class="section-title">Lifestyle & Preferences</div>
+      <div class="lifestyle-grid">${cards}</div>
+    </div>`;
+  }
+
+  // ── 12. Flags ────────────────────────────────────────────────────
+  const flags = sr.flags || [];
+  if (flags.length > 0) {
+    const flagHtml = flags.map(f => `
+      <div class="flag ${f.priority || 'low'}">
+        <div class="flag-priority">${(f.priority||'').toUpperCase()} · ${f.track||''}</div>
+        <div class="flag-text">${f.text||''}</div>
+      </div>
+    `).join('');
+    html += `<div class="section">
+      <div class="section-title">Planning Flags</div>
+      <div class="flags-list">${flagHtml}</div>
+    </div>`;
+  }
+
+  // ── Footer ───────────────────────────────────────────────────────
+  html += `<div class="page-footer">
+    <span>Integrated Planning Partners · StructureReview™</span>
+    <span>Internal Record — Confidential</span>
+  </div>`;
+
+  return html;
+}
+
+async function load() {
+  const params = new URLSearchParams(window.location.search);
+  const srId = params.get('sr_id');
+  const clientId = params.get('client_id');
+
+  if (!srId && !clientId) {
+    showError('No record ID provided. Please use a link from the advisor notification email.');
+    return;
+  }
+
+  try {
+    let url;
+    if (srId) {
+      url = `${SB_URL}/rest/v1/structure_reviews?id=eq.${srId}&select=*`;
+    } else {
+      url = `${SB_URL}/rest/v1/structure_reviews?client_id=eq.${clientId}&select=*&order=submitted_at.desc&limit=1`;
+    }
+
+    const [srRes, clientRes] = await Promise.all([
+      fetch(url, { headers: { 'apikey': SB_KEY, 'Accept': 'application/json' } }),
+      clientId ? fetch(`${SB_URL}/rest/v1/clients?id=eq.${clientId}&select=*&limit=1`, {
+        headers: { 'apikey': SB_KEY, 'Accept': 'application/json' }
+      }) : Promise.resolve(null)
+    ]);
+
+    const srData = await srRes.json();
+    const clientData = clientRes ? await clientRes.json() : [];
+
+    if (!srData || srData.length === 0) {
+      showError('No StructureReview record found. The link may be expired or incorrect.');
+      return;
+    }
+
+    const sr = srData[0];
+    const client = clientData?.[0] || {};
+
+    document.getElementById('loading').style.display = 'none';
+    const content = document.getElementById('content');
+    content.style.display = 'block';
+    content.innerHTML = renderAnswers(sr, client);
+
+    // Update page title
+    const name = sr.answers?.first_name ? `${sr.answers.first_name} ${sr.answers.last_name || ''}`.trim() : 'Client';
+    document.title = `${name} — StructureReview™ Full Record`;
+
+  } catch (err) {
+    showError('Unable to load record. ' + err.message);
+  }
+}
+
+function showError(msg) {
+  document.getElementById('loading').style.display = 'none';
+  const err = document.getElementById('error');
+  err.style.display = 'block';
+  err.innerHTML = `<div style="font-size:32px;margin-bottom:16px;">⚠</div>${msg}`;
+}
+
+load();
+</script>
+</body>
+</html>
