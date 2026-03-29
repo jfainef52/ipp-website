@@ -1435,26 +1435,7 @@ const QUESTIONS = [
       {id:"cp_any",    label:"Any — whatever is fastest"},
     ],
   },
-  { id:"email", phase:"universal", type:"text",
-    q:"What's the best email address to reach you?",
-    placeholder:"your@email.com",
-    why:"We'll use this to send you a copy of your planning summary and to follow up ahead of your StructureReview™ conversation. We never share your information.",
-  },
-  { id:"phone", phase:"universal", type:"text",
-    q:"And a phone number?",
-    placeholder:"(555) 555-5555",
-    why:null,
-  },
-  { id:"contact_preference", phase:"universal", type:"single",
-    q:"How do you prefer we reach out to you?",
-    why:null,
-    options:[
-      {id:"cp_email",  label:"Email"},
-      {id:"cp_call",   label:"Phone call"},
-      {id:"cp_text",   label:"Text message"},
-      {id:"cp_any",    label:"Any — whatever is fastest"},
-    ],
-  },
+
   { id:"dob", phase:"universal", type:"date", q:"What is your date of birth?",
     why:"Your age determines which planning windows are open, which tax rules apply, and helps us calculate where you stand relative to key milestones like RMDs at 73 and Medicare at 65." },
   { id:"bio_sex", phase:"universal", type:"single", q:"What is your biological sex at birth?",
@@ -3105,9 +3086,12 @@ function App() {
   if(view==="report") return (<ClientReport answers={answers} report={report} onBack={start}/>);
   if(view==="advisor") return (<AdvisorBrief answers={answers} report={report} onBack={start}/>);
   if(view==="flow"&&currentQ)return(
-    <QuestionScreen question={currentQ} anser={answers[currentQ.id]} onAnswer={handleAnswer} onNext={next} onBack={()=>step>0&&setStep(s=>s-1)} stepNum={step+1} totalSteps={sequence.length||1} allAnswers={answers}/>
+    <QuestionScreen question={currentQ} answer={answers[currentQ.id]} onAnswer={handleAnswer} onNext={next} onBack={()=>step>0&&setStep(s=>s-1)} stepNum={step+1} totalSteps={sequence.length||1} allAnswers={answers}/>
   );
   return null;
 }
 
-ReactDOM.render(<App/>, document.getElementById('root'));w
+ReactDOM.render(<App/>, document.getElementById('root'));
+</script>
+</body>
+</html>
