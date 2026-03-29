@@ -2306,6 +2306,12 @@ const QUESTIONS = [
 
   // ── FAMILY ──
 
+  { id:"spouse_bio_sex", phase:"universal", type:"single",
+    q:"What is your spouse's biological sex at birth?",
+    why:"Insurance carriers use biological sex at birth for underwriting — it affects mortality tables, premium calculations, and benefit projections for any insurance components in the plan.",
+    condition: a => a.marital === 'married' || a.marital === 'partnered',
+    options:[{id:"sp_male",label:"Male"},{id:"sp_female",label:"Female"}]
+  },
   { id:"spouse_employment", phase:"universal", type:"single",
     q:"What best describes your spouse's current work situation?",
     why:"Your spouse's employment status affects household income, access to employer retirement plans, and benefit eligibility — all of which shape the overall planning structure.",
@@ -2827,7 +2833,7 @@ function buildSequence(answers) {
     if (q.phase==="qp" && q.id!=="has_qp" && skipQP) return false;
     if (q.id==="qp_roth_pct" && skipRothPct) return false;
     if (q.id==="concern_spouse"         && skipSpouse)       return false;
-    if ((q.id==="spouse_first_name"||q.id==="spouse_last_name"||q.id==="spouse_dob"||q.id==="spouse_health"||q.id==="anniversary"||q.id==="spouse_employment"||q.id==="spouse_business"||q.id==="spouse_income"||q.id==="spouse_retirement_plan") && skipSpouse) return false;
+    if ((q.id==="spouse_first_name"||q.id==="spouse_last_name"||q.id==="spouse_dob"||q.id==="spouse_health"||q.id==="anniversary"||q.id==="spouse_bio_sex"||q.id==="spouse_employment"||q.id==="spouse_business"||q.id==="spouse_income"||q.id==="spouse_retirement_plan") && skipSpouse) return false;
     if (q.id==="retire_age"             && skipRetire)       return false;
     if (q.id==="cpa_name"               && skipCpaName)      return false;
     if (q.id==="advisor_name"           && skipAdvisorName)  return false;
