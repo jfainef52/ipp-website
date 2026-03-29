@@ -1310,9 +1310,9 @@ html, body { background: #0E1824; min-height: 100vh; height: 100%; }
 <div id="root"></div>
 <footer id="contact">
   <div class="footer-logo">
-    <svg id="Layer_2" style="height:56px;width:125px;display:block;" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="875 1789 3260 1462">
+    <svg id="Layer_2" style="height:56px;width:auto;display:block;" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="875 1789 3260 1462">
   <!-- Generator: Adobe Illustrator 30.0.0, SVG Export Plug-In . SVG Version: 2.1.1 Build 123)  -->
-  
+  <defs></defs>
   <g>
     <rect fill="#C8A96E" x="914.76" y="2074.65" width="228.09" height="228.09"/>
     <rect fill="#C8A96E" x="1226.07" y="2697.25" width="228.09" height="228.09"/>
@@ -1356,20 +1356,20 @@ html, body { background: #0E1824; min-height: 100vh; height: 100%; }
   <div class="footer-contact">
     <a href="mailto:support@integratedplanningpartners.com">support@integratedplanningpartners.com</a>
     <div><a href="tel:7733189608">773-318-9608</a></div>
-    <div><a href="https://www.integratedplanningpartners.com">integratedplanningpartners.com</a></div>
+    <div><a href="https://integratedplanningpartners.com">integratedplanningpartners.com</a></div>
   </div>
-  <div class="footer-links">
-    <a href="https://www.integratedplanningpartners.com/#what-we-do">What We Do</a>
-    <a href="https://www.integratedplanningpartners.com/#structure-review"><span style="text-transform:none;">StructureReview™</span></a>
-    <a href="https://www.integratedplanningpartners.com/incomearc.html"><span style="text-transform:none;">IncomeArc™</span></a>
-    <a href="https://www.integratedplanningpartners.com/income-architect-modeler.html"><span style="text-transform:none;">IncomeArchitect™ Modeler</span></a>
-    <a href="https://www.integratedplanningpartners.com/#book">Architecture of Retirement</a>
-    <a href="https://www.integratedplanningpartners.com/about.html">About Us</a>
-    <a href="https://www.integratedplanningpartners.com/#contact">Contact Us</a>
-    <a href="https://www.integratedplanningpartners.com/advisor-portal.html">Advisor Portal</a>
+    <div class="footer-links">
+    <a href="index.html#what-we-do">What We Do</a>
+    <a href="index.html#structure-review"><span style="text-transform:none;">StructureReview™</span></a>
+    <a href="incomearc.html"><span style="text-transform:none;">IncomeArc™</span></a>
+    <a href="income-architect-modeler.html"><span style="text-transform:none;">IncomeArchitect™ Modeler</span></a>
+    <a href="index.html#book">Architecture of Retirement</a>
+    <a href="about.html">About Us</a>
+    <a href="index.html#contact">Contact Us</a>
+    <a href="advisor-portal.html">Advisor Portal</a>
   </div>
   <div class="footer-bottom">
-    <div>© 2026 Integrated Planning Partners. IncomeArc™, IncomeArchitect™ Modeler, and StructureReview™ are trademarks of Integrated Planning Partners.</div>
+    <div>© 2026 Integrated Planning Partners. IncomeArc™ and StructureReview™ are trademarks of Integrated Planning Partners.</div>
     <div>For informational purposes only. Not financial, tax, legal, or investment advice.</div>
   </div>
 </footer>
@@ -1511,6 +1511,13 @@ const QUESTIONS = [
     q:"What is your spouse's date of birth?",
     why:"Spouse age affects survivor income planning, joint life underwriting, Social Security optimization, and the sequencing of retirement strategies.",
   },
+  { id:"anniversary", phase:"universal", type:"date",
+    q:"What is your wedding anniversary date?",
+    placeholder:"MM/DD/YYYY",
+    why:"A card on the right day can mean everything.",
+    condition: a => a.marital === 'married' || a.marital === 'partnered'
+  },
+
   { id:"spouse_health", phase:"universal", type:"single",
     q:"How would you describe your spouse's overall health?",
     why:"Spouse health affects joint underwriting eligibility and survivor planning options — particularly for second-to-die policies and joint living benefit structures.",
@@ -1860,6 +1867,43 @@ const QUESTIONS = [
   },
 
   // ── WRAP ──
+  // ── Lifestyle ───────────────────────────────────────────────────
+  { id:"ls_musician", phase:"lifestyle", type:"text",
+    q:"Who's your favorite musician or band?",
+    placeholder:"e.g. Eagles, Frank Sinatra, Taylor Swift...",
+    why:"Great for a concert surprise.",
+    optional: true
+  },
+  { id:"ls_vacation", phase:"lifestyle", type:"text",
+    q:"What's your favorite vacation spot — or somewhere you've always wanted to go?",
+    placeholder:"e.g. Tuscany, Napa Valley, Scottsdale...",
+    why:"Good to know when we're thinking of you.",
+    optional: true
+  },
+  { id:"ls_hobbies", phase:"lifestyle", type:"text",
+    q:"What do you enjoy outside of work? Any hobbies or passions?",
+    placeholder:"e.g. golf, fishing, cooking, wine, reading...",
+    why:"Helps us find meaningful ways to connect.",
+    optional: true
+  },
+  { id:"ls_sports_team", phase:"lifestyle", type:"text",
+    q:"Do you have a favorite sports team — college, pro, or even a specific athlete you follow?",
+    placeholder:"e.g. Chicago Cubs, Notre Dame, Tiger Woods...",
+    why:"Tickets to the right game go a long way.",
+    optional: true
+  },
+  { id:"ls_restaurant", phase:"lifestyle", type:"text",
+    q:"What's your favorite local restaurant near home?",
+    placeholder:"e.g. Gibson's Steakhouse, The Capital Grille...",
+    why:"A gift card to the right place is always welcome.",
+    optional: true
+  },
+  { id:"ls_milestone", phase:"lifestyle", type:"text",
+    q:"Any upcoming personal milestones we should know about? A retirement, anniversary, graduation, or big birthday?",
+    placeholder:"e.g. Retiring in June, 40th anniversary in August...",
+    why:"We want to be there for the moments that count.",
+    optional: true
+  },
   { id:"advisor_present", phase:"wrap", type:"single", q:"Are you completing this with your advisor, or on your own?", why:null,
     options:[{id:"with_advisor",label:"With my advisor"},{id:"on_own",label:"On my own before our meeting"},{id:"exploring",label:"Just exploring on my own"}] },
   { id:"open_concerns", phase:"wrap", type:"text", q:"Is there anything specific on your mind that we haven't covered yet?", placeholder:"Optional — anything you'd like us to know", why:null },
@@ -1896,6 +1940,7 @@ function buildSequence(answers) {
 
   seq.push(...QUESTIONS.filter(q=>q.phase==="income"));
   seq.push(...QUESTIONS.filter(q=>q.phase==="motivations"));
+  seq.push(...QUESTIONS.filter(q=>q.phase==="lifestyle"));
   seq.push(...QUESTIONS.filter(q=>q.phase==="wrap"));
 
   // Skip concern_spouse if single/widowed
