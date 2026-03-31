@@ -5925,7 +5925,13 @@ function CompletionScreen({onReport,onAdvisor,answers,report,advisorId,advisorCo
       const age = calcAge(answers.dob);
 
       // Send client copy
-      const clientRes = await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_CLIENT, {
+      const clientRes = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          service_id: EMAILJS_SERVICE_ID,
+          template_id: EMAILJS_TEMPLATE_CLIENT,
+          user_id: EMAILJS_PUBLIC_KEY,
+          template_params: {
             to_email: answers.email,
             to_name: report.firstName || answers.first_name || "there",
             name: report.name || "Client",
@@ -6212,7 +6218,8 @@ function CompletionScreen({onReport,onAdvisor,answers,report,advisorId,advisorCo
                 subject: 'Documents to Gather Before Your Planning Meeting',
                 html_content: checklistHtml,
               }
-            }));
+            })
+          });
         } catch(checklistErr) {
           console.warn('Checklist email failed (non-critical):', checklistErr);
         }
