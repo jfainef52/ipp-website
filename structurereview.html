@@ -6027,7 +6027,7 @@ function CompletionScreen({onReport,onAdvisor,answers,report,advisorId,advisorCo
         ["Referring Advisor", answers.referring_advisor_name||"N/A"],
         ["Open Concerns", answers.open_concerns||"None"],
       ];
-      details.forEach     details.forEach(function(d) {
+      details.forEach(function(d) {
         detailRows += "<tr>"
           + "<td style=\"padding:7px 12px;font-size:11px;color:#6E8299;white-space:nowrap;border-bottom:1px solid rgba(255,255,255,.05);width:38%;\">" + d[0] + "</td>"
           + "<td style=\"padding:7px 12px;font-size:12px;color:#C8BFA8;border-bottom:1px solid rgba(255,255,255,.05);\">" + d[1] + "</td>"
