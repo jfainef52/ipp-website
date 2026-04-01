@@ -6250,7 +6250,7 @@ function CompletionScreen({onReport,onAdvisor,answers,report,advisorId,advisorCo
           console.warn('Edge Function error:', await efRes.text());
         }
       } catch(efErr) {
-        console.warn('Edge Function failed:', efErr);
+        console.warn('Edge Function failed: ' + (efErr && efErr.message ? efErr.message : efErr));
       } catch(sbErr){ console.warn('Supabase SR save failed:',sbErr); }
       // ── End Supabase save ───────────────────────────────────────
       setSent(true);
