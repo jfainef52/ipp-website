@@ -5944,18 +5944,32 @@ function CompletionScreen({onReport,onAdvisor,answers,report,advisorId,advisorCo
       // ── Step 2: Build email content ──
       const clientHtml = buildClientEmailHtml();
       const trackList = report.tracks.join(', ').toUpperCase();
-      const flagLines = report.flags.map(f => '[' + f.priority.toUpperCase() + '] ' + f.track + ': ' + f.text).join('\n\n');
+      const flagLines = report.flags.map(f => '[' + f.priority.toUpperCase() + '] ' + f.track + ': ' + f.text).join('<br>');
       const srLink = 'https://www.integratedplanningpartners.com/sr-full-answers.html?sr_id=' + (report.srId||'') + '&client_id=' + (report.clientId||'');
-      const advisorHtml = '<p><strong>New StructureReview™ Submission</strong></p>'
-        + '<p><strong>Name:</strong> ' + (answers.first_name||'') + ' ' + (answers.last_name||'') + '<br>'
-        + '<strong>Email:</strong> ' + answers.email + '<br>'
-        + '<strong>Phone:</strong> ' + (answers.phone||'—') + '<br>'
-        + '<strong>State:</strong> ' + (answers.state||'—') + '<br>'
-        + '<strong>QP Balance:</strong> ' + (answers.qp_balance_range||'—') + '<br>'
-        + '<strong>RMD Status:</strong> ' + (answers.rmd_status||'—') + '</p>'
-        + '<p><strong>Planning Tracks:</strong> ' + trackList + '</p>'
-        + (flagLines ? '<p><strong>Flags:</strong><br><pre>' + flagLines + '</pre></p>' : '')
-        + '<p><a href="' + srLink + '">View Full Client Answers →</a></p>';
+      const advisorHtml = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family:Arial,sans-serif;background:#0E1824;color:#E8DDD0;padding:24px;">'
+        + '<table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;">'
+        + '<tr><td style="background:#162032;border-bottom:2px solid #C8A96E;padding:20px 24px;border-radius:8px 8px 0 0;">'
+        + '<p style="margin:0;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:#C8A96E;">StructureReview™ — New Submission</p>'
+        + '<p style="margin:6px 0 0;font-size:20px;color:#F5F2EC;">' + (answers.first_name||'') + ' ' + (answers.last_name||'') + '</p>'
+        + '</td></tr>'
+        + '<tr><td style="background:#0F1D2E;padding:20px 24px;">'
+        + '<table width="100%" cellpadding="4" cellspacing="0">'
+        + '<tr><td style="color:#6E8299;font-size:12px;width:140px;">Email</td><td style="color:#E8DDD0;font-size:13px;"><a href="mailto:' + answers.email + '" style="color:#C8A96E;">' + answers.email + '</a></td></tr>'
+        + '<tr><td style="color:#6E8299;font-size:12px;">Phone</td><td style="color:#E8DDD0;font-size:13px;">' + (answers.phone||'—') + '</td></tr>'
+        + '<tr><td style="color:#6E8299;font-size:12px;">State</td><td style="color:#E8DDD0;font-size:13px;">' + (answers.state||'—') + '</td></tr>'
+        + '<tr><td style="color:#6E8299;font-size:12px;">QP Balance</td><td style="color:#E8DDD0;font-size:13px;">' + (answers.qp_balance_range||'—') + '</td></tr>'
+        + '<tr><td style="color:#6E8299;font-size:12px;">RMD Status</td><td style="color:#E8DDD0;font-size:13px;">' + (answers.rmd_status||'—') + '</td></tr>'
+        + '</table>'
+        + '</td></tr>'
+        + '<tr><td style="background:#0F1D2E;padding:0 24px 20px;">'
+        + '<p style="margin:0 0 8px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#C8A96E;">Planning Tracks</p>'
+        + '<p style="margin:0;font-size:13px;color:#E8DDD0;">' + trackList + '</p>'
+        + '</td></tr>'
+        + (flagLines ? '<tr><td style="background:#0F1D2E;padding:0 24px 20px;"><p style="margin:0 0 8px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#C8A96E;">Flags</p><p style="margin:0;font-size:12px;color:#8EA4B8;line-height:1.8;">' + flagLines + '</p></td></tr>' : '')
+        + '<tr><td style="background:#162032;padding:20px 24px;border-radius:0 0 8px 8px;border-top:1px solid rgba(200,169,110,0.2);">'
+        + '<a href="' + srLink + '" style="display:inline-block;background:#C8A96E;color:#0E1824;padding:10px 20px;border-radius:6px;font-size:13px;font-weight:700;text-decoration:none;">View Full Client Answers →</a>'
+        + '</td></tr>'
+        + '</table></body></html>';
 
       // ── Step 3: Resolve advisor routing ──
       const resolvedAdvisorId = await resolveAdvisorId();
@@ -5989,7 +6003,7 @@ function CompletionScreen({onReport,onAdvisor,answers,report,advisorId,advisorCo
 
       setSent(true);
     } catch(e) {
-      console.error("sendEmails error:", e);
+      console.error('sendEmails error:', e);
       setSendError(true);
     }
     setSending(false);
