@@ -1,4 +1,6 @@
-<!DOCTYPE html>
+const SUPPORT_EMAIL = "support@integratedplanningpartners.com";
+      const JEFF_EMAIL = "jf@emailipp.com";
+      <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -5949,6 +5951,7 @@ function CompletionScreen({onReport,onAdvisor,answers,report,advisorId,advisorCo
         throw new Error("Client email failed: " + clientRes.status + " " + errText);
       }
 
+      try {
       // Build advisor HTML email
       const spouseName = (answers.spouse_first_name&&answers.spouse_last_name)
         ? (answers.spouse_first_name + " " + answers.spouse_last_name)
@@ -5958,7 +5961,7 @@ function CompletionScreen({onReport,onAdvisor,answers,report,advisorId,advisorCo
         : "(not provided)";
 
       let flagRows = "";
-      report.flags.forEach(function(f) {
+      (report.flags||[]).forEach(function(f) {
         const color = f.priority==="high" ? "#C47A7A" : f.priority==="medium" ? "#C8A030" : "#6E8299";
         flagRows += "<tr><td style=\"padding:0 0 10px 0;\">"
           + "<div style=\"padding:12px 16px;background:#1a2438;border-left:3px solid " + color + ";border-radius:0 6px 6px 0;\">"
@@ -6027,7 +6030,7 @@ function CompletionScreen({onReport,onAdvisor,answers,report,advisorId,advisorCo
         ["Referring Advisor", answers.referring_advisor_name||"N/A"],
         ["Open Concerns", answers.open_concerns||"None"],
       ];
-      details.forEach(function(d) {
+      (details||[]).forEach(function(d) {
         detailRows += "<tr>"
           + "<td style=\"padding:7px 12px;font-size:11px;color:#6E8299;white-space:nowrap;border-bottom:1px solid rgba(255,255,255,.05);width:38%;\">" + d[0] + "</td>"
           + "<td style=\"padding:7px 12px;font-size:12px;color:#C8BFA8;border-bottom:1px solid rgba(255,255,255,.05);\">" + d[1] + "</td>"
@@ -6120,6 +6123,7 @@ function CompletionScreen({onReport,onAdvisor,answers,report,advisorId,advisorCo
       if (advisorCcEmail) advisorParams.cc_email = advisorCcEmail;
 
       await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ADVISOR, advisorParams);
+      } catch(advErr) { console.warn("Advisor email error:", advErr); }
 
       // ── Document checklist email ──────────────────────────────
       // Fires after SR submission — gives client a list of documents
