@@ -5948,6 +5948,12 @@ function CompletionScreen({onReport,onAdvisor,answers,report,advisorId,advisorCo
       } catch(efErr) {
         console.warn('Edge Function failed:', efErr.message || efErr);
       }
+      // Patch advisor HTML with real IDs now that EF has returned them
+      if (typeof advisorHtml === 'string' && report.srId) {
+        advisorHtml = advisorHtml
+          .replace(/sr_id=[^&"']*/g, 'sr_id=' + report.srId)
+          .replace(/client_id=[^&"']*/g, 'client_id=' + (report.clientId || ''));
+      }
       setSent(true);
     } catch(e) {
       console.error("EmailJS error:",e);
