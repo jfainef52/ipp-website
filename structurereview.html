@@ -1,6 +1,4 @@
-const SUPPORT_EMAIL = "support@integratedplanningpartners.com";
-      const JEFF_EMAIL = "jf@emailipp.com";
-      <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -6089,26 +6087,22 @@ function CompletionScreen({onReport,onAdvisor,answers,report,advisorId,advisorCo
 
       if (answers.how_heard === "hh_advisor") {
         // Unknown advisor queue — support only
-        advisorToEmail = SUPPORT_EMAIL;
+        advisorToEmail = "support@integratedplanningpartners.com";
         advisorCcEmail = "";
       } else {
-        // All other cases: Jeff gets it + CC support (hardcoded reliable fallback)
-        advisorToEmail = JEFF_EMAIL;
-        advisorCcEmail = SUPPORT_EMAIL;
-        // If a specific non-Jeff advisor URL param, try Supabase lookup
+        // All other cases — Jeff gets it + CC support
+        advisorToEmail = "jf@emailipp.com";
+        advisorCcEmail = "support@integratedplanningpartners.com";
+        // If non-Jeff advisor URL param, try lookup
         const advCode = new URLSearchParams(window.location.search).get("a");
         if (advCode && advCode !== "jeff-faine") {
           try {
             const SB_URL = "https://piixgvxrasddphklgazh.supabase.co";
             const SB_KEY = "sb_publishable_acvdk0hBniaB6qOD8_k8XQ_9R6FNbP_";
-            const advRes = await fetch(SB_URL + "/rest/v1/advisor_profiles?advisor_code=eq." + encodeURIComponent(advCode) + "&select=email&limit=1", {
-              headers:{"apikey":SB_KEY,"Accept":"application/json"}
-            });
+            const advRes = await fetch(SB_URL+"/rest/v1/advisor_profiles?advisor_code=eq."+encodeURIComponent(advCode)+"&select=email&limit=1",{headers:{"apikey":SB_KEY,"Accept":"application/json"}});
             const advData = await advRes.json();
-            if (advData && advData[0] && advData[0].email) {
-              advisorToEmail = advData[0].email;
-            }
-          } catch(e) { /* keep Jeff as fallback */ }
+            if (advData&&advData[0]&&advData[0].email) advisorToEmail = advData[0].email;
+          } catch(e) {}
         }
       }
 
