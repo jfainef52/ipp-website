@@ -5917,15 +5917,7 @@ function CompletionScreen({onReport,onAdvisor,answers,report,advisorId,advisorCo
     if (!answers.email) { onReport(); return; }
     setSending(true);
     try {
-      // Build plain-text advisor summary
-      const flagList = report.flags.map(f=>`[${f.priority.toUpperCase()}] ${f.track}: ${f.text}`).join("\
-\
-");
-      const trackList = report.tracks.join(", ").toUpperCase();
-      const age = calcAge(answers.dob);
-
-      // Send client copy
-      // ── Submit via Edge Function (service role, bypasses RLS) ──
+      // ── Step 1: Submit to Supabase via Edge Function ──
       try {
         const efRes = await fetch(
           'https://piixgvxrasddphklgazh.supabase.co/functions/v1/submit-structure-review',
@@ -5948,9 +5940,56 @@ function CompletionScreen({onReport,onAdvisor,answers,report,advisorId,advisorCo
       } catch(efErr) {
         console.warn('Edge Function failed:', efErr.message || efErr);
       }
+
+      // ── Step 2: Build email content ──
+      const clientHtml = buildClientEmailHtml();
+      const trackList = report.tracks.join(', ').toUpperCase();
+      const flagLines = report.flags.map(f => '[' + f.priority.toUpperCase() + '] ' + f.track + ': ' + f.text).join('\n\n');
+      const srLink = 'https://www.integratedplanningpartners.com/sr-full-answers.html?sr_id=' + (report.srId||'') + '&client_id=' + (report.clientId||'');
+      const advisorHtml = '<p><strong>New StructureReview™ Submission</strong></p>'
+        + '<p><strong>Name:</strong> ' + (answers.first_name||'') + ' ' + (answers.last_name||'') + '<br>'
+        + '<strong>Email:</strong> ' + answers.email + '<br>'
+        + '<strong>Phone:</strong> ' + (answers.phone||'—') + '<br>'
+        + '<strong>State:</strong> ' + (answers.state||'—') + '<br>'
+        + '<strong>QP Balance:</strong> ' + (answers.qp_balance_range||'—') + '<br>'
+        + '<strong>RMD Status:</strong> ' + (answers.rmd_status||'—') + '</p>'
+        + '<p><strong>Planning Tracks:</strong> ' + trackList + '</p>'
+        + (flagLines ? '<p><strong>Flags:</strong><br><pre>' + flagLines + '</pre></p>' : '')
+        + '<p><a href="' + srLink + '">View Full Client Answers →</a></p>';
+
+      // ── Step 3: Resolve advisor routing ──
+      const resolvedAdvisorId = await resolveAdvisorId();
+      const advisorEmail = 'jf@emailipp.com';
+      const ccEmail = 'support@integratedplanningpartners.com';
+
+      // ── Step 4: Init EmailJS ──
+      emailjs.init(EMAILJS_PUBLIC_KEY);
+
+      // ── Step 5: Send client email ──
+      await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_CLIENT, {
+        to_email: answers.email,
+        to_name: answers.first_name || answers.email,
+        name: (answers.first_name||'') + ' ' + (answers.last_name||''),
+        client_name: answers.first_name || 'there',
+        tracks: trackList,
+        vision: answers.retirement_vision || '',
+        retire_age: answers.retire_age || '',
+        html_content: clientHtml,
+      });
+
+      // ── Step 6: Send advisor email ──
+      await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ADVISOR, {
+        to_email: advisorEmail,
+        cc_email: ccEmail,
+        name: (answers.first_name||'') + ' ' + (answers.last_name||''),
+        email: answers.email,
+        reply_to: answers.email,
+        html_content: advisorHtml,
+      });
+
       setSent(true);
     } catch(e) {
-      console.error("EmailJS error:",e);
+      console.error("sendEmails error:", e);
       setSendError(true);
     }
     setSending(false);
