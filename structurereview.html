@@ -6252,6 +6252,8 @@ function CompletionScreen({onReport,onAdvisor,answers,report,advisorId,advisorCo
       } catch(efErr) {
         console.warn('Edge Function failed: ' + (efErr && efErr.message ? efErr.message : efErr));
       }
+      } catch(sbErr1) { console.warn('Save error 1:', sbErr1); }
+      } catch(sbErr2) { console.warn('Save error 2:', sbErr2); }
       setSent(true);
     } catch(e) {
       console.error("EmailJS error:",e);
