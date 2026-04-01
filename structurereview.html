@@ -6229,38 +6229,28 @@ function CompletionScreen({onReport,onAdvisor,answers,report,advisorId,advisorCo
         const SUPABASE_URL = 'https://piixgvxrasddphklgazh.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_acvdk0hBniaB6qOD8_k8XQ_9R6FNbP_';
         const sbHdrs = {'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY};
-        let clientId = null;
-        if (answers.email) {
-          const lookup = await fetch(SUPABASE_URL+'/rest/v1/clients?email=eq.'+encodeURIComponent(answers.email)+'&select=id&limit=1',{headers:sbHdrs});
-          const existing = await lookup.json();
-          if (existing?.length > 0) {
-            clientId = existing[0].id;
-          } else {
-            const create = await fetch(SUPABASE_URL+'/rest/v1/clients',{method:'POST',headers:{...sbHdrs,'Prefer':'return=representation'},body:JSON.stringify({
-            first_name:answers.first_name||'',
-            last_name:answers.last_name||'',
-            email:answers.email,
-            phone:answers.phone||null,
-            dob:answers.dob||null,
-            state:answers.state||null,
-            filing_status:answers.marital==='married'?'mfj':'single',
-            spouse_first_name:answers.spouse_first_name||null,
-            spouse_last_name:answers.spouse_last_name||null,
-            status:'prospect',
-            pipeline_stage:'structure_review',
-            referral_source:answers.how_heard||null,
-            advisor_id: await resolveAdvisorId()||null,
-            sr_advisor_code: advisorCode||null,
-            referred_advisor_name: answers.how_heard==='hh_advisor' ? (answers.referring_advisor_name||null) : null
-          })});
-            const nc = await create.json();
-            clientId = Array.isArray(nc)?nc[0]?.id:nc?.id;
+      // ── Edge Function: saves client + SR, returns IDs ──────────
+      try {
+        const efRes = await fetch(
+          'https://piixgvxrasddphklgazh.supabase.co/functions/v1/submit-structure-review',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBpaXhndnhyYXNkZHBoa2xnYXpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0NzExNjAsImV4cCI6MjA4OTA0NzE2MH0.vZqwRoICyqiaHWSbGTiGvBgw6Egdd_2jPTNn4XielJs',
+            },
+            body: JSON.stringify({ answers, report }),
           }
+        );
+        if (efRes.ok) {
+          const efData = await efRes.json();
+          if (efData.client_id) report.clientId = efData.client_id;
+          if (efData.sr_id) report.srId = efData.sr_id;
+        } else {
+          console.warn('Edge Function error:', await efRes.text());
         }
-        if (clientId) {
-          await fetch(SUPABASE_URL+'/rest/v1/structure_reviews',{method:'POST',headers:{...sbHdrs,'Prefer':'return=minimal'},body:JSON.stringify({client_id:clientId,submitted_at:new Date().toISOString(),answers:answers,tracks:report.tracks||[],flags:report.flags||[],planning_tracks:(report.tracks||[]).join(','),status:'submitted'})});
-          await fetch(SUPABASE_URL+'/rest/v1/clients?id=eq.'+clientId,{method:'PATCH',headers:{...sbHdrs,'Prefer':'return=minimal'},body:JSON.stringify({pipeline_stage:'structure_review',structure_review_submitted_at:new Date().toISOString(),first_name:answers.first_name||undefined,last_name:answers.last_name||undefined,phone:answers.phone||undefined})});
-        }
+      } catch(efErr) {
+        console.warn('Edge Function failed:', efErr);
       } catch(sbErr){ console.warn('Supabase SR save failed:',sbErr); }
       // ── End Supabase save ───────────────────────────────────────
       setSent(true);
