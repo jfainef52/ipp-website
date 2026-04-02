@@ -770,7 +770,7 @@ async function saveOutput(clientId, supplementId, result, userId) {
 async function init() {
   // Auth check
   const session = getSession();
-  if(!session?.access_token){ window.location.href='advisor-portal.html'; return; }
+  if(!session?.access_token){ localStorage.setItem('ipp_return_url', window.location.href); window.location.href='advisor-portal.html'; return; }
 
   const params = new URLSearchParams(window.location.search);
   const clientId     = params.get('client_id');
