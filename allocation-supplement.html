@@ -1848,31 +1848,34 @@ async function completeSuplement(){
     });
   }
 
-  // Fire DocuSign signature request
+  // DocuSign signature request — non-blocking, skipped if not configured
   if(window._clientId && window._supplementId){
-    setDocuSignStatus('sending');
-    try {
-      const session = JSON.parse(localStorage.getItem(SESSION_KEY)||'{}');
-      const res = await fetch(SUPABASE_URL+'/functions/v1/send-docusign', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer '+(session?.access_token||SUPABASE_KEY)
-        },
-        body: JSON.stringify({
-          supplement_id: window._supplementId,
-          client_id: window._clientId
-        })
-      });
-      const result = await res.json();
-      if(result.success){
-        setDocuSignStatus('sent', result.message);
-      } else {
-        setDocuSignStatus('error', result.error || 'DocuSign send failed');
+    (async () => {
+      try {
+        setDocuSignStatus('sending');
+        const session = JSON.parse(localStorage.getItem(SESSION_KEY)||'{}');
+        const res = await fetch(SUPABASE_URL+'/functions/v1/send-docusign', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer '+(session?.access_token||SUPABASE_KEY)
+          },
+          body: JSON.stringify({
+            supplement_id: window._supplementId,
+            client_id: window._clientId
+          })
+        });
+        if(!res.ok){ setDocuSignStatus('error', 'DocuSign not configured — skipped.'); return; }
+        const result = await res.json();
+        if(result.success){
+          setDocuSignStatus('sent', result.message);
+        } else {
+          setDocuSignStatus('error', result.error || 'DocuSign send failed');
+        }
+      } catch(e){
+        setDocuSignStatus('error', 'DocuSign not configured — skipped.');
       }
-    } catch(e){
-      setDocuSignStatus('error', 'Could not reach DocuSign service');
-    }
+    })();
   }
 }
 
