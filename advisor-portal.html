@@ -651,7 +651,7 @@ document.addEventListener('DOMContentLoaded', function() {
   <div class="success-msg" id="success-login">
     <div class="success-icon">✦</div>
     <div class="success-title">Signing you <em style="font-style:italic;color:var(--gold);">in…</em></div>
-    <p class="success-body">Redirecting to your advisor dashboard.</p>
+    <p class="success-body">Signing you in…</p>
   </div>
 
   <div class="success-msg" id="success-register">
@@ -708,7 +708,13 @@ const sb = supabase;
 (async () => {
   const { data: { session } } = await sb.auth.getSession();
   if (session) {
-    window.location.href = 'advisor-dashboard.html';
+    const returnUrl = localStorage.getItem('ipp_return_url');
+    if (returnUrl) {
+      localStorage.removeItem('ipp_return_url');
+      window.location.href = returnUrl;
+    } else {
+      window.location.href = 'advisor-dashboard.html';
+    }
   }
 })();
 
@@ -778,7 +784,13 @@ async function handleLogin() {
   document.getElementById('success-login').classList.add('visible');
 
   setTimeout(() => {
-    window.location.href = 'advisor-dashboard.html';
+    const returnUrl = localStorage.getItem('ipp_return_url');
+    if (returnUrl) {
+      localStorage.removeItem('ipp_return_url');
+      window.location.href = returnUrl;
+    } else {
+      window.location.href = 'advisor-dashboard.html';
+    }
   }, 1200);
 }
 
