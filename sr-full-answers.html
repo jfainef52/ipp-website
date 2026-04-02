@@ -1,624 +1,752 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>StructureReview™ — Full Client Answers</title>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Barlow+Condensed:wght@300;400;500;600&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --navy:     #0B1220;
-    --navy2:    #0F1D2E;
-    --navy3:    #162032;
-    --gold:     #C8A96E;
-    --gold2:    #E0C080;
-    --gold-dim: rgba(200,169,110,0.3);
-    --warm:     #F5F2EC;
-    --gray:     #8EA4B8;
-    --border:   rgba(255,255,255,0.08);
-    --error:    #C47A7A;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    background: var(--navy);
-    color: var(--warm);
-    font-family: 'Barlow', sans-serif;
-    font-weight: 300;
-    min-height: 100vh;
-  }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StructureReview™ — Full Client Answers | Integrated Planning Partners</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
 
-  /* ── NAV ── */
-  nav {
-    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-    height: 64px;
-    background: rgba(11,18,32,0.95);
-    border-bottom: 1px solid var(--border);
-    backdrop-filter: blur(12px);
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 0 40px;
-  }
-  .nav-logo {
-    display: flex; align-items: center; gap: 10px;
-    text-decoration: none;
-  }
-  .nav-logo svg { height: 36px; width: auto; }
-  .nav-logo-text { font-family: 'Cormorant Garamond', serif; font-size: 14px; color: var(--warm); line-height: 1.2; }
-  .nav-logo-sub { font-family: 'Barlow Condensed', sans-serif; font-size: 8px; font-weight: 500; letter-spacing: .18em; color: var(--gold); text-transform: uppercase; }
-  .nav-badge {
-    font-family: 'Barlow Condensed', sans-serif; font-size: 9px; font-weight: 600;
-    letter-spacing: .2em; text-transform: uppercase;
-    color: var(--gold); border: 1px solid var(--gold-dim);
-    padding: 4px 12px; border-radius: 2px;
-  }
+  <style>
+    :root {
+      --navy:       #0B1929;
+      --navy-mid:   #122035;
+      --navy-light: #1a2e47;
+      --navy-card:  #162740;
+      --gold:       #C8A96E;
+      --gold-light: #d9bc8a;
+      --gold-dim:   rgba(200,169,110,0.15);
+      --gold-line:  rgba(200,169,110,0.3);
+      --text:       #e8ddd0;
+      --text-muted: #8a9ab0;
+      --text-dim:   #5a6a7e;
+      --green:      #4caf7d;
+      --red:        #e05757;
+      --amber:      #e0a94a;
+      --radius:     6px;
+    }
 
-  /* ── MAIN ── */
-  main { padding: 100px 40px 60px; max-width: 900px; margin: 0 auto; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
-  /* ── LOADING / ERROR ── */
-  #loading, #error {
-    text-align: center; padding: 80px 40px;
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--gray);
-  }
-  #error { color: var(--error); }
-  .spinner {
-    width: 32px; height: 32px; border: 1px solid var(--border);
-    border-top-color: var(--gold); border-radius: 50%;
-    animation: spin .8s linear infinite; margin: 0 auto 20px;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
+    body {
+      background: var(--navy);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
 
-  /* ── HEADER ── */
-  .report-header {
-    border-bottom: 1px solid var(--border);
-    padding-bottom: 32px; margin-bottom: 40px;
-  }
-  .report-eyebrow {
-    font-family: 'Barlow Condensed', sans-serif; font-size: 9px; font-weight: 600;
-    letter-spacing: .22em; text-transform: uppercase; color: var(--gold);
-    display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
-  }
-  .report-eyebrow::before { content: ''; width: 20px; height: 1px; background: var(--gold); }
-  .report-name {
-    font-family: 'Cormorant Garamond', serif; font-size: 42px; font-weight: 300;
-    color: var(--warm); line-height: 1.1; margin-bottom: 8px;
-  }
-  .report-meta {
-    font-family: 'Barlow Condensed', sans-serif; font-size: 11px; font-weight: 400;
-    letter-spacing: .1em; color: var(--gray); text-transform: uppercase;
-    display: flex; gap: 24px; flex-wrap: wrap;
-  }
-  .report-meta span { display: flex; align-items: center; gap: 6px; }
-  .report-meta span::before { content: ''; width: 4px; height: 4px; border-radius: 50%; background: var(--gold-dim); }
+    /* ── NAV ── */
+    nav {
+      background: var(--navy);
+      border-bottom: 1px solid var(--gold-line);
+      padding: 0 2rem;
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+      height: 62px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      flex-shrink: 0;
+    }
+    .nav-logo svg { height: 46px; width: 103px; }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      margin-left: auto;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+    }
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--gold); }
+    .btn-portal {
+      border: 1px solid var(--gold);
+      color: var(--gold);
+      padding: 6px 14px;
+      border-radius: var(--radius);
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      text-decoration: none;
+      transition: background 0.2s, color 0.2s;
+    }
+    .btn-portal:hover { background: var(--gold); color: var(--navy); }
 
-  /* ── SECTIONS ── */
-  .section {
-    margin-bottom: 40px;
-    animation: fadeUp .4s ease both;
-  }
-  @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-  .section:nth-child(2) { animation-delay: .05s; }
-  .section:nth-child(3) { animation-delay: .1s; }
-  .section:nth-child(4) { animation-delay: .15s; }
-  .section:nth-child(5) { animation-delay: .2s; }
-  .section:nth-child(6) { animation-delay: .25s; }
-  .section:nth-child(7) { animation-delay: .3s; }
+    /* ── LAYOUT ── */
+    .page-wrap {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 5rem;
+    }
 
-  .section-title {
-    font-family: 'Barlow Condensed', sans-serif; font-size: 9px; font-weight: 600;
-    letter-spacing: .22em; text-transform: uppercase; color: var(--gold);
-    margin-bottom: 16px;
-    display: flex; align-items: center; gap: 12px;
-  }
-  .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+    /* ── LOADING / ERROR / NOT FOUND ── */
+    .state-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 60vh;
+      gap: 1rem;
+      text-align: center;
+    }
+    .state-screen .icon {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .state-screen h2 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.8rem;
+      color: var(--gold);
+    }
+    .state-screen p { color: var(--text-muted); max-width: 380px; }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid var(--gold-line);
+      border-top-color: var(--gold);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
-  .answer-grid {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 2px;
-    background: var(--border); border-radius: 6px; overflow: hidden;
-  }
-  .answer-row {
-    background: var(--navy2); padding: 14px 18px;
-    display: flex; flex-direction: column; gap: 4px;
-  }
-  .answer-row.full-width { grid-column: 1 / -1; }
-  .answer-label {
-    font-family: 'Barlow Condensed', sans-serif; font-size: 9px; font-weight: 500;
-    letter-spacing: .14em; text-transform: uppercase; color: var(--gray);
-  }
-  .answer-value {
-    font-family: 'Barlow', sans-serif; font-size: 13px; font-weight: 400;
-    color: var(--warm); line-height: 1.5;
-  }
-  .answer-value.empty { color: var(--gray); font-style: italic; }
-  .answer-value.highlight { color: var(--gold); font-weight: 500; }
+    /* ── BREADCRUMB ── */
+    .breadcrumb {
+      font-size: 12px;
+      color: var(--text-dim);
+      letter-spacing: 0.05em;
+      margin-bottom: 1.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .breadcrumb a { color: var(--text-dim); text-decoration: none; }
+    .breadcrumb a:hover { color: var(--gold); }
+    .breadcrumb span { color: var(--gold); }
 
-  /* ── LIFESTYLE CARDS ── */
-  .lifestyle-grid {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
-  }
-  .lifestyle-card {
-    background: var(--navy3); border: 1px solid var(--border);
-    border-radius: 6px; padding: 16px 18px;
-  }
-  .lifestyle-card-icon { font-size: 20px; margin-bottom: 8px; }
-  .lifestyle-card-label {
-    font-family: 'Barlow Condensed', sans-serif; font-size: 9px; font-weight: 500;
-    letter-spacing: .14em; text-transform: uppercase; color: var(--gray); margin-bottom: 4px;
-  }
-  .lifestyle-card-value {
-    font-family: 'Cormorant Garamond', serif; font-size: 18px; font-weight: 400;
-    color: var(--warm); line-height: 1.3;
-  }
-  .lifestyle-card-value.empty { font-size: 13px; font-family: 'Barlow', sans-serif; color: var(--gray); font-style: italic; }
+    /* ── CLIENT HEADER CARD ── */
+    .client-header {
+      background: var(--navy-card);
+      border: 1px solid var(--gold-line);
+      border-radius: 10px;
+      padding: 1.75rem 2rem;
+      margin-bottom: 1.75rem;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 1.5rem;
+      align-items: start;
+    }
+    .client-name {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 2rem;
+      font-weight: 600;
+      color: var(--gold);
+      line-height: 1.2;
+      margin-bottom: 0.35rem;
+    }
+    .client-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.25rem;
+      margin-top: 0.75rem;
+    }
+    .meta-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .meta-label {
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      font-weight: 500;
+    }
+    .meta-value {
+      font-size: 13px;
+      color: var(--text);
+      font-weight: 400;
+    }
+    .meta-value a { color: var(--gold-light); text-decoration: none; }
+    .meta-value a:hover { text-decoration: underline; }
 
-  /* ── FLAGS ── */
-  .flags-list { display: flex; flex-direction: column; gap: 8px; }
-  .flag {
-    padding: 14px 18px; border-radius: 4px;
-    border-left: 3px solid;
-    background: rgba(255,255,255,0.02);
-  }
-  .flag.high { border-color: #C47A7A; }
-  .flag.medium { border-color: #C8A030; }
-  .flag.low { border-color: var(--gray); }
-  .flag-priority {
-    font-family: 'Barlow Condensed', sans-serif; font-size: 9px; font-weight: 600;
-    letter-spacing: .14em; text-transform: uppercase; margin-bottom: 4px;
-  }
-  .flag.high .flag-priority { color: #C47A7A; }
-  .flag.medium .flag-priority { color: #C8A030; }
-  .flag.low .flag-priority { color: var(--gray); }
-  .flag-text { font-size: 12px; color: #C8BFA8; line-height: 1.55; }
+    /* ── STATUS BADGE ── */
+    .status-col {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0.75rem;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+    }
+    .badge-new    { background: rgba(76,175,125,0.15); color: var(--green); border: 1px solid rgba(76,175,125,0.3); }
+    .badge-review { background: rgba(224,169,74,0.15);  color: var(--amber); border: 1px solid rgba(224,169,74,0.3); }
+    .badge-done   { background: rgba(90,106,126,0.15);  color: var(--text-muted); border: 1px solid rgba(90,106,126,0.3); }
 
-  /* ── FOOTER ── */
-  .page-footer {
-    margin-top: 60px; padding-top: 24px; border-top: 1px solid var(--border);
-    display: flex; justify-content: space-between; align-items: center;
-    font-family: 'Barlow Condensed', sans-serif; font-size: 10px;
-    letter-spacing: .1em; text-transform: uppercase; color: var(--gray);
-  }
+    /* ── FLAGS ── */
+    .flags-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      margin-bottom: 1.75rem;
+    }
+    .flag-chip {
+      background: rgba(224,87,87,0.12);
+      border: 1px solid rgba(224,87,87,0.3);
+      color: #e88080;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 3px 10px;
+      border-radius: 20px;
+      letter-spacing: 0.03em;
+    }
+    .flag-chip.flag-info {
+      background: var(--gold-dim);
+      border-color: var(--gold-line);
+      color: var(--gold-light);
+    }
 
-  @media (max-width: 640px) {
-    main { padding: 90px 20px 40px; }
-    .answer-grid { grid-template-columns: 1fr; }
-    .lifestyle-grid { grid-template-columns: 1fr 1fr; }
-    nav { padding: 0 20px; }
-  }
-</style>
+    /* ── TRACKS ROW ── */
+    .tracks-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      margin-bottom: 1.75rem;
+    }
+    .track-chip {
+      background: rgba(76,175,125,0.1);
+      border: 1px solid rgba(76,175,125,0.25);
+      color: #7ecfa6;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 3px 10px;
+      border-radius: 20px;
+      letter-spacing: 0.03em;
+    }
+
+    /* ── SECTION HEADERS ── */
+    .section-label {
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--gold);
+      font-weight: 500;
+      margin-bottom: 0.85rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--gold-line);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .section-label::before {
+      content: '';
+      display: inline-block;
+      width: 3px;
+      height: 12px;
+      background: var(--gold);
+      border-radius: 2px;
+    }
+
+    /* ── ANSWER GRID ── */
+    .answers-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1px;
+      background: var(--gold-line);
+      border: 1px solid var(--gold-line);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 1.75rem;
+    }
+    .answer-cell {
+      background: var(--navy-card);
+      padding: 1rem 1.25rem;
+      transition: background 0.15s;
+    }
+    .answer-cell:hover { background: var(--navy-light); }
+    .answer-cell.wide {
+      grid-column: 1 / -1;
+    }
+    .answer-q {
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+      margin-bottom: 0.3rem;
+      font-weight: 500;
+    }
+    .answer-v {
+      font-size: 14px;
+      color: var(--text);
+      font-weight: 400;
+    }
+    .answer-v.empty { color: var(--text-dim); font-style: italic; }
+    .answer-v.highlight { color: var(--gold-light); font-weight: 500; }
+
+    /* ── RAW JSON SECTION ── */
+    .json-toggle {
+      background: none;
+      border: 1px solid var(--gold-line);
+      color: var(--text-muted);
+      font-size: 12px;
+      font-family: 'DM Sans', sans-serif;
+      padding: 7px 14px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      letter-spacing: 0.04em;
+      transition: border-color 0.2s, color 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 0.85rem;
+    }
+    .json-toggle:hover { border-color: var(--gold); color: var(--gold); }
+    .json-block {
+      background: #0a1520;
+      border: 1px solid var(--gold-line);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 12px;
+      color: #8fa8c4;
+      overflow-x: auto;
+      white-space: pre;
+      line-height: 1.7;
+      display: none;
+    }
+    .json-block.open { display: block; }
+
+    /* ── ACTION BAR ── */
+    .action-bar {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-bottom: 2rem;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 9px 18px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 500;
+      font-family: 'DM Sans', sans-serif;
+      cursor: pointer;
+      text-decoration: none;
+      letter-spacing: 0.02em;
+      transition: all 0.2s;
+      border: none;
+    }
+    .btn-gold {
+      background: var(--gold);
+      color: var(--navy);
+    }
+    .btn-gold:hover { background: var(--gold-light); }
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--gold-line);
+      color: var(--text-muted);
+    }
+    .btn-outline:hover { border-color: var(--gold); color: var(--gold); }
+
+    /* ── SR ID BAR ── */
+    .sr-id-bar {
+      background: var(--navy-mid);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: var(--radius);
+      padding: 0.65rem 1rem;
+      font-size: 11px;
+      color: var(--text-dim);
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      letter-spacing: 0.04em;
+      margin-bottom: 1.75rem;
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .sr-id-bar span { color: var(--text-muted); }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--gold-line);
+      padding: 1.5rem 2rem;
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-dim);
+      letter-spacing: 0.04em;
+      margin-top: 4rem;
+    }
+  </style>
 </head>
 <body>
 
+<!-- NAV -->
 <nav>
-  <a href="https://www.integratedplanningpartners.com" class="nav-logo">
-    <svg viewBox="875 1789 3260 1462" xmlns="http://www.w3.org/2000/svg">
-      <g><rect fill="#C8A96E" x="914.76" y="2074.65" width="228.09" height="228.09"/><rect fill="#C8A96E" x="1226.07" y="2697.25" width="228.09" height="228.09"/><path fill="#C8A96E" d="M1564.58,2074.65h-338.52v228.09h566.61c0-125.97-102.12-228.09-228.09-228.09Z"/><path fill="#C8A96E" d="M1226.07,2614.05h338.52c125.97,0,228.09-102.12,228.09-228.09h-566.61v228.09Z"/><rect fill="#C8A96E" x="914.76" y="2385.95" width="228.09" height="539.39"/><path fill="#C8A96E" d="M2011.69,1828.72h15.92v1342.55h-15.92z"/><path fill="#C8A96E" d="M2402.93,2389.86c-15.76-7.03-34.78-10.54-57.07-10.54h-99.24v254.46h36.35v-77.06h62.89c22.29,0,41.31-3.58,57.07-10.72,15.75-7.15,27.87-17.32,36.35-30.54,8.48-13.21,12.73-29.02,12.73-47.44s-4.24-34.29-12.73-47.62c-8.48-13.33-20.6-23.5-36.35-30.54Z"/></g>
+  <a class="nav-logo" href="https://www.integratedplanningpartners.com/">
+    <svg viewBox="0 0 206 92" xmlns="http://www.w3.org/2000/svg">
+      <!-- Four-ring mark -->
+      <circle cx="24" cy="46" r="18" fill="none" stroke="#C8A96E" stroke-width="3.5"/>
+      <circle cx="46" cy="28" r="18" fill="none" stroke="#C8A96E" stroke-width="3.5"/>
+      <circle cx="68" cy="46" r="18" fill="none" stroke="#C8A96E" stroke-width="3.5"/>
+      <circle cx="46" cy="64" r="18" fill="none" stroke="#C8A96E" stroke-width="3.5"/>
+      <!-- Wordmark -->
+      <text x="98" y="36" font-family="'DM Sans',sans-serif" font-size="13" font-weight="500" fill="#C8A96E" letter-spacing="1">INTEGRATED</text>
+      <text x="98" y="52" font-family="'DM Sans',sans-serif" font-size="13" font-weight="500" fill="#C8A96E" letter-spacing="1">PLANNING</text>
+      <text x="98" y="68" font-family="'DM Sans',sans-serif" font-size="13" font-weight="500" fill="#C8A96E" letter-spacing="1">PARTNERS</text>
     </svg>
-    <div>
-      <div class="nav-logo-text">Integrated Planning<br>Partners</div>
-      <div class="nav-logo-sub">Built for planning. Designed for execution.</div>
-    </div>
   </a>
-  <div class="nav-badge">StructureReview™ — Full Client Record</div>
+  <div class="nav-links">
+    <a href="https://www.integratedplanningpartners.com/advisor-portal.html">← Advisor Portal</a>
+    <a href="https://www.integratedplanningpartners.com/advisor-portal.html" class="btn-portal">ADVISOR PORTAL</a>
+  </div>
 </nav>
 
-<main>
-  <div id="loading">
+<!-- MAIN -->
+<main class="page-wrap" id="main">
+  <!-- Loading state (default) -->
+  <div class="state-screen" id="state-loading">
     <div class="spinner"></div>
-    Loading client answers...
+    <p style="color:var(--text-muted)">Loading StructureReview™ record…</p>
   </div>
-  <div id="error" style="display:none;"></div>
-  <div id="content" style="display:none;"></div>
+
+  <!-- Error states (hidden) -->
+  <div class="state-screen" id="state-not-found" style="display:none">
+    <div class="icon">🔍</div>
+    <h2>Record Not Found</h2>
+    <p>No StructureReview™ record matches this ID. It may have been deleted or the link may be incorrect.</p>
+    <a href="https://www.integratedplanningpartners.com/advisor-portal.html" class="btn btn-outline" style="margin-top:1rem">← Back to Portal</a>
+  </div>
+
+  <div class="state-screen" id="state-error" style="display:none">
+    <div class="icon">⚠️</div>
+    <h2>Unable to Load</h2>
+    <p id="error-msg">An error occurred loading this record.</p>
+    <a href="https://www.integratedplanningpartners.com/advisor-portal.html" class="btn btn-outline" style="margin-top:1rem">← Back to Portal</a>
+  </div>
+
+  <div class="state-screen" id="state-no-id" style="display:none">
+    <div class="icon">🔗</div>
+    <h2>No Review ID Provided</h2>
+    <p>This page requires a <code style="color:var(--gold)">?sr_id=</code> parameter in the URL. Use the link from the advisor notification email.</p>
+    <a href="https://www.integratedplanningpartners.com/advisor-portal.html" class="btn btn-outline" style="margin-top:1rem">← Back to Portal</a>
+  </div>
+
+  <!-- Content (hidden until loaded) -->
+  <div id="content" style="display:none">
+
+    <div class="breadcrumb">
+      <a href="https://www.integratedplanningpartners.com/advisor-portal.html">Advisor Portal</a>
+      ›
+      <a href="https://www.integratedplanningpartners.com/advisor-portal.html">Clients</a>
+      ›
+      <span id="bc-name">StructureReview™</span>
+    </div>
+
+    <!-- Client header -->
+    <div class="client-header">
+      <div>
+        <div class="client-name" id="client-name-display">—</div>
+        <div style="font-size:13px;color:var(--text-muted)" id="client-email-display">—</div>
+        <div class="client-meta" id="client-meta-row"></div>
+      </div>
+      <div class="status-col">
+        <span class="badge badge-new" id="status-badge">● NEW</span>
+        <div style="font-size:11px;color:var(--text-dim);text-align:right" id="submitted-display">—</div>
+      </div>
+    </div>
+
+    <!-- SR / Client ID bar -->
+    <div class="sr-id-bar" id="id-bar">
+      <div>SR ID: <span id="sr-id-display">—</span></div>
+      <div>Client ID: <span id="client-id-display">—</span></div>
+    </div>
+
+    <!-- Flags -->
+    <div id="flags-section" style="display:none">
+      <div class="section-label">Planning Flags</div>
+      <div class="flags-row" id="flags-row"></div>
+    </div>
+
+    <!-- Planning tracks -->
+    <div id="tracks-section" style="display:none">
+      <div class="section-label">Planning Tracks Identified</div>
+      <div class="tracks-row" id="tracks-row"></div>
+    </div>
+
+    <!-- Actions -->
+    <div class="action-bar">
+      <a id="btn-supplement" href="#" class="btn btn-gold">Begin Allocation Supplement →</a>
+      <button onclick="window.print()" class="btn btn-outline">🖨 Print / Save PDF</button>
+      <a href="https://www.integratedplanningpartners.com/advisor-portal.html" class="btn btn-outline">← Portal</a>
+    </div>
+
+    <!-- Answers -->
+    <div class="section-label">Client Answers</div>
+    <div class="answers-grid" id="answers-grid"></div>
+
+    <!-- Raw JSON -->
+    <button class="json-toggle" onclick="toggleJson()">
+      <span id="json-arrow">▶</span> Raw JSON
+    </button>
+    <pre class="json-block" id="json-block"></pre>
+
+  </div><!-- /content -->
 </main>
 
+<footer>
+  Powered by Integrated Planning Partners &nbsp;·&nbsp; Advisor Use Only &nbsp;·&nbsp; Confidential
+</footer>
+
 <script>
-const SB_URL = 'https://piixgvxrasddphklgazh.supabase.co';
-const SB_KEY = 'sb_publishable_acvdk0hBniaB6qOD8_k8XQ_9R6FNbP_';
+  const SUPABASE_URL  = 'https://piixgvxrasddphklgazh.supabase.co';
+  const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBpaXhndnhyYXNkZHBoa2xnYXpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0NzExNjAsImV4cCI6MjA4OTA0NzE2MH0.vZqwRoICyqiaHWSbGTiGvBgw6Egdd_2jPTNn4XielJs';
 
-// Label maps for option IDs
-const LABELS = {
-  // Contact preference
-  cp_email: 'Email', cp_call: 'Phone call', cp_text: 'Text message', cp_any: 'Any — whatever is fastest',
-  // Bio sex
-  male: 'Male', female: 'Female', sp_male: 'Male', sp_female: 'Female',
-  // Health
-  sh_excellent: 'Excellent', sh_good: 'Good', sh_fair: 'Fair', sh_poor: 'Poor',
-  // Tobacco
-  tb_no: 'No', tb_yes_current: 'Yes — currently', tb_yes_former: 'Former user',
-  // Insurance
-  id_no: 'No', id_yes: 'Yes',
-  // Marital
-  married: 'Married or partnered', single: 'Single', divorced: 'Divorced', widowed: 'Widowed',
-  // Children
-  ch_none: 'No children', ch_1: '1', ch_2: '2', ch_3: '3', ch_4: '4', ch_5plus: '5 or more',
-  // Employment
-  employed: 'Employed full-time', part_time: 'Part-time', self_employed: 'Self-employed / business owner',
-  retired: 'Retired', not_working: 'Not currently working',
-  sp_emp_full: 'Full-time', sp_emp_part: 'Part-time', sp_emp_self: 'Self-employed / business owner',
-  sp_emp_retired: 'Retired', sp_emp_not: 'Not working',
-  sp_biz_yes: 'Yes', sp_biz_no: 'No',
-  sp_inc_under50: 'Under $50,000', sp_inc_50_100: '$50,000–$100,000', sp_inc_100_200: '$100,000–$200,000',
-  sp_inc_200_500: '$200,000–$500,000', sp_inc_over500: 'Over $500,000',
-  sp_rp_yes_active: 'Yes — contributing', sp_rp_yes_not: 'Yes — not contributing',
-  sp_rp_no: 'No employer plan', sp_rp_pension: 'Pension / defined benefit',
-  // Primary asset
-  pa_qp: 'Qualified retirement accounts', pa_real_estate: 'Real estate', pa_business: 'Business equity',
-  pa_investment: 'Investment accounts', pa_mixed: 'Mixed / roughly equal',
-  // Net worth
-  nw_under500: 'Under $500,000', nw_500_1m: '$500,000–$1M', nw_1_3m: '$1M–$3M',
-  nw_3_5m: '$3M–$5M', nw_over5m: 'Over $5M',
-  // Has CPA/advisor/attorney
-  cpa_yes: 'Yes', cpa_no: 'No',
-  adv_yes: 'Yes', adv_no: 'No',
-  att_yes: 'Yes', att_no: 'No',
-  // How heard
-  hh_jeff: 'Working with Jeff Faine', hh_advisor: 'Referred by another IPP advisor',
-  hh_seminar: 'Attended a seminar', hh_book: 'Read Architecture of Retirement',
-  hh_social: 'Social media or internet search', hh_other: 'Other',
-  // Event horizon
-  business_sale: 'Selling a business', real_estate_sale: 'Selling real estate',
-  equity_event: 'Equity compensation event', retirement: 'Retiring / stepping back',
-  nothing: 'No major event anticipated',
-  // QP
-  hqp_401k: '401(k)', hqp_403b: '403(b)', hqp_ira_trad: 'Traditional IRA',
-  hqp_sep: 'SEP IRA', hqp_simple: 'SIMPLE IRA', hqp_pension: 'Pension',
-  hqp_roth: 'Roth IRA / Roth 401(k)', hqp_none: 'None',
-  // QP balance
-  qpb_under250: 'Under $250,000', qpb_250_500: '$250,000–$500,000',
-  qpb_500_1m: '$500,000–$1M', qpb_1_2m: '$1M–$2M', qpb_2_3m: '$2M–$3M',
-  qpb_over3m: 'Over $3M',
-  // Roth pct
-  rp_none: 'None — all pre-tax', rp_small: 'Less than 25%', rp_quarter: 'About 25%',
-  rp_half: 'About 50%', rp_most: 'More than 75%', rp_all: 'All Roth',
-  // RMD
-  rmd_yes: 'Yes — strategy in place', rmd_partial: 'Somewhat — thought about it',
-  rmd_no: 'Not on my radar',
-  // Beneficiary
-  qpb_spouse: 'Spouse', qpb_children: 'Children', qpb_mixed: 'Mix of family members',
-  qpb_trust: 'Trust or estate', qpb_charity: 'Charity',
-  // Inherited QP
-  inh_yes: 'Yes', inh_no: 'No',
-  inh_recent: 'Within the last 1–2 years', inh_mid: '3–6 years ago', inh_older: 'More than 6 years ago',
-  inh_bal_small: 'Under $250,000', inh_bal_mid: '$250,000–$500,000',
-  inh_bal_large: '$500,000–$1M', inh_bal_xlarge: 'Over $1M',
-  inh_dist_yes: 'Yes — taking distributions', inh_dist_no: 'Not yet', inh_dist_unsure: 'Unsure of rules',
-  // Estate
-  ep_yes_full: 'Yes — complete plan', ep_yes_partial: 'Partial — some documents',
-  ep_no: 'No estate plan', ep_old: 'Yes — but needs updating',
-  ec_survivor: 'Survivor income for spouse', ec_equalize: 'Equal distribution among children',
-  ec_charity: 'Charitable giving', ec_business: 'Business succession',
-  ec_tax: 'Estate tax reduction', ec_none: 'No specific concerns',
-  // Income
-  ig_yes: 'Yes — income will cover expenses', ig_partial: 'Partially — will need to supplement',
-  ig_no: 'No — will need significant income from savings',
-  cp_yes: 'Yes — plan in place', cp_no: 'No plan', cp_partial: 'Partial — thinking about it',
-  li_yes: 'Yes', li_no: 'No',
-  // Advisor present
-  ap_self: 'On my own', ap_advisor: 'With my advisor',
-  // LE
-  le_biz: 'Business sale', le_real_estate: 'Real estate sale', le_equity: 'Equity / stock event',
-  le_other: 'Other',
-  le_yes: 'Yes — closed', le_no: 'Not yet',
-  le_under500: 'Under $500K', le_500_1m: '$500K–$1M', le_1_3m: '$1M–$3M', le_over3m: 'Over $3M',
-  le_pay_tax: 'Pay the taxes and invest the rest', le_defer: 'Looking for deferral strategies',
-  le_unsure: 'Unsure — need guidance',
-};
+  // ── Label maps extracted from SR question definitions ──
+  const OPTION_LABELS = {"cp_email": "Email", "cp_call": "Phone call", "cp_text": "Text message", "cp_any": "Any — whatever is fastest", "male": "Male", "female": "Female", "hs_excellent": "Excellent — no significant issues", "hs_good": "Good — minor issues, well managed", "hs_fair": "Fair — some ongoing health concerns", "hs_poor": "Poor — significant health issues", "tobacco_no": "No — never or quit more than 5 years ago", "tobacco_former": "Former user — quit within the last 5 years", "tobacco_yes": "Yes — current user", "id_no": "No — never", "id_rated": "Yes — I was rated or had a modified offer", "id_declined": "Yes — I was declined", "id_unsure": "I'm not sure", "married": "Married or partnered", "single": "Single", "divorced": "Divorced", "widowed": "Widowed", "sh_excellent": "Excellent — no significant issues", "sh_good": "Good — minor issues, well managed", "sh_fair": "Fair — some ongoing health concerns", "sh_poor": "Poor — significant health issues", "sp_male": "Male", "sp_female": "Female", "sp_emp_full": "Working full-time", "sp_emp_part": "Working part-time", "sp_emp_self": "Self-employed or business owner", "sp_emp_retired": "Retired", "sp_emp_not": "Not currently working", "sp_biz_yes": "Yes — they own or co-own a business", "sp_biz_no": "No", "sp_inc_under50": "Under $50,000", "sp_inc_50_100": "$50,000 – $100,000", "sp_inc_100_200": "$100,000 – $200,000", "sp_inc_200_500": "$200,000 – $500,000", "sp_inc_over500": "Over $500,000", "sp_rp_yes_active": "Yes — and they're contributing", "sp_rp_yes_not": "Yes — but they're not contributing", "sp_rp_no": "No employer plan", "sp_rp_pension": "Pension or defined benefit plan", "ch_none": "No children", "ch_1": "1", "ch_2": "2", "ch_3": "3", "ch_4plus": "4 or more", "mc_none": "None — all are adults", "mc_1": "1", "mc_2": "2", "mc_3plus": "3 or more", "ac_none": "None", "ac_1": "1", "ac_2": "2", "ac_3plus": "3 or more", "w2": "Employed — W-2", "business_owner": "Business owner or self-employed", "retired": "Retired", "transitioning": "Transitioning — sale, retirement, or career change ahead", "qp": "Retirement accounts — IRA, 401(k), 403(b)", "business": "A business or professional practice", "real_estate": "Real estate", "investments": "Investment or brokerage accounts", "mixed": "A mix of several", "nw_under500k": "Under $500,000", "nw_500k_1m": "$500,000 – $1,000,000", "nw_1_2m": "$1,000,000 – $2,000,000", "nw_2_5m": "$2,000,000 – $5,000,000", "nw_5_10m": "$5,000,000 – $10,000,000", "nw_10_20m": "$10,000,000 – $20,000,000", "nw_over20m": "Over $20,000,000", "cpa_yes": "Yes", "cpa_no": "No", "adv_yes": "Yes", "adv_no": "No", "att_yes": "Yes", "att_no": "No", "hh_jeff": "Working with Jeff Faine", "hh_advisor": "Referred by another IPP advisor", "hh_seminar": "Attended a seminar", "hh_book": "Read Architecture of Retirement", "hh_social": "Social media or internet search", "hh_other": "Other", "business_sale": "Selling a business", "real_estate_sale": "Selling real estate", "equity_event": "Equity compensation — RSUs, stock options, ESPP", "retirement": "Retiring or stepping back from work", "nothing": "No major event anticipated", "hqp_401k": "401(k) or 403(b) — employer plan", "hqp_ira": "Traditional IRA or Rollover IRA", "hqp_roth": "Roth IRA or Roth 401(k)", "hqp_sep": "SEP-IRA or SIMPLE IRA", "hqp_tsp": "TSP — Thrift Savings Plan", "hqp_db": "Defined Benefit or Cash Balance Plan", "hqp_none": "None — I don't have any of these", "rp_small": "Less than 10% is in Roth", "rp_quarter": "Roughly 10% – 25% is in Roth", "rp_half": "Roughly 25% – 50% is in Roth", "rp_most": "More than 50% is in Roth", "rp_all": "Virtually all of it is in Roth", "under500k": "Under $500,000", "500k_1m": "$500,000 – $1,000,000", "1m_2m": "$1,000,000 – $2,000,000", "2m_5m": "$2,000,000 – $5,000,000", "over5m": "Over $5,000,000", "rmd_yes": "Yes — I have a strategy in place", "rmd_partial": "Somewhat — I've thought about it but haven't acted", "rmd_no": "Not really — this hasn't been on my radar", "inh_yes": "Yes", "inh_no": "No", "inh_recent": "Within the last 1–2 years", "inh_mid": "$250,000 – $500,000", "inh_older": "More than 6 years ago", "inh_small": "Under $250,000", "inh_large": "$500,000 – $1M", "inh_xlarge": "Over $1M", "inh_dist_yes": "Yes — taking distributions now", "inh_dist_no": "Not yet", "inh_dist_unsure": "Unsure of the rules", "qp_spouse": "Spouse", "qp_children": "Adult children", "qp_mixed": "A mix — spouse and children", "qp_trust": "A trust or charity", "qp_undecided": "Not yet decided", "le_business": "Business sale", "le_realestate": "Real estate sale", "le_equity": "Equity compensation — RSUs, options, ESPP", "le_other": "Other concentrated position", "le_open": "No — still in negotiation or planning", "le_soon": "Closing within 90 days", "le_closed": "Already closed", "le_under100": "Under $100,000", "le_100_250": "$100,000 – $250,000", "le_250_500": "$250,000 – $500,000", "le_500_1m": "$500,000 – $1,000,000", "le_over1m": "Over $1,000,000", "le_invest": "Invest in a diversified portfolio", "le_retire": "Fund my retirement", "le_undecided": "Still figuring it out", "le_other_plan": "Have a specific plan in mind", "biz_sole": "Sole proprietor or single-member LLC", "biz_scorp": "S-Corporation", "biz_ccorp": "C-Corporation", "biz_partner": "Partnership or multi-member LLC", "biz_prof": "Professional practice — medical, legal, dental, etc.", "bp_reduce_tax": "Reducing business or personal income tax", "bp_retirement": "Building tax-advantaged retirement savings", "bp_exit": "Planning for an eventual exit or sale", "bp_keyman": "Protecting the business if I or a key person dies or is disabled", "bp_buysell": "Funding a buy-sell agreement with a partner", "bp_attract": "Attracting or retaining key employees", "brp_401k": "401(k) — with or without profit sharing", "brp_sep_simple": "SEP-IRA or SIMPLE IRA", "brp_db": "Defined benefit or cash balance plan", "brp_none": "No formal plan in place", "bc_under150": "Under $150,000", "bc_150_300": "$150,000 – $300,000", "bc_300_500": "$300,000 – $500,000", "bc_500_1m": "$500,000 – $1,000,000", "bc_over1m": "Over $1,000,000", "be_just_me": "Just me — owner only", "be_2_5": "2 – 5", "be_6_20": "6 – 20", "be_21_50": "21 – 50", "be_over50": "More than 50", "bhp_yes": "Yes", "bhp_no": "No — I'm the sole owner", "bpc_one": "1 other partner", "bpc_two": "2 other partners", "bpc_three": "3 or more", "bbs_yes": "Yes — we have one", "bbs_no": "No — nothing formal in place", "bbs_outdated": "We have something but it hasn't been reviewed recently", "bbf_life": "Life insurance", "bbf_cash": "Cash reserve or sinking fund", "bbf_loan": "Bank financing or installment", "bbf_none": "It isn't funded", "bbf_unknown": "I'm not sure how it's funded", "ep_yes_current": "Yes — reviewed within the last 3 years", "ep_yes_old": "Yes — but it hasn't been updated in a while", "ep_basic": "Basic documents only — will, maybe a trust", "ep_no": "No formal estate plan in place", "ec_tax": "Minimizing estate taxes", "ec_legacy": "Leaving a meaningful legacy", "ec_charity": "Charitable giving", "ec_survivor": "Protecting a surviving spouse", "ec_business": "Business succession", "ec_equalize": "Equalizing inheritance among children", "ig_yes": "Yes — I have a pension that covers my essential expenses", "ig_partial": "Partially — Social Security will help but there will still be a gap", "ig_no": "No — my income will come primarily from investments", "ig_unknown": "I haven't modeled this yet", "cp_ltc": "Yes — standalone long-term care policy", "cp_hybrid": "Yes — hybrid life/LTC or living benefit policy", "cp_self": "Planning to self-insure from savings", "cp_none": "No plan in place", "li_term": "Term insurance", "li_perm": "Permanent — whole life or universal life", "li_both": "Both term and permanent", "li_none": "No life insurance in place", "li_business": "Business-owned policy", "ct_very": "Very concerned — this is something I think about", "ct_somewhat": "Somewhat concerned — I know it's there but haven't addressed it", "ct_not": "Not concerned — I have a plan for this", "ct_new": "I hadn't thought about it in those terms before", "cc_covered": "We have a dedicated plan or policy in place", "cc_portfolio": "It would come from our investment portfolio", "cc_family": "We would rely on family support", "cc_unknown": "Honestly, we haven't figured that out", "cm_yes": "Yes — part of my income is contractually protected", "cm_partial": "Partially — some protection but not enough", "cm_no": "No — my income depends entirely on portfolio performance", "cm_unknown": "I'm not sure how my plan handles this", "cs_yes": "Yes — they would be fully provided for", "cs_mostly": "Mostly — there would be some adjustment but they'd be okay", "cs_no": "No — it would significantly impact their financial picture", "cs_unsure": "Honestly, I'm not sure", "pu_urgent": "Urgent — there are things I know I need to address soon", "pu_active": "Active — I'm engaged and looking to improve the plan", "pu_curious": "Curious — exploring options, no immediate pressure", "pu_early": "Early stages — just starting to think about this seriously", "with_advisor": "With my advisor", "on_own": "On my own before our meeting", "exploring": "Just exploring on my own"};
 
-function label(val) {
-  if (!val) return null;
-  if (Array.isArray(val)) return val.map(v => LABELS[v] || v).join(', ');
-  return LABELS[val] || val;
-}
+  const QUESTION_LABELS = {"first_name": "First Name", "last_name": "Last Name", "email": "Email Address", "phone": "Phone Number", "contact_preference": "How do you prefer we reach out to you?", "dob": "Date of Birth", "bio_sex": "What is your biological sex at birth?", "health_status": "How would you describe your overall health?", "tobacco": "Do you use tobacco or nicotine products?", "insurance_declined": "Have you ever been declined, rated, or postponed for life insurance coverage?", "marital": "What's your marital or partnership status?", "spouse_first_name": "Spouse's First Name", "spouse_last_name": "Spouse's Last Name", "spouse_dob": "Spouse's Date of Birth", "anniversary": "What is your wedding anniversary date?", "spouse_health": "How would you describe your spouse's overall health?", "spouse_bio_sex": "What is your spouse's biological sex at birth?", "spouse_employment": "What best describes your spouse's current work situation?", "spouse_business": "Does your spouse own a business or have an ownership interest in one?", "spouse_income": "Roughly what is your spouse's annual income?", "spouse_retirement_plan": "Does your spouse have access to an employer retirement plan — 401k, 403b, pension?", "children_count": "How many children do you have?", "minor_children_count": "How many of your children are minors — under age 18?", "adult_children_count": "How many adult children do you have?", "employment": "What best describes your current work situation?", "primary_asset": "Where does most of your wealth sit today?", "net_worth": "Roughly what is your estimated total net worth — including all assets?", "has_cpa": "Do you have a CPA or tax advisor you work with?", "cpa_name": "What is your CPA's name?", "has_advisor": "Do you have a financial advisor or investment advisor you work with?", "advisor_name": "What is your financial advisor's name?", "has_attorney": "Do you have an estate planning attorney?", "attorney_name": "What is your estate attorney's name?", "state": "State", "how_heard": "How They Found Us", "referring_advisor_name": "Please enter their first and last name.", "event_horizon": "Is a major financial event on the horizon in the next 1–3 years?", "has_qp": "Which of the following retirement accounts do you have? Check all that apply.", "qp_roth_pct": "Roughly what portion of your total retirement account balance is in Roth accounts?", "qp_balance": "Roughly how much is in your qualified retirement accounts?", "rmd_status": "Do you have a plan to address the tax impact of your Required Minimum Distributions?", "has_inherited_qp": "Have you inherited a qualified retirement account (IRA, 401k) from someone other than a spouse?", "inherited_qp_timing": "When did you inherit the account?", "inherited_qp_balance": "Roughly how large is the inherited account?", "inherited_qp_distributions": "Are you currently taking distributions from the inherited account?", "qp_beneficiary": "Who inherits your retirement accounts when you're gone?", "le_type": "What kind of liquidity event are you looking at?", "le_timing": "Has the transaction closed yet?", "le_size": "Expected Liquidity Event Size", "le_plan": "What's the current plan for the proceeds after taxes?", "biz_structure": "How is your business structured?", "biz_priorities": "What are your biggest business planning priorities right now?", "biz_retirement_plan": "What type of retirement plan does your business currently offer?", "biz_compensation": "Annual Business Compensation", "biz_employees": "How many employees does your business have?", "biz_has_partners": "Do you have business partners or co-owners?", "biz_partner_count": "How many partners or co-owners?", "biz_buysell": "Do you have a buy-sell agreement in place?", "biz_buysell_funding": "How is the buy-sell agreement funded?", "estate_plan": "Do you have an estate plan in place?", "estate_concern": "Which estate planning concerns are on your mind?", "income_gap": "In retirement, do you expect your guaranteed income to cover your essential expenses?", "care_plan": "Do you have a plan for long-term care costs if you need them?", "life_insurance": "Do you currently have life insurance?", "retire_age": "Target Retirement Age", "retirement_vision": "Retirement Vision", "concern_tax_burden": "A $1,000,000 retirement account growing at 7% for 20 years becomes nearly $4,000,000 — of which $1,450,000 or more could be owed in taxes at current rates before your family sees a dollar. How concerned are you about the deferred tax burden inside your retirement accounts?", "concern_care_cost": "A three-year care event — assisted living, memory care, or in-home nursing — can easily cost $250,000 to $450,000. Most retirement plans have no dedicated funding for this. If that happened to you or your spouse, where would the money come from?", "concern_market_seq": "Markets have dropped 30–50% multiple times in the last 25 years. If that happened in the first three years of your retirement, your portfolio might never fully recover — even if markets bounce back. Does your current plan have a protected income floor for that scenario?", "concern_spouse": "If something happened to you tomorrow — death or disability — would your spouse or family be able to maintain their current lifestyle indefinitely without your income or your involvement in managing the finances?", "planning_urgency": "How would you describe where you are with your financial planning right now?", "ls_musician": "Who's your favorite musician or band?", "ls_vacation": "What's your favorite vacation spot — or somewhere you've always wanted to go?", "ls_hobbies": "What do you enjoy outside of work? Any hobbies or passions?", "ls_sports_team": "Do you have a favorite sports team — college, pro, or even a specific athlete you follow?", "ls_restaurant": "What's your favorite local restaurant near home?", "ls_milestone": "Any upcoming personal milestones we should know about? A retirement, anniversary, graduation, or big birthday?", "advisor_present": "Are you completing this with your advisor, or on your own?", "open_concerns": "Is there anything specific on your mind that we haven't covered yet?", "income_gap_amount": "Estimated Income Gap", "biz_rev": "Annual Business Revenue"};
 
-function fmt(val, fallback) {
-  const l = label(val);
-  return l || fallback || null;
-}
+  // Keys to always show at the top, in order
+  const PRIORITY_KEYS = ['first_name','last_name','email','phone','dob','state',
+    'marital','employment','retire_age','qp_balance','rmd_status','net_worth',
+    'life_insurance','care_plan','estate_plan','planning_urgency','how_heard'];
 
-function fmtDate(d) {
-  if (!d) return null;
-  try {
-    const dt = new Date(d + 'T12:00:00');
-    return dt.toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'});
-  } catch { return d; }
-}
+  // Keys to highlight in gold
+  const HIGHLIGHT_KEYS = new Set(['qp_balance','rmd_status','retire_age','net_worth','planning_urgency']);
 
-function calcAge(dob) {
-  if (!dob) return null;
-  const d = new Date(dob + 'T12:00:00');
-  if (isNaN(d)) return null;
-  const now = new Date();
-  let age = now.getFullYear() - d.getFullYear();
-  if (now.getMonth() < d.getMonth() || (now.getMonth() === d.getMonth() && now.getDate() < d.getDate())) age--;
-  return age;
-}
+  // Keys to skip (shown in header already or internal)
+  const SKIP_KEYS = new Set(['first_name','last_name','email','tracks','planning_tracks']);
 
-function calcYearsMarried(d) {
-  if (!d) return null;
-  const dt = new Date(d + 'T12:00:00');
-  if (isNaN(dt)) return null;
-  const now = new Date();
-  let y = now.getFullYear() - dt.getFullYear();
-  if (now.getMonth() < dt.getMonth() || (now.getMonth() === dt.getMonth() && now.getDate() < dt.getDate())) y--;
-  return y >= 0 ? y : null;
-}
-
-function row(label, value, opts = {}) {
-  if (!value && !opts.showEmpty) return '';
-  const cls = ['answer-row'];
-  if (opts.fullWidth) cls.push('full-width');
-  const valCls = ['answer-value'];
-  if (!value) valCls.push('empty');
-  if (opts.highlight) valCls.push('highlight');
-  return `<div class="${cls.join(' ')}">
-    <div class="answer-label">${label}</div>
-    <div class="${valCls.join(' ')}">${value || '—'}</div>
-  </div>`;
-}
-
-function section(title, html) {
-  if (!html.trim()) return '';
-  return `<div class="section">
-    <div class="section-title">${title}</div>
-    ${html}
-  </div>`;
-}
-
-function grid(rows) {
-  return `<div class="answer-grid">${rows}</div>`;
-}
-
-function renderAnswers(sr, client) {
-  const a = sr.answers || {};
-  const age = calcAge(a.dob);
-  const spouseAge = calcAge(a.spouse_dob);
-  const yearsMarried = calcYearsMarried(a.anniversary);
-  const hasSpouse = a.marital === 'married' || a.marital === 'partnered';
-
-  const submittedAt = sr.submitted_at
-    ? new Date(sr.submitted_at).toLocaleDateString('en-US', {month:'long',day:'numeric',year:'numeric', hour:'2-digit', minute:'2-digit'})
-    : '';
-
-  let html = '';
-
-  // ── Header ──────────────────────────────────────────────────────
-  html += `<div class="report-header">
-    <div class="report-eyebrow">StructureReview™ — Complete Client Record</div>
-    <div class="report-name">${a.first_name || ''} ${a.last_name || ''}</div>
-    <div class="report-meta">
-      ${age !== null ? `<span>Age ${age}</span>` : ''}
-      ${a.state ? `<span>${a.state}</span>` : ''}
-      ${submittedAt ? `<span>Submitted ${submittedAt}</span>` : ''}
-      ${sr.planning_tracks ? `<span>Tracks: ${sr.planning_tracks}</span>` : ''}
-    </div>
-  </div>`;
-
-  // ── 1. Personal ──────────────────────────────────────────────────
-  let personal = grid(
-    row('Email', a.email, {highlight: true}) +
-    row('Phone', a.phone) +
-    row('Contact Preference', fmt(a.contact_preference)) +
-    row('Date of Birth', fmtDate(a.dob) + (age !== null ? ` (Age ${age})` : '')) +
-    row('Biological Sex', fmt(a.bio_sex)) +
-    row('State', a.state) +
-    row('Marital Status', fmt(a.marital)) +
-    (hasSpouse ? row('Spouse', `${a.spouse_first_name || ''} ${a.spouse_last_name || ''}`.trim()) : '') +
-    (hasSpouse && a.spouse_dob ? row('Spouse DOB', fmtDate(a.spouse_dob) + (spouseAge !== null ? ` (Age ${spouseAge})` : '')) : '') +
-    (hasSpouse && a.anniversary ? row('Wedding Anniversary', fmtDate(a.anniversary) + (yearsMarried !== null ? ` — Married ${yearsMarried} years` : ''), {highlight: true}) : '') +
-    row('Children', fmt(a.children_count)) +
-    (a.minor_children_count && a.minor_children_count !== 'ch_none' ? row('Minor Children', fmt(a.minor_children_count)) : '') +
-    (a.adult_children_count && a.adult_children_count !== 'ch_none' ? row('Adult Children', fmt(a.adult_children_count)) : '')
-  );
-  html += section('Personal', personal);
-
-  // ── 2. Health & Underwriting ─────────────────────────────────────
-  let health = grid(
-    row('Health Status', fmt(a.health_status)) +
-    row('Tobacco / Nicotine', fmt(a.tobacco)) +
-    row('Insurance Declined / Rated', fmt(a.insurance_declined)) +
-    (hasSpouse ? row('Spouse Health', fmt(a.spouse_health)) : '') +
-    (hasSpouse && a.spouse_bio_sex ? row('Spouse Biological Sex', fmt(a.spouse_bio_sex)) : '')
-  );
-  html += section('Health & Underwriting', health);
-
-  // ── 3. Employment ────────────────────────────────────────────────
-  let employment = grid(
-    row('Employment Status', fmt(a.employment)) +
-    (hasSpouse ? row('Spouse Employment', fmt(a.spouse_employment)) : '') +
-    (hasSpouse && a.spouse_business ? row('Spouse Business Owner', fmt(a.spouse_business)) : '') +
-    (hasSpouse && a.spouse_income ? row('Spouse Annual Income', fmt(a.spouse_income)) : '') +
-    (hasSpouse && a.spouse_retirement_plan ? row('Spouse Retirement Plan', fmt(a.spouse_retirement_plan)) : '')
-  );
-  html += section('Employment', employment);
-
-  // ── 4. Financial Picture ─────────────────────────────────────────
-  let financial = grid(
-    row('Primary Asset', fmt(a.primary_asset)) +
-    row('Estimated Net Worth', fmt(a.net_worth)) +
-    row('Qualified Plan Accounts', Array.isArray(a.has_qp) ? a.has_qp.map(v => LABELS[v]||v).join(', ') : fmt(a.has_qp)) +
-    row('QP Balance', fmt(a.qp_balance)) +
-    row('Roth Percentage', fmt(a.qp_roth_pct)) +
-    row('QP Beneficiary', fmt(a.qp_beneficiary))
-  );
-  html += section('Financial Picture', financial);
-
-  // ── 5. RMD & Inherited QP ────────────────────────────────────────
-  const age73 = age !== null ? (age >= 73 ? 'Currently in RMD years' : `RMDs begin in ${73 - age} year${73-age===1?'':'s'}`) : null;
-  let rmd = grid(
-    (age73 ? row('RMD Timeline', age73, {highlight: age !== null && age >= 73}) : '') +
-    row('RMD Planning', fmt(a.rmd_status)) +
-    row('Inherited Qualified Plan', fmt(a.has_inherited_qp), {showEmpty: true}) +
-    (a.has_inherited_qp === 'inh_yes' ? row('When Inherited', fmt(a.inherited_qp_timing)) : '') +
-    (a.has_inherited_qp === 'inh_yes' ? row('Inherited Balance', fmt(a.inherited_qp_balance)) : '') +
-    (a.has_inherited_qp === 'inh_yes' ? row('Taking Distributions', fmt(a.inherited_qp_distributions)) : '')
-  );
-  html += section('RMDs & Inherited Plans', rmd);
-
-  // ── 6. Planning Areas ────────────────────────────────────────────
-  let planning = grid(
-    row('Estate Plan', fmt(a.estate_plan)) +
-    row('Estate Concerns', Array.isArray(a.estate_concern) ? a.estate_concern.map(v => LABELS[v]||v).join(', ') : fmt(a.estate_concern)) +
-    row('Income Gap in Retirement', fmt(a.income_gap)) +
-    row('Long-Term Care Plan', fmt(a.care_plan)) +
-    row('Life Insurance', fmt(a.life_insurance)) +
-    row('Upcoming Financial Event', fmt(a.event_horizon)) +
-    row('Retirement Vision', a.retirement_vision, {fullWidth: true}) +
-    row('Open Concerns', a.open_concerns, {fullWidth: true})
-  );
-  html += section('Planning Areas', planning);
-
-  // ── 7. Professional Team ─────────────────────────────────────────
-  let team = grid(
-    row('Has CPA / Tax Advisor', fmt(a.has_cpa)) +
-    row('CPA Name', a.cpa_name) +
-    row('Has Financial Advisor', fmt(a.has_advisor)) +
-    row('Advisor Name', a.advisor_name) +
-    row('Has Estate Attorney', fmt(a.has_attorney)) +
-    row('Attorney Name', a.attorney_name)
-  );
-  html += section('Professional Team', team);
-
-  // ── 8. Business ──────────────────────────────────────────────────
-  if (a.biz_structure) {
-    let biz = grid(
-      row('Business Structure', fmt(a.biz_structure)) +
-      row('Annual Compensation', fmt(a.biz_compensation)) +
-      row('Number of Employees', fmt(a.biz_employees)) +
-      row('Retirement Plan Type', fmt(a.biz_retirement_plan)) +
-      row('Business Partners', fmt(a.biz_has_partners)) +
-      row('Partner Count', fmt(a.biz_partner_count)) +
-      row('Buy-Sell Agreement', fmt(a.biz_buysell)) +
-      row('Buy-Sell Funding', fmt(a.biz_buysell_funding)) +
-      row('Planning Priorities', Array.isArray(a.biz_priorities) ? a.biz_priorities.map(v => LABELS[v]||v).join(', ') : fmt(a.biz_priorities), {fullWidth: true})
-    );
-    html += section('Business', biz);
+  function questionLabel(key) {
+    return QUESTION_LABELS[key] || key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   }
 
-  // ── 9. Liquidity Event ───────────────────────────────────────────
-  if (a.le_type) {
-    let le = grid(
-      row('Event Type', fmt(a.le_type)) +
-      row('Transaction Status', fmt(a.le_timing)) +
-      row('Tax Obligation', fmt(a.le_size)) +
-      row('Current Plan', fmt(a.le_plan))
-    );
-    html += section('Liquidity Event', le);
-  }
-
-  // ── 10. How Heard / Routing ──────────────────────────────────────
-  let routing = grid(
-    row('How They Heard', fmt(a.how_heard)) +
-    row('Referring Advisor', a.referring_advisor_name) +
-    row('Completed With', fmt(a.advisor_present)) +
-    row('SR Advisor Code', sr.sr_advisor_code || a.sr_advisor_code)
-  );
-  html += section('Source & Routing', routing);
-
-  // ── 11. Lifestyle ────────────────────────────────────────────────
-  const lifestyle = [
-    { icon: '🎵', label: 'Favorite Musician / Band', key: 'ls_musician' },
-    { icon: '✈️', label: 'Favorite Vacation Spot', key: 'ls_vacation' },
-    { icon: '🎯', label: 'Hobbies & Passions', key: 'ls_hobbies' },
-    { icon: '🏆', label: 'Favorite Sports Team', key: 'ls_sports_team' },
-    { icon: '🍽️', label: 'Favorite Local Restaurant', key: 'ls_restaurant' },
-    { icon: '🎉', label: 'Upcoming Milestone', key: 'ls_milestone' },
-  ];
-  const hasLifestyle = lifestyle.some(l => a[l.key]);
-  if (hasLifestyle) {
-    const cards = lifestyle.map(l => `
-      <div class="lifestyle-card">
-        <div class="lifestyle-card-icon">${l.icon}</div>
-        <div class="lifestyle-card-label">${l.label}</div>
-        <div class="lifestyle-card-value${a[l.key] ? '' : ' empty'}">${a[l.key] || 'Not provided'}</div>
-      </div>
-    `).join('');
-    html += `<div class="section">
-      <div class="section-title">Lifestyle & Preferences</div>
-      <div class="lifestyle-grid">${cards}</div>
-    </div>`;
-  }
-
-  // ── 12. Flags ────────────────────────────────────────────────────
-  const flags = sr.flags || [];
-  if (flags.length > 0) {
-    const flagHtml = flags.map(f => `
-      <div class="flag ${f.priority || 'low'}">
-        <div class="flag-priority">${(f.priority||'').toUpperCase()} · ${f.track||''}</div>
-        <div class="flag-text">${f.text||''}</div>
-      </div>
-    `).join('');
-    html += `<div class="section">
-      <div class="section-title">Planning Flags</div>
-      <div class="flags-list">${flagHtml}</div>
-    </div>`;
-  }
-
-  // ── Footer ───────────────────────────────────────────────────────
-  html += `<div class="page-footer">
-    <span>Integrated Planning Partners · StructureReview™</span>
-    <span>Internal Record — Confidential</span>
-  </div>`;
-
-  return html;
-}
-
-async function load() {
-  const params = new URLSearchParams(window.location.search);
-  const srId = params.get('sr_id');
-  const clientId = params.get('client_id');
-
-  if (!srId && !clientId) {
-    showError('No record ID provided. Please use a link from the advisor notification email.');
-    return;
-  }
-
-  try {
-    let url;
-    if (srId) {
-      url = `${SB_URL}/rest/v1/structure_reviews?id=eq.${srId}&select=*`;
-    } else {
-      url = `${SB_URL}/rest/v1/structure_reviews?client_id=eq.${clientId}&select=*&order=submitted_at.desc&limit=1`;
+  function decodeAnswer(key, val) {
+    if (val === null || val === undefined || val === '') return null;
+    if (typeof val === 'boolean') return val ? 'Yes' : 'No';
+    // Array of option IDs (multi-select)
+    if (Array.isArray(val)) {
+      const decoded = val.map(v => OPTION_LABELS[v] || v);
+      return decoded.join(', ');
     }
+    // Single option ID — look up label
+    if (typeof val === 'string' && OPTION_LABELS[val]) {
+      return OPTION_LABELS[val];
+    }
+    // Plain string or number
+    if (typeof val === 'object') return JSON.stringify(val);
+    return String(val);
+  }
 
-    const [srRes, clientRes] = await Promise.all([
-      fetch(url, { headers: { 'apikey': SB_KEY, 'Accept': 'application/json' } }),
-      clientId ? fetch(`${SB_URL}/rest/v1/clients?id=eq.${clientId}&select=*&limit=1`, {
-        headers: { 'apikey': SB_KEY, 'Accept': 'application/json' }
-      }) : Promise.resolve(null)
-    ]);
+  function show(id)  { document.getElementById(id).style.display = ''; }
+  function hide(id)  { document.getElementById(id).style.display = 'none'; }
+  function block(id) { document.getElementById(id).style.display = 'block'; }
+  function set(id, html) { document.getElementById(id).innerHTML = html; }
+  function setText(id, t) { document.getElementById(id).textContent = t; }
 
-    const srData = await srRes.json();
-    const clientData = clientRes ? await clientRes.json() : [];
+  function formatDate(iso) {
+    if (!iso) return '—';
+    try {
+      return new Date(iso).toLocaleString('en-US', {
+        month: 'short', day: 'numeric', year: 'numeric',
+        hour: 'numeric', minute: '2-digit', hour12: true
+      });
+    } catch { return iso; }
+  }
 
-    if (!srData || srData.length === 0) {
-      showError('No StructureReview record found. The link may be expired or incorrect.');
+  function toggleJson() {
+    const b = document.getElementById('json-block');
+    const a = document.getElementById('json-arrow');
+    b.classList.toggle('open');
+    a.textContent = b.classList.contains('open') ? '▼' : '▶';
+  }
+
+  async function load() {
+    const params = new URLSearchParams(window.location.search);
+    const srId     = params.get('sr_id');
+    const clientId = params.get('client_id');
+
+    if (!srId) {
+      hide('state-loading');
+      show('state-no-id');
       return;
     }
 
-    const sr = srData[0];
-    const client = clientData?.[0] || {};
+    try {
+      const url = `${SUPABASE_URL}/rest/v1/structure_reviews?id=eq.${encodeURIComponent(srId)}&select=*,clients(first_name,last_name,email)`;
+      const res = await fetch(url, {
+        headers: {
+          'apikey': SUPABASE_ANON,
+          'Authorization': `Bearer ${SUPABASE_ANON}`,
+          'Accept': 'application/json'
+        }
+      });
 
-    document.getElementById('loading').style.display = 'none';
-    const content = document.getElementById('content');
-    content.style.display = 'block';
-    content.innerHTML = renderAnswers(sr, client);
+      if (!res.ok) throw new Error(`Supabase returned ${res.status}`);
+      const data = await res.json();
 
-    // Update page title
-    const name = sr.answers?.first_name ? `${sr.answers.first_name} ${sr.answers.last_name || ''}`.trim() : 'Client';
-    document.title = `${name} — StructureReview™ Full Record`;
+      if (!data || data.length === 0) {
+        hide('state-loading');
+        show('state-not-found');
+        return;
+      }
 
-  } catch (err) {
-    showError('Unable to load record. ' + err.message);
+      render(data[0], srId, clientId);
+
+    } catch (err) {
+      hide('state-loading');
+      setText('error-msg', err.message || 'Unknown error.');
+      show('state-error');
+    }
   }
-}
 
-function showError(msg) {
-  document.getElementById('loading').style.display = 'none';
-  const err = document.getElementById('error');
-  err.style.display = 'block';
-  err.innerHTML = `<div style="font-size:32px;margin-bottom:16px;">⚠</div>${msg}`;
-}
+  function render(rec, srId, clientIdFromUrl) {
+    // ── IDs ──
+    const clientData  = rec.clients || {};
+    const actualClientId = rec.client_id || clientIdFromUrl || '—';
 
-load();
+    // ── Name ──
+    const firstName = clientData.first_name || (rec.answers?.first_name) || rec.respondent_first_name || '';
+    const lastName  = clientData.last_name  || (rec.answers?.last_name)  || rec.respondent_last_name  || '';
+    const email     = clientData.email      || (rec.answers?.email)      || rec.respondent_email      || '';
+    const fullName  = [firstName, lastName].filter(Boolean).join(' ') || 'Unknown Client';
+
+    // ── Breadcrumb + title ──
+    setText('bc-name', fullName);
+    setText('client-name-display', fullName);
+
+    // Email with mailto
+    set('client-email-display', email
+      ? `<a href="mailto:${email}">${email}</a>`
+      : '<span style="color:var(--text-dim)">No email</span>');
+
+    // ── Meta row ──
+    const answers = rec.answers || {};
+    const metaFields = [
+      { label: 'Phone',        val: answers.phone || '—' },
+      { label: 'State',        val: answers.state || rec.state || '—' },
+      { label: 'QP Balance',   val: answers.qp_balance_range || rec.qp_balance_range || '—' },
+      { label: 'RMD Status',   val: answers.rmd_status || rec.rmd_status || '—' },
+      { label: 'Marital',      val: answers.marital_status || '—' },
+      { label: 'How Heard',    val: answers.how_heard || rec.how_heard || '—' },
+    ];
+    set('client-meta-row', metaFields.map(m => `
+      <div class="meta-item">
+        <div class="meta-label">${m.label}</div>
+        <div class="meta-value">${m.val}</div>
+      </div>`).join(''));
+
+    // ── Status badge ──
+    // Simple heuristic: if reviewed_at exists it's done; else new
+    const badgeEl = document.getElementById('status-badge');
+    if (rec.reviewed_at) {
+      badgeEl.className = 'badge badge-done';
+      badgeEl.textContent = '✓ REVIEWED';
+    } else {
+      badgeEl.className = 'badge badge-new';
+      badgeEl.textContent = '● NEW';
+    }
+
+    // ── Submitted date ──
+    const submitted = rec.submitted_at || rec.created_at;
+    setText('submitted-display', submitted ? 'Submitted ' + formatDate(submitted) : '—');
+
+    // ── ID bar ──
+    setText('sr-id-display', srId);
+    setText('client-id-display', actualClientId);
+
+    // ── Flags ──
+    const flags = rec.flags;
+    if (flags && typeof flags === 'object' && Object.keys(flags).length > 0) {
+      const flagEntries = Object.entries(flags);
+      const hasFlags = flagEntries.some(([,v]) => v === true || (typeof v === 'string' && v));
+      if (hasFlags) {
+        show('flags-section');
+        set('flags-row', flagEntries
+          .filter(([,v]) => v === true || (typeof v === 'string' && v))
+          .map(([k, v]) => `<span class="flag-chip">${label(k)}${typeof v === 'string' ? ': ' + v : ''}</span>`)
+          .join(''));
+      }
+    }
+
+    // ── Planning tracks ──
+    const tracks = rec.planning_tracks || answers.tracks || answers.planning_tracks;
+    if (tracks) {
+      show('tracks-section');
+      const trackList = typeof tracks === 'string'
+        ? tracks.split(/[,;]+/).map(t => t.trim()).filter(Boolean)
+        : Array.isArray(tracks) ? tracks : [String(tracks)];
+      set('tracks-row', trackList.map(t => `<span class="track-chip">▸ ${t}</span>`).join(''));
+    }
+
+    // ── Supplement button ──
+    const suppEl = document.getElementById('btn-supplement');
+    suppEl.href = `https://www.integratedplanningpartners.com/allocation-supplement.html?sr_id=${srId}&client_id=${actualClientId}`;
+
+    // ── Answers grid ──
+    const grid = document.getElementById('answers-grid');
+    const cells = [];
+
+    // Sort: priority keys first, then alphabetical
+    const allKeys = Object.keys(answers);
+    const sortedKeys = [
+      ...PRIORITY_KEYS.filter(k => allKeys.includes(k)),
+      ...allKeys.filter(k => !PRIORITY_KEYS.includes(k)).sort()
+    ];
+
+
+    for (const k of sortedKeys) {
+      if (SKIP_KEYS.has(k)) continue;
+      const val = decodeAnswer(k, answers[k]);
+      if (!val) continue;
+      const isLong = val.length > 80;
+      cells.push(`
+        <div class="answer-cell${isLong ? ' wide' : ''}">
+          <div class="answer-q">${questionLabel(k)}</div>
+          <div class="answer-v${HIGHLIGHT_KEYS.has(k) ? ' highlight' : ''}">${val}</div>
+        </div>`);
+    }
+
+    if (cells.length === 0) {
+      grid.innerHTML = `<div class="answer-cell wide"><div class="answer-v empty">No structured answers recorded.</div></div>`;
+    } else {
+      grid.innerHTML = cells.join('');
+    }
+
+    // ── Raw JSON ──
+    const rawData = { ...rec };
+    delete rawData.clients; // shown separately
+    document.getElementById('json-block').textContent = JSON.stringify(rawData, null, 2);
+
+    // ── Show content ──
+    hide('state-loading');
+    block('content');
+  }
+
+  // ── Boot ──
+  load();
 </script>
+
 </body>
 </html>
