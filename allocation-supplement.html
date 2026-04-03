@@ -534,6 +534,35 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
 
       <div class="section-nav">
         <div></div>
+      <div class="form-group">
+        <div class="group-title">Guaranteed Income Preference</div>
+        <div class="form-row cols1">
+          <div class="form-field">
+            <label>Your stated fixed monthly expenses are shown below. What portion of those fixed expenses do you want covered by guaranteed income — income that cannot decline regardless of what markets do?</label>
+            <select id="f_fixed_expense_coverage_pref" onchange="updateCoveragePrefHint()">
+              <option value="">Select preference…</option>
+              <option value="none">None — I prefer full flexibility</option>
+              <option value="low">20–30% — a small guaranteed foundation</option>
+              <option value="moderate">31–50% — moderate guaranteed base</option>
+              <option value="high">51–75% — majority of essentials guaranteed</option>
+              <option value="very_high">76–90% — nearly all essentials guaranteed</option>
+              <option value="full">100% — all fixed expenses fully guaranteed</option>
+            </select>
+            <div class="field-hint" id="coverage-pref-hint">This drives Layer 1 sizing. The higher the preference, the larger the guaranteed income allocation.</div>
+          </div>
+        </div>
+        <div class="form-row cols1" id="lifestyle-coverage-row" style="display:none;">
+          <div class="form-field">
+            <label>Beyond your fixed essentials, do you also want to guarantee a portion of your lifestyle spending — travel, dining, discretionary?</label>
+            <select id="f_coverage_includes_lifestyle">
+              <option value="false">No — I'm comfortable funding lifestyle from market-exposed assets</option>
+              <option value="true">Yes — I want my lifestyle spending guaranteed too</option>
+            </select>
+            <div class="field-hint">If yes, Layer 1 will be sized to cover your selected percentage of total expenses, not just fixed.</div>
+          </div>
+        </div>
+      </div>
+
         <button class="btn-primary" onclick="goToSection(1)">Next: Financial Position &#8594;</button>
       </div>
     </div>
@@ -600,11 +629,7 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
             <div class="input-prefix"><span>$</span><input type="number" id="f_mortgage_balance" min="0" step="1000" placeholder="0"></div>
           </div>
           <div class="form-field">
-            <label>Monthly Mortgage Payment <span class="optional">optional</span></label>
-            <div class="input-prefix"><span>$</span><input type="number" id="f_mortgage_monthly_payment" min="0" step="100" placeholder="0"></div>
-          </div>
-          <div class="form-field">
-            <label>Other Monthly Debt <span class="optional">optional</span></label>
+            <label>Other Monthly Debt Obligations <span class="optional">optional</span></label>
             <div class="input-prefix"><span>$</span><input type="number" id="f_other_debt_monthly" min="0" step="100" placeholder="0"></div>
           </div>
         </div>
@@ -777,19 +802,19 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
       </div>
 
       <div class="form-group">
-        <div class="group-title">Discretionary Annual Expenses</div>
+        <div class="group-title">Discretionary Monthly Expenses</div>
         <div class="form-row cols3">
           <div class="form-field">
             <label>Travel &amp; Vacation</label>
-            <div class="input-prefix"><span>$</span><input type="number" id="f_travel_annual" min="0" step="500" placeholder="0" oninput="calcExpenses()"></div>
+            <div class="input-prefix"><span>$</span><input type="number" id="f_travel_monthly" min="0" step="100" placeholder="0" oninput="calcExpenses()"></div>
           </div>
           <div class="form-field">
             <label>Dining &amp; Entertainment</label>
-            <div class="input-prefix"><span>$</span><input type="number" id="f_entertainment_annual" min="0" step="500" placeholder="0" oninput="calcExpenses()"></div>
+            <div class="input-prefix"><span>$</span><input type="number" id="f_entertainment_monthly" min="0" step="100" placeholder="0" oninput="calcExpenses()"></div>
           </div>
           <div class="form-field">
             <label>Total Discretionary Annual</label>
-            <div class="input-prefix"><span>$</span><input type="number" id="f_discretionary_annual" min="0" step="500" placeholder="Auto-calculated" style="color:var(--gold);" oninput="calcExpenses()"></div>
+            <div class="input-prefix"><span>$</span><input type="number" id="f_discretionary_monthly" min="0" step="100" placeholder="Auto-calculated" style="color:var(--gold);" oninput="calcExpenses()"></div>
           </div>
         </div>
       </div>
@@ -864,7 +889,7 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
       <div id="risk-questions">
         <!-- Q1 -->
         <div class="risk-question">
-          <div class="risk-q-text"><strong>1.</strong> If your investment portfolio dropped 25% in the first year of retirement, what would your instinct be?</div>
+          <div class="risk-q-text"><strong>1.</strong> If your investment portfolio dropped 25% in the first year of retirement — and you knew that could mean adjusting your lifestyle or spending less — what would your instinct be?</div>
           <div class="risk-options" id="rq1">
             <div class="risk-opt" onclick="selectRisk('rq1',1,this)">1<span class="risk-opt-label">Sell immediately</span></div>
             <div class="risk-opt" onclick="selectRisk('rq1',2,this)">2<span class="risk-opt-label">Reduce risk</span></div>
@@ -875,13 +900,13 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
         </div>
         <!-- Q2 -->
         <div class="risk-question">
-          <div class="risk-q-text"><strong>2.</strong> How important is it that your income in retirement is guaranteed and cannot decline — even if markets recover?</div>
+          <div class="risk-q-text"><strong>2.</strong> If a market downturn forced you to cut back your lifestyle in retirement — spending less on travel, dining, or the things you enjoy — how acceptable would that be?</div>
           <div class="risk-options" id="rq2">
-            <div class="risk-opt" onclick="selectRisk('rq2',1,this)">1<span class="risk-opt-label">Extremely important</span></div>
-            <div class="risk-opt" onclick="selectRisk('rq2',2,this)">2<span class="risk-opt-label">Very important</span></div>
-            <div class="risk-opt" onclick="selectRisk('rq2',3,this)">3<span class="risk-opt-label">Somewhat</span></div>
-            <div class="risk-opt" onclick="selectRisk('rq2',4,this)">4<span class="risk-opt-label">Flexible</span></div>
-            <div class="risk-opt" onclick="selectRisk('rq2',5,this)">5<span class="risk-opt-label">Not a priority</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq2',1,this)">1<span class="risk-opt-label">Not acceptable</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq2',2,this)">2<span class="risk-opt-label">Very uncomfortable</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq2',3,this)">3<span class="risk-opt-label">Could adjust some</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq2',4,this)">4<span class="risk-opt-label">Manageable</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq2',5,this)">5<span class="risk-opt-label">Completely fine</span></div>
           </div>
         </div>
         <!-- Q3 -->
@@ -908,13 +933,13 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
         </div>
         <!-- Q5 -->
         <div class="risk-question">
-          <div class="risk-q-text"><strong>5.</strong> How would you feel about converting a significant portion of your IRA to a tax-free structure now — paying taxes today in exchange for zero taxes on that money forever?</div>
+          <div class="risk-q-text"><strong>5.</strong> If you could reposition a portion of your IRA or 401(k) into a structure that grows tax-free — without writing a check to the IRS today — and that structure also provided tax-free income in retirement, how interested would you be?</div>
           <div class="risk-options" id="rq5">
-            <div class="risk-opt" onclick="selectRisk('rq5',1,this)">1<span class="risk-opt-label">Very reluctant</span></div>
-            <div class="risk-opt" onclick="selectRisk('rq5',2,this)">2<span class="risk-opt-label">Somewhat reluctant</span></div>
-            <div class="risk-opt" onclick="selectRisk('rq5',3,this)">3<span class="risk-opt-label">Open to it</span></div>
-            <div class="risk-opt" onclick="selectRisk('rq5',4,this)">4<span class="risk-opt-label">Favorable</span></div>
-            <div class="risk-opt" onclick="selectRisk('rq5',5,this)">5<span class="risk-opt-label">Strongly in favor</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq5',1,this)">1<span class="risk-opt-label">Not interested</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq5',2,this)">2<span class="risk-opt-label">Skeptical</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq5',3,this)">3<span class="risk-opt-label">Open to learning</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq5',4,this)">4<span class="risk-opt-label">Very interested</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq5',5,this)">5<span class="risk-opt-label">This is exactly what I want</span></div>
           </div>
         </div>
       </div>
@@ -1074,7 +1099,7 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
         <div class="group-title">Priority Ranking — 1 = Most Important, 5 = Least Important</div>
         <div class="priority-grid">
           <div class="priority-item">
-            <select class="priority-rank-sel" id="f_priority_income_security">
+            <select class="priority-rank-sel" id="f_priority_income_security" onchange="enforceUniqueRanking('f_priority_income_security')">
               <option value="">—</option>
               <option value="1">1st</option><option value="2">2nd</option>
               <option value="3">3rd</option><option value="4">4th</option><option value="5">5th</option>
@@ -1085,7 +1110,7 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
             </div>
           </div>
           <div class="priority-item">
-            <select class="priority-rank-sel" id="f_priority_tax_efficiency">
+            <select class="priority-rank-sel" id="f_priority_tax_efficiency" onchange="enforceUniqueRanking('f_priority_tax_efficiency')">
               <option value="">—</option>
               <option value="1">1st</option><option value="2">2nd</option>
               <option value="3">3rd</option><option value="4">4th</option><option value="5">5th</option>
@@ -1096,7 +1121,7 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
             </div>
           </div>
           <div class="priority-item">
-            <select class="priority-rank-sel" id="f_priority_care_protection">
+            <select class="priority-rank-sel" id="f_priority_care_protection" onchange="enforceUniqueRanking('f_priority_care_protection')">
               <option value="">—</option>
               <option value="1">1st</option><option value="2">2nd</option>
               <option value="3">3rd</option><option value="4">4th</option><option value="5">5th</option>
@@ -1107,7 +1132,7 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
             </div>
           </div>
           <div class="priority-item">
-            <select class="priority-rank-sel" id="f_priority_legacy">
+            <select class="priority-rank-sel" id="f_priority_legacy" onchange="enforceUniqueRanking('f_priority_legacy')">
               <option value="">—</option>
               <option value="1">1st</option><option value="2">2nd</option>
               <option value="3">3rd</option><option value="4">4th</option><option value="5">5th</option>
@@ -1118,7 +1143,7 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
             </div>
           </div>
           <div class="priority-item">
-            <select class="priority-rank-sel" id="f_priority_liquidity">
+            <select class="priority-rank-sel" id="f_priority_liquidity" onchange="enforceUniqueRanking('f_priority_liquidity')">
               <option value="">—</option>
               <option value="1">1st</option><option value="2">2nd</option>
               <option value="3">3rd</option><option value="4">4th</option><option value="5">5th</option>
@@ -1415,6 +1440,71 @@ function startSessionTimers(){
 }
 
 // ── Auto-save ─────────────────────────────────────────────────
+function updateCoveragePrefHint() {
+  const val = document.getElementById('f_fixed_expense_coverage_pref')?.value;
+  const hint = document.getElementById('coverage-pref-hint');
+  const lifestyleRow = document.getElementById('lifestyle-coverage-row');
+  const hints = {
+    none:     'L1 will be zeroed — all income funded from market-exposed assets.',
+    low:      'L1 sized for ~20–30% of fixed expenses. Maximum capital available for L3.',
+    moderate: 'Balanced — L1 covers roughly half of essentials, remainder to L3 and L4.',
+    high:     'Strong income certainty — L1 covers majority of fixed expenses.',
+    very_high:'Near-complete income security for fixed expenses.',
+    full:     'Maximum L1. May constrain L3 at lower balance levels.'
+  };
+  if (hint && val) hint.textContent = hints[val] || '';
+  if (lifestyleRow) lifestyleRow.style.display = (val && val !== 'none') ? '' : 'none';
+}
+
+function suggestMarginalRate() {
+  const income = parseFloat(document.getElementById('f_current_household_income').value) || 0;
+  const filingStatus = document.getElementById('f_filing_status')?.value || 'mfj';
+  let suggested = '';
+  if (filingStatus === 'mfj') {
+    if (income <= 23200) suggested = '0.10';
+    else if (income <= 94300) suggested = '0.12';
+    else if (income <= 201050) suggested = '0.22';
+    else if (income <= 383900) suggested = '0.24';
+    else if (income <= 487450) suggested = '0.32';
+    else if (income <= 731200) suggested = '0.35';
+    else suggested = '0.37';
+  } else {
+    if (income <= 11600) suggested = '0.10';
+    else if (income <= 47150) suggested = '0.12';
+    else if (income <= 100525) suggested = '0.22';
+    else if (income <= 191950) suggested = '0.24';
+    else if (income <= 243725) suggested = '0.32';
+    else if (income <= 609350) suggested = '0.35';
+    else suggested = '0.37';
+  }
+  const sel = document.getElementById('f_current_marginal_rate');
+  if (sel && !sel.value && suggested) {
+    sel.value = suggested;
+    const hint = document.getElementById('rate-hint');
+    if (hint) hint.textContent = 'Suggested ' + Math.round(suggested*100) + '% based on household income — confirm with client';
+  }
+}
+
+function toggleInheritedQP() {
+  const has = document.getElementById('f_has_inherited_qp')?.value === 'true';
+  ['inherited-balance-field','inherited-timing-field'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = has ? '' : 'none';
+  });
+}
+
+function enforceUniqueRanking(changedId) {
+  const ids = ['f_priority_income_security','f_priority_tax_efficiency','f_priority_care_protection','f_priority_legacy','f_priority_liquidity'];
+  const changedEl = document.getElementById(changedId);
+  if (!changedEl || !changedEl.value) return;
+  const chosenVal = changedEl.value;
+  ids.forEach(id => {
+    if (id === changedId) return;
+    const el = document.getElementById(id);
+    if (el && el.value === chosenVal) el.value = '';
+  });
+}
+
 function setAutosaveStatus(status){
   const el = document.getElementById('autosave-status');
   el.className = 'autosave-status ' + status;
@@ -1501,9 +1591,9 @@ function collectFormData(){
     insurance_monthly:        num('f_insurance_monthly'),
     essential_monthly:        num('f_essential_monthly'),
     essential_annual:         (num('f_essential_monthly')||0)*12||null,
-    travel_annual:            num('f_travel_annual'),
-    entertainment_annual:     num('f_entertainment_annual'),
-    discretionary_annual:     num('f_discretionary_annual'),
+    travel_annual:            num('f_travel_monthly')*12,
+    entertainment_annual:     num('f_entertainment_monthly')*12,
+    discretionary_annual:     (num('f_discretionary_monthly')*12 || 0),
     charitable_annual:        num('f_charitable_annual'),
     charitable_pledge_total:  num('f_charitable_pledge_total'),
     charitable_pledge_desc:   val('f_charitable_pledge_desc'),
@@ -1518,6 +1608,8 @@ function collectFormData(){
     risk_q5: riskScores.rq5||null,
     risk_score_total: calcRiskScore()||null,
     risk_profile: calcRiskProfile()||null,
+    fixed_expense_coverage_pref: document.getElementById('f_fixed_expense_coverage_pref')?.value || 'moderate',
+    coverage_includes_lifestyle: document.getElementById('f_coverage_includes_lifestyle')?.value === 'true',
     risk_notes: val('f_risk_notes'),
     // S6
     has_ltc_policy:           bool('f_has_ltc_policy'),
@@ -1671,8 +1763,8 @@ function calcExpenses(){
   const essMonthly = h+hc+f+t+i;
   if(essMonthly > 0) document.getElementById('f_essential_monthly').value = essMonthly;
 
-  const tv= num('f_travel_annual')||0;
-  const en= num('f_entertainment_annual')||0;
+  const tv= num('f_travel_monthly')*12||0;
+  const en= num('f_entertainment_monthly')*12||0;
   const ch= num('f_charitable_annual')||0;
   const discAnnual = tv+en+ch;
   if(discAnnual > 0) document.getElementById('f_discretionary_annual').value = discAnnual;
