@@ -1292,6 +1292,7 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
       </div>
       <div class="complete-actions">
         <button class="btn-primary" id="btn-view-allocation" onclick="viewAllocation()">View Allocation Results &#8594;</button>
+        <button class="btn-secondary" onclick="reopenSupplement()">&#9998; Reopen &amp; Edit</button>
         <button class="btn-secondary" onclick="window.location.href='advisor-dashboard.html'">Return to Dashboard</button>
       </div>
     </div>
@@ -1918,6 +1919,28 @@ function saveAndExit(){
   autoSave(false).then(()=>{ window.location.href='advisor-dashboard.html'; });
 }
 
+
+async function reopenSupplement() {
+  if(!window._supplementId) return;
+  // Reset status to in_progress in Supabase
+  const sess = JSON.parse(localStorage.getItem(SESSION_KEY)||'{}');
+  await fetch(SUPABASE_URL+'/rest/v1/allocation_supplements?id=eq.'+window._supplementId, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer '+(sess?.access_token||SUPABASE_KEY),
+      'Prefer': 'return=minimal'
+    },
+    body: JSON.stringify({ status: 'in_progress', completed_at: null })
+  });
+  // Hide completion screen, show Section 1
+  document.getElementById('section-complete').classList.remove('active');
+  document.querySelectorAll('.form-section').forEach(s => s.classList.remove('active'));
+  document.getElementById('section-0').classList.add('active');
+  updateProgress();
+}
+
 async function completeSuplement(){
   setAutosaveStatus('saving');
   const data = collectFormData();
@@ -2033,7 +2056,7 @@ function restoreFromSupplement(s){
   window._supplementId = s.id;
   const setV=(id,v)=>{ const el=document.getElementById(id); if(el&&v!==null&&v!==undefined) el.value=v; };
   // All text/number/select fields
-  const fields=['primary_first_name','primary_last_name','primary_dob','primary_age','spouse_first_name','spouse_last_name','spouse_dob','spouse_age','filing_status','state','target_retire_age','years_to_retirement','primary_goal_narrative','qp_balance_total','qp_roth_balance','taxable_investment_balance','primary_residence_value','other_assets_balance','mortgage_balance','mortgage_monthly_payment','other_debt_monthly','ss_primary_monthly','ss_primary_claim_age','ss_spouse_monthly','ss_spouse_claim_age','current_household_income','current_marginal_rate','pension_monthly','pension_start_age','pension_has_cola','pension_survivor_option','spouse_pension_monthly','spouse_pension_start_age','other_guaranteed_monthly','other_guaranteed_desc','part_time_income_monthly','part_time_end_age','housing_monthly','healthcare_monthly','food_monthly','transport_monthly','insurance_monthly','essential_monthly','travel_annual','entertainment_annual','discretionary_annual','charitable_annual','charitable_pledge_total','charitable_pledge_desc','expense_notes','risk_notes','has_ltc_policy','ltc_policy_type','ltc_monthly_benefit','ltc_benefit_period_years','ltc_elimination_days','ltc_inflation_rider','health_status_primary','health_conditions_primary','family_ltc_history','health_status_spouse','health_conditions_spouse','family_ltc_history_spouse','legacy_importance','legacy_target_amount','legacy_beneficiaries','charitable_intent','estate_plan_status','secure_act_awareness','advisor_observations','incumbent_advisor_flag','incumbent_advisor_name','incumbent_advisor_notes','urgency_assessment','health_underwriting_notes','recommended_next_steps','priority_income_security','priority_tax_efficiency','priority_care_protection','priority_legacy','priority_liquidity'];
+  const fields=['primary_first_name','primary_last_name','primary_dob','primary_age','spouse_first_name','spouse_last_name','spouse_dob','spouse_age','filing_status','state','target_retire_age','years_to_retirement','primary_goal_narrative','qp_balance_total','qp_roth_balance','taxable_investment_balance','primary_residence_value','other_assets_balance','mortgage_balance','mortgage_monthly_payment','other_debt_monthly','ss_primary_monthly','ss_primary_claim_age','ss_spouse_monthly','ss_spouse_claim_age','current_household_income','current_marginal_rate','pension_monthly','pension_start_age','pension_has_cola','pension_survivor_option','spouse_pension_monthly','spouse_pension_start_age','other_guaranteed_monthly','other_guaranteed_desc','part_time_income_monthly','part_time_end_age','housing_monthly','healthcare_monthly','food_monthly','transport_monthly','insurance_monthly','essential_monthly','travel_monthly','entertainment_monthly','discretionary_monthly','charitable_annual','charitable_pledge_total','charitable_pledge_desc','expense_notes','risk_notes','has_ltc_policy','ltc_policy_type','ltc_monthly_benefit','ltc_benefit_period_years','ltc_elimination_days','ltc_inflation_rider','health_status_primary','health_conditions_primary','family_ltc_history','health_status_spouse','health_conditions_spouse','family_ltc_history_spouse','legacy_importance','legacy_target_amount','legacy_beneficiaries','charitable_intent','estate_plan_status','secure_act_awareness','advisor_observations','incumbent_advisor_flag','incumbent_advisor_name','incumbent_advisor_notes','urgency_assessment','health_underwriting_notes','recommended_next_steps','priority_income_security','priority_tax_efficiency','priority_care_protection','priority_legacy','priority_liquidity'];
   fields.forEach(f=>{ if(s[f]!==null&&s[f]!==undefined) setV('f_'+f, s[f]); });
   // Checkboxes for account types
   if(s.qp_account_types) s.qp_account_types.forEach(v=>{ const cb=document.querySelector(`.acct-type-cb[value="${v}"]`); if(cb) cb.checked=true; });
@@ -2047,6 +2070,20 @@ function restoreFromSupplement(s){
   toggleLtcFields();
   toggleIncumbent();
   calcExpenses();
+  // Restore new v2 fields
+  if(s.fixed_expense_coverage_pref) {
+    const el = document.getElementById('f_fixed_expense_coverage_pref');
+    if(el) { el.value = s.fixed_expense_coverage_pref; updateCoveragePrefHint(); }
+  }
+  if(s.coverage_includes_lifestyle !== undefined) {
+    const el = document.getElementById('f_coverage_includes_lifestyle');
+    if(el) el.value = s.coverage_includes_lifestyle ? 'true' : 'false';
+  }
+  if(s.has_inherited_qp !== undefined) {
+    const el = document.getElementById('f_has_inherited_qp');
+    if(el) { el.value = s.has_inherited_qp ? 'true' : 'false'; toggleInheritedQP(); }
+  }
+  if(s.inherited_qp_balance) { const el = document.getElementById('f_inherited_qp_balance'); if(el) el.value = s.inherited_qp_balance; }
 }
 
 // ── Init ──────────────────────────────────────────────────────
@@ -2079,7 +2116,14 @@ async function init(){
 
   // Check for existing in-progress supplement
   const existing = await sb.getSupplement(window._clientId);
-  if(existing) restoreFromSupplement(existing);
+  if(existing) {
+    restoreFromSupplement(existing);
+    // If previously completed, show completion screen
+    if(existing.status === 'completed') {
+      document.querySelectorAll('.form-section').forEach(sec => sec.classList.remove('active'));
+      document.getElementById('section-complete').classList.add('active');
+    }
+  }
 
   // Check for SR answers to prefill
   if(window._structureReviewId){
