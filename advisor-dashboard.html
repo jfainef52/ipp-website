@@ -2370,6 +2370,13 @@ let toolLoaded     = false;
     .eq('id', currentUser.id)
     .single();
 
+  // Block access if no profile — auth account exists but not an approved advisor
+  if (!profile) {
+    await sb.auth.signOut();
+    window.location.href = 'advisor-portal.html?error=no_profile';
+    return;
+  }
+
   const firstName = profile?.first_name || currentUser.email.split('@')[0];
   const lastName  = profile?.last_name  || '';
   const firm      = profile?.firm_name  || '';
@@ -2945,25 +2952,25 @@ async function openClientDetail(clientId) {
   if (stage === 'prospect') {
     actionBtn = `<span style="font-size:12px;color:var(--gray);font-style:italic;">Waiting for StructureReview™ submission</span>`;
   } else if (stage === 'structure_review') {
-    actionBtn = `<a class="pipeline-action-btn" href="allocation-supplement.html?client_id=${c.id}${srId ? '&sr_id='+srId : ''}" target="_blank">
+    actionBtn = `<a class="pipeline-action-btn" href="https://www.integratedplanningpartners.com/allocation-supplement.html?client_id=${c.id}${srId ? '&sr_id='+srId : ''}" target="_blank">
       Begin Allocation Supplement &#8594;
     </a>`;
   } else if (stage === 'supplement' || stage === 'supplement_complete') {
     const supplementId = c.allocation_supplement_id || '';
     actionBtn = `
-      <a class="pipeline-action-btn" href="allocation-supplement.html?client_id=${c.id}${srId ? '&sr_id='+srId : ''}" target="_blank" style="margin-right:8px;">
+      <a class="pipeline-action-btn" href="https://www.integratedplanningpartners.com/allocation-supplement.html?client_id=${c.id}${srId ? '&sr_id='+srId : ''}" target="_blank" style="margin-right:8px;">
         ${stage === 'supplement' ? 'Continue Supplement &#8594;' : 'Review Supplement &#8594;'}
       </a>
-      ${stage === 'supplement_complete' ? `<a class="pipeline-action-btn green" href="allocation-modeler.html?client_id=${c.id}${supplementId ? '&supplement_id='+supplementId : ''}" target="_blank">
+      ${stage === 'supplement_complete' ? `<a class="pipeline-action-btn green" href="https://www.integratedplanningpartners.com/allocation-modeler.html?client_id=${c.id}${supplementId ? '&supplement_id='+supplementId : ''}" target="_blank">
         View Allocation Results &#8594;
       </a>` : ''}`;
   } else if (stage === 'modeler') {
     const supplementId = c.allocation_supplement_id || '';
     actionBtn = `
-      <a class="pipeline-action-btn" href="allocation-supplement.html?client_id=${c.id}${srId ? '&sr_id='+srId : ''}" target="_blank" style="margin-right:8px;">
+      <a class="pipeline-action-btn" href="https://www.integratedplanningpartners.com/allocation-supplement.html?client_id=${c.id}${srId ? '&sr_id='+srId : ''}" target="_blank" style="margin-right:8px;">
         &#9998; Edit Supplement
       </a>
-      <a class="pipeline-action-btn green" href="allocation-modeler.html?client_id=${c.id}${supplementId ? '&supplement_id='+supplementId : ''}" target="_blank">
+      <a class="pipeline-action-btn green" href="https://www.integratedplanningpartners.com/allocation-modeler.html?client_id=${c.id}${supplementId ? '&supplement_id='+supplementId : ''}" target="_blank">
         Open Allocation Modeler &#8594;
       </a>`;
   } else if (stage === 'presentation') {
