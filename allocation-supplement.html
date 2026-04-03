@@ -662,7 +662,8 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
           </div>
           <div class="form-field">
             <label>Current Household Income</label>
-            <div class="input-prefix"><span>$</span><input type="number" id="f_current_household_income" min="0" step="5000" placeholder="e.g. 150000"></div>
+            <div class="input-prefix"><span>$</span><input type="number" id="f_current_household_income" min="0" step="5000" placeholder="e.g. 150000" oninput="suggestMarginalRate()"></div>
+            <div class="field-hint">Enter income to auto-suggest marginal rate →</div>
           </div>
         </div>
         <div class="form-row cols3" id="spouse-ss-row">
@@ -675,7 +676,7 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
             <input type="number" id="f_ss_spouse_claim_age" min="62" max="70" placeholder="e.g. 67">
           </div>
           <div class="form-field">
-            <label>Current Marginal Tax Rate</label>
+            <label>Current Marginal Tax Rate <span class="optional">auto-suggested from income</span></label>
             <select id="f_current_marginal_rate">
               <option value="">Select bracket…</option>
               <option value="0.10">10%</option>
@@ -686,6 +687,7 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
               <option value="0.35">35%</option>
               <option value="0.37">37%</option>
             </select>
+            <div class="field-hint" id="rate-hint">Enter household income above to auto-suggest</div>
           </div>
         </div>
       </div>
@@ -1459,6 +1461,7 @@ function updateCoveragePrefHint() {
 
 function suggestMarginalRate() {
   const income = parseFloat(document.getElementById('f_current_household_income').value) || 0;
+  if (!income) return;
   const filingStatus = document.getElementById('f_filing_status')?.value || 'mfj';
   let suggested = '';
   if (filingStatus === 'mfj') {
@@ -1479,10 +1482,10 @@ function suggestMarginalRate() {
     else suggested = '0.37';
   }
   const sel = document.getElementById('f_current_marginal_rate');
-  if (sel && !sel.value && suggested) {
+  const hint = document.getElementById('rate-hint');
+  if (sel && suggested) {
     sel.value = suggested;
-    const hint = document.getElementById('rate-hint');
-    if (hint) hint.textContent = 'Suggested ' + Math.round(suggested*100) + '% based on household income — confirm with client';
+    if (hint) hint.textContent = Math.round(suggested*100) + '% suggested based on ' + (filingStatus==='mfj'?'MFJ':'single') + ' bracket — advisor may override';
   }
 }
 
