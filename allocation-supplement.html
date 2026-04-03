@@ -1310,6 +1310,14 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
 </div>
 
 <script>
+// ── Origin guard — must run on www for localStorage session access ────────
+(function() {
+  const correct = 'https://www.integratedplanningpartners.com';
+  if (window.location.origin !== correct) {
+    window.location.replace(correct + window.location.pathname + window.location.search);
+  }
+})();
+
 // ── Supabase client (same as portal) ─────────────────────────
 const SUPABASE_URL = 'https://piixgvxrasddphklgazh.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_acvdk0hBniaB6qOD8_k8XQ_9R6FNbP_';
