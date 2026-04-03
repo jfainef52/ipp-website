@@ -661,9 +661,9 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
             <input type="number" id="f_ss_primary_claim_age" min="62" max="70" placeholder="e.g. 67">
           </div>
           <div class="form-field">
-            <label>Current Household Income</label>
+            <label>Current Household Income <span class="optional">all sources</span></label>
             <div class="input-prefix"><span>$</span><input type="number" id="f_current_household_income" min="0" step="5000" placeholder="e.g. 150000" oninput="suggestMarginalRate()"></div>
-            <div class="field-hint">Enter income to auto-suggest marginal rate →</div>
+            <div class="field-hint">Include all taxable income: wages, SS, pension, distributions, business income. Used to determine marginal bracket.</div>
           </div>
         </div>
         <div class="form-row cols3" id="spouse-ss-row">
@@ -815,8 +815,9 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
             <div class="input-prefix"><span>$</span><input type="number" id="f_entertainment_monthly" min="0" step="100" placeholder="0" oninput="calcExpenses()"></div>
           </div>
           <div class="form-field">
-            <label>Total Discretionary Annual</label>
+            <label>Total Discretionary Monthly</label>
             <div class="input-prefix"><span>$</span><input type="number" id="f_discretionary_monthly" min="0" step="100" placeholder="Auto-calculated" style="color:var(--gold);" oninput="calcExpenses()"></div>
+            <div class="field-hint">× 12 = annual discretionary</div>
           </div>
         </div>
       </div>
@@ -1485,7 +1486,7 @@ function suggestMarginalRate() {
   const hint = document.getElementById('rate-hint');
   if (sel && suggested) {
     sel.value = suggested;
-    if (hint) hint.textContent = Math.round(suggested*100) + '% suggested based on ' + (filingStatus==='mfj'?'MFJ':'single') + ' bracket — advisor may override';
+    if (hint) hint.textContent = Math.round(suggested*100) + '% suggested based on ' + (filingStatus==='mfj'?'MFJ':'single') + ' ordinary income bracket — override if significant capital gains or pass-through income applies';
   }
 }
 
@@ -1795,17 +1796,17 @@ function calcExpenses(){
   const essMonthly = h+hc+f+t+i;
   if(essMonthly > 0) document.getElementById('f_essential_monthly').value = essMonthly;
 
-  const tv= num('f_travel_monthly')*12||0;
-  const en= num('f_entertainment_monthly')*12||0;
-  const ch= num('f_charitable_annual')||0;
-  const discFromParts = tv+en+ch;
-  const discFromTotal = (num('f_discretionary_monthly')||0)*12;
-  // Auto-fill the total if parts are entered; use total directly if advisor typed it
-  const discAnnual = discFromParts > 0 ? discFromParts : discFromTotal;
-  if(discFromParts > 0){
+  const tv= num('f_travel_monthly')||0;
+  const en= num('f_entertainment_monthly')||0;
+  const ch= (num('f_charitable_annual')||0)/12;  // charitable is annual — convert to monthly
+  const discMonthlyFromParts = tv+en+ch;
+  const discMonthlyFromTotal = num('f_discretionary_monthly')||0;
+  // Auto-fill total if parts are entered; use total directly if advisor typed it
+  if(tv > 0 || en > 0){
     const discEl = document.getElementById('f_discretionary_monthly');
-    if(discEl && document.activeElement !== discEl) discEl.value = Math.round(discFromParts/12);
+    if(discEl && document.activeElement !== discEl) discEl.value = Math.round(discMonthlyFromParts);
   }
+  const discAnnual = (discMonthlyFromParts > 0 ? discMonthlyFromParts : discMonthlyFromTotal) * 12;
 
   const essential = (num('f_essential_monthly')||essMonthly)*12;
   const total = essential + discAnnual;
