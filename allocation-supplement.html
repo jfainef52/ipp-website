@@ -1403,10 +1403,10 @@ async function unlockSession(){
   if(!pw){ err.textContent='Password required.'; return; }
   err.textContent = '';
   const session = sb.getSession();
-  if(!session){ localStorage.setItem('ipp_return_url', window.location.href); window.location.href='advisor-portal.html'; return; }
+  if(!session){ if(new URLSearchParams(window.location.search).get('client_id')){ localStorage.setItem('ipp_return_url', window.location.href); } window.location.href='advisor-portal.html'; return; }
   // Re-authenticate
   const email = currentUser?.email || '';
-  if(!email){ localStorage.setItem('ipp_return_url', window.location.href); window.location.href='advisor-portal.html'; return; }
+  if(!email){ if(new URLSearchParams(window.location.search).get('client_id')){ localStorage.setItem('ipp_return_url', window.location.href); } window.location.href='advisor-portal.html'; return; }
   const res = await sb.signInWithPassword(email, pw);
   if(res.error){ err.textContent='Incorrect password. Try again.'; return; }
   document.getElementById('lock-password').value = '';
@@ -2053,7 +2053,7 @@ function restoreFromSupplement(s){
 async function init(){
   // Auth check
   const session = sb.getSession();
-  if(!session){ localStorage.setItem('ipp_return_url', window.location.href); window.location.href='advisor-portal.html'; return; }
+  if(!session){ if(new URLSearchParams(window.location.search).get('client_id')){ localStorage.setItem('ipp_return_url', window.location.href); } window.location.href='advisor-portal.html'; return; }
   currentUser = { id: session.user?.id || session.sub, email: session.user?.email || session.email };
   if(!currentUser.id){
     // Parse from JWT
@@ -2062,7 +2062,7 @@ async function init(){
 
   // Admin check
   const profile = await sb.getProfile(currentUser.id);
-  if(!profile){ localStorage.setItem('ipp_return_url', window.location.href); window.location.href='advisor-portal.html'; return; }
+  if(!profile){ if(new URLSearchParams(window.location.search).get('client_id')){ localStorage.setItem('ipp_return_url', window.location.href); } window.location.href='advisor-portal.html'; return; }
   currentProfile = profile;
   // Only allow admin (Jeffrey) or users with is_admin flag — adjust role check to match your schema
   // For now we check if the advisor is you by email
