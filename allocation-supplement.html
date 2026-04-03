@@ -1658,8 +1658,8 @@ function collectFormData(){
 // A field is satisfied if it has a non-empty value.
 // Risk section uses the riskScores object instead of field IDs.
 const SECTION_REQUIRED = [
-  // S1 — Identity: must have first name, last name, age, filing status
-  ['f_primary_first_name','f_primary_last_name','f_primary_age','f_filing_status'],
+  // S1 — Identity: must have first name, last name, age, filing status, and coverage preference
+  ['f_primary_first_name','f_primary_last_name','f_primary_age','f_filing_status','f_fixed_expense_coverage_pref'],
   // S2 — Financial Position: must have QP balance total
   ['f_qp_balance_total'],
   // S3 — Income Architecture: must have SS monthly and claim age
@@ -1708,6 +1708,34 @@ function refreshSectionStates(){
 // ── Navigation ────────────────────────────────────────────────
 function goToSection(idx){
   if(idx < 0 || idx > 7) return;
+  // Enforce completion when moving forward
+  if(idx > currentSection && !isSectionComplete(currentSection)){
+    const missing = SECTION_REQUIRED[currentSection].filter(id=>{
+      const el = document.getElementById(id);
+      return !el || !el.value || el.value.trim() === '';
+    });
+    // Special label mapping for cleaner error messages
+    const labels = {
+      f_primary_first_name:'First name', f_primary_last_name:'Last name',
+      f_primary_age:'Current age', f_filing_status:'Filing status',
+      f_fixed_expense_coverage_pref:'Fixed expense coverage preference',
+      f_qp_balance_total:'Total qualified plan balance',
+      f_ss_primary_monthly:'Primary SS monthly benefit',
+      f_ss_primary_claim_age:'SS claim age',
+      f_essential_monthly:'Essential monthly expenses',
+      f_health_status_primary:'Primary health status',
+      f_has_ltc_policy:'LTC coverage',
+      f_urgency_assessment:'Urgency assessment',
+    };
+    const missingLabels = missing.map(id => labels[id] || id.replace('f_','').replace(/_/g,' ')).join(', ');
+    // Highlight missing fields
+    missing.forEach(id => {
+      const el = document.getElementById(id);
+      if(el){ el.style.borderColor='var(--error)'; el.addEventListener('change',()=>el.style.borderColor='',{once:true}); }
+    });
+    alert('Please complete required fields before continuing:\n\n• ' + missingLabels.split(', ').join('\n• '));
+    return;
+  }
   document.querySelectorAll('.form-section').forEach(s=>s.classList.remove('active'));
   document.getElementById('section-complete').classList.remove('active');
   document.getElementById('section-'+idx).classList.add('active');
@@ -1770,8 +1798,14 @@ function calcExpenses(){
   const tv= num('f_travel_monthly')*12||0;
   const en= num('f_entertainment_monthly')*12||0;
   const ch= num('f_charitable_annual')||0;
-  const discAnnual = tv+en+ch;
-  if(discAnnual > 0) document.getElementById('f_discretionary_annual').value = discAnnual;
+  const discFromParts = tv+en+ch;
+  const discFromTotal = (num('f_discretionary_monthly')||0)*12;
+  // Auto-fill the total if parts are entered; use total directly if advisor typed it
+  const discAnnual = discFromParts > 0 ? discFromParts : discFromTotal;
+  if(discFromParts > 0){
+    const discEl = document.getElementById('f_discretionary_monthly');
+    if(discEl && document.activeElement !== discEl) discEl.value = Math.round(discFromParts/12);
+  }
 
   const essential = (num('f_essential_monthly')||essMonthly)*12;
   const total = essential + discAnnual;
