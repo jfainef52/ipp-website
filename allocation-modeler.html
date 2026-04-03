@@ -173,6 +173,8 @@ html,body{min-height:100vh;font-family:'Barlow',sans-serif;background:#0E1C2E;co
   letter-spacing:.2em;text-transform:uppercase;color:var(--gold);margin-bottom:10px;
 }
 .defensibility-items{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+#algo-warnings{display:none;margin:0 0 20px;}
+.algo-warning{background:rgba(196,122,122,.1);border:1px solid rgba(196,122,122,.3);border-radius:4px;padding:10px 14px;font-size:12px;color:#E08080;margin-bottom:6px;}
 .def-item{font-size:12px;color:var(--gray);display:flex;gap:6px;align-items:baseline;}
 .def-item strong{color:var(--warm);font-weight:500;flex-shrink:0;}
 
@@ -273,6 +275,7 @@ html,body{min-height:100vh;font-family:'Barlow',sans-serif;background:#0E1C2E;co
   </div>
 
   <!-- Layer cards -->
+  <div id="algo-warnings"></div>
   <div class="alloc-grid" id="layer-cards"></div>
 
   <!-- Factor log -->
@@ -356,252 +359,460 @@ const fmtK  = v => v!=null&&v>0 ? '$'+Math.round(v/1000)+'K' : '—';
 //          rationales: plain language per layer
 //          metrics: computed planning metrics
 
+// ════════════════════════════════════════════════════════════════
+// IncomeArc™ Allocation Algorithm — v2.0
+// Architecture agreed: Jeffrey Faine / Claude, April 2, 2026
+// ════════════════════════════════════════════════════════════════
+//
+// DESIGN PRINCIPLES:
+//   1. L2 sized first (hard floor, scales to ceiling)
+//   2. L1 sized from client coverage preference + 5% payout estimate
+//   3. L4 bridges the L1-uncovered gap for bridge_years
+//      bridge_years = max(0, 10 - years_to_retirement)
+//   4. L3 = remainder (20% floor guardrail)
+//   5. Gap assessment determines output type before allocation
+//   6. Recalibration mode available if L2 underwriting fails
+//
+// PAYOUT RATE NOTE: 5% used as estimate pending carrier data
+// ════════════════════════════════════════════════════════════════
+
 function runAllocationAlgorithm(s) {
-  const log = [];   // factor log — every decision documented
 
-  // ── Base allocations (starting point before adjustments) ──
-  let l1 = 0.35, l2 = 0.15, l3 = 0.28, l4 = 0.12;
+  const log = [];
+  const warn = [];
 
-  // ── Helper to log a factor ────────────────────────────────
-  const addFactor = (name, layers, direction, delta, reason) => {
+  // ── Helper: format currency ───────────────────────────────
+  const fmt$ = v => '$' + Math.round(v).toLocaleString();
+  const fmtPct = v => Math.round(v * 100) + '%';
+  const addFactor = (name, layers, direction, delta, reason) =>
     log.push({ name, layers, direction, delta, reason });
-  };
 
-  // ── Derived inputs ────────────────────────────────────────
-  const balance     = s.qp_balance_total || 0;
-  const age         = s.primary_age || 62;
-  const retireAge   = s.target_retire_age || 65;
-  const yearsToRet  = Math.max(0, (s.years_to_retirement || Math.max(0, retireAge - age)));
-  const filingStatus= s.filing_status || 'mfj';
-  const isSingle    = filingStatus === 'single' || filingStatus === 'divorced' || filingStatus === 'widowed';
-  const marginalRate= s.current_marginal_rate || 0.24;
-  const riskProfile = s.risk_profile || 'Moderate';
-  const riskScore   = s.risk_score_total || 15;
+  // ── 1. EXTRACT INPUTS ────────────────────────────────────
+  const balance       = s.qp_balance_total || 0;
+  const rothBalance   = s.qp_roth_balance  || 0;
+  const preTaxBalance = Math.max(0, balance - rothBalance);
+  const age           = s.primary_age       || 62;
+  const retireAge     = s.target_retire_age || 65;
+  const yearsToRet    = Math.max(0, s.years_to_retirement || Math.max(0, retireAge - age));
+  const filingStatus  = s.filing_status     || 'mfj';
+  const isMFJ         = filingStatus === 'mfj';
+  const isSingle      = ['single','divorced','widowed'].includes(filingStatus);
+  const marginalRate  = s.current_marginal_rate || 0.24;
+  const riskScore     = s.risk_score_total  || 15;
+  const riskProfile   = s.risk_profile      || 'Moderate';
 
-  // Income
-  const ssMonthly    = (s.ss_primary_monthly||0) + (s.ss_spouse_monthly||0);
-  const pensionMo    = (s.pension_monthly||0) + (s.spouse_pension_monthly||0);
-  const otherGuarMo  = s.other_guaranteed_monthly || 0;
-  const guaranteedAnnual = (ssMonthly + pensionMo + otherGuarMo) * 12;
-  const totalExpenses= s.total_annual_expenses || (s.essential_annual||0) + (s.discretionary_annual||0);
-  const incomeGapAnnual = s.income_gap_annual || Math.max(0, totalExpenses - guaranteedAnnual);
-  const incomeGapPct = balance > 0 ? incomeGapAnnual / balance : 0;
+  // Income inputs
+  const ssPrimary     = s.ss_primary_monthly    || 0;
+  const ssSpouse      = s.ss_spouse_monthly     || 0;
+  const pensionPri    = s.pension_monthly       || 0;
+  const pensionSp     = s.spouse_pension_monthly|| 0;
+  const otherGuar     = s.other_guaranteed_monthly || 0;
+  const existingGuaranteedMonthly = ssPrimary + ssSpouse + pensionPri + pensionSp + otherGuar;
+  const existingGuaranteedAnnual  = existingGuaranteedMonthly * 12;
 
-  // Tax metrics
-  const rmdAt73      = balance * 0.0365;
-  const taxLiability = (balance - (s.qp_roth_balance||0)) * marginalRate;
+  // Expense inputs
+  const essentialMonthly   = s.essential_monthly   || 0;
+  const essentialAnnual    = s.essential_annual    || (essentialMonthly * 12);
+  const discretionaryAnnual= s.discretionary_annual|| 0;
+  const totalExpensesAnnual= s.total_annual_expenses
+    || (essentialAnnual + discretionaryAnnual);
+  const incomeGapAnnual    = s.income_gap_annual
+    || Math.max(0, totalExpensesAnnual - existingGuaranteedAnnual);
+
+  // External assets (truly external — NOT part of the qualified plan)
+  const taxableInvest  = s.taxable_investment_balance || 0;
+  // Note: qp_roth_balance is INSIDE the QP already — do not double-count
+  // s.roth_ira_external would be a separate Roth IRA not in the QP (future field)
+  const externalRothIra = s.roth_ira_external || 0;
+  const externalLiquid = taxableInvest + (externalRothIra * 0.80);
+  // 80% of external Roth — don't want to fully consume it
+
+  // Large known expenses
+  const largeExpenses  = s.large_expenses_total || 0;
 
   // LTC / health
-  const healthPrimary      = s.health_status_primary || 'good';
-  const familyLtcHistory   = s.family_ltc_history === true;
-  const familyLtcSpouse    = s.family_ltc_history_spouse === true;
-  const hasExistingLtc     = s.has_ltc_policy === true;
-  const legacyImportance   = s.legacy_importance || 1;
-  const priorityLegacy     = s.priority_legacy || 4;
-  const priorityTax        = s.priority_tax_efficiency || 2;
-  const priorityIncome     = s.priority_income_security || 1;
-  const priorityCare       = s.priority_care_protection || 3;
+  const healthPrimary       = s.health_status_primary       || 'good';
+  const healthSpouse        = s.health_status_spouse        || 'good';
+  const familyLtcPrimary    = s.family_ltc_history          === true;
+  const familyLtcSpouse     = s.family_ltc_history_spouse   === true;
+  const hasAdequateLtc      = s.has_ltc_policy === true
+    && (s.ltc_benefit_period_years || 0) >= 3;
+  const insuranceDeclined   = s.insurance_declined_primary  === true
+    || s.insurance_declined_spouse === true;
+  const healthDisqualifying = ['poor'].includes(healthPrimary)
+    && ['poor'].includes(healthSpouse);
 
-  // ── FACTOR 1: Income Gap Size ─────────────────────────────
-  if (incomeGapPct > 0.08) {
-    l1 += 0.06; l3 -= 0.04; l4 -= 0.02;
-    addFactor('Large income gap', ['L1'], 'up',
-      { l1: +0.06, l3: -0.04, l4: -0.02 },
-      `Income gap of ${fmt$(incomeGapAnnual)}/yr is ${(incomeGapPct*100).toFixed(1)}% of the qualified plan balance — above the 8% threshold that signals high income dependency. Layer 1 must be sized to reliably close this gap for life.`);
-  } else if (incomeGapPct > 0.04) {
-    addFactor('Moderate income gap', ['L1'], 'neutral',
-      { l1: 0 },
-      `Income gap of ${fmt$(incomeGapAnnual)}/yr is ${(incomeGapPct*100).toFixed(1)}% of the qualified plan — moderate. Base Layer 1 allocation is appropriate.`);
-  } else if (incomeGapPct < 0.02 && incomeGapAnnual > 0) {
-    l1 -= 0.05; l3 += 0.03; l4 += 0.02;
-    addFactor('Small income gap', ['L1','L3','L4'], 'down',
-      { l1: -0.05, l3: +0.03, l4: +0.02 },
-      `Income gap of ${fmt$(incomeGapAnnual)}/yr is only ${(incomeGapPct*100).toFixed(1)}% of the plan. Guaranteed income sources largely cover expenses — L1 does not need to do heavy lifting. Freed capital shifts to tax efficiency and liquidity.`);
-  } else if (incomeGapAnnual === 0 || guaranteedAnnual >= totalExpenses) {
-    l1 -= 0.07; l3 += 0.04; l4 += 0.03;
-    addFactor('Income fully covered', ['L1','L3','L4'], 'down',
-      { l1: -0.07, l3: +0.04, l4: +0.03 },
-      `Guaranteed income covers essential expenses. Layer 1 needs only a modest allocation for supplemental certainty — remaining capital is more productively deployed to tax elimination and liquidity.`);
+  // Goals / priorities
+  const legacyImportance    = s.legacy_importance          || 1;
+  const priorityLegacy      = parseInt(s.priority_legacy)  || 4;
+  const priorityTax         = parseInt(s.priority_tax_efficiency) || 3;
+  const priorityIncome      = parseInt(s.priority_income_security)|| 1;
+  const priorityCare        = parseInt(s.priority_care_protection)|| 3;
+
+  // Client coverage preference for L1
+  // stored as: 'none','low'(20-30%),'moderate'(31-50%),'high'(51-75%),'very_high'(76-90%),'full'(100%)
+  const coveragePref = s.fixed_expense_coverage_pref || 'moderate';
+  const coverageMidpoints = {
+    none:     0.00,
+    low:      0.25,
+    moderate: 0.405,  // midpoint 31-50
+    high:     0.63,   // midpoint 51-75
+    very_high:0.83,   // midpoint 76-90
+    full:     1.00
+  };
+  const coveragePct = coverageMidpoints[coveragePref] ?? 0.405;
+
+  // Lifestyle coverage preference
+  const includesLifestyle = s.coverage_includes_lifestyle === true;
+
+  // ── 2. MINIMUM VIABLE BALANCE CHECK ─────────────────────
+  if (balance < 1000000) {
+    warn.push('QP balance below $1M minimum — IncomeArc allocation may not be viable at this balance.');
+  } else if (balance < 1500000) {
+    warn.push('QP balance below $1.5M — layer sizing will be constrained. Review with client carefully.');
   }
 
-  // ── FACTOR 2: Qualified Plan Balance Size ─────────────────
-  if (balance >= 2500000) {
-    l3 += 0.06; l1 -= 0.03; l4 -= 0.03;
-    addFactor('Very large QP balance (≥$2.5M)', ['L3'], 'up',
-      { l3: +0.06, l1: -0.03, l4: -0.03 },
-      `At ${fmt$(balance)}, estimated RMD at age 73 is ${fmt$(rmdAt73)}/yr — very likely pushing into the 32–37% bracket and triggering IRMAA Medicare surcharges. The embedded tax liability is ${fmt$(taxLiability)}. Layer 3/ETA urgency is highest in this balance range.`);
-  } else if (balance >= 1800000) {
-    l3 += 0.04; l1 -= 0.02; l4 -= 0.02;
-    addFactor('Large QP balance ($1.8M–$2.5M)', ['L3'], 'up',
-      { l3: +0.04, l1: -0.02, l4: -0.02 },
-      `At ${fmt$(balance)}, RMD exposure at age 73 is ${fmt$(rmdAt73)}/yr. Embedded tax liability of ${fmt$(taxLiability)} warrants an elevated Layer 3 allocation to convert pre-tax dollars to tax-free before RMDs compound the obligation.`);
-  } else if (balance >= 1200000) {
-    l3 += 0.02;
-    addFactor('Moderate-large QP balance ($1.2M–$1.8M)', ['L3'], 'up',
-      { l3: +0.02 },
-      `Balance of ${fmt$(balance)} carries an embedded tax liability of ${fmt$(taxLiability)}. Modest Layer 3 increase reflects meaningful RMD exposure beginning at age 73.`);
-  }
+  // ── 3. GAP ASSESSMENT — determines output type ───────────
+  const rmdAt73 = preTaxBalance * 0.0365;
+  const taxLiability = preTaxBalance * marginalRate;
+  const rothPct = balance > 0 ? rothBalance / balance : 0;
 
-  // ── FACTOR 3: Client Age / Time Horizon ───────────────────
-  if (age >= 68) {
-    l1 += 0.04; l4 -= 0.02; l3 -= 0.02;
-    addFactor('Age 68+', ['L1','L4'], 'up/down',
-      { l1: +0.04, l4: -0.02, l3: -0.02 },
-      `At age ${age}, the behavioral urgency for guaranteed income certainty increases. Shorter distribution window reduces the time available for tax conversion strategies. L1 bumped; L4 bridge and L3 trimmed modestly.`);
-  } else if (age <= 58) {
-    l1 -= 0.03; l3 += 0.02; l4 += 0.01;
-    addFactor('Age 58 or younger', ['L1','L3','L4'], 'down/up',
-      { l1: -0.03, l3: +0.02, l4: +0.01 },
-      `At age ${age} with ${yearsToRet} years to retirement, there is meaningful runway for tax conversion before RMDs begin at 73. L3/ETA should be funded earlier to allow maximum compounding of tax-free assets.`);
+  const l1Needed = coveragePct > 0 && incomeGapAnnual > 0;
+  const l2Needed = !hasAdequateLtc && !insuranceDeclined && !healthDisqualifying;
+  const l3Needed = balance >= 1000000 && rothPct < 0.50;
+  // L4 always needed — minimum floor
+
+  const layersNeeded = [l1Needed, l2Needed, l3Needed, true].filter(Boolean).length;
+  let outputType;
+  if (layersNeeded >= 3) outputType = 'full_incomearc';
+  else if (layersNeeded === 2) outputType = 'targeted';
+  else outputType = 'continue_current_path';
+
+  // ── 4. LAYER SIZING ──────────────────────────────────────
+  let L1 = 0, L2 = 0, L3 = 0, L4 = 0;
+  let L1_dollars = 0, L2_dollars = 0, L3_dollars = 0, L4_dollars = 0;
+
+  // ── L2: Hard floor, scales to ceiling ────────────────────
+  if (l2Needed) {
+    const insurableLives = isMFJ ? 2 : 1;
+    // Scaling: $125k + 8% of balance above $1M, capped at $1M net per person
+    const netPerPerson = Math.min(
+      125000 + Math.max(0, balance - 1000000) * 0.08,
+      1000000
+    );
+    const grossPerPerson = netPerPerson / (1 - marginalRate);
+    L2_dollars = grossPerPerson * insurableLives;
+
+    addFactor('L2 sizing', ['L2'], 'calculated',
+      { net_per_person: Math.round(netPerPerson), gross_per_person: Math.round(grossPerPerson), lives: insurableLives },
+      `${fmt$(netPerPerson)} net per insurable life × ${insurableLives} ${isMFJ ? 'lives' : 'life'}, grossed up at ${Math.round(marginalRate*100)}% marginal rate = ${fmt$(grossPerPerson)} gross per person. Total L2 allocation: ${fmt$(L2_dollars)}.`
+    );
   } else {
-    addFactor('Core retirement age (59–67)', ['L1'], 'neutral',
-      { l1: 0 },
-      `Age ${age} falls in the core planning window — base allocations are appropriate without age-driven adjustment.`);
+    if (hasAdequateLtc) {
+      addFactor('L2 not needed — adequate LTC in place', ['L2'], 'zero',
+        {},
+        `Existing LTC coverage with ${s.ltc_benefit_period_years}+ year benefit period in place. L2 allocation zeroed. Freed capital redistributed to L3 and L4.`
+      );
+    } else if (insuranceDeclined || healthDisqualifying) {
+      addFactor('L2 not available — underwriting barrier', ['L2'], 'zero',
+        {},
+        `Coverage unavailable due to health/underwriting status. L2 zeroed. Redistribution to L4 and L1 per care-protection intent. Recommend recalibration review.`
+      );
+    }
   }
 
-  // ── FACTOR 4: Risk Profile ────────────────────────────────
-  if (riskScore <= 9) {
-    l1 += 0.05; l3 -= 0.03; l4 += 0.01; l2 -= 0.03;
-    addFactor('Conservative risk profile', ['L1'], 'up',
-      { l1: +0.05, l3: -0.03, l4: +0.01, l2: -0.03 },
-      `Risk score of ${riskScore}/25 indicates a Conservative profile. Strong preference for guaranteed income certainty over growth or tax optimization complexity. Layer 1 allocation increased to match stated tolerance.`);
-  } else if (riskScore <= 13) {
-    l1 += 0.03; l3 -= 0.02; l4 += 0.01; l2 -= 0.02;
-    addFactor('Moderate-Conservative risk profile', ['L1'], 'up',
-      { l1: +0.03, l3: -0.02, l4: +0.01, l2: -0.02 },
-      `Risk score of ${riskScore}/25 indicates Moderate-Conservative. Favors income security. Layer 1 modestly increased.`);
-  } else if (riskScore >= 22) {
-    l1 -= 0.04; l3 += 0.03; l4 += 0.01;
-    addFactor('Growth risk profile', ['L1','L3'], 'down/up',
-      { l1: -0.04, l3: +0.03, l4: +0.01 },
-      `Risk score of ${riskScore}/25 indicates a Growth profile. Greater comfort with tax conversion complexity and reduced emphasis on guaranteed income certainty. L1 trimmed; L3 and L4 increased.`);
+  // ── L1: Client preference + 5% payout estimate ───────────
+  if (l1Needed) {
+    const expenseBase = includesLifestyle ? totalExpensesAnnual : essentialAnnual;
+    const targetGuaranteedAnnual = expenseBase * coveragePct;
+    const incomeToFund = Math.max(0, targetGuaranteedAnnual - existingGuaranteedAnnual);
+    const PAYOUT_RATE = 0.05; // 5% estimate — pending carrier data
+    L1_dollars = incomeToFund / PAYOUT_RATE;
+
+    addFactor('L1 sizing', ['L1'], 'calculated',
+      { expense_base: Math.round(expenseBase), coverage_pct: Math.round(coveragePct*100)+'%', target_annual: Math.round(targetGuaranteedAnnual), existing_guaranteed: Math.round(existingGuaranteedAnnual), income_to_fund: Math.round(incomeToFund) },
+      `Client selected ${Math.round(coveragePct*100)}% coverage of ${includesLifestyle ? 'total' : 'essential'} expenses (${fmt$(expenseBase)}/yr). Target guaranteed income: ${fmt$(targetGuaranteedAnnual)}/yr. Existing guaranteed income: ${fmt$(existingGuaranteedAnnual)}/yr. Funding gap: ${fmt$(incomeToFund)}/yr. At 5% payout rate (estimate): ${fmt$(L1_dollars)} required. NOTE: Payout rate is an estimate — confirm with carrier illustration.`
+    );
   } else {
-    addFactor(`${riskProfile} risk profile`, [], 'neutral',
+    addFactor('L1 not needed or zeroed', ['L1'], 'zero',
       {},
-      `Risk score of ${riskScore}/25 (${riskProfile}). No significant risk-driven allocation adjustment — base weightings appropriate.`);
+      `Client selected no coverage preference or existing guaranteed income fully covers fixed expense target. L1 allocation zeroed.`
+    );
   }
 
-  // ── FACTOR 5: Health Status and LTC ──────────────────────
-  if (healthPrimary === 'poor' || healthPrimary === 'fair') {
-    l2 += 0.05; l4 -= 0.03; l1 -= 0.02;
-    addFactor('Elevated health concern', ['L2'], 'up',
-      { l2: +0.05, l4: -0.03, l1: -0.02 },
-      `Primary client health status is ${healthPrimary}. LTC risk is elevated and the underwriting window may be limited. Layer 2 allocation increased to prioritize funded care protection while coverage is still accessible.`);
-  } else if (familyLtcHistory || familyLtcSpouse) {
-    l2 += 0.03; l4 -= 0.02; l1 -= 0.01;
-    addFactor('Family LTC history', ['L2'], 'up',
-      { l2: +0.03, l4: -0.02, l1: -0.01 },
-      `Family history of long-term care need elevates actuarial LTC risk above population average. Layer 2 increased to fund the leverage structure while health status remains favorable for underwriting.`);
-  } else if (!hasExistingLtc) {
-    l2 += 0.01;
-    addFactor('No existing LTC coverage', ['L2'], 'up',
-      { l2: +0.01 },
-      `No dedicated LTC coverage in place. Layer 2 receives a modest increase to prioritize closing this gap through leveraged life/LTC structure.`);
-  } else {
-    addFactor('Existing LTC coverage in place', ['L2'], 'down',
-      { l2: -0.01 },
-      `Existing LTC coverage reduces the urgency for full Layer 2 funding. Modest reduction reflects partial coverage of the care risk.`);
-    l2 -= 0.01;
+  // ── L4: Bridge the L1-uncovered gap for bridge_years ─────
+  {
+    // 10-year clock starts at L3 installation (today)
+    // bridge_years = how many of those 10 years fall in retirement
+    const bridgeYears = Math.max(0, 10 - yearsToRet);
+
+    // Annual income L1 will produce (existing + new L1 structure)
+    const annualL1Income = existingGuaranteedAnnual + (L1_dollars * 0.05);
+
+    // What L4 needs to cover annually
+    const annualL4Burden = Math.max(0, totalExpensesAnnual - annualL1Income);
+
+    // Raw bridge need
+    const rawBridge = annualL4Burden * bridgeYears;
+
+    // Sequence of returns factor: 0.70 (conservative — never undersell liquidity)
+    const SEQUENCE_FACTOR = 0.70;
+    const adjustedBridge = rawBridge * SEQUENCE_FACTOR;
+
+    // Add known large expenses, subtract external liquid assets
+    const grossL4 = adjustedBridge + largeExpenses;
+    const netL4 = Math.max(0, grossL4 - externalLiquid);
+
+    // Hard floor: 10% of QP regardless
+    L4_dollars = Math.max(netL4, balance * 0.10);
+
+    addFactor('L4 sizing', ['L4'], 'calculated',
+      {
+        bridge_years: bridgeYears,
+        years_to_retirement: yearsToRet,
+        annual_l1_income: Math.round(annualL1Income),
+        annual_l4_burden: Math.round(annualL4Burden),
+        raw_bridge: Math.round(rawBridge),
+        sequence_factor: SEQUENCE_FACTOR,
+        adjusted_bridge: Math.round(adjustedBridge),
+        large_expenses: largeExpenses,
+        external_liquid: Math.round(externalLiquid),
+        floor_applied: netL4 < balance * 0.10
+      },
+      `${bridgeYears} bridge year${bridgeYears !== 1 ? 's' : ''} required (10 years minus ${yearsToRet} years to retirement). L1 income (existing + new structure): ${fmt$(annualL1Income)}/yr. Annual L4 burden: ${fmt$(annualL4Burden)}/yr. Raw bridge: ${fmt$(rawBridge)}. Sequence-of-returns factor 0.70 applied: ${fmt$(adjustedBridge)}. ${largeExpenses > 0 ? 'Known large expenses: '+fmt$(largeExpenses)+'. ' : ''}${externalLiquid > 0 ? 'External liquid assets deducted: '+fmt$(externalLiquid)+'. ' : ''}Final L4: ${fmt$(L4_dollars)}.${netL4 < balance*0.10 ? ' (10% hard floor applied)' : ''}`
+    );
   }
 
-  // ── FACTOR 6: Single filer ────────────────────────────────
+  // ── L3: Remainder with 20% floor ─────────────────────────
+  {
+    L3_dollars = balance - L1_dollars - L2_dollars - L4_dollars;
+
+    // Enforce 20% floor — shave L4 first, then L1
+    const l3Floor = balance * 0.20;
+    if (L3_dollars < l3Floor) {
+      const deficit = l3Floor - L3_dollars;
+      const l4Min = balance * 0.10;
+      const l4Headroom = Math.max(0, L4_dollars - l4Min);
+      const shaveL4 = Math.min(deficit, l4Headroom);
+      L4_dollars -= shaveL4;
+      L3_dollars += shaveL4;
+
+      const remaining = l3Floor - L3_dollars;
+      if (remaining > 0 && L1_dollars > 0) {
+        const shaveL1 = Math.min(remaining, L1_dollars * 0.50);
+        L1_dollars -= shaveL1;
+        L3_dollars += shaveL1;
+      }
+
+      addFactor('L3 floor guardrail applied', ['L3','L4','L1'], 'adjustment',
+        { deficit: Math.round(deficit), shaved_l4: Math.round(shaveL4) },
+        `L3 fell below 20% floor. L4 trimmed by ${fmt$(shaveL4)} to restore L3 minimum. ${remaining > 0 ? 'Additional L1 trim applied.' : ''}`
+      );
+    }
+
+    // Viability warning
+    if (L3_dollars < l3Floor) {
+      warn.push(`L3 cannot reach 20% floor even after trimming L4 and L1. Full IncomeArc structure may not be viable at this balance with these expense/coverage inputs. Consider: adjusted retirement timing, reduced coverage preference, or incorporating external assets.`);
+    }
+
+    if (l3Needed) {
+      addFactor('L3 sizing', ['L3'], 'remainder',
+        { tax_liability: Math.round(taxLiability), rmd_at_73: Math.round(rmdAt73) },
+        `L3/ETA receives ${fmt$(L3_dollars)} — the remainder after L1, L2, and L4 are funded. Embedded pre-tax liability: ${fmt$(taxLiability)} at ${Math.round(marginalRate*100)}% marginal rate. Estimated RMD at age 73: ${fmt$(rmdAt73)}/yr. This capital accumulates in a tax-free structure with 0% floor protection. Income accessible after 10-year seasoning period.`
+      );
+    }
+  }
+
+  // ── Convert to percentages ────────────────────────────────
+  L1 = balance > 0 ? L1_dollars / balance : 0;
+  L2 = balance > 0 ? L2_dollars / balance : 0;
+  L3 = balance > 0 ? L3_dollars / balance : 0;
+  L4 = balance > 0 ? L4_dollars / balance : 0;
+
+  // ── 5. ADJUSTMENT FACTORS (fine-tuning on top of base) ────
+  // NOTE: These no longer set the allocation — they document
+  // situational context and apply modest adjustments where
+  // the client-derived sizing may not fully capture nuance.
+
+  // Risk profile — affects L1/L4 balance within the bridge
+  if (riskScore <= 9) {
+    // Very conservative — shift more bridge burden to L1 (guaranteed), less L4 (market)
+    const shift = Math.min(L4_dollars * 0.08, L1_dollars > 0 ? balance * 0.04 : 0);
+    L4_dollars -= shift; L1_dollars += shift;
+    addFactor('Conservative risk — shift bridge to guaranteed', ['L1','L4'], 'adjustment',
+      { shift: Math.round(shift) },
+      `Risk score ${riskScore}/25 (Conservative). Modest shift from L4 bridge to L1 guaranteed income — aligns with client preference for certainty over flexibility.`
+    );
+  } else if (riskScore >= 20) {
+    // Growth-oriented — client more comfortable with L4 market exposure
+    const shift = Math.min(L1_dollars * 0.08, balance * 0.03);
+    L1_dollars -= shift; L4_dollars += shift;
+    addFactor('Growth risk — shift to flexible L4', ['L1','L4'], 'adjustment',
+      { shift: Math.round(shift) },
+      `Risk score ${riskScore}/25 (Growth). Modest shift from guaranteed L1 to flexible L4 — client comfortable with market exposure and values flexibility.`
+    );
+  }
+
+  // Single filer — elevate L4 (no spousal income backstop)
   if (isSingle) {
-    l2 += 0.02; l1 -= 0.01; l3 -= 0.01;
-    addFactor('Single filer / no spouse', ['L2'], 'up',
-      { l2: +0.02, l1: -0.01, l3: -0.01 },
-      `Single filer has no spousal income backstop. If a care event and income disruption occur simultaneously, the financial exposure is acute. Layer 2 increase provides the leveraged protection that would otherwise rely on a second income stream.`);
+    const shift = balance * 0.02;
+    L4_dollars += shift; L3_dollars -= shift;
+    addFactor('Single filer — elevated L4', ['L4','L3'], 'adjustment',
+      { shift: Math.round(shift) },
+      `Single filer has no spousal income backstop. L4 modestly increased for additional behavioral safety margin.`
+    );
   }
 
-  // ── FACTOR 7: Legacy priority ─────────────────────────────
-  if (legacyImportance === 3 || priorityLegacy <= 2) {
-    l2 += 0.02; l4 -= 0.01; l3 -= 0.01;
-    addFactor('Legacy is a non-negotiable priority', ['L2'], 'up',
-      { l2: +0.02, l4: -0.01, l3: -0.01 },
-      `Client ranked legacy as a top-2 priority and indicated it is non-negotiable. Layer 2's leverage ratio produces the most efficient legacy value per dollar allocated — a small allocation delivers outsized death benefit.`);
-  }
-
-  // ── FACTOR 8: Tax priority ────────────────────────────────
-  if (priorityTax <= 2 && balance >= 1500000) {
-    l3 += 0.02; l4 -= 0.01; l1 -= 0.01;
-    addFactor('Tax efficiency ranked as top priority', ['L3'], 'up',
-      { l3: +0.02, l4: -0.01, l1: -0.01 },
-      `Client ranked tax efficiency as a top-2 priority, consistent with the ${fmt$(taxLiability)} embedded tax liability. Additional allocation to Layer 3 reflects the client's stated intent to address this obligation.`);
-  }
-
-  // ── FACTOR 9: Years to retirement ────────────────────────
-  if (yearsToRet <= 2) {
-    l4 -= 0.02; l1 += 0.02;
-    addFactor('Retirement imminent (≤2 years)', ['L1','L4'], 'L1 up / L4 down',
-      { l1: +0.02, l4: -0.02 },
-      `Retirement within 2 years means the income bridge function of Layer 4 is short-lived. Capital redirected to Layer 1 where it will be needed immediately.`);
-  } else if (yearsToRet >= 8) {
-    l4 += 0.02; l3 += 0.01; l1 -= 0.03;
-    addFactor('Long runway to retirement (8+ years)', ['L4','L3'], 'up',
-      { l4: +0.02, l3: +0.01, l1: -0.03 },
-      `With ${yearsToRet} years to retirement, Layer 4 bridge income is more valuable and Layer 3 has time to compound. Layer 1 guarantee can be slightly trimmed as there is time to build the structure.`);
-  }
-
-  // ── FACTOR 10: RMD proximity ─────────────────────────────
+  // RMD proximity — elevate L3 urgency (already sized as remainder, but note timing)
   const yearsToRmd = Math.max(0, 73 - age);
   if (yearsToRmd <= 3) {
-    l3 += 0.04; l4 -= 0.02; l1 -= 0.02;
-    addFactor('RMDs begin within 3 years', ['L3'], 'up',
-      { l3: +0.04, l4: -0.02, l1: -0.02 },
-      `RMDs begin in approximately ${yearsToRmd} year(s). The window for repositioning pre-tax dollars to tax-free structures before mandatory distributions is closing. Layer 3 urgency is highest — act before RMDs force taxable distributions at a rate the client cannot control.`);
+    addFactor('RMDs imminent', ['L3'], 'urgent',
+      { years_to_rmd: yearsToRmd },
+      `RMDs begin in approximately ${yearsToRmd} year(s). L3/ETA installation is time-critical — window for pre-RMD repositioning is closing rapidly.`
+    );
   } else if (yearsToRmd <= 7) {
-    l3 += 0.02;
-    addFactor('RMDs within 7 years', ['L3'], 'up',
-      { l3: +0.02 },
-      `RMDs begin in ${yearsToRmd} years. Meaningful repositioning window remains but is narrowing. Layer 3 receives a modest increase to reflect the approaching deadline.`);
+    addFactor('RMDs within 7 years', ['L3'], 'note',
+      { years_to_rmd: yearsToRmd },
+      `RMDs begin in ${yearsToRmd} years. Meaningful repositioning window remains. L3 installation should be prioritized.`
+    );
   }
 
-  // ── Normalize to exactly 100% ─────────────────────────────
-  // Apply guardrails (min/max per layer) before normalization
-  l1 = Math.max(0.20, Math.min(0.55, l1));
-  l2 = Math.max(0.08, Math.min(0.28, l2));
-  l3 = Math.max(0.15, Math.min(0.42, l3));
-  l4 = Math.max(0.06, Math.min(0.22, l4));
+  // Legacy priority — note for L2 if not fully funded
+  if ((legacyImportance === 3 || priorityLegacy <= 2) && !l2Needed) {
+    addFactor('Legacy priority — L2 not available', ['L3'], 'note',
+      {},
+      `Legacy is a top priority but L2 leveraged structure is unavailable. L3 tax-free accumulation becomes the primary legacy vehicle — policy loans leave tax-free death benefit for heirs.`
+    );
+  }
 
-  const total = l1 + l2 + l3 + l4;
-  l1 = l1/total; l2 = l2/total; l3 = l3/total; l4 = l4/total;
+  // ── 6. FINAL NORMALIZATION ────────────────────────────────
+  // Re-derive percentages after adjustments
+  L1 = balance > 0 ? L1_dollars / balance : 0;
+  L2 = balance > 0 ? L2_dollars / balance : 0;
+  L3 = balance > 0 ? L3_dollars / balance : 0;
+  L4 = balance > 0 ? L4_dollars / balance : 0;
 
-  // Document guardrail application
-  addFactor('Guardrails applied', ['L1','L2','L3','L4'], 'neutral',
+  // Normalize to exactly 100%
+  const total = L1 + L2 + L3 + L4;
+  if (total > 0) {
+    L1 /= total; L2 /= total; L3 /= total; L4 /= total;
+    L1_dollars = balance * L1;
+    L2_dollars = balance * L2;
+    L3_dollars = balance * L3;
+    L4_dollars = balance * L4;
+  }
+
+  addFactor('Guardrail documentation', ['L1','L2','L3','L4'], 'note',
     {},
-    `All layer allocations are bounded within professionally defined min/max ranges: L1 20–55%, L2 8–28%, L3 15–42%, L4 6–22%. Final allocations normalized to 100% after guardrail application.`);
+    `L2 hard floor: ${fmt$(125000)} net per insurable life (scales with QP balance, ceiling ${fmt$(1000000)} net). L3 floor guardrail: 20% of QP. L4 minimum: 10% of QP. Payout rate assumption: 5% (estimate — pending carrier illustration data).`
+  );
 
-  // ── Generate rationales ───────────────────────────────────
+  // ── 7. METRICS ───────────────────────────────────────────
+  const metrics = {
+    balance,
+    preTaxBalance,
+    rothBalance,
+    rothPct,
+    existingGuaranteedAnnual,
+    totalExpensesAnnual,
+    essentialAnnual,
+    incomeGapAnnual,
+    bridgeYears: Math.max(0, 10 - yearsToRet),
+    yearsToRmd,
+    marginalRate,
+    taxLiability,
+    rmdAt73,
+    riskScore,
+    riskProfile,
+    coveragePct,
+    coveragePref,
+    outputType,
+    warnings: warn,
+  };
+
+  // ── 8. RATIONALES ────────────────────────────────────────
   const rationales = {
-    l1: `Layer 1 is sized at ${fmtPct(l1)} (${fmt$(balance*l1)}) to fund the ${fmt$(incomeGapAnnual)}/yr income gap — the amount that guaranteed income sources (Social Security, pension) do not cover. ${riskScore<=13?'The conservative risk profile reinforces the need for contractual income certainty.':''} ${age>=68?'At age '+age+', the income guarantee carries heightened behavioral importance.':''} This allocation produces a guaranteed income floor that cannot be outlived and cannot decline regardless of market performance.`,
+    l1: L1_dollars > 0
+      ? `Layer 1 is funded at ${fmtPct(L1)} (${fmt$(L1_dollars)}) to provide guaranteed income covering ${Math.round(coveragePct*100)}% of ${includesLifestyle ? 'total' : 'essential'} expenses (${fmt$(essentialAnnual)}/yr). At a 5% payout rate (estimate), this allocation produces approximately ${fmt$(L1_dollars * 0.05)}/yr of guaranteed income. Combined with existing Social Security and pension income of ${fmt$(existingGuaranteedAnnual)}/yr, total guaranteed income reaches approximately ${fmt$(existingGuaranteedAnnual + L1_dollars * 0.05)}/yr. NOTE: Actual income figure requires carrier illustration.`
+      : `Layer 1 allocation is zero. Existing guaranteed income sources cover the client's target fixed expense coverage, or client selected no coverage preference.`,
 
-    l2: `Layer 2 is allocated ${fmtPct(l2)} (${fmt$(balance*l2)}) to fund the leveraged life/LTC structure. ${familyLtcHistory||familyLtcSpouse?'Family LTC history elevates the actuarial case for dedicated care protection.':''} ${healthPrimary==='fair'||healthPrimary==='poor'?'Health status flags elevated underwriting urgency.':''} ${isSingle?'Single filer status removes the spousal income backstop that typically cushions a care event.':''} At this balance level, a ${fmtPct(l2)} allocation delivers meaningful leverage — producing care coverage and death benefit multiples of the premium deployed.`,
+    l2: l2Needed
+      ? `Layer 2 is allocated ${fmtPct(L2)} (${fmt$(L2_dollars)}) for the leveraged life and long-term care structure. This represents ${fmt$(L2_dollars / (isMFJ ? 2 : 1))} gross per insurable life — netting approximately ${fmt$(L2_dollars / (isMFJ ? 2 : 1) * (1 - marginalRate))} after the ${Math.round(marginalRate*100)}% distribution tax cost. ${familyLtcPrimary || familyLtcSpouse ? 'Family LTC history elevates the actuarial case for dedicated care protection.' : ''} At this allocation level, leveraged life/LTC structure provides dedicated care coverage and death benefit without relying on qualified plan assets for care costs.`
+      : `Layer 2 allocation is zero. ${hasAdequateLtc ? 'Existing LTC coverage with adequate benefit period in place.' : 'Coverage unavailable due to health or underwriting status — see recalibration recommendation.'}`,
 
-    l3: `Layer 3/ETA receives ${fmtPct(l3)} (${fmt$(balance*l3)}) — the largest single threat to this client's retirement wealth is the ${fmt$(taxLiability)} embedded tax liability growing inside the qualified plan. At ${fmt$(balance)}, the estimated RMD at age 73 is ${fmt$(rmdAt73)}/yr — added to other income, this forces a tax bill the client cannot defer or avoid. The ETA/EP structure converts pre-tax qualified dollars to a tax-free income stream, eliminating this liability permanently. ${yearsToRmd<=5?'With only '+yearsToRmd+' years before RMDs begin, this is the most time-sensitive layer to fund.':''}`,
+    l3: `Layer 3/ETA receives ${fmtPct(L3)} (${fmt$(L3_dollars)}) — the largest single threat to this client's retirement wealth is the ${fmt$(taxLiability)} embedded tax liability growing inside the qualified plan at ${Math.round(marginalRate*100)}%. At ${fmt$(balance)}, the estimated RMD at age 73 is ${fmt$(rmdAt73)}/yr — added to other income, this forces a tax obligation the client cannot defer or avoid. The ETA structure repositions pre-tax qualified dollars into a tax-free, 0%-floor-protected asset. Income accessible via policy loans after the 10-year seasoning period. ${yearsToRmd <= 5 ? 'With only '+yearsToRmd+' years before RMDs begin, this is the most time-sensitive installation.' : ''}`,
 
-    l4: `Layer 4 holds ${fmtPct(l4)} (${fmt$(balance*l4)}) as accessible reserves — approximately ${Math.round(balance*l4/(totalExpenses||1)*10)/10} years of total expenses. This layer serves a behavioral function: ensuring the client never needs to disrupt Layers 1, 2, or 3 due to a short-term liquidity need or market anxiety. It is sized to be sufficient for behavioral safety without being excessive — capital beyond this threshold is better deployed in the other layers.`
+    l4: `Layer 4 holds ${fmtPct(L4)} (${fmt$(L4_dollars)}) as the income bridge and liquidity reserve. ${Math.max(0,10-yearsToRet) > 0 ? 'During the L3 seasoning period, Layer 4 — alongside Layer 1 guaranteed income — funds the income not covered by existing guaranteed sources. This ensures no layer needs to be disrupted during the 10-year accumulation window.' : 'Client installs L3 '+yearsToRet+' years before retirement — L3 seasoning period is largely consumed during working years, minimizing the bridge requirement.'} Layer 4 retains market participation with full liquidity. Once L3 income comes online after year 10, L4 transitions from primary bridge to flexible reserve — available for opportunities, large expenses, or behavioral safety without disrupting the guaranteed layers.`,
   };
 
   return {
-    l1, l2, l3, l4,
+    l1: L1, l2: L2, l3: L3, l4: L4,
+    l1_dollars: L1_dollars, l2_dollars: L2_dollars,
+    l3_dollars: L3_dollars, l4_dollars: L4_dollars,
     factorLog: log,
     rationales,
-    metrics: {
-      balance,
-      incomeGapAnnual,
-      incomeGapPct,
-      rmdAt73,
-      taxLiability,
-      marginalRate,
-      riskProfile,
-      riskScore
+    metrics,
+    outputType,
+    warnings: warn,
+    // Legacy fields for compatibility
+    _age: age,
+    _filing: filingStatus,
+    _health: healthPrimary,
+    _ltcHistory: familyLtcPrimary,
+    _yearsToRmd: yearsToRmd,
+    _legacy: legacyImportance,
+    _priorityTax: priorityTax,
+  };
+}
+
+function recalibrateL2Failed(originalResult, s) {
+  const freed = originalResult.l2_dollars;
+  const balance = originalResult.metrics.balance;
+
+  // Determine original L2 intent
+  const ltcScore = (s.family_ltc_history === true ? 2 : 0)
+    + (s.family_ltc_history_spouse === true ? 1 : 0)
+    + (['fair'].includes(s.health_status_primary) ? 1 : 0);
+  const legacyScore = (s.legacy_importance === 3 ? 2 : s.legacy_importance === 2 ? 1 : 0)
+    + (parseInt(s.priority_legacy) <= 2 ? 2 : 0);
+
+  let l1_add = 0, l3_add = 0, l4_add = 0;
+  let reason = '';
+
+  if (ltcScore > legacyScore) {
+    l4_add = freed * 0.60;
+    l1_add = freed * 0.40;
+    reason = 'L2 was primarily care-driven. Freed capital redirected: 60% to L4 (self-insurance reserve for care costs), 40% to L1 (larger guaranteed income floor reduces income disruption risk during a care event).';
+  } else if (legacyScore > ltcScore) {
+    l3_add = freed * 0.70;
+    l4_add = freed * 0.30;
+    reason = 'L2 was primarily legacy-driven. Freed capital redirected: 70% to L3 (tax-free accumulation becomes primary legacy vehicle), 30% to L4 (liquidity).';
+  } else {
+    l4_add = freed * 0.40;
+    l3_add = freed * 0.35;
+    l1_add = freed * 0.25;
+    reason = 'L2 served balanced care and legacy goals. Freed capital split: 40% to L4 (care self-insurance), 35% to L3 (legacy/tax efficiency), 25% to L1 (income security).';
+  }
+
+  return {
+    ...originalResult,
+    l1_dollars: originalResult.l1_dollars + l1_add,
+    l2_dollars: 0,
+    l3_dollars: originalResult.l3_dollars + l3_add,
+    l4_dollars: originalResult.l4_dollars + l4_add,
+    l1: (originalResult.l1_dollars + l1_add) / balance,
+    l2: 0,
+    l3: (originalResult.l3_dollars + l3_add) / balance,
+    l4: (originalResult.l4_dollars + l4_add) / balance,
+    recalibration: {
+      reason: 'L2 underwriting failed — allocation recalibrated',
+      original_l2: freed,
+      redistribution: { l1_add, l2_add: -freed, l3_add, l4_add },
+      rationale: reason,
     }
   };
 }
 
-// ══════════════════════════════════════════════════════════════
-// RENDER OUTPUT
-// ══════════════════════════════════════════════════════════════
-let allocChart = null;
 
 function renderOutput(s, result, clientName) {
   const { l1, l2, l3, l4, factorLog, rationales, metrics } = result;
@@ -685,24 +896,42 @@ function renderOutput(s, result, clientName) {
     </tr>`).join('');
 
   // Defensibility summary
+  const coverageLabels = {none:'None',low:'20–30%',moderate:'31–50%',high:'51–75%',very_high:'76–90%',full:'100%'};
   const defItems = [
     ['QP Balance Used', fmt$(b)],
     ['Income Gap', fmt$(metrics.incomeGapAnnual)+'/yr'],
-    ['Marginal Tax Rate', Math.round(metrics.marginalRate*100)+'%'],
+    ['Existing Guaranteed Income', fmt$(metrics.existingGuaranteedAnnual)+'/yr'],
+    ['Fixed Expense Coverage Pref', coverageLabels[metrics.coveragePref] || '—'],
+    ['Marginal Tax Rate', Math.round(metrics.marginalRate*100)+'% (estimate)'],
     ['Risk Profile', metrics.riskProfile+' ('+metrics.riskScore+'/25)'],
+    ['Bridge Years (L4)', metrics.bridgeYears+' year'+(metrics.bridgeYears!==1?'s':'')],
     ['Client Age', s.primary_age],
     ['Filing Status', s.filing_status==='mfj'?'Married Filing Jointly':'Single'],
     ['Health Status', s.health_status_primary||'Not specified'],
     ['Legacy Priority', ['','Nice to have','Important','Non-negotiable'][s.legacy_importance||1]],
     ['RMD Projection (Age 73)', fmt$(metrics.rmdAt73)+'/yr'],
     ['Est. Tax Liability', fmt$(metrics.taxLiability)],
+    ['Payout Rate Assumption', '5.0% (estimate — pending carrier data)'],
   ];
   document.getElementById('defensibility-items').innerHTML = defItems.map(([k,v])=>
     `<div class="def-item"><strong>${k}:</strong> ${v}</div>`).join('');
 
   // Output ID
   document.getElementById('output-id-display').textContent = '';
+
+  // Show algorithm warnings if any
+  const warningsEl = document.getElementById('algo-warnings');
+  if (warningsEl) {
+    if (result.warnings && result.warnings.length > 0) {
+      warningsEl.innerHTML = result.warnings.map(w =>
+        `<div class="algo-warning">⚠️ ${w}</div>`).join('');
+      warningsEl.style.display = 'block';
+    } else {
+      warningsEl.style.display = 'none';
+    }
+  }
 }
+
 
 // ══════════════════════════════════════════════════════════════
 // SAVE OUTPUT TO SUPABASE
@@ -730,9 +959,14 @@ async function saveOutput(clientId, supplementId, result, userId) {
     algo_inputs: {
       balance: b,
       income_gap: metrics.incomeGapAnnual,
+      existing_guaranteed: metrics.existingGuaranteedAnnual,
+      coverage_pref: metrics.coveragePref,
+      coverage_pct: metrics.coveragePct,
+      bridge_years: metrics.bridgeYears,
       marginal_rate: metrics.marginalRate,
       risk_score: metrics.riskScore,
       risk_profile: metrics.riskProfile,
+      output_type: metrics.outputType,
       age: result._age,
       filing_status: result._filing,
       health_status: result._health,
@@ -740,6 +974,7 @@ async function saveOutput(clientId, supplementId, result, userId) {
       years_to_rmd: result._yearsToRmd,
       legacy_importance: result._legacy,
       priority_tax: result._priorityTax,
+      warnings: result.warnings,
     },
     factor_log:      { factors: factorLog },
     l1_rationale:    rationales.l1,
