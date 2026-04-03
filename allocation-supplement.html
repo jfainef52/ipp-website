@@ -189,14 +189,14 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
 .form-field label .prefilled{
   color:rgba(200,169,110,.6);font-weight:400;text-transform:none;letter-spacing:0;margin-left:4px;
 }
-.form-field input,.form-field select,.form-field textarea{
+.form-field input:not([type="checkbox"]),.form-field select,.form-field textarea{
   width:100%;padding:9px 12px;
   background:var(--navy3);border:1px solid var(--border);border-radius:3px;
   color:var(--white);font-family:'Barlow',sans-serif;font-size:13px;font-weight:300;
   outline:none;transition:border-color .2s;appearance:none;
 }
-.form-field input:focus,.form-field select:focus,.form-field textarea:focus{border-color:var(--gold-dim);}
-.form-field input::placeholder,.form-field textarea::placeholder{color:rgba(110,130,153,.5);}
+.form-field input:not([type="checkbox"]):focus,.form-field select:focus,.form-field textarea:focus{border-color:var(--gold-dim);}
+.form-field input:not([type="checkbox"])::placeholder,.form-field textarea::placeholder{color:rgba(110,130,153,.5);}
 .form-field input.prefilled-val{border-color:rgba(200,169,110,.2);background:rgba(200,169,110,.04);}
 .form-field select option{background:var(--navy3);}
 .form-field textarea{resize:vertical;min-height:80px;line-height:1.6;}
