@@ -2959,9 +2959,13 @@ async function openClientDetail(clientId) {
       </a>` : ''}`;
   } else if (stage === 'modeler') {
     const supplementId = c.allocation_supplement_id || '';
-    actionBtn = `<a class="pipeline-action-btn green" href="allocation-modeler.html?client_id=${c.id}${supplementId ? '&supplement_id='+supplementId : ''}" target="_blank">
-      Open Allocation Modeler &#8594;
-    </a>`;
+    actionBtn = `
+      <a class="pipeline-action-btn" href="allocation-supplement.html?client_id=${c.id}${srId ? '&sr_id='+srId : ''}" target="_blank" style="margin-right:8px;">
+        &#9998; Edit Supplement
+      </a>
+      <a class="pipeline-action-btn green" href="allocation-modeler.html?client_id=${c.id}${supplementId ? '&supplement_id='+supplementId : ''}" target="_blank">
+        Open Allocation Modeler &#8594;
+      </a>`;
   } else if (stage === 'presentation') {
     actionBtn = `<span style="font-size:12px;color:var(--success);">&#10003; Presentation stage — see IncomeArchitect™ Modeler</span>`;
   } else if (stage === 'implementation') {
