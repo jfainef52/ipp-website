@@ -316,6 +316,14 @@ html,body{min-height:100vh;font-family:'Barlow',sans-serif;background:#0E1C2E;co
 </div>
 
 <script>
+// ── Origin guard ────────────────────────────────────────────────────────
+(function() {
+  const correct = 'https://www.integratedplanningpartners.com';
+  if (window.location.origin !== correct) {
+    window.location.replace(correct + window.location.pathname + window.location.search);
+  }
+})();
+
 // ── Supabase ──────────────────────────────────────────────────
 const SUPABASE_URL = 'https://piixgvxrasddphklgazh.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_acvdk0hBniaB6qOD8_k8XQ_9R6FNbP_';
