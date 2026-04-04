@@ -718,6 +718,21 @@ const sb = supabase;
   }
 })();
 
+// Show error message if redirected with an error param
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  const err = params.get('error');
+  if (err === 'no_profile') {
+    document.addEventListener('DOMContentLoaded', () => {
+      const el = document.getElementById('login-error');
+      if (el) {
+        el.textContent = 'Your account does not have advisor access. Please contact support@integratedplanningpartners.com.';
+        el.classList.add('visible');
+      }
+    });
+  }
+})();
+
 // ── Tab switching ──────────────────────────────────────────────
 function switchTab(tab) {
   // Hide all panels and success messages
@@ -771,9 +786,11 @@ async function handleLogin() {
   if (error) {
     btn.disabled = false;
     btn.textContent = 'Sign In to Portal';
-    const msg = error.message.includes('Invalid login')
+    console.error('Login error:', JSON.stringify(error));
+    const raw = error.message || error.error_description || '';
+    const msg = (raw.toLowerCase().includes('invalid') || raw.toLowerCase().includes('credentials') || raw.toLowerCase().includes('password') || !raw)
       ? 'Incorrect email or password. Please try again.'
-      : error.message;
+      : raw;
     showError('login-error', msg);
     return;
   }
