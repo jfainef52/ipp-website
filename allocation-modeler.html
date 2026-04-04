@@ -574,29 +574,55 @@ function runAllocationAlgorithm(s) {
     const annualL1Income = existingGuaranteedAnnual + (L1_dollars * 0.05);
 
     // Inherited QP distributions — if already flowing, offset L4 burden
-    // Taxable so apply marginal rate haircut for net income
     const inheritedDistIncome = inheritedQPTakingDist
       ? inheritedAnnualDist * (1 - marginalRate) : 0;
 
     // Known large upcoming expenses
     const largeExpenses = s.large_expenses_total || 0;
 
-    // What L4 needs to cover annually (after L1 and inherited distributions)
-    const annualL4Burden = Math.max(0, totalExpensesAnnual - annualL1Income - inheritedDistIncome);
+    // ── Inflation-adjusted bridge calculation ─────────────────
+    // General expense inflation: 3.5%/yr
+    // Healthcare inflation: 5.5%/yr (separate — compounds faster than general CPI)
+    // Healthcare typically represents 15–20% of retirement spending by mid-retirement.
+    // We model it as 15% of total expenses inflating at a premium rate.
+    const GENERAL_INFLATION  = 0.035;
+    const HEALTHCARE_INFLATION = 0.055;
+    const HEALTHCARE_SHARE   = 0.15; // 15% of total expenses assumed healthcare
 
-    // Raw bridge need
-    const rawBridge = annualL4Burden * bridgeYears;
+    // Split expenses into healthcare and non-healthcare portions
+    const healthcareAnnual    = totalExpensesAnnual * HEALTHCARE_SHARE;
+    const nonHealthcareAnnual = totalExpensesAnnual * (1 - HEALTHCARE_SHARE);
 
-    // Sequence of returns factor: 0.70 (conservative — never undersell liquidity)
+    // Sum inflation-adjusted expenses over bridge years
+    // Each year: non-healthcare grows at 3.5%, healthcare grows at 5.5%
+    let inflatedBridgeTotal = 0;
+    for (let yr = 1; yr <= bridgeYears; yr++) {
+      const inflatedNonHealth = nonHealthcareAnnual * Math.pow(1 + GENERAL_INFLATION, yr);
+      const inflatedHealth    = healthcareAnnual    * Math.pow(1 + HEALTHCARE_INFLATION, yr);
+      const inflatedExpenses  = inflatedNonHealth + inflatedHealth;
+      const annualBurden = Math.max(0, inflatedExpenses - annualL1Income - inheritedDistIncome);
+      inflatedBridgeTotal += annualBurden;
+    }
+
+    // Compute what a flat (non-inflated) bridge would have been for comparison
+    const annualL4BurdenFlat = Math.max(0, totalExpensesAnnual - annualL1Income - inheritedDistIncome);
+    const rawBridgeFlat = annualL4BurdenFlat * bridgeYears;
+
+    // Sequence of returns factor: 0.70
     const SEQUENCE_FACTOR = 0.70;
-    const adjustedBridge = rawBridge * SEQUENCE_FACTOR;
+    const adjustedBridge = inflatedBridgeTotal * SEQUENCE_FACTOR;
 
     // Add known large expenses, subtract external liquid assets
     const grossL4 = adjustedBridge + largeExpenses;
     const netL4 = Math.max(0, grossL4 - externalLiquid);
 
-    // Hard floor: 10% of QP regardless
-    L4_dollars = Math.max(netL4, balance * 0.10);
+    // Hard floor: 20% of QP — minimum liquidity for unforeseen expenses,
+    // healthcare cost escalation, and behavioral reserve
+    const L4_FLOOR = 0.20;
+    L4_dollars = Math.max(netL4, balance * L4_FLOOR);
+
+    // Inflation uplift for documentation
+    const inflationUplift = Math.round(inflatedBridgeTotal - rawBridgeFlat);
 
     addFactor('L4 sizing', ['L4'], 'calculated',
       {
@@ -604,15 +630,29 @@ function runAllocationAlgorithm(s) {
         years_to_retirement: yearsToRet,
         annual_l1_income: Math.round(annualL1Income),
         inherited_dist_income: Math.round(inheritedDistIncome),
-        annual_l4_burden: Math.round(annualL4Burden),
-        raw_bridge: Math.round(rawBridge),
+        annual_burden_flat: Math.round(annualL4BurdenFlat),
+        inflated_bridge_total: Math.round(inflatedBridgeTotal),
+        inflation_uplift: inflationUplift,
+        general_inflation_rate: GENERAL_INFLATION,
+        healthcare_inflation_rate: HEALTHCARE_INFLATION,
         sequence_factor: SEQUENCE_FACTOR,
         adjusted_bridge: Math.round(adjustedBridge),
         large_expenses: largeExpenses,
         external_liquid: Math.round(externalLiquid),
-        floor_applied: netL4 < balance * 0.10
+        floor_applied: netL4 < balance * L4_FLOOR,
+        floor_pct: L4_FLOOR
       },
-      `${bridgeYears} bridge year${bridgeYears !== 1 ? 's' : ''} required (10 years minus ${yearsToRet} years to retirement). L1 income (existing + new structure): ${fmt$(annualL1Income)}/yr.${inheritedDistIncome > 0 ? ' Inherited QP distributions (net of tax): '+fmt$(inheritedDistIncome)+'/yr — reducing L4 burden.' : ''} Annual L4 burden: ${fmt$(annualL4Burden)}/yr. Raw bridge: ${fmt$(rawBridge)}. Sequence-of-returns factor 0.70 applied: ${fmt$(adjustedBridge)}. ${largeExpenses > 0 ? 'Known large expenses: '+fmt$(largeExpenses)+'. ' : ''}${externalLiquid > 0 ? 'External liquid assets deducted: '+fmt$(externalLiquid)+'. ' : ''}Final L4: ${fmt$(L4_dollars)}.${netL4 < balance*0.10 ? ' (10% hard floor applied)' : ''}`
+      `${bridgeYears} bridge year${bridgeYears !== 1 ? 's' : ''} required (10 years minus ${yearsToRet} to retirement). ` +
+      `L1 income: ${fmt$(annualL1Income)}/yr.` +
+      (inheritedDistIncome > 0 ? ` Inherited QP (net): ${fmt$(inheritedDistIncome)}/yr offset.` : '') +
+      ` Base annual burden: ${fmt$(annualL4BurdenFlat)}/yr. ` +
+      `Inflation-adjusted bridge (3.5% general / 5.5% healthcare over ${bridgeYears} years): ${fmt$(inflatedBridgeTotal)}` +
+      (inflationUplift > 0 ? ` (+${fmt$(inflationUplift)} vs flat).` : '.') +
+      ` Sequence factor 0.70 applied: ${fmt$(adjustedBridge)}.` +
+      (largeExpenses > 0 ? ` Large expenses: ${fmt$(largeExpenses)}.` : '') +
+      (externalLiquid > 0 ? ` External assets deducted: ${fmt$(externalLiquid)}.` : '') +
+      ` Final L4: ${fmt$(L4_dollars)}.` +
+      (netL4 < balance * L4_FLOOR ? ` (20% hard floor applied — minimum liquidity for unforeseen expenses and healthcare escalation)` : '')
     );
   }
 
@@ -620,11 +660,11 @@ function runAllocationAlgorithm(s) {
   {
     L3_dollars = balance - L1_dollars - L2_dollars - L4_dollars;
 
-    // Enforce 20% floor — shave L4 first, then L1
+    // Enforce 20% floor — shave L4 only down to its 20% floor, then trim L1
     const l3Floor = balance * 0.20;
     if (L3_dollars < l3Floor) {
       const deficit = l3Floor - L3_dollars;
-      const l4Min = balance * 0.10;
+      const l4Min = balance * 0.20; // L4 hard floor — cannot go below
       const l4Headroom = Math.max(0, L4_dollars - l4Min);
       const shaveL4 = Math.min(deficit, l4Headroom);
       L4_dollars -= shaveL4;
@@ -676,7 +716,7 @@ function runAllocationAlgorithm(s) {
   // downturn — direct argument for more guaranteed income
   if (riskQ3 <= 2) {
     const q3Boost = balance * 0.06;
-    const fromL4 = Math.min(q3Boost * 0.60, L4_dollars - balance * 0.10);
+    const fromL4 = Math.min(q3Boost * 0.60, L4_dollars - balance * 0.20);
     const fromL3 = Math.min(q3Boost * 0.40, L3_dollars - balance * 0.20);
     const actualBoost = Math.max(0, fromL4) + Math.max(0, fromL3);
     L1_dollars += actualBoost;
@@ -706,45 +746,45 @@ function runAllocationAlgorithm(s) {
 
   // ── Risk profile — material L1/L4 rebalancing ────────────
   // 4-question, 20-point scale. Thresholds updated accordingly.
+  // All L4 reductions capped to preserve the 20% L4 hard floor.
+  const L4_HARD_FLOOR = balance * 0.20;
+
   if (riskScore <= 7) {
-    // Conservative: large shift toward guaranteed income
-    const shift = Math.min(L4_dollars * 0.25, balance * 0.08);
+    const maxShift = Math.max(0, L4_dollars - L4_HARD_FLOOR);
+    const shift = Math.min(L4_dollars * 0.25, balance * 0.08, maxShift);
     L4_dollars -= shift; L1_dollars += shift;
     addFactor('Conservative risk profile (≤7/20)', ['L1','L4'], 'up',
       { shift: Math.round(shift) },
-      `Risk score ${riskScore}/20 — Conservative. Client has low tolerance for income variability in retirement. ${fmt$(shift)} shifted from L4 (market-exposed bridge) to L1 (guaranteed income floor).`
+      `Risk score ${riskScore}/20 — Conservative. ${fmt$(shift)} shifted from L4 to L1. L4 held at 20% floor minimum.`
     );
   } else if (riskScore <= 10) {
-    // Moderate-Conservative: meaningful shift toward guaranteed
-    const shift = Math.min(L4_dollars * 0.15, balance * 0.05);
+    const maxShift = Math.max(0, L4_dollars - L4_HARD_FLOOR);
+    const shift = Math.min(L4_dollars * 0.15, balance * 0.05, maxShift);
     L4_dollars -= shift; L1_dollars += shift;
     addFactor('Moderate-Conservative risk profile (8–10/20)', ['L1','L4'], 'up',
       { shift: Math.round(shift) },
-      `Risk score ${riskScore}/20 — Moderate-Conservative. Preference for income certainty. ${fmt$(shift)} shifted from L4 to L1.`
+      `Risk score ${riskScore}/20 — Moderate-Conservative. ${fmt$(shift)} shifted from L4 to L1. L4 held at 20% floor minimum.`
     );
   } else if (riskScore <= 14) {
-    // Moderate: base sizing stands
     addFactor('Moderate risk profile (11–14/20)', [], 'neutral',
       {},
       `Risk score ${riskScore}/20 — Moderate. Client-derived layer sizing is appropriate. No risk-driven adjustment applied.`
     );
   } else if (riskScore <= 17) {
-    // Moderate-Growth: shift toward flexible L4
     const shift = Math.min(L1_dollars * 0.15, balance * 0.05);
     const actualShift = L1_dollars - shift > 0 ? shift : 0;
     L1_dollars -= actualShift; L4_dollars += actualShift;
     addFactor('Moderate-Growth risk profile (15–17/20)', ['L1','L4'], 'adjustment',
       { shift: Math.round(actualShift) },
-      `Risk score ${riskScore}/20 — Moderate-Growth. Comfortable with market participation. ${fmt$(actualShift)} shifted from L1 to L4.`
+      `Risk score ${riskScore}/20 — Moderate-Growth. ${fmt$(actualShift)} shifted from L1 to L4.`
     );
   } else {
-    // Growth: significant shift toward L4
     const shift = Math.min(L1_dollars * 0.25, balance * 0.08);
     const actualShift = L1_dollars - shift > 0 ? shift : 0;
     L1_dollars -= actualShift; L4_dollars += actualShift;
     addFactor('Growth risk profile (18–20/20)', ['L1','L4'], 'down',
       { shift: Math.round(actualShift) },
-      `Risk score ${riskScore}/20 — Growth. High tolerance for market variability. ${fmt$(actualShift)} shifted from L1 to L4.`
+      `Risk score ${riskScore}/20 — Growth. ${fmt$(actualShift)} shifted from L1 to L4.`
     );
   }
 
@@ -752,7 +792,7 @@ function runAllocationAlgorithm(s) {
   const l3Floor = balance * 0.20;
   if (L3_dollars < l3Floor) {
     const deficit = l3Floor - L3_dollars;
-    const l4Headroom = Math.max(0, L4_dollars - balance * 0.10);
+    const l4Headroom = Math.max(0, L4_dollars - balance * 0.20);
     const shave = Math.min(deficit, l4Headroom);
     L4_dollars -= shave;
     L3_dollars += shave;
