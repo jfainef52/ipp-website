@@ -268,6 +268,36 @@ html,body{min-height:100vh;font-family:'Barlow',sans-serif;background:#0E1C2E;co
 .btn-save-adj:hover{opacity:.85;}
 .cal-saved-badge{font-size:12px;color:var(--success);display:none;}
 @media print{.cal-panel{display:none!important;}}
+
+/* ── Mode switching ───────────────────────────────────────── */
+#results-view{display:block;}
+#calibration-view{display:none;}
+.mode-indicator{display:flex;align-items:center;gap:10px;padding:12px 40px;background:rgba(200,169,110,.08);border-bottom:1px solid rgba(200,169,110,.25);}
+.mode-indicator-label{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);}
+.mode-indicator-desc{font-size:12px;color:var(--gray);}
+.mode-indicator-rec{font-size:12px;color:var(--success);}
+.btn-mode-toggle{background:rgba(200,169,110,.12);color:var(--gold);border:1px solid rgba(200,169,110,.35);border-radius:3px;padding:7px 16px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;cursor:pointer;transition:all .15s;}
+.btn-mode-toggle:hover{background:rgba(200,169,110,.22);}
+.btn-mode-toggle.active{background:var(--gold);color:var(--navy);}
+/* Calibration view layout */
+#calibration-view{padding:0;}
+.cal-view-header{background:var(--navy2);border-bottom:1px solid var(--border);padding:20px 40px;display:flex;align-items:center;justify-content:space-between;}
+.cal-view-title{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);}
+.cal-view-subtitle{font-size:12px;color:var(--gray);margin-top:3px;}
+.cal-view-client{font-size:13px;color:var(--white);font-weight:600;}
+.cal-view-body{padding:28px 40px;max-width:1200px;margin:0 auto;}
+.cal-rec-summary{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:28px;}
+.cal-rec-card{background:var(--navy2);border:1px solid var(--border);border-radius:4px;padding:14px 16px;}
+.cal-rec-layer-tag{font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;margin-bottom:4px;}
+.cal-rec-layer-tag.l1{color:var(--l1);}
+.cal-rec-layer-tag.l2{color:var(--l2);}
+.cal-rec-layer-tag.l3{color:var(--l3);}
+.cal-rec-layer-tag.l4{color:var(--l4);}
+.cal-rec-name{font-size:11px;color:var(--warm);margin-bottom:8px;}
+.cal-rec-val{font-size:22px;font-weight:600;color:var(--white);}
+.cal-rec-amt{font-size:12px;color:var(--gray);margin-top:2px;}
+.cal-inputs-section-title{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--gray);margin-bottom:14px;}
+@media print{.mode-indicator,.btn-mode-toggle,#calibration-view{display:none!important;}}
 </style>
 </head>
 <body>
@@ -299,74 +329,41 @@ html,body{min-height:100vh;font-family:'Barlow',sans-serif;background:#0E1C2E;co
 </div>
 
 <!-- Main content -->
-<div id="main-content">
 
-  <!-- Client header -->
-  <div class="client-header">
-    <div>
-      <div class="client-name" id="client-name-display">—</div>
-      <div class="client-meta" id="client-meta-display">—</div>
-    </div>
-    <div class="run-badge" id="run-badge">Generated —</div>
-  </div>
-
-  <!-- Key metrics -->
-  <div class="metrics-row">
-    <div class="metric-card">
-      <div class="metric-label">Qualified Plan Balance</div>
-      <div class="metric-val gold" id="m-balance">—</div>
-      <div class="metric-sub" id="m-balance-sub">—</div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-label">Annual Income Gap</div>
-      <div class="metric-val warn" id="m-gap">—</div>
-      <div class="metric-sub" id="m-gap-sub">—</div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-label">Est. RMD at Age 73</div>
-      <div class="metric-val" id="m-rmd">—</div>
-      <div class="metric-sub">Based on IRS Uniform Lifetime Table</div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-label">Embedded Tax Liability</div>
-      <div class="metric-val warn" id="m-tax">—</div>
-      <div class="metric-sub" id="m-tax-sub">—</div>
-    </div>
-  </div>
-
-  <!-- Chart + Legend -->
-  <div class="alloc-section-title">Layer Allocation</div>
-  <div class="chart-row">
-    <div class="chart-wrap">
-      <canvas id="allocChart"></canvas>
-    </div>
-    <div class="chart-legend" id="chart-legend"></div>
-  </div>
-
-  <!-- Layer cards -->
-  <div id="algo-warnings"></div>
-  <div class="alloc-grid" id="layer-cards"></div>
-
-  <!-- ── CLIENT CALIBRATION PANEL ──────────────────────────── -->
-  <div class="cal-panel" id="cal-panel">
-    <div class="cal-header" onclick="toggleCalPanel()">
-      <div class="cal-header-left">
-        <div class="cal-header-icon">⚖</div>
-        <div>
-          <div class="cal-header-title">Client Calibration</div>
-          <div class="cal-header-sub">Advisor-led — document client preferences and recalibrate allocations. Both versions will be saved.</div>
-        </div>
+<!-- ── CALIBRATION VIEW (full-page mode) ─────────────────── -->
+<div id="calibration-view" style="display:none;">
+  <div class="mode-indicator" style="background:rgba(200,169,110,.1);border-bottom:1px solid rgba(200,169,110,.3);padding:14px 40px;display:flex;align-items:center;justify-content:space-between;">
+    <div style="display:flex;align-items:center;gap:16px;">
+      <span style="font-size:20px;">⚖</span>
+      <div>
+        <div class="mode-indicator-label">Client Calibration Mode</div>
+        <div class="mode-indicator-desc">Advisor-led — enter client preferences below. Model recommendation is preserved as a separate record.</div>
       </div>
-      <div class="cal-chevron" id="cal-chevron">▼</div>
     </div>
-    <div class="cal-body" id="cal-body">
-      <div class="cal-disclaimer">
-        <strong>Advisor note:</strong> Enter only what the client has specifically requested during your conversation.
-        Leave any input blank to keep the model's recommendation for that layer.
-        The recalibration will distribute the difference proportionally across the other unlocked layers based on their recommended sizes — no layer is arbitrarily prioritized.
-        The original model recommendation is always preserved separately — both versions will be saved to the client record.
-      </div>
-      <div class="cal-grid">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div class="mode-indicator-rec" id="cal-view-client-name" style="font-size:13px;font-weight:600;color:var(--white);"></div>
+      <button class="btn-mode-toggle" onclick="exitCalibrationMode()">&#8592; Back to Results</button>
+    </div>
+  </div>
+
+  <div style="padding:24px 40px;max-width:1200px;margin:0 auto;">
+
+    <!-- Model recommendation summary cards -->
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--gray);margin-bottom:12px;">Model Recommendation — Read Only</div>
+    <div class="cal-rec-summary" id="cal-rec-summary"></div>
+
+    <!-- Disclaimer -->
+    <div class="cal-disclaimer" style="margin-bottom:20px;">
+      <strong>Advisor note:</strong> Enter only what the client has specifically requested during your conversation.
+      Leave any input blank to keep the model's recommendation for that layer.
+      The difference is distributed proportionally across unlocked layers — no layer is arbitrarily prioritized.
+      Both the model recommendation and client-adjusted version are saved separately to the client record.
+    </div>
+
+    <!-- Client input cards (reuse existing cal-grid) -->
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--gray);margin-bottom:12px;">Client Preferences</div>
+
+<div class="cal-grid">
         <!-- L1 -->
         <div class="cal-card">
           <div class="cal-card-layer l1">Layer 1</div>
@@ -455,7 +452,59 @@ html,body{min-height:100vh;font-family:'Barlow',sans-serif;background:#0E1C2E;co
         </div>
       </div>
     </div>
+
   </div>
+</div>
+
+
+<div id="main-content">
+
+  <!-- Client header -->
+  <div class="client-header">
+    <div>
+      <div class="client-name" id="client-name-display">—</div>
+      <div class="client-meta" id="client-meta-display">—</div>
+    </div>
+    <div class="run-badge" id="run-badge">Generated —</div>
+  </div>
+
+  <!-- Key metrics -->
+  <div class="metrics-row">
+    <div class="metric-card">
+      <div class="metric-label">Qualified Plan Balance</div>
+      <div class="metric-val gold" id="m-balance">—</div>
+      <div class="metric-sub" id="m-balance-sub">—</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Annual Income Gap</div>
+      <div class="metric-val warn" id="m-gap">—</div>
+      <div class="metric-sub" id="m-gap-sub">—</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Est. RMD at Age 73</div>
+      <div class="metric-val" id="m-rmd">—</div>
+      <div class="metric-sub">Based on IRS Uniform Lifetime Table</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Embedded Tax Liability</div>
+      <div class="metric-val warn" id="m-tax">—</div>
+      <div class="metric-sub" id="m-tax-sub">—</div>
+    </div>
+  </div>
+
+  <!-- Chart + Legend -->
+  <div class="alloc-section-title">Layer Allocation</div>
+  <div class="chart-row">
+    <div class="chart-wrap">
+      <canvas id="allocChart"></canvas>
+    </div>
+    <div class="chart-legend" id="chart-legend"></div>
+  </div>
+
+  <!-- Layer cards -->
+  <div id="algo-warnings"></div>
+  <div class="alloc-grid" id="layer-cards"></div>
+
 
 
   <!-- Factor log -->
@@ -488,6 +537,7 @@ html,body{min-height:100vh;font-family:'Barlow',sans-serif;background:#0E1C2E;co
   <div class="action-bar">
     <button class="top-btn gold" onclick="window.print()">&#x1F4C4; Print / Save as PDF</button>
     <button class="top-btn" id="btn-open-supplement" onclick="openSupplement()">&#x270E; Review Supplement</button>
+    <button class="top-btn btn-mode-toggle" id="btn-cal-mode" onclick="enterCalibrationMode()" style="display:none;">&#9881; Client Calibration</button>
     <button class="top-btn" onclick="window.location.href='advisor-dashboard.html'">&#8592; Dashboard</button>
     <div style="flex:1;"></div>
     <div style="font-size:11px;color:var(--gray);" id="output-id-display"></div>
@@ -1483,8 +1533,8 @@ function initCalibration(s, result) {
   document.getElementById('cal-panel').dataset.annuityNet = Math.round(annuityNet);
   document.getElementById('cal-panel').dataset.l2Max = Math.round(result.l2_dollars);
 
-  // Show panel
-  document.getElementById('cal-panel').style.display = '';
+  // Show cal mode button in top bar
+  showCalModeButton();
   // Reset inputs
   resetCalibration();
 }
@@ -1892,6 +1942,61 @@ async function saveAdjusted() {
     alert('Save failed — ' + e.message);
   }
 }
+
+
+// ══════════════════════════════════════════════════════════════
+// MODE SWITCHING — Results ↔ Calibration
+// ══════════════════════════════════════════════════════════════
+function enterCalibrationMode() {
+  document.getElementById('main-content').style.display = 'none';
+  document.getElementById('calibration-view').style.display = 'block';
+  document.getElementById('btn-cal-mode').classList.add('active');
+  document.getElementById('btn-print').style.display = 'none';
+  // Sync client name to cal view header
+  const clientName = document.getElementById('client-name-display')?.textContent || '';
+  const calViewName = document.getElementById('cal-view-client-name');
+  if (calViewName) calViewName.textContent = clientName;
+  // Render rec summary cards
+  renderCalRecSummary();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+function exitCalibrationMode() {
+  document.getElementById('calibration-view').style.display = 'none';
+  document.getElementById('main-content').style.display = 'block';
+  document.getElementById('btn-cal-mode').classList.remove('active');
+  document.getElementById('btn-print').style.display = '';
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+function renderCalRecSummary() {
+  if (!_calRecommended) return;
+  const b = _calRecommended.balance;
+  const layers = [
+    { cls:'l1', tag:'Layer 1', name:'Guaranteed Income',       pct:_calRecommended.l1, amt:_calRecommended.l1_dollars },
+    { cls:'l2', tag:'Layer 2', name:'LTC & Legacy',            pct:_calRecommended.l2, amt:_calRecommended.l2_dollars },
+    { cls:'l3', tag:'Layer 3', name:'Tax Efficiency & Growth', pct:_calRecommended.l3, amt:_calRecommended.l3_dollars },
+    { cls:'l4', tag:'Layer 4', name:'Liquidity Bridge',        pct:_calRecommended.l4, amt:_calRecommended.l4_dollars },
+  ];
+  const el = document.getElementById('cal-rec-summary');
+  if (!el) return;
+  el.innerHTML = layers.map(l => `
+    <div class="cal-rec-card">
+      <div class="cal-rec-layer-tag ${l.cls}">${l.tag}</div>
+      <div class="cal-rec-name">${l.name}</div>
+      <div class="cal-rec-val">${Math.round(l.pct*100)}<span style="font-size:14px;font-weight:400;color:var(--gray);">%</span></div>
+      <div class="cal-rec-amt">${fmt$(l.amt)} of qualified plan</div>
+    </div>`).join('');
+}
+
+// Show cal mode button once results are rendered
+function showCalModeButton() {
+  const btn = document.getElementById('btn-cal-mode');
+  if (btn) btn.style.display = '';
+}
+
+// Override toggleCalPanel — now a no-op since we use full mode
+function toggleCalPanel() {}
 
 </script>
 </body>
