@@ -581,6 +581,8 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
       <div class="form-group">
         <div class="group-title">Qualified Plan Balances</div>
         <div class="form-row cols2">
+          <div class="form-field">
+            <label>Total Qualified Plan Balance</label>
             <div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="f_qp_balance_total" min="0" step="1000" placeholder="e.g. 1500000"></div>
             <div class="field-hint">Sum of all traditional/pre-tax qualified accounts</div>
           </div>
@@ -646,6 +648,9 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
 
       <div class="form-group">
         <div class="group-title">Other Assets</div>
+        <div class="form-row cols3">
+          <div class="form-field">
+            <label>Taxable Investment Accounts <span class="optional">optional</span></label>
             <div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="f_taxable_investment_balance" min="0" step="1000" placeholder="0"></div>
           </div>
           <div class="form-field">
