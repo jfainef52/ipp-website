@@ -298,6 +298,41 @@ html,body{min-height:100vh;font-family:'Barlow',sans-serif;background:#0E1C2E;co
 .cal-rec-amt{font-size:12px;color:var(--gray);margin-top:2px;}
 .cal-inputs-section-title{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--gray);margin-bottom:14px;}
 @media print{.mode-indicator,.btn-mode-toggle,#calibration-view{display:none!important;}}
+
+/* ── Calibration print layout ─────────────────────────────── */
+@media print {
+  .cal-print-hide { display: none !important; }
+  #cal-print-view {
+    display: block !important;
+    font-family: 'Arial', sans-serif;
+    color: #1A2B3C;
+    padding: 0;
+    margin: 0;
+  }
+  #cal-print-view * { color: #1A2B3C !important; background: white !important; border-color: #CCC !important; }
+  .cal-print-header { border-bottom: 3px solid #C8A96E; padding-bottom: 12px; margin-bottom: 20px; }
+  .cal-print-title { font-size: 20px; font-weight: bold; color: #0B1220 !important; }
+  .cal-print-subtitle { font-size: 12px; color: #666 !important; margin-top: 4px; }
+  .cal-print-meta { font-size: 11px; color: #666 !important; margin-top: 6px; }
+  .cal-print-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+  .cal-print-col-title { font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: .1em; border-bottom: 2px solid #C8A96E; padding-bottom: 4px; margin-bottom: 10px; }
+  .cal-print-col-title.rec { color: #666 !important; border-color: #999 !important; }
+  .cal-print-col-title.adj { color: #C8A96E !important; }
+  .cal-print-layer-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #EEE; font-size: 12px; }
+  .cal-print-layer-name { color: #333 !important; }
+  .cal-print-layer-val { font-weight: bold; color: #1A2B3C !important; }
+  .cal-print-delta { font-size: 11px; margin-left: 6px; }
+  .cal-print-delta.up { color: #2A6E2A !important; }
+  .cal-print-delta.down { color: #8B0000 !important; }
+  .cal-print-log { border: 1px solid #C8A96E; border-radius: 4px; padding: 12px 14px; margin-bottom: 16px; }
+  .cal-print-log-title { font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: .1em; color: #C8A96E !important; margin-bottom: 8px; }
+  .cal-print-log-entry { font-size: 11px; color: #333 !important; line-height: 1.6; padding: 4px 0; border-bottom: 1px solid #EEE; }
+  .cal-print-log-entry:last-child { border-bottom: none; }
+  .cal-print-disclaimer { font-size: 10px; color: #999 !important; border-top: 1px solid #EEE; padding-top: 10px; margin-top: 16px; }
+  .cal-print-income { background: #F8F8F8 !important; border: 1px solid #DDD; border-radius: 3px; padding: 10px 12px; margin-bottom: 16px; font-size: 11px; }
+  .cal-print-income-title { font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: .1em; color: #C8A96E !important; margin-bottom: 6px; }
+}
+#cal-print-view { display: none; }
 </style>
 </head>
 <body>
@@ -331,6 +366,10 @@ html,body{min-height:100vh;font-family:'Barlow',sans-serif;background:#0E1C2E;co
 <!-- Main content -->
 
 <!-- ── CALIBRATION VIEW (full-page mode) ─────────────────── -->
+
+<!-- ── CALIBRATION PRINT VIEW (hidden, shown only when printing) ── -->
+<div id="cal-print-view"></div>
+
 <div id="calibration-view" style="display:none;">
   <div class="mode-indicator" style="background:rgba(200,169,110,.1);border-bottom:1px solid rgba(200,169,110,.3);padding:14px 40px;display:flex;align-items:center;justify-content:space-between;">
     <div style="display:flex;align-items:center;gap:16px;">
@@ -448,6 +487,7 @@ html,body{min-height:100vh;font-family:'Barlow',sans-serif;background:#0E1C2E;co
         </div>
         <div class="cal-save-row">
           <button class="btn-save-adj" onclick="saveAdjusted()">Save Client-Adjusted Version</button>
+          <button class="btn-mode-toggle" onclick="printCalibration()" style="margin-left:8px;">&#x1F4C4; Print Calibration Summary</button>
           <div class="cal-saved-badge" id="cal-saved-badge">✓ Saved to client record</div>
         </div>
       </div>
@@ -2029,6 +2069,113 @@ function showCalModeButton() {
 
 // Override toggleCalPanel — now a no-op since we use full mode
 function toggleCalPanel() {}
+
+
+// ══════════════════════════════════════════════════════════════
+// PRINT CALIBRATION SUMMARY
+// ══════════════════════════════════════════════════════════════
+function printCalibration() {
+  if (!_calAdjusted || !_calRecommended) {
+    alert('Run the recalibration first before printing.');
+    return;
+  }
+
+  const rec = _calRecommended;
+  const adj = _calAdjusted;
+  const b   = rec.balance;
+  const clientName = document.getElementById('client-name-display')?.textContent || '—';
+  const date = new Date().toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'});
+
+  const layers = [
+    { key:'l1', name:'L1 — Guaranteed Income Foundation' },
+    { key:'l2', name:'L2 — LTC & Legacy' },
+    { key:'l3', name:'L3 — Tax Efficiency & Growth' },
+    { key:'l4', name:'L4 — Liquidity Bridge' },
+  ];
+
+  const layerRow = (l, isAdj) => {
+    const pct  = isAdj ? adj[l.key] : rec[l.key];
+    const amt  = isAdj ? adj[l.key+'_dollars'] : rec[l.key+'_dollars'];
+    let delta  = '';
+    if (isAdj) {
+      const diff = adj[l.key+'_dollars'] - rec[l.key+'_dollars'];
+      const diffPct = Math.round(adj[l.key]*100) - Math.round(rec[l.key]*100);
+      if (diff !== 0) {
+        const cls = diff > 0 ? 'up' : 'down';
+        delta = `<span class="cal-print-delta ${cls}">${diff>0?'+':''}${fmt$(diff)} (${diffPct>0?'+':''}${diffPct}%)</span>`;
+      }
+    }
+    return `<div class="cal-print-layer-row">
+      <div class="cal-print-layer-name">${l.name}</div>
+      <div class="cal-print-layer-val">${Math.round(pct*100)}% &nbsp; ${fmt$(amt)}${delta}</div>
+    </div>`;
+  };
+
+  // Build override log entries
+  const overrideEntries = document.getElementById('cal-override-entries')?.innerHTML || '';
+
+  // Income breakdown
+  const l1Monthly = Math.round(adj.l1_dollars * 0.05 / 12);
+  const totalNet  = Math.round(l1Monthly + (adj.ssNet||0) + (adj.annuityNet||0));
+  const incomeSection = adj.overrides?.l1Target !== null ? `
+    <div class="cal-print-income">
+      <div class="cal-print-income-title">Guaranteed Income Breakdown</div>
+      SS income (net of tax): <strong>${fmt$(adj.ssNet||0)}/mo</strong> &nbsp;·&nbsp;
+      Existing annuity (net): <strong>${fmt$(adj.annuityNet||0)}/mo</strong> &nbsp;·&nbsp;
+      L1 Roth annuity (tax-free): <strong>${fmt$(l1Monthly)}/mo</strong><br>
+      <strong>Total net spendable: ${fmt$(totalNet)}/mo</strong>
+    </div>` : '';
+
+  const printHTML = `
+    <div class="cal-print-header">
+      <div class="cal-print-title">IncomeArc™ Allocation — Client-Adjusted Summary</div>
+      <div class="cal-print-subtitle">Integrated Planning Partners &nbsp;·&nbsp; ${date}</div>
+      <div class="cal-print-meta">Client: <strong>${clientName}</strong> &nbsp;·&nbsp; Qualified Plan Balance: <strong>${fmt$(b)}</strong></div>
+    </div>
+
+    ${incomeSection}
+
+    <div class="cal-print-compare">
+      <div>
+        <div class="cal-print-col-title rec">Model Recommendation</div>
+        ${layers.map(l => layerRow(l, false)).join('')}
+      </div>
+      <div>
+        <div class="cal-print-col-title adj">Client-Adjusted</div>
+        ${layers.map(l => layerRow(l, true)).join('')}
+      </div>
+    </div>
+
+    <div class="cal-print-log">
+      <div class="cal-print-log-title">Client Override Log & Advisor Notes</div>
+      ${overrideEntries}
+    </div>
+
+    <div class="cal-print-disclaimer">
+      This client-adjusted allocation reflects client-directed preferences documented during the planning conversation.
+      The model recommendation has been preserved separately in the client record.
+      For informational purposes only — not financial, tax, legal, or investment advice.
+      © ${new Date().getFullYear()} Integrated Planning Partners.
+    </div>
+  `;
+
+  // Inject into print div
+  const printDiv = document.getElementById('cal-print-view');
+  printDiv.innerHTML = printHTML;
+
+  // Hide everything else, show print div
+  document.getElementById('calibration-view').classList.add('cal-print-hide');
+  document.getElementById('main-content').classList.add('cal-print-hide');
+
+  window.print();
+
+  // Restore after print dialog closes
+  setTimeout(() => {
+    document.getElementById('calibration-view').classList.remove('cal-print-hide');
+    document.getElementById('main-content').classList.remove('cal-print-hide');
+    printDiv.innerHTML = '';
+  }, 1000);
+}
 
 </script>
 </body>
