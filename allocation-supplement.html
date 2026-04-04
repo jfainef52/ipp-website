@@ -189,6 +189,10 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
 .form-field label .prefilled{
   color:rgba(200,169,110,.6);font-weight:400;text-transform:none;letter-spacing:0;margin-left:4px;
 }
+.currency-display {
+  font-variant-numeric: tabular-nums;
+}
+
 .form-field input:not([type="checkbox"]),.form-field select,.form-field textarea{
   width:100%;padding:9px 12px;
   background:var(--navy3);border:1px solid var(--border);border-radius:3px;
@@ -440,7 +444,7 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
           </div>
           <div class="form-field">
             <label>Date of Birth</label>
-            <input type="date" id="f_primary_dob">
+            <input type="date" id="f_primary_dob" oninput="calcAgeFromDob('f_primary_dob','f_primary_age','f_years_to_retirement','f_target_retire_age')">
           </div>
         </div>
         <div class="form-row cols3">
@@ -508,7 +512,7 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
           </div>
           <div class="form-field">
             <label>Date of Birth <span class="prefilled">SR</span></label>
-            <input type="date" id="f_spouse_dob" class="prefilled-val">
+            <input type="date" id="f_spouse_dob" class="prefilled-val" oninput="calcAgeFromDob('f_spouse_dob','f_spouse_age')">
           </div>
         </div>
         <div class="form-row cols3">
@@ -579,12 +583,12 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
         <div class="form-row">
           <div class="form-field">
             <label>Total Qualified Plan Balance</label>
-            <div class="input-prefix"><span>$</span><input type="number" id="f_qp_balance_total" min="0" step="1000" placeholder="e.g. 1500000"></div>
+            <div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="f_qp_balance_total" min="0" step="1000" placeholder="e.g. 1500000"></div>
             <div class="field-hint">Sum of all traditional/pre-tax qualified accounts</div>
           </div>
           <div class="form-field">
             <label>Roth Balance (already tax-free) <span class="optional">optional</span></label>
-            <div class="input-prefix"><span>$</span><input type="number" id="f_qp_roth_balance" min="0" step="1000" placeholder="e.g. 0"></div>
+            <div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="f_qp_roth_balance" min="0" step="1000" placeholder="e.g. 0"></div>
             <div class="field-hint">Roth IRA, Roth 401k — excluded from tax liability calc</div>
           </div>
         </div>
@@ -608,15 +612,15 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
         <div class="form-row cols3">
           <div class="form-field">
             <label>Taxable Investment Accounts <span class="optional">optional</span></label>
-            <div class="input-prefix"><span>$</span><input type="number" id="f_taxable_investment_balance" min="0" step="1000" placeholder="0"></div>
+            <div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="f_taxable_investment_balance" min="0" step="1000" placeholder="0"></div>
           </div>
           <div class="form-field">
             <label>Primary Residence Value <span class="optional">optional</span></label>
-            <div class="input-prefix"><span>$</span><input type="number" id="f_primary_residence_value" min="0" step="10000" placeholder="0"></div>
+            <div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="f_primary_residence_value" min="0" step="10000" placeholder="0"></div>
           </div>
           <div class="form-field">
             <label>Other Assets <span class="optional">optional</span></label>
-            <div class="input-prefix"><span>$</span><input type="number" id="f_other_assets_balance" min="0" step="1000" placeholder="0"></div>
+            <div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="f_other_assets_balance" min="0" step="1000" placeholder="0"></div>
           </div>
         </div>
       </div>
@@ -626,11 +630,11 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
         <div class="form-row cols3">
           <div class="form-field">
             <label>Mortgage Balance <span class="optional">optional</span></label>
-            <div class="input-prefix"><span>$</span><input type="number" id="f_mortgage_balance" min="0" step="1000" placeholder="0"></div>
+            <div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="f_mortgage_balance" min="0" step="1000" placeholder="0"></div>
           </div>
           <div class="form-field">
             <label>Other Monthly Debt Obligations <span class="optional">optional</span></label>
-            <div class="input-prefix"><span>$</span><input type="number" id="f_other_debt_monthly" min="0" step="100" placeholder="0"></div>
+            <div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="f_other_debt_monthly" min="0" step="100" placeholder="0"></div>
           </div>
         </div>
       </div>
@@ -653,7 +657,7 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
         <div class="form-row cols3">
           <div class="form-field">
             <label>Primary SS Monthly Benefit</label>
-            <div class="input-prefix"><span>$</span><input type="number" id="f_ss_primary_monthly" min="0" step="100" placeholder="e.g. 2500"></div>
+            <div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="f_ss_primary_monthly" min="0" step="100" placeholder="e.g. 2500"></div>
             <div class="field-hint">At intended claim age, from SS statement</div>
           </div>
           <div class="form-field">
@@ -662,14 +666,14 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
           </div>
           <div class="form-field">
             <label>Current Household Income <span class="optional">all sources</span></label>
-            <div class="input-prefix"><span>$</span><input type="number" id="f_current_household_income" min="0" step="5000" placeholder="e.g. 150000" oninput="suggestMarginalRate()"></div>
+            <div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="f_current_household_income" min="0" step="5000" placeholder="e.g. 150000" oninput="suggestMarginalRate()"></div>
             <div class="field-hint">Include all taxable income: wages, SS, pension, distributions, business income. Used to determine marginal bracket.</div>
           </div>
         </div>
         <div class="form-row cols3" id="spouse-ss-row">
           <div class="form-field">
             <label>Spouse SS Monthly Benefit <span class="optional">if applicable</span></label>
-            <div class="input-prefix"><span>$</span><input type="number" id="f_ss_spouse_monthly" min="0" step="100" placeholder="0"></div>
+            <div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="f_ss_spouse_monthly" min="0" step="100" placeholder="0"></div>
           </div>
           <div class="form-field">
             <label>Spouse Claim Age <span class="optional">if applicable</span></label>
@@ -697,7 +701,7 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
         <div class="form-row cols3">
           <div class="form-field">
             <label>Pension Monthly Benefit <span class="optional">if applicable</span></label>
-            <div class="input-prefix"><span>$</span><input type="number" id="f_pension_monthly" min="0" step="100" placeholder="0"></div>
+            <div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="f_pension_monthly" min="0" step="100" placeholder="0"></div>
           </div>
           <div class="form-field">
             <label>Pension Start Age</label>
@@ -724,7 +728,7 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
           </div>
           <div class="form-field">
             <label>Spouse Pension Monthly <span class="optional">if applicable</span></label>
-            <div class="input-prefix"><span>$</span><input type="number" id="f_spouse_pension_monthly" min="0" step="100" placeholder="0"></div>
+            <div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="f_spouse_pension_monthly" min="0" step="100" placeholder="0"></div>
           </div>
           <div class="form-field">
             <label>Spouse Pension Start Age</label>
@@ -738,11 +742,11 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
         <div class="form-row cols3">
           <div class="form-field">
             <label>Other Guaranteed Monthly <span class="optional">rental, annuity, etc.</span></label>
-            <div class="input-prefix"><span>$</span><input type="number" id="f_other_guaranteed_monthly" min="0" step="100" placeholder="0"></div>
+            <div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="f_other_guaranteed_monthly" min="0" step="100" placeholder="0"></div>
           </div>
           <div class="form-field">
             <label>Part-Time Income Monthly <span class="optional">if applicable</span></label>
-            <div class="input-prefix"><span>$</span><input type="number" id="f_part_time_income_monthly" min="0" step="100" placeholder="0"></div>
+            <div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="f_part_time_income_monthly" min="0" step="100" placeholder="0"></div>
           </div>
           <div class="form-field">
             <label>Part-Time Ends at Age <span class="optional">if applicable</span></label>
@@ -775,29 +779,29 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
         <div class="form-row cols3">
           <div class="form-field">
             <label>Housing (mortgage/rent/HOA)</label>
-            <div class="input-prefix"><span>$</span><input type="number" id="f_housing_monthly" min="0" step="100" placeholder="0" oninput="calcExpenses()"></div>
+            <div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="f_housing_monthly" min="0" step="100" placeholder="0" oninput="calcExpenses()"></div>
           </div>
           <div class="form-field">
             <label>Healthcare &amp; Insurance</label>
-            <div class="input-prefix"><span>$</span><input type="number" id="f_healthcare_monthly" min="0" step="100" placeholder="0" oninput="calcExpenses()"></div>
+            <div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="f_healthcare_monthly" min="0" step="100" placeholder="0" oninput="calcExpenses()"></div>
           </div>
           <div class="form-field">
             <label>Food &amp; Groceries</label>
-            <div class="input-prefix"><span>$</span><input type="number" id="f_food_monthly" min="0" step="100" placeholder="0" oninput="calcExpenses()"></div>
+            <div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="f_food_monthly" min="0" step="100" placeholder="0" oninput="calcExpenses()"></div>
           </div>
         </div>
         <div class="form-row cols3">
           <div class="form-field">
             <label>Transportation</label>
-            <div class="input-prefix"><span>$</span><input type="number" id="f_transport_monthly" min="0" step="50" placeholder="0" oninput="calcExpenses()"></div>
+            <div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="f_transport_monthly" min="0" step="50" placeholder="0" oninput="calcExpenses()"></div>
           </div>
           <div class="form-field">
             <label>Other Insurance Premiums</label>
-            <div class="input-prefix"><span>$</span><input type="number" id="f_insurance_monthly" min="0" step="50" placeholder="0" oninput="calcExpenses()"></div>
+            <div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="f_insurance_monthly" min="0" step="50" placeholder="0" oninput="calcExpenses()"></div>
           </div>
           <div class="form-field">
             <label>Total Essential Monthly</label>
-            <div class="input-prefix"><span>$</span><input type="number" id="f_essential_monthly" min="0" step="100" placeholder="Auto-calculated" style="color:var(--gold);" oninput="calcExpenses()"></div>
+            <div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="f_essential_monthly" min="0" step="100" placeholder="Auto-calculated" style="color:var(--gold);" oninput="calcExpenses()"></div>
             <div class="field-hint">Auto-sums above, or enter directly</div>
           </div>
         </div>
@@ -808,15 +812,15 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
         <div class="form-row cols3">
           <div class="form-field">
             <label>Travel &amp; Vacation</label>
-            <div class="input-prefix"><span>$</span><input type="number" id="f_travel_monthly" min="0" step="100" placeholder="0" oninput="calcExpenses()"></div>
+            <div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="f_travel_monthly" min="0" step="100" placeholder="0" oninput="calcExpenses()"></div>
           </div>
           <div class="form-field">
             <label>Dining &amp; Entertainment</label>
-            <div class="input-prefix"><span>$</span><input type="number" id="f_entertainment_monthly" min="0" step="100" placeholder="0" oninput="calcExpenses()"></div>
+            <div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="f_entertainment_monthly" min="0" step="100" placeholder="0" oninput="calcExpenses()"></div>
           </div>
           <div class="form-field">
             <label>Total Discretionary Monthly</label>
-            <div class="input-prefix"><span>$</span><input type="number" id="f_discretionary_monthly" min="0" step="100" placeholder="Auto-calculated" style="color:var(--gold);" oninput="calcExpenses()"></div>
+            <div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="f_discretionary_monthly" min="0" step="100" placeholder="Auto-calculated" style="color:var(--gold);" oninput="calcExpenses()"></div>
             <div class="field-hint">× 12 = annual discretionary</div>
           </div>
         </div>
@@ -827,11 +831,11 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
         <div class="form-row cols3">
           <div class="form-field">
             <label>Annual Charitable Giving</label>
-            <div class="input-prefix"><span>$</span><input type="number" id="f_charitable_annual" min="0" step="500" placeholder="0" oninput="calcExpenses()"></div>
+            <div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="f_charitable_annual" min="0" step="500" placeholder="0" oninput="calcExpenses()"></div>
           </div>
           <div class="form-field">
             <label>Existing Pledge Total <span class="optional">if any</span></label>
-            <div class="input-prefix"><span>$</span><input type="number" id="f_charitable_pledge_total" min="0" step="1000" placeholder="0"></div>
+            <div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="f_charitable_pledge_total" min="0" step="1000" placeholder="0"></div>
           </div>
           <div class="form-field">
             <label>Pledge Description <span class="optional">optional</span></label>
@@ -1001,7 +1005,7 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
           </div>
           <div class="form-field" id="ltc-benefit-field" style="display:none;">
             <label>Monthly Benefit</label>
-            <div class="input-prefix"><span>$</span><input type="number" id="f_ltc_monthly_benefit" min="0" step="500" placeholder="0"></div>
+            <div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="f_ltc_monthly_benefit" min="0" step="500" placeholder="0"></div>
           </div>
         </div>
         <div class="form-row cols3" id="ltc-detail-row" style="display:none;">
@@ -1173,7 +1177,7 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
           </div>
           <div class="form-field">
             <label>Legacy Target Amount <span class="optional">if stated</span></label>
-            <div class="input-prefix"><span>$</span><input type="number" id="f_legacy_target_amount" min="0" step="50000" placeholder="0"></div>
+            <div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="f_legacy_target_amount" min="0" step="50000" placeholder="0"></div>
           </div>
           <div class="form-field">
             <label>Beneficiaries <span class="optional">brief description</span></label>
@@ -1452,6 +1456,23 @@ function startSessionTimers(){
 }
 
 // ── Auto-save ─────────────────────────────────────────────────
+function calcAgeFromDob(dobId, ageId, yearsToRetId, retireAgeId) {
+  const dob = document.getElementById(dobId)?.value;
+  if (!dob) return;
+  const age = Math.floor((Date.now() - new Date(dob)) / (365.25 * 24 * 3600 * 1000));
+  if (age > 0 && age < 110) {
+    const ageEl = document.getElementById(ageId);
+    if (ageEl) ageEl.value = age;
+    // Update years to retirement if retire age is known (primary only)
+    if (yearsToRetId && retireAgeId) {
+      const retireAge = parseInt(document.getElementById(retireAgeId)?.value) || null;
+      if (retireAge && retireAge > age) {
+        document.getElementById(yearsToRetId).value = retireAge - age;
+      }
+    }
+  }
+}
+
 function updateCoveragePrefHint() {
   const val = document.getElementById('f_fixed_expense_coverage_pref')?.value;
   const hint = document.getElementById('coverage-pref-hint');
@@ -1518,6 +1539,34 @@ function enforceUniqueRanking(changedId) {
   });
 }
 
+
+// ── Currency formatting for $ inputs ─────────────────────────
+function formatCurrencyInput(input) {
+  // On blur: format with commas
+  input.addEventListener('blur', function() {
+    const raw = parseFloat(this.value.replace(/,/g, ''));
+    if (!isNaN(raw) && raw > 0) {
+      this.value = Math.round(raw).toLocaleString('en-US');
+      this.dataset.raw = Math.round(raw);
+    }
+  });
+  // On focus: strip commas so editing works cleanly
+  input.addEventListener('focus', function() {
+    const raw = this.dataset.raw || this.value.replace(/,/g, '');
+    this.value = raw;
+  });
+}
+
+// Wire up all $ currency inputs on load
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.input-prefix').forEach(wrapper => {
+    if (wrapper.querySelector('span')?.textContent === '$') {
+      const input = wrapper.querySelector('input[type="number"]');
+      if (input) formatCurrencyInput(input);
+    }
+  });
+});
+
 function setAutosaveStatus(status){
   const el = document.getElementById('autosave-status');
   el.className = 'autosave-status ' + status;
@@ -1544,9 +1593,9 @@ async function autoSave(silent=false){
 
 // ── Form data collection ──────────────────────────────────────
 function val(id){ const el=document.getElementById(id); return el?el.value.trim()||null:null; }
-function num(id){ const v=val(id); return v?parseFloat(v):null; }
+function num(id){ const v=val(id); return v?parseFloat(v.toString().replace(/,/g,"")):null; }
 function bool(id){ const v=val(id); return v==='true'?true:v==='false'?false:null; }
-function intVal(id){ const v=val(id); return v?parseInt(v):null; }
+function intVal(id){ const v=val(id); return v?parseInt(v.toString().replace(/,/g,'')):null; }
 
 function collectFormData(){
   const acctTypes = Array.from(document.querySelectorAll('.acct-type-cb:checked')).map(c=>c.value);
@@ -1885,7 +1934,7 @@ function addLargeExpense(){
     <button class="repeater-remove" onclick="document.getElementById('le-${idx}').remove();scheduleAutoSave()">&#215;</button>
     <div class="form-row cols3">
       <div class="form-field"><label>Description</label><input type="text" id="le-desc-${idx}" placeholder="e.g. Help with home purchase, grandchildren education"></div>
-      <div class="form-field"><label>Amount</label><div class="input-prefix"><span>$</span><input type="number" id="le-amt-${idx}" min="0" step="5000" placeholder="0" oninput="scheduleAutoSave()"></div></div>
+      <div class="form-field"><label>Amount</label><div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="le-amt-${idx}" min="0" step="5000" placeholder="0" oninput="scheduleAutoSave()"></div></div>
       <div class="form-field"><label>Target Age</label><input type="number" id="le-age-${idx}" min="55" max="90" placeholder="e.g. 68" oninput="scheduleAutoSave()"></div>
     </div>`;
   document.getElementById('large-expenses-repeater').appendChild(div);
@@ -1913,11 +1962,11 @@ function addLifePolicy(){
       <div class="form-field"><label>Carrier</label><input type="text" id="lp-carrier-${idx}" placeholder="e.g. John Hancock"></div>
       <div class="form-field"><label>Policy Type</label>
         <select id="lp-type-${idx}"><option value="">Select…</option><option value="term">Term</option><option value="whole_life">Whole Life</option><option value="ul">Universal Life</option><option value="iul">IUL</option><option value="vul">VUL</option><option value="group">Group/Employer</option></select></div>
-      <div class="form-field"><label>Face Amount</label><div class="input-prefix"><span>$</span><input type="number" id="lp-face-${idx}" min="0" step="10000" placeholder="0"></div></div>
+      <div class="form-field"><label>Face Amount</label><div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="lp-face-${idx}" min="0" step="10000" placeholder="0"></div></div>
     </div>
     <div class="form-row cols3">
-      <div class="form-field"><label>Cash Surrender Value</label><div class="input-prefix"><span>$</span><input type="number" id="lp-csv-${idx}" min="0" step="1000" placeholder="0"></div></div>
-      <div class="form-field"><label>Annual Premium</label><div class="input-prefix"><span>$</span><input type="number" id="lp-premium-${idx}" min="0" step="500" placeholder="0"></div></div>
+      <div class="form-field"><label>Cash Surrender Value</label><div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="lp-csv-${idx}" min="0" step="1000" placeholder="0"></div></div>
+      <div class="form-field"><label>Annual Premium</label><div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="lp-premium-${idx}" min="0" step="500" placeholder="0"></div></div>
       <div class="form-field"><label>Purpose / Notes</label><input type="text" id="lp-purpose-${idx}" placeholder="e.g. Legacy, key person, buy-sell"></div>
     </div>`;
   document.getElementById('life-policies-repeater').appendChild(div);
@@ -1943,12 +1992,12 @@ function addAnnuity(){
       <div class="form-field"><label>Carrier</label><input type="text" id="an-carrier-${idx}" placeholder="e.g. Pacific Life"></div>
       <div class="form-field"><label>Annuity Type</label>
         <select id="an-type-${idx}"><option value="">Select…</option><option value="fixed">Fixed</option><option value="fixed_indexed">Fixed Indexed (FIA)</option><option value="variable">Variable (VA)</option><option value="immediate">Immediate (SPIA)</option><option value="deferred_income">Deferred Income (DIA)</option></select></div>
-      <div class="form-field"><label>Current Value</label><div class="input-prefix"><span>$</span><input type="number" id="an-value-${idx}" min="0" step="1000" placeholder="0"></div></div>
+      <div class="form-field"><label>Current Value</label><div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="an-value-${idx}" min="0" step="1000" placeholder="0"></div></div>
     </div>
     <div class="form-row cols3">
       <div class="form-field"><label>Surrender End Year <span class="optional">optional</span></label><input type="number" id="an-surr-${idx}" min="2024" max="2045" placeholder="e.g. 2027"></div>
       <div class="form-field"><label>Income Rider?</label><select id="an-rider-${idx}"><option value="false">No income rider</option><option value="true">Yes — GLWB or similar</option></select></div>
-      <div class="form-field"><label>Monthly Income (if active)</label><div class="input-prefix"><span>$</span><input type="number" id="an-income-${idx}" min="0" step="100" placeholder="0"></div></div>
+      <div class="form-field"><label>Monthly Income (if active)</label><div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="an-income-${idx}" min="0" step="100" placeholder="0"></div></div>
     </div>`;
   document.getElementById('annuities-repeater').appendChild(div);
 }
@@ -2088,12 +2137,17 @@ function prefillFromSR(answers){
   // Show/hide spouse section
   const noSpouse = ['single','divorced','widowed'].includes(answers.marital);
   toggleSpouseFields(!noSpouse);
-  // Age calc
+  // Primary age calc
   if(answers.dob){
     const age=Math.floor((Date.now()-new Date(answers.dob))/(365.25*24*3600*1000));
     if(age>0){ document.getElementById('f_primary_age').value=age; }
     const ret=parseInt(answers.retire_age)||null;
     if(ret&&age&&ret>age) document.getElementById('f_years_to_retirement').value=ret-age;
+  }
+  // Spouse age calc
+  if(answers.spouse_dob){
+    const spouseAge=Math.floor((Date.now()-new Date(answers.spouse_dob))/(365.25*24*3600*1000));
+    if(spouseAge>0){ document.getElementById('f_spouse_age').value=spouseAge; }
   }
 }
 
@@ -2101,7 +2155,8 @@ function prefillFromSR(answers){
 function restoreFromSupplement(s){
   if(!s) return;
   window._supplementId = s.id;
-  const setV=(id,v)=>{ const el=document.getElementById(id); if(el&&v!==null&&v!==undefined) el.value=v; };
+  const currencyIds = new Set(['qp_balance_total','qp_roth_balance','taxable_investment_balance','primary_residence_value','other_assets_balance','mortgage_balance','other_assets_balance','ss_primary_monthly','ss_spouse_monthly','pension_monthly','spouse_pension_monthly','other_guaranteed_monthly','part_time_income_monthly','housing_monthly','healthcare_monthly','food_monthly','transport_monthly','insurance_monthly','essential_monthly','travel_monthly','entertainment_monthly','discretionary_monthly','charitable_annual','charitable_pledge_total','legacy_target_amount','large_expenses_total','inherited_qp_balance','current_household_income']);
+  const setV=(id,v)=>{ const el=document.getElementById(id); if(el&&v!==null&&v!==undefined){ const raw=parseFloat(v); el.value=(currencyIds.has(id)&&!isNaN(raw)&&raw>0)?Math.round(raw).toLocaleString('en-US'):v; el.dataset.raw=raw; } };
   // All text/number/select fields
   const fields=['primary_first_name','primary_last_name','primary_dob','primary_age','spouse_first_name','spouse_last_name','spouse_dob','spouse_age','filing_status','state','target_retire_age','years_to_retirement','primary_goal_narrative','qp_balance_total','qp_roth_balance','taxable_investment_balance','primary_residence_value','other_assets_balance','mortgage_balance','mortgage_monthly_payment','other_debt_monthly','ss_primary_monthly','ss_primary_claim_age','ss_spouse_monthly','ss_spouse_claim_age','current_household_income','current_marginal_rate','pension_monthly','pension_start_age','pension_has_cola','pension_survivor_option','spouse_pension_monthly','spouse_pension_start_age','other_guaranteed_monthly','other_guaranteed_desc','part_time_income_monthly','part_time_end_age','housing_monthly','healthcare_monthly','food_monthly','transport_monthly','insurance_monthly','essential_monthly','travel_monthly','entertainment_monthly','discretionary_monthly','charitable_annual','charitable_pledge_total','charitable_pledge_desc','expense_notes','risk_notes','has_ltc_policy','ltc_policy_type','ltc_monthly_benefit','ltc_benefit_period_years','ltc_elimination_days','ltc_inflation_rider','health_status_primary','health_conditions_primary','family_ltc_history','health_status_spouse','health_conditions_spouse','family_ltc_history_spouse','legacy_importance','legacy_target_amount','legacy_beneficiaries','charitable_intent','estate_plan_status','secure_act_awareness','advisor_observations','incumbent_advisor_flag','incumbent_advisor_name','incumbent_advisor_notes','urgency_assessment','health_underwriting_notes','recommended_next_steps','priority_income_security','priority_tax_efficiency','priority_care_protection','priority_legacy','priority_liquidity'];
   fields.forEach(f=>{ if(s[f]!==null&&s[f]!==undefined) setV('f_'+f, s[f]); });
