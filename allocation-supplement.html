@@ -941,15 +941,18 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
             <div class="risk-opt" onclick="selectRisk('rq4',5,this)">5<span class="risk-opt-label">Definitely Option B — I want the higher potential</span></div>
           </div>
         </div>
-        <!-- Q5 -->
+        <!-- Q5 — L3 Readiness Indicator (not included in risk score) -->
         <div class="risk-question">
-          <div class="risk-q-text"><strong>5.</strong> What if there was a way to move money from your IRA or 401(k) into an account that grows tax-free and pays you tax-free income in retirement — and you wouldn't have to write a check to the IRS to do it today. How interested would you be in learning more?</div>
+          <div class="risk-q-text"><strong>5.</strong> There's a strategy that can move money from your IRA or 401(k) into an account that grows completely tax-free — and when you take income from it in retirement, that income is also tax-free. You wouldn't write a check to the IRS to do it. However, it does require additional planning steps and works best when implemented over time. Knowing that it involves some extra effort — how motivated would you be to explore it?</div>
+          <div style="background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.25);border-radius:3px;padding:10px 14px;margin:8px 0 12px;font-size:12px;color:var(--gold);line-height:1.6;">
+            <strong>Note:</strong> This question measures your openness to tax-efficient planning — not your comfort with risk. Your answer helps your advisor understand how to approach this conversation with you. It is not included in your risk score.
+          </div>
           <div class="risk-options" id="rq5">
-            <div class="risk-opt" onclick="selectRisk('rq5',1,this)">1<span class="risk-opt-label">Not interested — I'm happy with what I have</span></div>
-            <div class="risk-opt" onclick="selectRisk('rq5',2,this)">2<span class="risk-opt-label">Skeptical — sounds too good to be true</span></div>
-            <div class="risk-opt" onclick="selectRisk('rq5',3,this)">3<span class="risk-opt-label">Curious — I'd want to understand it better first</span></div>
-            <div class="risk-opt" onclick="selectRisk('rq5',4,this)">4<span class="risk-opt-label">Very interested — that sounds like a smart move</span></div>
-            <div class="risk-opt" onclick="selectRisk('rq5',5,this)">5<span class="risk-opt-label">Sign me up — eliminating future taxes is a priority</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq5',1,this)">1<span class="risk-opt-label">Not interested — I'd rather keep things simple</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq5',2,this)">2<span class="risk-opt-label">Skeptical — extra steps make me nervous</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq5',3,this)">3<span class="risk-opt-label">Open — I'd want to fully understand it before deciding</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq5',4,this)">4<span class="risk-opt-label">Motivated — the tax benefit is worth the extra effort</span></div>
+            <div class="risk-opt" onclick="selectRisk('rq5',5,this)">5<span class="risk-opt-label">Very motivated — reducing future taxes is a top priority</span></div>
           </div>
         </div>
       </div>
@@ -959,7 +962,7 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
         <div style="display:flex;align-items:center;justify-content:space-between;">
           <div>
             <div style="font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--gray);margin-bottom:4px;">Risk Score</div>
-            <div style="font-size:28px;font-weight:500;color:var(--white);" id="risk-score-display">— / 25</div>
+            <div style="font-size:28px;font-weight:500;color:var(--white);" id="risk-score-display">— / 20</div>
           </div>
           <div style="text-align:right;">
             <div style="font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--gray);margin-bottom:4px;">Risk Profile</div>
@@ -1762,9 +1765,10 @@ const SECTION_REQUIRED = [
 
 function isSectionComplete(idx){
   const required = SECTION_REQUIRED[idx];
-  // Special case: risk section — all 5 questions must be scored
+  // Special case: risk section — Q1-Q4 must be scored (Q5 is readiness, still required)
   if(idx === 4){
-    return Object.values(riskScores).filter(v=>v>0).length === 5;
+    return Object.keys(riskScores).filter(k => k !== 'rq5' ? riskScores[k] > 0 : true).length === 5
+      && riskScores.rq1 > 0 && riskScores.rq2 > 0 && riskScores.rq3 > 0 && riskScores.rq4 > 0 && riskScores.rq5 > 0;
   }
   // All required fields must have a non-empty value
   return required.every(id=>{
@@ -1845,25 +1849,31 @@ function selectRisk(qid, score, el){
 }
 
 function calcRiskScore(){
-  const vals = Object.values(riskScores).filter(v=>v>0);
-  if(vals.length < 5) return null;
-  return vals.reduce((a,b)=>a+b,0);
+  // Q5 is excluded — it is an L3 readiness indicator, not a risk tolerance measure
+  // Score is based on Q1–Q4 only: 4 questions × 5 points = 20 point scale
+  const q1 = riskScores.rq1 || 0;
+  const q2 = riskScores.rq2 || 0;
+  const q3 = riskScores.rq3 || 0;
+  const q4 = riskScores.rq4 || 0;
+  if (!q1 || !q2 || !q3 || !q4) return null;
+  return q1 + q2 + q3 + q4;
 }
 
 function calcRiskProfile(){
   const score = calcRiskScore();
   if(!score) return null;
-  if(score <= 9)  return 'Conservative';
-  if(score <= 13) return 'Moderate-Conservative';
-  if(score <= 17) return 'Moderate';
-  if(score <= 21) return 'Moderate-Growth';
+  // 4-question scale: max 20 points
+  if(score <= 7)  return 'Conservative';
+  if(score <= 10) return 'Moderate-Conservative';
+  if(score <= 14) return 'Moderate';
+  if(score <= 17) return 'Moderate-Growth';
   return 'Growth';
 }
 
 function updateRiskDisplay(){
   const score = calcRiskScore();
   const profile = calcRiskProfile();
-  document.getElementById('risk-score-display').textContent = score ? score+' / 25' : '— / 25';
+  document.getElementById('risk-score-display').textContent = score ? score+' / 20' : '— / 20';
   document.getElementById('risk-profile-display').textContent = profile || 'Not yet scored';
   refreshSectionStates();
 }
