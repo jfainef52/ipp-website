@@ -1526,12 +1526,14 @@ function initCalibration(s, result) {
     `Model: <strong>${fmt$(result.l4_dollars)}</strong> (${Math.round(result.l4*100)}%)<br>` +
     `<span style="font-size:10px;color:var(--gray);">Hard floor: ${fmt$(b*0.20)} (20%)</span>`;
 
-  // Store for constraint checks
-  document.getElementById('cal-panel').dataset.balance = b;
-  document.getElementById('cal-panel').dataset.marginalRate = marginalRate;
-  document.getElementById('cal-panel').dataset.ssNet = Math.round(ssNet);
-  document.getElementById('cal-panel').dataset.annuityNet = Math.round(annuityNet);
-  document.getElementById('cal-panel').dataset.l2Max = Math.round(result.l2_dollars);
+  // Store constraint data in a JS object (cal-panel element no longer exists)
+  window._calConstraints = {
+    balance: b,
+    marginalRate: marginalRate,
+    ssNet: Math.round(ssNet),
+    annuityNet: Math.round(annuityNet),
+    l2Max: Math.round(result.l2_dollars),
+  };
 
   // Show cal mode button in top bar
   showCalModeButton();
@@ -1549,9 +1551,7 @@ function toggleCalPanel() {
 
 function onCalInput(el, layer) {
   const raw = parseFloat(el.value.replace(/,/g,''));
-  const panel = document.getElementById('cal-panel');
-  const b = parseFloat(panel.dataset.balance);
-  const l2Max = parseFloat(panel.dataset.l2Max);
+  const { balance: b, l2Max, ssNet: _ssNet, annuityNet: _annuityNet } = window._calConstraints || {};
   const hint = document.getElementById('cal-'+layer+'-hint');
   el.classList.remove('has-val','error');
 
@@ -1564,8 +1564,8 @@ function onCalInput(el, layer) {
 
   // Constraint feedback per layer
   if (layer === 'l1') {
-    const ssNet = parseFloat(panel.dataset.ssNet);
-    const annuityNet = parseFloat(panel.dataset.annuityNet);
+    const ssNet = _ssNet || 0;
+    const annuityNet = _annuityNet || 0;
     const l1Needed = Math.max(0, raw - ssNet - annuityNet);
     const l1Dollars = Math.round((l1Needed * 12) / 0.05);
     hint.textContent = `L1 allocation needed: ${fmt$(l1Dollars)} (after SS and annuity income)`;
@@ -1608,12 +1608,7 @@ function onCalInput(el, layer) {
 }
 
 function runCalibration() {
-  const panel = document.getElementById('cal-panel');
-  const b = parseFloat(panel.dataset.balance);
-  const marginalRate = parseFloat(panel.dataset.marginalRate);
-  const ssNet = parseFloat(panel.dataset.ssNet);
-  const annuityNet = parseFloat(panel.dataset.annuityNet);
-  const l2Max = parseFloat(panel.dataset.l2Max);
+  const { balance: b, marginalRate, ssNet, annuityNet, l2Max } = window._calConstraints || {};
   const errEl = document.getElementById('cal-error');
   errEl.style.display = 'none';
 
