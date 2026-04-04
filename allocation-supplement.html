@@ -1542,6 +1542,12 @@ function enforceUniqueRanking(changedId) {
 
 // ── Currency formatting for $ inputs ─────────────────────────
 function formatCurrencyInput(input) {
+  // Format existing value immediately
+  const raw = parseFloat((input.value||'').replace(/,/g, ''));
+  if (!isNaN(raw) && raw > 0) {
+    input.value = Math.round(raw).toLocaleString('en-US');
+    input.dataset.raw = Math.round(raw);
+  }
   // On blur: format with commas
   input.addEventListener('blur', function() {
     const raw = parseFloat(this.value.replace(/,/g, ''));
@@ -1561,11 +1567,27 @@ function formatCurrencyInput(input) {
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.input-prefix').forEach(wrapper => {
     if (wrapper.querySelector('span')?.textContent === '$') {
-      const input = wrapper.querySelector('input[type="number"]');
+      const input = wrapper.querySelector('input');
       if (input) formatCurrencyInput(input);
     }
   });
 });
+
+// Re-apply formatting after restore (called after restoreFromSupplement)
+function formatAllCurrencyInputs() {
+  document.querySelectorAll('.input-prefix').forEach(wrapper => {
+    if (wrapper.querySelector('span')?.textContent === '$') {
+      const input = wrapper.querySelector('input');
+      if (input) {
+        const raw = parseFloat((input.value||'').replace(/,/g, ''));
+        if (!isNaN(raw) && raw > 0) {
+          input.value = Math.round(raw).toLocaleString('en-US');
+          input.dataset.raw = Math.round(raw);
+        }
+      }
+    }
+  });
+}
 
 function setAutosaveStatus(status){
   const el = document.getElementById('autosave-status');
@@ -2186,6 +2208,8 @@ function restoreFromSupplement(s){
     if(el) { el.value = s.has_inherited_qp ? 'true' : 'false'; toggleInheritedQP(); }
   }
   if(s.inherited_qp_balance) { const el = document.getElementById('f_inherited_qp_balance'); if(el) el.value = s.inherited_qp_balance; }
+  // Format all currency fields after restore
+  formatAllCurrencyInputs();
 }
 
 // ── Init ──────────────────────────────────────────────────────
