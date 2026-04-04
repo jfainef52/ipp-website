@@ -199,6 +199,75 @@ html,body{min-height:100vh;font-family:'Barlow',sans-serif;background:#0E1C2E;co
   .layer-card::before{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   .layer-bar-fill{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
 }
+
+/* ── Client Calibration Panel ─────────────────────────────── */
+.cal-panel{background:var(--navy2);border:1px solid var(--border);border-radius:6px;margin:28px 0;overflow:hidden;display:none;}
+.cal-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;cursor:pointer;user-select:none;}
+.cal-header:hover{background:rgba(255,255,255,.02);}
+.cal-header-left{display:flex;align-items:center;gap:12px;}
+.cal-header-icon{font-size:18px;color:var(--gold);}
+.cal-header-title{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);}
+.cal-header-sub{font-size:11px;color:var(--gray);margin-top:1px;}
+.cal-chevron{color:var(--gold);font-size:14px;transition:transform .2s;flex-shrink:0;}
+.cal-chevron.open{transform:rotate(180deg);}
+.cal-body{padding:20px 20px 24px;border-top:1px solid var(--border);display:none;}
+.cal-body.open{display:block;}
+.cal-disclaimer{background:rgba(200,169,110,.07);border:1px solid rgba(200,169,110,.2);border-radius:3px;padding:10px 14px;font-size:12px;color:var(--gold);line-height:1.6;margin-bottom:20px;}
+.cal-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:14px;margin-bottom:20px;}
+.cal-card{background:var(--navy3);border:1px solid var(--border);border-radius:4px;padding:14px 16px;}
+.cal-card-layer{font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;margin-bottom:2px;}
+.cal-card-layer.l1{color:var(--l1);}
+.cal-card-layer.l2{color:var(--l2);}
+.cal-card-layer.l3{color:var(--l3);}
+.cal-card-layer.l4{color:var(--l4);}
+.cal-card-name{font-size:12px;color:var(--white);font-weight:600;margin-bottom:8px;}
+.cal-card-rec{font-size:11px;color:var(--gray);margin-bottom:10px;line-height:1.5;}
+.cal-card-rec strong{color:var(--warm);}
+.cal-card-desc{font-size:11px;color:var(--gray);line-height:1.5;margin-bottom:10px;}
+.cal-input-wrap{position:relative;margin-bottom:6px;}
+.cal-input-prefix{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--gray);font-size:12px;pointer-events:none;}
+.cal-input-suffix{position:absolute;right:9px;top:50%;transform:translateY(-50%);color:var(--gray);font-size:11px;pointer-events:none;}
+.cal-input{background:var(--navy);border:1px solid var(--border);border-radius:3px;padding:7px 9px 7px 20px;font-size:13px;color:var(--white);width:100%;font-family:'Barlow',sans-serif;box-sizing:border-box;}
+.cal-input:focus{outline:none;border-color:var(--gold);}
+.cal-input.has-val{border-color:rgba(200,169,110,.5);color:var(--gold);}
+.cal-input.error{border-color:var(--error);}
+.cal-note-label{font-size:10px;color:var(--gray);margin-top:8px;margin-bottom:3px;text-transform:uppercase;letter-spacing:.08em;}
+.cal-note{background:var(--navy);border:1px solid var(--border);border-radius:3px;padding:6px 9px;font-size:11px;color:var(--warm);width:100%;font-family:'Barlow',sans-serif;resize:vertical;min-height:48px;box-sizing:border-box;}
+.cal-note:focus{outline:none;border-color:var(--gold);}
+.cal-constraint{font-size:10px;color:var(--gray);margin-top:4px;line-height:1.4;}
+.cal-constraint.warn{color:#E8A050;}
+.cal-actions{display:flex;align-items:center;gap:10px;margin-top:4px;flex-wrap:wrap;}
+.btn-recalibrate{background:var(--gold);color:var(--navy);border:none;border-radius:3px;padding:9px 22px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;cursor:pointer;transition:opacity .15s;}
+.btn-recalibrate:hover{opacity:.85;}
+.btn-reset-cal{background:transparent;color:var(--gray);border:1px solid var(--border);border-radius:3px;padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;cursor:pointer;}
+.cal-error-msg{font-size:12px;color:var(--error);display:none;padding:8px 12px;background:rgba(220,80,80,.08);border:1px solid rgba(220,80,80,.25);border-radius:3px;}
+/* Comparison result */
+.cal-result{margin-top:20px;display:none;}
+.cal-result.visible{display:block;}
+.cal-result-title{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--gold);margin-bottom:14px;}
+.cal-compare{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;}
+.cal-version{background:var(--navy3);border:1px solid var(--border);border-radius:4px;padding:14px 16px;}
+.cal-version-title{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;margin-bottom:12px;}
+.cal-version-title.rec{color:var(--gray);}
+.cal-version-title.adj{color:var(--gold);}
+.cal-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04);}
+.cal-row:last-child{border-bottom:none;}
+.cal-row-layer{font-size:12px;color:var(--warm);}
+.cal-row-val{font-size:12px;font-weight:600;color:var(--white);text-align:right;}
+.cal-row-delta{font-size:11px;margin-left:6px;}
+.delta-up{color:#7BAF84;}
+.delta-down{color:#E07070;}
+.delta-same{color:var(--gray);}
+.cal-override-log{background:var(--navy3);border:1px solid rgba(200,169,110,.25);border-radius:4px;padding:14px 16px;margin-bottom:14px;}
+.cal-override-log-title{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--gold);margin-bottom:10px;}
+.cal-override-entry{font-size:12px;color:var(--warm);line-height:1.8;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);}
+.cal-override-entry:last-child{border-bottom:none;}
+.cal-override-entry strong{color:var(--white);}
+.cal-save-row{display:flex;align-items:center;gap:10px;}
+.btn-save-adj{background:var(--gold);color:var(--navy);border:none;border-radius:3px;padding:9px 22px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;cursor:pointer;}
+.btn-save-adj:hover{opacity:.85;}
+.cal-saved-badge{font-size:12px;color:var(--success);display:none;}
+@media print{.cal-panel{display:none!important;}}
 </style>
 </head>
 <body>
@@ -277,6 +346,117 @@ html,body{min-height:100vh;font-family:'Barlow',sans-serif;background:#0E1C2E;co
   <!-- Layer cards -->
   <div id="algo-warnings"></div>
   <div class="alloc-grid" id="layer-cards"></div>
+
+  <!-- ── CLIENT CALIBRATION PANEL ──────────────────────────── -->
+  <div class="cal-panel" id="cal-panel">
+    <div class="cal-header" onclick="toggleCalPanel()">
+      <div class="cal-header-left">
+        <div class="cal-header-icon">⚖</div>
+        <div>
+          <div class="cal-header-title">Client Calibration</div>
+          <div class="cal-header-sub">Advisor-led — document client preferences and recalibrate allocations. Both versions will be saved.</div>
+        </div>
+      </div>
+      <div class="cal-chevron" id="cal-chevron">▼</div>
+    </div>
+    <div class="cal-body" id="cal-body">
+      <div class="cal-disclaimer">
+        <strong>Advisor note:</strong> Enter only what the client has specifically requested during your conversation.
+        Leave any input blank to keep the model's recommendation for that layer.
+        The recalibration will distribute the difference proportionally across the other unlocked layers based on their recommended sizes — no layer is arbitrarily prioritized.
+        The original model recommendation is always preserved separately — both versions will be saved to the client record.
+      </div>
+      <div class="cal-grid">
+        <!-- L1 -->
+        <div class="cal-card">
+          <div class="cal-card-layer l1">Layer 1</div>
+          <div class="cal-card-name">Guaranteed Income</div>
+          <div class="cal-card-rec" id="cal-l1-rec">Model: <strong>—</strong></div>
+          <div class="cal-card-desc">Enter the client's desired monthly guaranteed income (net spendable — SS and existing annuity income will be factored in separately).</div>
+          <div class="cal-input-wrap">
+            <span class="cal-input-prefix">$</span>
+            <input class="cal-input" id="cal-l1" type="text" inputmode="numeric" placeholder="Target $/month net" oninput="onCalInput(this,'l1')">
+            <span class="cal-input-suffix">/mo</span>
+          </div>
+          <div class="cal-constraint" id="cal-l1-hint"></div>
+          <div class="cal-note-label">Client's stated preference</div>
+          <textarea class="cal-note" id="cal-l1-note" placeholder="e.g. Client wants $20k/month net guaranteed — concerned about sequence of returns risk..."></textarea>
+        </div>
+        <!-- L2 -->
+        <div class="cal-card">
+          <div class="cal-card-layer l2">Layer 2</div>
+          <div class="cal-card-name">LTC & Legacy</div>
+          <div class="cal-card-rec" id="cal-l2-rec">Model: <strong>—</strong></div>
+          <div class="cal-card-desc">Enter a dollar target for L2. Client may request more or less than the model recommends, or zero. Cannot exceed the model's formula-based recommendation — the model sizes L2 based on the client's balance and care-cost scaling formula, not carrier data.</div>
+          <div class="cal-input-wrap">
+            <span class="cal-input-prefix">$</span>
+            <input class="cal-input" id="cal-l2" type="text" inputmode="numeric" placeholder="Target $ amount" oninput="onCalInput(this,'l2')">
+          </div>
+          <div class="cal-constraint" id="cal-l2-hint"></div>
+          <div class="cal-note-label">Client's stated preference</div>
+          <textarea class="cal-note" id="cal-l2-note" placeholder="e.g. Client prefers to redirect — has group LTC coverage through prior employer..."></textarea>
+        </div>
+        <!-- L3 -->
+        <div class="cal-card">
+          <div class="cal-card-layer l3">Layer 3</div>
+          <div class="cal-card-name">Tax Efficiency & Growth</div>
+          <div class="cal-card-rec" id="cal-l3-rec">Model: <strong>—</strong></div>
+          <div class="cal-card-desc">Enter a dollar target for L3. Must be either $0 (fully redirect) or at least $400,000 to support a viable ETA structure.</div>
+          <div class="cal-input-wrap">
+            <span class="cal-input-prefix">$</span>
+            <input class="cal-input" id="cal-l3" type="text" inputmode="numeric" placeholder="Target $ amount" oninput="onCalInput(this,'l3')">
+          </div>
+          <div class="cal-constraint" id="cal-l3-hint"></div>
+          <div class="cal-note-label">Client's stated preference</div>
+          <textarea class="cal-note" id="cal-l3-note" placeholder="e.g. Client wants to maximize tax repositioning — willing to reduce liquidity..."></textarea>
+        </div>
+        <!-- L4 -->
+        <div class="cal-card">
+          <div class="cal-card-layer l4">Layer 4</div>
+          <div class="cal-card-name">Liquidity Bridge</div>
+          <div class="cal-card-rec" id="cal-l4-rec">Model: <strong>—</strong></div>
+          <div class="cal-card-desc">Enter a dollar target for L4. Cannot go below 20% of the qualified plan balance — that floor is a hard constraint to protect against early retirement and unforeseen expense scenarios.</div>
+          <div class="cal-input-wrap">
+            <span class="cal-input-prefix">$</span>
+            <input class="cal-input" id="cal-l4" type="text" inputmode="numeric" placeholder="Target $ amount" oninput="onCalInput(this,'l4')">
+          </div>
+          <div class="cal-constraint" id="cal-l4-hint"></div>
+          <div class="cal-note-label">Client's stated preference</div>
+          <textarea class="cal-note" id="cal-l4-note" placeholder="e.g. Client wants $500k liquid — anticipates home renovation in year 2..."></textarea>
+        </div>
+      </div>
+
+      <div class="cal-error-msg" id="cal-error"></div>
+      <div class="cal-actions">
+        <button class="btn-recalibrate" onclick="runCalibration()">Recalibrate Allocation</button>
+        <button class="btn-reset-cal" onclick="resetCalibration()">Reset</button>
+      </div>
+
+      <!-- Result comparison -->
+      <div class="cal-result" id="cal-result">
+        <div class="cal-result-title">Recalibration Result</div>
+        <div class="cal-compare">
+          <div class="cal-version">
+            <div class="cal-version-title rec">Model Recommendation</div>
+            <div id="cal-rec-rows"></div>
+          </div>
+          <div class="cal-version">
+            <div class="cal-version-title adj">Client-Adjusted</div>
+            <div id="cal-adj-rows"></div>
+          </div>
+        </div>
+        <div class="cal-override-log" id="cal-override-log">
+          <div class="cal-override-log-title">Client Override Log</div>
+          <div id="cal-override-entries"></div>
+        </div>
+        <div class="cal-save-row">
+          <button class="btn-save-adj" onclick="saveAdjusted()">Save Client-Adjusted Version</button>
+          <div class="cal-saved-badge" id="cal-saved-badge">✓ Saved to client record</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
 
   <!-- Factor log -->
   <div class="factor-section">
@@ -652,7 +832,7 @@ function runAllocationAlgorithm(s) {
       (largeExpenses > 0 ? ` Large expenses: ${fmt$(largeExpenses)}.` : '') +
       (externalLiquid > 0 ? ` External assets deducted: ${fmt$(externalLiquid)}.` : '') +
       ` Final L4: ${fmt$(L4_dollars)}.` +
-      (netL4 < balance * L4_FLOOR ? ` (20% hard floor applied — minimum liquidity for unforeseen expenses and healthcare escalation)` : '')
+      (netL4 < balance * L4_FLOOR ? ` (20% hard floor applied — minimum liquidity reserve for: unforeseen large expenses; healthcare cost escalation at 5.5%/yr; and forced early retirement risk. For pre-retirement clients, the stated bridge years assume voluntary retirement at the target date. Employer-forced exit, disability, or caregiver obligations can increase bridge years from the modeled ${bridgeYears} to as many as 10, multiplying the liquidity need severalfold. The 20% floor preserves the ability to sustain the IncomeArc™ structure without disrupting L3 seasoning in an unplanned early retirement scenario.)` : '')
     );
   }
 
@@ -912,7 +1092,7 @@ function runAllocationAlgorithm(s) {
       : `Layer 1 allocation is zero. Existing guaranteed income sources cover the client's target fixed expense coverage, or client selected no coverage preference.`,
 
     l2: l2Needed
-      ? `Layer 2 is allocated ${fmtPct(L2)} (${fmt$(L2_dollars)}) for the leveraged life and long-term care structure. This represents ${fmt$(L2_dollars / (isMFJ ? 2 : 1))} gross per insurable life — netting approximately ${fmt$(L2_dollars / (isMFJ ? 2 : 1) * (1 - marginalRate))} after the ${Math.round(marginalRate*100)}% distribution tax cost. ${familyLtcPrimary || familyLtcSpouse ? 'Family LTC history elevates the actuarial case for dedicated care protection.' : ''} At this allocation level, leveraged life/LTC structure provides dedicated care coverage and death benefit without relying on qualified plan assets for care costs.`
+      ? `Layer 2 is allocated ${fmtPct(L2)} (${fmt$(L2_dollars)}) for the leveraged life and long-term care structure. This represents ${fmt$(L2_dollars / (isMFJ ? 2 : 1))} gross per insurable life — netting approximately ${fmt$(L2_dollars / (isMFJ ? 2 : 1) * (1 - marginalRate))} after the ${Math.round(marginalRate*100)}% distribution tax cost. ${familyLtcPrimary || familyLtcSpouse ? 'Family LTC history elevates the case for dedicated care protection.' : ''} At this allocation level, leveraged life/LTC structure provides dedicated care coverage and death benefit without relying on qualified plan assets for care costs.`
       : `Layer 2 allocation is zero. ${hasAdequateLtc ? 'Existing LTC coverage with adequate benefit period in place.' : 'Coverage unavailable due to health or underwriting status — see recalibration recommendation.'}`,
 
     l3: `Layer 3/ETA receives ${fmtPct(L3)} (${fmt$(L3_dollars)}) — the largest single threat to this client's retirement wealth is the ${fmt$(taxLiability)} embedded tax liability growing inside the qualified plan at ${Math.round(marginalRate*100)}%. At ${fmt$(balance)}, the estimated RMD at age 73 is ${fmt$(rmdAt73)}/yr — added to other income, this forces a tax obligation the client cannot defer or avoid. The ETA structure repositions pre-tax qualified dollars into a tax-free, 0%-floor-protected asset. Income accessible via policy loans after the 10-year seasoning period. ${yearsToRmd <= 5 ? 'With only '+yearsToRmd+' years before RMDs begin, this is the most time-sensitive installation.' : ''}`,
@@ -1093,6 +1273,8 @@ function renderOutput(s, result, clientName) {
 
   // Output ID
   document.getElementById('output-id-display').textContent = '';
+  // Initialise calibration panel with current result
+  initCalibration(s, result);
 
   // Show algorithm warnings if any
   const warningsEl = document.getElementById('algo-warnings');
@@ -1253,6 +1435,464 @@ function openSupplement(){
 }
 
 init();
+
+// ══════════════════════════════════════════════════════════════
+// CLIENT CALIBRATION
+// ══════════════════════════════════════════════════════════════
+
+let _calRecommended = null;  // frozen copy of original result
+let _calAdjusted    = null;  // current calibrated result
+let _calSupp        = null;  // supplement data reference
+
+function initCalibration(s, result) {
+  _calSupp = s;
+  const b = result.metrics.balance;
+  // Freeze the recommended allocation
+  _calRecommended = {
+    l1: result.l1, l1_dollars: result.l1_dollars,
+    l2: result.l2, l2_dollars: result.l2_dollars,
+    l3: result.l3, l3_dollars: result.l3_dollars,
+    l4: result.l4, l4_dollars: result.l4_dollars,
+    balance: b,
+  };
+
+  // SS net (85% of SS is taxable at marginal rate)
+  const marginalRate = result.metrics.marginalRate || 0.24;
+  const ssMonthly = (s.ss_primary_monthly||0) + (s.ss_spouse_monthly||0);
+  const ssNet = ssMonthly * (1 - 0.85 * marginalRate);
+  // Existing annuity net (fully taxable)
+  const annuityNet = (s.other_guaranteed_monthly||0) * (1 - marginalRate);
+  // L1 currently produces (Roth annuity — tax-free)
+  const l1Monthly = Math.round((result.l1_dollars * 0.05) / 12);
+  const totalNetMonthly = Math.round(ssNet + annuityNet + l1Monthly);
+
+  // Update model recommendation displays
+  document.getElementById('cal-l1-rec').innerHTML =
+    `Model: <strong>${fmt$(result.l1_dollars)}</strong> → ~${fmt$(l1Monthly)}/mo L1 income<br>` +
+    `<span style="font-size:10px;color:var(--gray);">Total net w/ SS+annuity: ~${fmt$(totalNetMonthly)}/mo</span>`;
+  document.getElementById('cal-l2-rec').innerHTML = `Model: <strong>${fmt$(result.l2_dollars)}</strong>`;
+  document.getElementById('cal-l3-rec').innerHTML = `Model: <strong>${fmt$(result.l3_dollars)}</strong>`;
+  document.getElementById('cal-l4-rec').innerHTML =
+    `Model: <strong>${fmt$(result.l4_dollars)}</strong> (${Math.round(result.l4*100)}%)<br>` +
+    `<span style="font-size:10px;color:var(--gray);">Hard floor: ${fmt$(b*0.20)} (20%)</span>`;
+
+  // Store for constraint checks
+  document.getElementById('cal-panel').dataset.balance = b;
+  document.getElementById('cal-panel').dataset.marginalRate = marginalRate;
+  document.getElementById('cal-panel').dataset.ssNet = Math.round(ssNet);
+  document.getElementById('cal-panel').dataset.annuityNet = Math.round(annuityNet);
+  document.getElementById('cal-panel').dataset.l2Max = Math.round(result.l2_dollars);
+
+  // Show panel
+  document.getElementById('cal-panel').style.display = '';
+  // Reset inputs
+  resetCalibration();
+}
+
+function toggleCalPanel() {
+  const body = document.getElementById('cal-body');
+  const chev = document.getElementById('cal-chevron');
+  const open = body.classList.contains('open');
+  body.classList.toggle('open', !open);
+  chev.classList.toggle('open', !open);
+}
+
+function onCalInput(el, layer) {
+  const raw = parseFloat(el.value.replace(/,/g,''));
+  const panel = document.getElementById('cal-panel');
+  const b = parseFloat(panel.dataset.balance);
+  const l2Max = parseFloat(panel.dataset.l2Max);
+  const hint = document.getElementById('cal-'+layer+'-hint');
+  el.classList.remove('has-val','error');
+
+  if (isNaN(raw) || el.value.trim() === '') {
+    hint.textContent = '';
+    hint.className = 'cal-constraint';
+    return;
+  }
+  el.classList.add('has-val');
+
+  // Constraint feedback per layer
+  if (layer === 'l1') {
+    const ssNet = parseFloat(panel.dataset.ssNet);
+    const annuityNet = parseFloat(panel.dataset.annuityNet);
+    const l1Needed = Math.max(0, raw - ssNet - annuityNet);
+    const l1Dollars = Math.round((l1Needed * 12) / 0.05);
+    hint.textContent = `L1 allocation needed: ${fmt$(l1Dollars)} (after SS and annuity income)`;
+    hint.className = 'cal-constraint';
+  } else if (layer === 'l2') {
+    if (raw > l2Max) {
+      hint.textContent = `⚠ Cannot exceed model recommendation of ${fmt$(l2Max)}`;
+      hint.className = 'cal-constraint warn';
+      el.classList.add('error');
+    } else if (raw > 0 && raw < 1000) {
+      hint.textContent = `L2 = $0 (redirect) or a meaningful amount`;
+      hint.className = 'cal-constraint warn';
+    } else {
+      hint.textContent = raw === 0 ? 'L2 will be zeroed — capital redistributed to other layers' : `Override: ${fmt$(raw)}`;
+      hint.className = 'cal-constraint';
+    }
+  } else if (layer === 'l3') {
+    if (raw > 0 && raw < 400000) {
+      hint.textContent = `⚠ L3 must be $0 or ≥ $400,000 to support a viable ETA structure`;
+      hint.className = 'cal-constraint warn';
+      el.classList.add('error');
+    } else if (raw === 0) {
+      hint.textContent = 'L3 will be zeroed — ETA structure not implemented';
+      hint.className = 'cal-constraint warn';
+    } else {
+      hint.textContent = `Override: ${fmt$(raw)} (${Math.round(raw/b*100)}% of balance)`;
+      hint.className = 'cal-constraint';
+    }
+  } else if (layer === 'l4') {
+    const floor = b * 0.20;
+    if (raw < floor) {
+      hint.textContent = `⚠ Cannot go below 20% floor (${fmt$(floor)}) — hard constraint`;
+      hint.className = 'cal-constraint warn';
+      el.classList.add('error');
+    } else {
+      hint.textContent = `Override: ${fmt$(raw)} (${Math.round(raw/b*100)}% of balance)`;
+      hint.className = 'cal-constraint';
+    }
+  }
+}
+
+function runCalibration() {
+  const panel = document.getElementById('cal-panel');
+  const b = parseFloat(panel.dataset.balance);
+  const marginalRate = parseFloat(panel.dataset.marginalRate);
+  const ssNet = parseFloat(panel.dataset.ssNet);
+  const annuityNet = parseFloat(panel.dataset.annuityNet);
+  const l2Max = parseFloat(panel.dataset.l2Max);
+  const errEl = document.getElementById('cal-error');
+  errEl.style.display = 'none';
+
+  const parseInput = id => {
+    const v = document.getElementById(id).value.trim();
+    return v === '' ? null : parseFloat(v.replace(/,/g,''));
+  };
+
+  const l1Target = parseInput('cal-l1');  // monthly net income target
+  const l2Target = parseInput('cal-l2');  // dollar amount
+  const l3Target = parseInput('cal-l3');  // dollar amount
+  const l4Target = parseInput('cal-l4');  // dollar amount
+
+  // If nothing entered, show message
+  if (l1Target === null && l2Target === null && l3Target === null && l4Target === null) {
+    errEl.textContent = 'No overrides entered — adjust at least one layer to recalibrate.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  // ── Validate all constraints before proceeding ─────────────
+  const errors = [];
+  if (l2Target !== null && l2Target > l2Max) errors.push(`L2 cannot exceed the model recommendation of ${fmt$(l2Max)}`);
+  if (l3Target !== null && l3Target > 0 && l3Target < 400000) errors.push('L3 must be $0 or at least $400,000');
+  if (l4Target !== null && l4Target < b * 0.20) errors.push(`L4 cannot go below the 20% floor (${fmt$(b*0.20)})`);
+
+  if (errors.length > 0) {
+    errEl.innerHTML = errors.map(e => '⚠ ' + e).join('<br>');
+    errEl.style.display = 'block';
+    return;
+  }
+
+  // ── Convert L1 monthly net target to dollar allocation ─────
+  // L1 = Roth annuity (tax-free). Net monthly from L1 = l1Target - ssNet - annuityNet
+  let l1Dollars = _calRecommended.l1_dollars;
+  if (l1Target !== null) {
+    const l1NetNeeded = Math.max(0, l1Target - ssNet - annuityNet);
+    l1Dollars = Math.round((l1NetNeeded * 12) / 0.05);
+  }
+
+  let l2Dollars = l2Target !== null ? l2Target : _calRecommended.l2_dollars;
+  let l3Dollars = l3Target !== null ? l3Target : _calRecommended.l3_dollars;
+  let l4Dollars = l4Target !== null ? Math.max(l4Target, b * 0.20) : _calRecommended.l4_dollars;
+
+  // ── Check if overrides are even feasible ───────────────────
+  const lockedSum = l1Dollars + l2Dollars + l3Dollars + l4Dollars;
+
+  // If user locked all 4 layers
+  const overrideCount = [l1Target, l2Target, l3Target, l4Target].filter(v => v !== null).length;
+  if (overrideCount === 4 && Math.round(lockedSum) !== Math.round(b)) {
+    const diff = lockedSum - b;
+    errEl.textContent = `The four layer targets sum to ${fmt$(lockedSum)}, but the balance is ${fmt$(b)}. ` +
+      `They are ${fmt$(Math.abs(diff))} ${diff > 0 ? 'over' : 'under'}. Adjust one or more targets to reach the balance exactly, or leave a layer blank to let it absorb the difference.`;
+    errEl.style.display = 'block';
+    return;
+  }
+
+  // ── Proportional redistribution across unlocked layers ────
+  // No preset order. Unlocked layers each give up or receive
+  // a proportional share of the difference based on their
+  // recommended sizes. The client sets targets — the math
+  // is neutral about which unlocked layer adjusts.
+  const overridden = {
+    l1: l1Target !== null,
+    l2: l2Target !== null,
+    l3: l3Target !== null,
+    l4: l4Target !== null,
+  };
+
+  // Start from recommended values for unlocked layers
+  if (!overridden.l1) l1Dollars = _calRecommended.l1_dollars;
+  if (!overridden.l2) l2Dollars = _calRecommended.l2_dollars;
+  if (!overridden.l3) l3Dollars = _calRecommended.l3_dollars;
+  if (!overridden.l4) l4Dollars = _calRecommended.l4_dollars;
+
+  // How much do the locked layers sum to?
+  const lockedTotal = (overridden.l1 ? l1Dollars : 0) +
+                      (overridden.l2 ? l2Dollars : 0) +
+                      (overridden.l3 ? l3Dollars : 0) +
+                      (overridden.l4 ? l4Dollars : 0);
+
+  // How much is left for unlocked layers?
+  const availableForUnlocked = b - lockedTotal;
+
+  // How much do unlocked layers currently recommend?
+  const unlockedRec = (!overridden.l1 ? _calRecommended.l1_dollars : 0) +
+                      (!overridden.l2 ? _calRecommended.l2_dollars : 0) +
+                      (!overridden.l3 ? _calRecommended.l3_dollars : 0) +
+                      (!overridden.l4 ? _calRecommended.l4_dollars : 0);
+
+  const diff = availableForUnlocked - unlockedRec;
+
+  if (Math.abs(diff) > 1 && unlockedRec > 0) {
+    // Distribute diff proportionally across unlocked layers
+    const layers = ['l1','l2','l3','l4'];
+    const vals = { l1: l1Dollars, l2: l2Dollars, l3: l3Dollars, l4: l4Dollars };
+    const recs = { l1: _calRecommended.l1_dollars, l2: _calRecommended.l2_dollars,
+                   l3: _calRecommended.l3_dollars, l4: _calRecommended.l4_dollars };
+
+    layers.forEach(l => {
+      if (!overridden[l] && recs[l] > 0) {
+        const share = recs[l] / unlockedRec;
+        vals[l] = Math.round(recs[l] + diff * share);
+      }
+    });
+
+    // Apply L4 floor — if L4 was pulled below floor, clamp and redistribute
+    if (!overridden.l4 && vals.l4 < b * 0.20) {
+      const shortfall = b * 0.20 - vals.l4;
+      vals.l4 = Math.round(b * 0.20);
+      // Take shortfall from largest unlocked non-L4 layer
+      const candidates = layers.filter(l => l !== 'l4' && !overridden[l] && vals[l] > 0)
+                               .sort((a,b_) => vals[b_] - vals[a]);
+      if (candidates.length > 0) vals[candidates[0]] = Math.max(0, vals[candidates[0]] - shortfall);
+    }
+
+    // Apply L3 gap rule — must be $0 or >= $400k
+    if (!overridden.l3 && vals.l3 > 0 && vals.l3 < 400000) {
+      // Round to nearest valid boundary
+      const roundToZero = vals.l3;
+      const roundTo400k = 400000 - vals.l3;
+      if (roundToZero <= roundTo400k) {
+        // Zero out L3 and redistribute its amount to next unlocked layer
+        const freed = vals.l3;
+        vals.l3 = 0;
+        const candidates = layers.filter(l => l !== 'l3' && !overridden[l])
+                                 .sort((a,b_) => vals[b_] - vals[a]);
+        if (candidates.length > 0) vals[candidates[0]] += freed;
+      } else {
+        // Bring L3 up to $400k and take from next unlocked layer
+        const needed = 400000 - vals.l3;
+        vals.l3 = 400000;
+        const candidates = layers.filter(l => l !== 'l3' && !overridden[l] && vals[l] > needed)
+                                 .sort((a,b_) => vals[b_] - vals[a]);
+        if (candidates.length > 0) vals[candidates[0]] -= needed;
+      }
+    }
+
+    l1Dollars = vals.l1; l2Dollars = vals.l2;
+    l3Dollars = vals.l3; l4Dollars = vals.l4;
+  }
+
+  // Final rounding check — sum must equal balance exactly
+  const total = l1Dollars + l2Dollars + l3Dollars + l4Dollars;
+  const delta = b - total;
+  if (Math.abs(delta) > 1) {
+    // Apply penny-rounding delta to largest unlocked layer
+    const adj = ['l1','l2','l3','l4']
+      .filter(l => !overridden[l])
+      .sort((a,c) => ({l1:l1Dollars,l2:l2Dollars,l3:l3Dollars,l4:l4Dollars}[c] - {l1:l1Dollars,l2:l2Dollars,l3:l3Dollars,l4:l4Dollars}[a]))[0];
+    if (adj === 'l1') l1Dollars += delta;
+    else if (adj === 'l2') l2Dollars += delta;
+    else if (adj === 'l3') l3Dollars = Math.max(0, l3Dollars + delta);
+    else if (adj === 'l4') l4Dollars = Math.max(Math.round(b * 0.20), l4Dollars + delta);
+    // Re-check L3 gap after rounding
+    if (l3Dollars > 0 && l3Dollars < 400000) l3Dollars = 0;
+  }
+
+  // L3 constraint: if it ended up in the gap after all adjustments, warn
+  if (l3Dollars > 0 && l3Dollars < 400000) {
+    errEl.textContent = `The recalibration cannot satisfy all constraints simultaneously — the layer targets create a conflict with the L3 minimum ($400k). ` +
+      `Try adjusting other layers to create more room for L3, or set L3 to $0 explicitly.`;
+    errEl.style.display = 'block';
+    return;
+  }
+
+  _calAdjusted = {
+    l1_dollars: Math.round(l1Dollars), l1: l1Dollars / b,
+    l2_dollars: Math.round(l2Dollars), l2: l2Dollars / b,
+    l3_dollars: Math.round(l3Dollars), l3: l3Dollars / b,
+    l4_dollars: Math.round(l4Dollars), l4: l4Dollars / b,
+    balance: b,
+    overrides: { l1Target, l2Target, l3Target, l4Target },
+    notes: {
+      l1: document.getElementById('cal-l1-note').value.trim(),
+      l2: document.getElementById('cal-l2-note').value.trim(),
+      l3: document.getElementById('cal-l3-note').value.trim(),
+      l4: document.getElementById('cal-l4-note').value.trim(),
+    },
+    ssNet, annuityNet, marginalRate,
+  };
+
+  renderCalibrationResult(_calAdjusted);
+}
+
+function renderCalibrationResult(adj) {
+  const rec = _calRecommended;
+  const b = rec.balance;
+
+  const layerNames = { l1:'L1 — Guaranteed Income', l2:'L2 — LTC & Legacy', l3:'L3 — Tax Efficiency & Growth', l4:'L4 — Liquidity Bridge' };
+  const layers = ['l1','l2','l3','l4'];
+
+  // Recommended column
+  document.getElementById('cal-rec-rows').innerHTML = layers.map(l => `
+    <div class="cal-row">
+      <div class="cal-row-layer">${layerNames[l]}</div>
+      <div class="cal-row-val">${Math.round(rec[l]*100)}% — ${fmt$(rec[l+'_dollars'])}</div>
+    </div>`).join('');
+
+  // Adjusted column with deltas
+  document.getElementById('cal-adj-rows').innerHTML = layers.map(l => {
+    const diff = adj[l+'_dollars'] - rec[l+'_dollars'];
+    const diffPct = Math.round(adj[l]*100) - Math.round(rec[l]*100);
+    const deltaClass = diff > 0 ? 'delta-up' : diff < 0 ? 'delta-down' : 'delta-same';
+    const deltaStr = diff === 0 ? '' : ` <span class="${deltaClass}">${diff>0?'+':''}${fmt$(diff)} (${diffPct>0?'+':''}${diffPct}%)</span>`;
+    return `<div class="cal-row">
+      <div class="cal-row-layer">${layerNames[l]}</div>
+      <div class="cal-row-val">${Math.round(adj[l]*100)}% — ${fmt$(adj[l+'_dollars'])}${deltaStr}</div>
+    </div>`;
+  }).join('');
+
+  // Override log
+  const entries = [];
+  const layerLabels = { l1:'L1 (Guaranteed Income)', l2:'L2 (LTC & Legacy)', l3:'L3 (Tax Efficiency & Growth)', l4:'L4 (Liquidity Bridge)' };
+  if (adj.overrides.l1Target !== null) {
+    const l1NetFromL1 = Math.round(adj.l1_dollars * 0.05 / 12);
+    const totalNet = Math.round(l1NetFromL1 + adj.ssNet + adj.annuityNet);
+    entries.push(`<div class="cal-override-entry"><strong>L1 income target:</strong> Client requested ~${fmt$(adj.overrides.l1Target)}/month net spendable guaranteed income. ` +
+      `L1 allocation set to ${fmt$(adj.l1_dollars)} → produces ~${fmt$(l1NetFromL1)}/mo tax-free from Roth annuity. ` +
+      `Combined with SS (~${fmt$(adj.ssNet)}/mo net) and annuity (~${fmt$(adj.annuityNet)}/mo net) = ~${fmt$(totalNet)}/mo total net.` +
+      (adj.notes.l1 ? ` Advisor note: ${adj.notes.l1}` : '') + '</div>');
+  }
+  if (adj.overrides.l2Target !== null) {
+    const direction = adj.l2_dollars < rec.l2_dollars ? 'reduced' : adj.l2_dollars > rec.l2_dollars ? 'increased' : 'unchanged';
+    entries.push(`<div class="cal-override-entry"><strong>L2 override:</strong> Client directed L2 to ${fmt$(adj.l2_dollars)} (model recommended ${fmt$(rec.l2_dollars)} — ${direction}).` +
+      (adj.l2_dollars === 0 ? ' L2 zeroed at client direction — capital redistributed to remaining layers.' : '') +
+      (adj.notes.l2 ? ` Advisor note: ${adj.notes.l2}` : '') + '</div>');
+  }
+  if (adj.overrides.l3Target !== null) {
+    entries.push(`<div class="cal-override-entry"><strong>L3 override:</strong> Client directed L3 to ${fmt$(adj.l3_dollars)} (model recommended ${fmt$(rec.l3_dollars)}).` +
+      (adj.l3_dollars === 0 ? ' ETA structure not to be implemented per client direction.' : '') +
+      (adj.notes.l3 ? ` Advisor note: ${adj.notes.l3}` : '') + '</div>');
+  }
+  if (adj.overrides.l4Target !== null) {
+    entries.push(`<div class="cal-override-entry"><strong>L4 override:</strong> Client requested ${fmt$(adj.l4_dollars)} in liquidity (model recommended ${fmt$(rec.l4_dollars)}). ` +
+      `20% floor (${fmt$(rec.balance*0.20)}) enforced.` +
+      (adj.notes.l4 ? ` Advisor note: ${adj.notes.l4}` : '') + '</div>');
+  }
+  // Log any unlocked layers that were affected by redistribution
+  layers.forEach(l => {
+    if (adj.overrides[l] === null) {
+      const diff = adj[l+'_dollars'] - rec[l+'_dollars'];
+      if (Math.abs(diff) > 500) {
+        entries.push(`<div class="cal-override-entry"><strong>${layerLabels[l]} adjusted (redistribution):</strong> Shifted ${diff>0?'+':''}${fmt$(diff)} to accommodate client overrides.</div>`);
+      }
+    }
+  });
+
+  document.getElementById('cal-override-entries').innerHTML = entries.join('') ||
+    '<div class="cal-override-entry" style="color:var(--gray);">No overrides recorded.</div>';
+
+  document.getElementById('cal-result').classList.add('visible');
+  document.getElementById('cal-saved-badge').style.display = 'none';
+  document.getElementById('cal-result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function resetCalibration() {
+  ['l1','l2','l3','l4'].forEach(l => {
+    document.getElementById('cal-'+l).value = '';
+    document.getElementById('cal-'+l).classList.remove('has-val','error');
+    document.getElementById('cal-'+l+'-hint').textContent = '';
+    document.getElementById('cal-'+l+'-hint').className = 'cal-constraint';
+    document.getElementById('cal-'+l+'-note').value = '';
+  });
+  document.getElementById('cal-error').style.display = 'none';
+  document.getElementById('cal-result').classList.remove('visible');
+  _calAdjusted = null;
+}
+
+async function saveAdjusted() {
+  if (!_calAdjusted || !_calRecommended) return;
+  const btn = document.querySelector('.btn-save-adj');
+  btn.textContent = 'Saving…';
+  btn.disabled = true;
+
+  try {
+    const clientId  = new URLSearchParams(window.location.search).get('client_id');
+    const suppId    = new URLSearchParams(window.location.search).get('supplement_id');
+    const session   = JSON.parse(localStorage.getItem(SESSION_KEY)||'{}');
+    const userId    = session?.user?.id;
+    const b         = _calAdjusted.balance;
+
+    const output = await sbPost('allocation_outputs', {
+      client_id:      clientId,
+      supplement_id:  suppId,
+      generated_by:   userId,
+      generated_at:   new Date().toISOString(),
+      qp_balance_used: b,
+      l1_pct: _calAdjusted.l1, l1_amount: _calAdjusted.l1_dollars,
+      l2_pct: _calAdjusted.l2, l2_amount: _calAdjusted.l2_dollars,
+      l3_pct: _calAdjusted.l3, l3_amount: _calAdjusted.l3_dollars,
+      l4_pct: _calAdjusted.l4, l4_amount: _calAdjusted.l4_dollars,
+      is_client_adjusted: true,
+      is_current: false,  // recommended version remains current
+      version: 2,
+      client_overrides: {
+        overrides: _calAdjusted.overrides,
+        notes: _calAdjusted.notes,
+        recommended: {
+          l1_pct: _calRecommended.l1, l1_dollars: _calRecommended.l1_dollars,
+          l2_pct: _calRecommended.l2, l2_dollars: _calRecommended.l2_dollars,
+          l3_pct: _calRecommended.l3, l3_dollars: _calRecommended.l3_dollars,
+          l4_pct: _calRecommended.l4, l4_dollars: _calRecommended.l4_dollars,
+        },
+        income_context: {
+          ss_net_monthly: _calAdjusted.ssNet,
+          annuity_net_monthly: _calAdjusted.annuityNet,
+          marginal_rate: _calAdjusted.marginalRate,
+        }
+      },
+      factor_log: { factors: [], note: 'Client-adjusted version — see client_overrides for override log' },
+      l1_rationale: 'Client-adjusted. See client_overrides for stated preferences.',
+      l2_rationale: 'Client-adjusted. See client_overrides for stated preferences.',
+      l3_rationale: 'Client-adjusted. See client_overrides for stated preferences.',
+      l4_rationale: 'Client-adjusted. See client_overrides for stated preferences.',
+      income_gap_annual: _calSupp?.income_gap_annual || 0,
+      risk_profile: _calSupp?.risk_profile || '',
+      is_current: false,
+    });
+
+    document.getElementById('cal-saved-badge').style.display = '';
+    btn.textContent = '✓ Saved';
+  } catch(e) {
+    btn.textContent = 'Save Client-Adjusted Version';
+    btn.disabled = false;
+    alert('Save failed — ' + e.message);
+  }
+}
+
 </script>
 </body>
 </html>
