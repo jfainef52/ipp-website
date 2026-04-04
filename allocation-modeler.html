@@ -328,6 +328,7 @@ html,body{min-height:100vh;font-family:'Barlow',sans-serif;background:#0E1C2E;co
 const SUPABASE_URL = 'https://piixgvxrasddphklgazh.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_acvdk0hBniaB6qOD8_k8XQ_9R6FNbP_';
 const SESSION_KEY  = 'ipp_sb_session';
+let allocChart     = null; // Chart.js instance — declared to prevent canvas global collision
 
 function getSession(){ try{return JSON.parse(localStorage.getItem(SESSION_KEY)||'null');}catch(e){return null;} }
 function authHeaders(){ const s=getSession(); return {'apikey':SUPABASE_KEY,'Authorization':'Bearer '+(s?.access_token||SUPABASE_KEY),'Content-Type':'application/json'}; }
@@ -445,9 +446,13 @@ function runAllocationAlgorithm(s) {
     : s.inherited_qp_timing === 'inh_mid' ? 5
     : s.inherited_qp_timing === 'inh_older' ? 2 : 6;
   const inheritedYearsRemaining = s.inherited_qp_years_remaining || timingFallback;
-  // Annual forced distribution: balance ÷ exact years remaining
-  const inheritedAnnualDist = hasInheritedQP && inheritedQPBalance > 0 && inheritedYearsRemaining > 0
-    ? inheritedQPBalance / inheritedYearsRemaining : 0;
+  // Annual forced distribution: project balance forward at 5% growth, then annualize
+  // The inherited QP is still invested — we distribute from a growing asset, not a static one
+  const INHERITED_GROWTH_RATE = 0.05;
+  const inheritedProjectedTotal = hasInheritedQP && inheritedQPBalance > 0 && inheritedYearsRemaining > 0
+    ? inheritedQPBalance * Math.pow(1 + INHERITED_GROWTH_RATE, inheritedYearsRemaining) : 0;
+  const inheritedAnnualDist = inheritedProjectedTotal > 0
+    ? inheritedProjectedTotal / inheritedYearsRemaining : 0;
 
   // LTC / health
   const healthPrimary       = s.health_status_primary       || 'good';
@@ -770,8 +775,8 @@ function runAllocationAlgorithm(s) {
 
     if (inheritedQPTakingDist) {
       addFactor('Inherited QP — active bridge income', ['L4'], 'down',
-        { years_remaining: inheritedYearsRemaining, annual_gross: Math.round(inheritedAnnualDist), annual_net: inheritedNetAnnual, gap_covered_pct: Math.round(bridgeGapCovered*100) },
-        `Inherited QP is currently distributing ~${fmt$(inheritedAnnualDist)}/yr gross (~${fmt$(inheritedNetAnnual)}/yr net at ${Math.round(marginalRate*100)}%). This is already reducing the L4 bridge requirement — ${Math.round(bridgeGapCovered*100)}% of the income gap is covered by this asset. ${bridgeGapCovered >= 1 ? 'Inherited distributions fully cover the bridge gap — L4 requirement is at its minimum floor.' : `Remaining gap of ~${fmt$(incomeGapAnnual - inheritedNetAnnual)}/yr is what L4 needs to fund.`} These funds must be fully distributed over the remaining ${inheritedYearsRemaining} year${inheritedYearsRemaining!==1?'s':''}.`
+        { years_remaining: inheritedYearsRemaining, current_balance: Math.round(inheritedQPBalance), projected_total: Math.round(inheritedProjectedTotal), annual_gross: Math.round(inheritedAnnualDist), annual_net: inheritedNetAnnual, gap_covered_pct: Math.round(bridgeGapCovered*100) },
+        `Inherited QP is currently distributing. Current balance ${fmt$(inheritedQPBalance)} projected to ${fmt$(inheritedProjectedTotal)} at 5% growth over ${inheritedYearsRemaining} years → ~${fmt$(inheritedAnnualDist)}/yr gross (~${fmt$(inheritedNetAnnual)}/yr net at ${Math.round(marginalRate*100)}%). ${Math.round(bridgeGapCovered*100)}% of income gap covered. ${bridgeGapCovered >= 1 ? 'Inherited distributions fully cover the bridge gap — L4 at minimum floor.' : `Remaining gap of ~${fmt$(incomeGapAnnual - inheritedNetAnnual)}/yr funded by L4.`}`
       );
     } else {
       addFactor('Inherited QP — available bridge income (not yet started)', ['L4'], 'note',
