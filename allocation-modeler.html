@@ -972,7 +972,7 @@ function renderOutput(s, result, clientName) {
 
   // Chart
   const COLORS = ['#4A7FB5','#7BAF84','#C8A96E','#7A8FA8'];
-  const LABELS = ['L1 — Guaranteed Income','L2 — LTC & Legacy','L3 — Tax Elimination','L4 — Liquidity Bridge'];
+  const LABELS = ['L1 — Guaranteed Income','L2 — LTC & Legacy','L3 — Tax Efficiency & Growth','L4 — Liquidity Bridge'];
   const pcts   = [l1, l2, l3, l4];
   const amts   = pcts.map(p => b*p);
 
@@ -1004,7 +1004,7 @@ function renderOutput(s, result, clientName) {
   const LAYER_DATA = [
     { cls:'l1', tag:'Layer 1', name:'Guaranteed Income Foundation', pct:l1, rat:rationales.l1 },
     { cls:'l2', tag:'Layer 2', name:'LTC & Legacy',                  pct:l2, rat:rationales.l2 },
-    { cls:'l3', tag:'Layer 3 / ETA', name:'Tax Elimination & Efficiency', pct:l3, rat:rationales.l3 },
+    { cls:'l3', tag:'Layer 3 / ETA', name:'Tax Efficiency & Growth', pct:l3, rat:rationales.l3 },
     { cls:'l4', tag:'Layer 4', name:'Liquidity & Income Bridge',     pct:l4, rat:rationales.l4 },
   ];
   document.getElementById('layer-cards').innerHTML = LAYER_DATA.map((ld,i)=>`
