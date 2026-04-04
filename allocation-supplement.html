@@ -607,11 +607,47 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
         </div>
       </div>
 
-      <div class="form-group">
-        <div class="group-title">Other Assets</div>
+      <!-- Inherited QP — only shown if flagged in SR -->
+      <div class="form-group" id="inherited-qp-group" style="display:none;">
+        <div class="group-title">Inherited Qualified Plan</div>
+        <div style="background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.25);border-radius:3px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--gold);line-height:1.6;">
+          <strong>SECURE Act Note:</strong> Most non-spouse beneficiaries who inherit an IRA or 401(k) must fully distribute the account within 10 years. Rather than viewing this as a burden, these mandatory distributions can be strategically timed to serve as bridge income — covering living expenses during the period before other retirement income sources come fully online. The timing and amount directly affect how much liquid bridge capital you need to set aside.
+        </div>
         <div class="form-row cols3">
           <div class="form-field">
-            <label>Taxable Investment Accounts <span class="optional">optional</span></label>
+            <label>Inherited Account Balance <span class="required">required</span></label>
+            <div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="f_inherited_qp_balance" placeholder="e.g. 350,000" oninput="calcExpenses()"></div>
+            <div class="field-hint">Current balance of the inherited account</div>
+          </div>
+          <div class="form-field">
+            <label>Year inherited</label>
+            <input type="number" id="f_inherited_qp_year" min="2020" max="2026" placeholder="e.g. 2022" oninput="calcInheritedYearsRemaining()">
+            <div class="field-hint" id="inherited-years-hint">10-year SECURE Act window starts the year after inheritance</div>
+          </div>
+          <div class="form-field">
+            <label>Years remaining in window</label>
+            <input type="number" id="f_inherited_qp_years_remaining" min="1" max="10" placeholder="Auto-calculated" style="color:var(--gold);" oninput="updateInheritedCalc()">
+            <div class="field-hint">Can override if you know the exact figure</div>
+          </div>
+          <div class="form-field">
+            <label>Currently taking distributions?</label>
+            <select id="f_inherited_qp_distributions" onchange="updateInheritedCalc()">
+              <option value="">Select…</option>
+              <option value="inh_dist_yes">Yes — taking distributions now</option>
+              <option value="inh_dist_no">Not yet</option>
+              <option value="inh_dist_unsure">Unsure of the rules</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row cols1" id="inherited-calc-result" style="display:none;">
+          <div class="form-field">
+            <div style="background:var(--navy3);border:1px solid var(--border);border-radius:3px;padding:12px 16px;font-size:12px;color:var(--gray);line-height:1.7;" id="inherited-calc-display"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="group-title">Other Assets</div>
             <div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="f_taxable_investment_balance" min="0" step="1000" placeholder="0"></div>
           </div>
           <div class="form-field">
@@ -1527,11 +1563,63 @@ function suggestMarginalRate() {
 
 function toggleInheritedQP() {
   const has = document.getElementById('f_has_inherited_qp')?.value === 'true';
-  ['inherited-balance-field','inherited-timing-field'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.style.display = has ? '' : 'none';
-  });
+  const group = document.getElementById('inherited-qp-group');
+  if (group) group.style.display = has ? '' : 'none';
+  if (has) updateInheritedCalc();
 }
+
+function calcInheritedYearsRemaining() {
+  const yearInherited = parseInt(document.getElementById('f_inherited_qp_year')?.value) || 0;
+  if (!yearInherited) return;
+  const windowStart = yearInherited + 1;
+  const windowEnd = windowStart + 10;
+  const currentYear = new Date().getFullYear();
+  const yearsRemaining = Math.max(1, windowEnd - currentYear);
+  const el = document.getElementById('f_inherited_qp_years_remaining');
+  if (el) el.value = yearsRemaining;
+  const hint = document.getElementById('inherited-years-hint');
+  if (hint) hint.textContent = `Window opened ${windowStart}, closes ${windowEnd} — ${yearsRemaining} year${yearsRemaining !== 1 ? 's' : ''} remaining`;
+  updateInheritedCalc();
+}
+
+function updateInheritedCalc() {
+  const balance = parseFloat((document.getElementById('f_inherited_qp_balance')?.value||'').replace(/,/g,'')) || 0;
+  const yearsRemaining = parseFloat(document.getElementById('f_inherited_qp_years_remaining')?.value) || 0;
+  const dists = document.getElementById('f_inherited_qp_distributions')?.value;
+  const result = document.getElementById('inherited-calc-result');
+  const display = document.getElementById('inherited-calc-display');
+  if (!yearsRemaining || !balance) { if (result) result.style.display = 'none'; return; }
+
+  const annualForced = Math.round(balance / yearsRemaining);
+  const fmtD = v => '$' + Math.round(v).toLocaleString();
+  const marginalRate = parseFloat(document.getElementById('f_current_marginal_rate')?.value) || 0.24;
+  const netAnnual = Math.round(annualForced * (1 - marginalRate));
+
+  const incomeGap = parseFloat(document.getElementById('f_income_gap_annual')?.value) || 0;
+  const gapCoverageNote = incomeGap > 0
+    ? netAnnual >= incomeGap
+      ? `At ${fmtD(netAnnual)}/yr net, the inherited QP distributions <strong style="color:var(--gold);">fully cover your income gap</strong> of ${fmtD(incomeGap)}/yr for the next ${yearsRemaining} year${yearsRemaining!==1?'s':''}. This substantially reduces or eliminates the bridge capital needed in Layer 4.`
+      : `At ${fmtD(netAnnual)}/yr net, these distributions cover <strong style="color:var(--gold);">${Math.round(netAnnual/incomeGap*100)}% of your income gap</strong> of ${fmtD(incomeGap)}/yr. The remaining ${fmtD(incomeGap - netAnnual)}/yr gap would be covered by Layer 4.`
+    : `Estimated net distributions of ${fmtD(netAnnual)}/yr can be applied directly toward living expenses, reducing what Layer 4 needs to hold.`;
+
+  const distNote = dists === 'inh_dist_yes'
+    ? `Currently taking distributions — these are already flowing as income. The algorithm applies this toward your bridge income needs.`
+    : dists === 'inh_dist_no'
+    ? `Not yet taking distributions. These funds must be distributed within the remaining window. Your advisor can help time withdrawals to align with your income needs and minimize tax impact.`
+    : `Distribution status to be confirmed with your advisor.`;
+
+  if (display) display.innerHTML = `
+    <strong style="color:var(--white);">Inherited QP — Bridge Income Analysis</strong><br><br>
+    Annual distribution required: <strong style="color:var(--white);">${fmtD(annualForced)}/yr</strong> (${fmtD(balance)} over ${yearsRemaining} years)<br>
+    After-tax at ${Math.round(marginalRate*100)}%: <strong style="color:var(--white);">${fmtD(netAnnual)}/yr net income</strong><br><br>
+    ${gapCoverageNote}<br><br>
+    <span style="color:var(--gray);font-size:11px;">${distNote}</span>
+  `;
+  if (result) result.style.display = '';
+}
+
+
+
 
 function enforceUniqueRanking(changedId) {
   const ids = ['f_priority_income_security','f_priority_tax_efficiency','f_priority_care_protection','f_priority_legacy','f_priority_liquidity'];
@@ -1650,6 +1738,12 @@ function collectFormData(){
     qp_balance_total:           num('f_qp_balance_total'),
     qp_roth_balance:            num('f_qp_roth_balance'),
     qp_account_types:           acctTypes.length?acctTypes:null,
+    has_inherited_qp:           document.getElementById('f_has_inherited_qp')?.value === 'true' || false,
+    inherited_qp_balance:       num('f_inherited_qp_balance'),
+    inherited_qp_timing:        val('f_inherited_qp_timing'),
+    inherited_qp_year:          intVal('f_inherited_qp_year'),
+    inherited_qp_years_remaining: num('f_inherited_qp_years_remaining'),
+    inherited_qp_distributions: val('f_inherited_qp_distributions'),
     taxable_investment_balance: num('f_taxable_investment_balance'),
     primary_residence_value:    num('f_primary_residence_value'),
     other_assets_balance:       num('f_other_assets_balance'),
@@ -1925,6 +2019,7 @@ function calcExpenses(){
 // Add hidden income_gap field for collection
 document.addEventListener('DOMContentLoaded',()=>{
   const h=document.createElement('input');h.type='hidden';h.id='f_income_gap_annual';document.body.appendChild(h);
+  const h2=document.createElement('input');h2.type='hidden';h2.id='f_has_inherited_qp';h2.value='false';document.body.appendChild(h2);
 });
 
 // ── Years to retirement auto-calc ─────────────────────────────
@@ -2184,6 +2279,21 @@ function prefillFromSR(answers){
     const spouseAge=Math.floor((Date.now()-new Date(answers.spouse_dob))/(365.25*24*3600*1000));
     if(spouseAge>0){ document.getElementById('f_spouse_age').value=spouseAge; }
   }
+  // Inherited QP — show section if flagged in SR
+  if(answers.has_inherited_qp === 'inh_yes'){
+    const hiddenEl = document.getElementById('f_has_inherited_qp');
+    if(hiddenEl) hiddenEl.value = 'true';
+    toggleInheritedQP();
+    // Pre-fill timing and distributions from SR if available
+    if(answers.inherited_qp_timing){
+      const el = document.getElementById('f_inherited_qp_timing');
+      if(el) el.value = answers.inherited_qp_timing;
+    }
+    if(answers.inherited_qp_distributions){
+      const el = document.getElementById('f_inherited_qp_distributions');
+      if(el) el.value = answers.inherited_qp_distributions;
+    }
+  }
 }
 
 // ── Restore from saved supplement ────────────────────────────
@@ -2221,6 +2331,16 @@ function restoreFromSupplement(s){
     if(el) { el.value = s.has_inherited_qp ? 'true' : 'false'; toggleInheritedQP(); }
   }
   if(s.inherited_qp_balance) { const el = document.getElementById('f_inherited_qp_balance'); if(el) el.value = s.inherited_qp_balance; }
+  if(s.inherited_qp_year) { const el = document.getElementById('f_inherited_qp_year'); if(el) { el.value = s.inherited_qp_year; calcInheritedYearsRemaining(); } }
+  if(s.inherited_qp_years_remaining) { const el = document.getElementById('f_inherited_qp_years_remaining'); if(el) el.value = s.inherited_qp_years_remaining; }
+  if(s.inherited_qp_timing) { const el = document.getElementById('f_inherited_qp_timing'); if(el) el.value = s.inherited_qp_timing; }
+  if(s.inherited_qp_distributions) { const el = document.getElementById('f_inherited_qp_distributions'); if(el) el.value = s.inherited_qp_distributions; }
+  if(s.has_inherited_qp) {
+    const hiddenEl = document.getElementById('f_has_inherited_qp');
+    if(hiddenEl) hiddenEl.value = s.has_inherited_qp ? 'true' : 'false';
+    toggleInheritedQP();
+    updateInheritedCalc();
+  }
   // Format all currency fields after restore
   formatAllCurrencyInputs();
 }
