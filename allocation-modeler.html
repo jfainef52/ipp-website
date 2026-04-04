@@ -240,7 +240,14 @@ html,body{min-height:100vh;font-family:'Barlow',sans-serif;background:#0E1C2E;co
 .btn-recalibrate{background:var(--gold);color:var(--navy);border:none;border-radius:3px;padding:9px 22px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;cursor:pointer;transition:opacity .15s;}
 .btn-recalibrate:hover{opacity:.85;}
 .btn-reset-cal{background:transparent;color:var(--gray);border:1px solid var(--border);border-radius:3px;padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;cursor:pointer;}
-.cal-error-msg{font-size:12px;color:var(--error);display:none;padding:8px 12px;background:rgba(220,80,80,.08);border:1px solid rgba(220,80,80,.25);border-radius:3px;}
+.cal-error-msg{font-size:12px;color:var(--error);display:none;padding:10px 14px;background:rgba(220,80,80,.08);border:1px solid rgba(220,80,80,.3);border-radius:3px;line-height:1.6;}
+.cal-warning-msg{font-size:12px;color:#E8A050;display:none;padding:10px 14px;background:rgba(232,160,80,.07);border:1px solid rgba(232,160,80,.35);border-radius:3px;line-height:1.6;}
+.cal-warning-title{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;color:#E8A050;}
+.cal-error-title{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;color:var(--error);}
+.cal-feasibility-item{padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05);}
+.cal-feasibility-item:last-child{border-bottom:none;}
+.cal-feasibility-accept{background:var(--gold);color:var(--navy);border:none;border-radius:3px;padding:7px 18px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;margin-top:10px;margin-right:8px;}
+.cal-feasibility-revise{background:transparent;color:var(--gray);border:1px solid var(--border);border-radius:3px;padding:7px 14px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;margin-top:10px;}
 /* Comparison result */
 .cal-result{margin-top:20px;display:none;}
 .cal-result.visible{display:block;}
@@ -462,6 +469,7 @@ html,body{min-height:100vh;font-family:'Barlow',sans-serif;background:#0E1C2E;co
         </div>
       </div>
 
+      <div class="cal-warning-msg" id="cal-warning"></div>
       <div class="cal-error-msg" id="cal-error"></div>
       <div class="cal-actions">
         <button class="btn-recalibrate" onclick="runCalibration()">Recalibrate Allocation</button>
@@ -1657,67 +1665,238 @@ function onCalInput(el, layer) {
   }
 }
 
-function runCalibration() {
+function runCalibration(bypassWarning) {
   const { balance: b, marginalRate, ssNet, annuityNet, l2Max } = window._calConstraints || {};
-  const errEl = document.getElementById('cal-error');
-  errEl.style.display = 'none';
+  const errEl  = document.getElementById('cal-error');
+  const warnEl = document.getElementById('cal-warning');
+  errEl.style.display  = 'none';
+  warnEl.style.display = 'none';
 
   const parseInput = id => {
     const v = document.getElementById(id).value.trim();
     return v === '' ? null : parseFloat(v.replace(/,/g,''));
   };
 
-  const l1Target = parseInput('cal-l1');  // monthly net income target
-  const l2Target = parseInput('cal-l2');  // dollar amount
-  const l3Target = parseInput('cal-l3');  // dollar amount
-  const l4Target = parseInput('cal-l4');  // dollar amount
+  const l1Target = parseInput('cal-l1');
+  const l2Target = parseInput('cal-l2');
+  const l3Target = parseInput('cal-l3');
+  const l4Target = parseInput('cal-l4');
 
-  // If nothing entered, show message
   if (l1Target === null && l2Target === null && l3Target === null && l4Target === null) {
-    errEl.textContent = 'No overrides entered — adjust at least one layer to recalibrate.';
+    errEl.innerHTML = '<div class="cal-error-title">No Overrides Entered</div>Adjust at least one layer to recalibrate.';
     errEl.style.display = 'block';
     return;
   }
 
-  // ── Validate all constraints before proceeding ─────────────
-  const errors = [];
-  if (l2Target !== null && l2Target > l2Max) errors.push(`L2 cannot exceed the model recommendation of ${fmt$(l2Max)}`);
-  if (l2Target !== null && l2Target > 0 && l2Target < 125000) errors.push(`L2 must be $0 or at least $125,000 — minimum for a viable leveraged life/LTC structure`);
-  if (l3Target !== null && l3Target > 0 && l3Target < 400000) errors.push('L3 must be $0 or at least $400,000');
-  if (l4Target !== null && l4Target < b * 0.20) errors.push(`L4 cannot go below the 20% floor (${fmt$(b*0.20)})`);
+  // ── TIER 1: Hard constraint violations (block immediately) ─────────────
+  // These are mathematically invalid inputs — cannot proceed under any circumstances.
+  const hardErrors = [];
+  if (l2Target !== null && l2Target > l2Max)
+    hardErrors.push(`L2 cannot exceed the model recommendation of ${fmt$(l2Max)} — the model formula sets the maximum based on this client's balance and insurable lives.`);
+  if (l2Target !== null && l2Target > 0 && l2Target < 125000)
+    hardErrors.push(`L2 must be $0 or at least $125,000. A smaller amount does not support a viable leveraged life/LTC structure.`);
+  if (l3Target !== null && l3Target > 0 && l3Target < 400000)
+    hardErrors.push(`L3 must be $0 or at least $400,000. Amounts between $1 and $399,999 are not sufficient for a viable ETA structure.`);
+  if (l4Target !== null && l4Target < b * 0.20)
+    hardErrors.push(`L4 cannot go below the 20% floor of ${fmt$(b * 0.20)}. This floor protects against forced early retirement, healthcare cost escalation, and unforeseen expenses.`);
 
-  if (errors.length > 0) {
-    errEl.innerHTML = errors.map(e => '⚠ ' + e).join('<br>');
+  if (hardErrors.length > 0) {
+    errEl.innerHTML = '<div class="cal-error-title">⛔ Cannot Proceed — Invalid Input</div>' +
+      hardErrors.map(e => `<div class="cal-feasibility-item">• ${e}</div>`).join('') +
+      '<br>Please correct the inputs above before recalibrating.';
     errEl.style.display = 'block';
     return;
   }
 
-  // ── Convert L1 monthly net target to dollar allocation ─────
-  // L1 = Roth annuity (tax-free). Net monthly from L1 = l1Target - ssNet - annuityNet
+  // ── Convert L1 income target to dollar allocation ──────────────────────
   let l1Dollars = _calRecommended.l1_dollars;
   if (l1Target !== null) {
     const l1NetNeeded = Math.max(0, l1Target - ssNet - annuityNet);
     l1Dollars = Math.round((l1NetNeeded * 12) / 0.05);
   }
-
   let l2Dollars = l2Target !== null ? l2Target : _calRecommended.l2_dollars;
   let l3Dollars = l3Target !== null ? l3Target : _calRecommended.l3_dollars;
   let l4Dollars = l4Target !== null ? Math.max(l4Target, b * 0.20) : _calRecommended.l4_dollars;
 
-  // ── Check if overrides are even feasible ───────────────────
-  const lockedSum = l1Dollars + l2Dollars + l3Dollars + l4Dollars;
+  // ── TIER 2: Simulate constrained outcome, then warn with concrete result ──
+  // Run once — if bypassWarning=true the advisor has reviewed and accepted.
+  if (!bypassWarning) {
+    const L4_FLOOR  = b * 0.20;
+    const L2_MIN    = 125000;
+    const L3_MIN    = 400000;
+    const overrideCount = [l1Target, l2Target, l3Target, l4Target].filter(v => v !== null).length;
 
-  // If user locked all 4 layers
-  const overrideCount = [l1Target, l2Target, l3Target, l4Target].filter(v => v !== null).length;
-  if (overrideCount === 4 && Math.round(lockedSum) !== Math.round(b)) {
-    const diff = lockedSum - b;
-    errEl.textContent = `The four layer targets sum to ${fmt$(lockedSum)}, but the balance is ${fmt$(b)}. ` +
-      `They are ${fmt$(Math.abs(diff))} ${diff > 0 ? 'over' : 'under'}. Adjust one or more targets to reach the balance exactly, or leave a layer blank to let it absorb the difference.`;
-    errEl.style.display = 'block';
-    return;
+    // Hard block: locked layers alone exceed balance
+    const lockedOnly = (l1Target !== null ? l1Dollars : 0) +
+                       (l2Target !== null ? l2Dollars : 0) +
+                       (l3Target !== null ? l3Dollars : 0) +
+                       (l4Target !== null ? l4Dollars : 0);
+    if (lockedOnly > b + 1) {
+      errEl.innerHTML =
+        `<div class="cal-error-title">⛔ Cannot Proceed — Targets Exceed Balance</div>` +
+        `<div class="cal-feasibility-item">The requested allocations total ${fmt$(lockedOnly)}, which is ${fmt$(lockedOnly - b)} more than the ${fmt$(b)} balance. ` +
+        `Reduce at least one target so the locked layers sum to less than ${fmt$(b)}.</div>`;
+      errEl.style.display = 'block';
+      return;
+    }
+
+    // Hard block: all 4 locked and don't sum to balance
+    if (overrideCount === 4 && Math.abs(lockedOnly - b) > 1) {
+      const diff = lockedOnly - b;
+      errEl.innerHTML =
+        `<div class="cal-error-title">⛔ Cannot Proceed — Four Layers Don't Sum to Balance</div>` +
+        `<div class="cal-feasibility-item">All four layers total ${fmt$(lockedOnly)} — ${fmt$(Math.abs(diff))} ${diff > 0 ? 'over' : 'under'} the ${fmt$(b)} balance. ` +
+        `Leave at least one layer blank to absorb the difference, or adjust targets to sum exactly to ${fmt$(b)}.</div>`;
+      errEl.style.display = 'block';
+      return;
+    }
+
+    // ── Simulate the constrained outcome ─────────────────────────────────
+    // Work out what the allocation WOULD actually be given all constraints,
+    // then surface any forced trade-offs before the advisor commits.
+    const remaining = b - lockedOnly;
+
+    // For unlocked layers, figure out what they can actually receive
+    // after respecting minimums and floors
+    let sim = {
+      l1: l1Target !== null ? l1Dollars : _calRecommended.l1_dollars,
+      l2: l2Target !== null ? l2Dollars : _calRecommended.l2_dollars,
+      l3: l3Target !== null ? l3Dollars : _calRecommended.l3_dollars,
+      l4: l4Target !== null ? l4Dollars : _calRecommended.l4_dollars,
+    };
+
+    // Proportional redistribution on unlocked layers
+    const unlockedRec = (l1Target===null?_calRecommended.l1_dollars:0)+
+                        (l2Target===null?_calRecommended.l2_dollars:0)+
+                        (l3Target===null?_calRecommended.l3_dollars:0)+
+                        (l4Target===null?_calRecommended.l4_dollars:0);
+    const diff = remaining - unlockedRec;
+    if (Math.abs(diff) > 1 && unlockedRec > 0) {
+      ['l1','l2','l3','l4'].forEach(l => {
+        const rec_val = _calRecommended[l+'_dollars'];
+        if ([l1Target,l2Target,l3Target,l4Target][['l1','l2','l3','l4'].indexOf(l)] === null && rec_val > 0) {
+          sim[l] = Math.max(0, Math.round(rec_val + diff * (rec_val / unlockedRec)));
+        }
+      });
+    }
+    // Enforce L4 floor on unlocked L4
+    if (l4Target === null && sim.l4 < L4_FLOOR) sim.l4 = Math.round(L4_FLOOR);
+    // Enforce L2 gap on unlocked L2
+    if (l2Target === null && sim.l2 > 0 && sim.l2 < L2_MIN) sim.l2 = 0;
+    // Enforce L3 gap on unlocked L3
+    if (l3Target === null && sim.l3 > 0 && sim.l3 < L3_MIN) sim.l3 = 0;
+    // Re-balance after gap enforcement
+    const simTotal = sim.l1 + sim.l2 + sim.l3 + sim.l4;
+    const simDiff  = b - simTotal;
+    if (Math.abs(simDiff) > 1) {
+      // Push remainder to largest unlocked layer
+      const adj = ['l1','l2','l3','l4']
+        .filter(l => [l1Target,l2Target,l3Target,l4Target][['l1','l2','l3','l4'].indexOf(l)] === null)
+        .sort((a,c) => sim[c] - sim[a])[0];
+      if (adj) sim[adj] = Math.max(0, sim[adj] + simDiff);
+    }
+
+    // ── Compare sim to recommended — identify forced trade-offs ──────────
+    const warnings = [];
+    const forcedChanges = [];
+
+    // Forced zeros (layer had value in rec, now zero due to constraints)
+    if (_calRecommended.l2_dollars > 0 && sim.l2 === 0 && l2Target === null) {
+      forcedChanges.push(`<strong>L2 forced to $0</strong> — insufficient remaining balance to meet the $125,000 minimum after L4 and L3. ` +
+        `The LTC & legacy structure is eliminated as a mathematical consequence of the other allocations, not a client decision. ` +
+        `The advisor should confirm the client understands this trade-off explicitly.`);
+    }
+    if (_calRecommended.l3_dollars > 0 && sim.l3 === 0 && l3Target === null) {
+      forcedChanges.push(`<strong>L3 forced to $0</strong> — insufficient remaining balance to meet the $400,000 ETA minimum. ` +
+        `The tax repositioning structure is eliminated as a mathematical consequence of the other allocations. ` +
+        `<strong>L1 structure also requires review:</strong> without L3, the financing mechanism for the Roth conversion is eliminated. ` +
+        `Advisor should discuss alternatives: qualified annuity, non-qualified annuity, or Roth conversion paid out of pocket.`);
+    }
+    if (_calRecommended.l1_dollars > 0 && sim.l1 === 0 && l1Target === null) {
+      forcedChanges.push(`<strong>L1 reduced to $0</strong> — no remaining balance for new guaranteed income structure. ` +
+        `The client's only guaranteed income will be Social Security (~${fmt$(Math.round(ssNet + annuityNet))}/mo net).`);
+    }
+
+    // Large L1 income requirement
+    if (l1Target !== null && l1Dollars > b * 0.55) {
+      const maxSustainableNet = Math.round((b * 0.55 * 0.05 / 12) + ssNet + annuityNet);
+      warnings.push(`The income target requires ${fmt$(l1Dollars)} (${Math.round(l1Dollars/b*100)}% of balance) for L1. ` +
+        `At 55%+ of the balance, this significantly constrains protection and liquidity. ` +
+        `Maximum sustainable income target keeping L1 ≤ 55% is approximately ${fmt$(maxSustainableNet)}/mo.`);
+    }
+
+    // Large L4 request
+    if (l4Target !== null && l4Dollars > b * 0.45) {
+      warnings.push(`L4 of ${fmt$(l4Dollars)} (${Math.round(l4Dollars/b*100)}% of balance) leaves only ${fmt$(b - l4Dollars)} ` +
+        `for L1, L2, and L3 combined. At this level, one or more protection/income structures may be eliminated.`);
+    }
+
+    // L1 goes to zero from income target exceeding capacity
+    if (l1Target !== null && sim.l1 <= 0 && remaining <= 0) {
+      forcedChanges.push(`<strong>Income target is not achievable</strong> — the L1 allocation required (${fmt$(l1Dollars)}) ` +
+        `exceeds what remains after the other locked layers. Maximum achievable from new structure: ${fmt$(Math.max(0, remaining))} → ${fmt$(Math.round(Math.max(0,remaining)*0.05/12))}/mo.`);
+    }
+
+    if (forcedChanges.length === 0 && warnings.length === 0) {
+      // No concerns — proceed directly
+    } else {
+      // Build the simulated outcome display
+      const simL1Net = Math.round(sim.l1 * 0.05 / 12);
+      const simTotalNet = simL1Net + Math.round(ssNet) + Math.round(annuityNet);
+      const outcomeHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin:10px 0 4px;font-size:11px;">
+          <div style="background:rgba(74,127,181,.12);border:1px solid rgba(74,127,181,.3);border-radius:3px;padding:8px;text-align:center;">
+            <div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--gray);margin-bottom:3px;">L1</div>
+            <div style="font-weight:700;color:var(--white);">${Math.round(sim.l1/b*100)}%</div>
+            <div style="color:var(--gray);">${fmt$(sim.l1)}</div>
+          </div>
+          <div style="background:rgba(123,175,132,.12);border:1px solid rgba(123,175,132,.3);border-radius:3px;padding:8px;text-align:center;">
+            <div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--gray);margin-bottom:3px;">L2</div>
+            <div style="font-weight:700;color:${sim.l2===0&&_calRecommended.l2_dollars>0?'#E07070':'var(--white)'};">${Math.round(sim.l2/b*100)}%</div>
+            <div style="color:var(--gray);">${fmt$(sim.l2)}</div>
+          </div>
+          <div style="background:rgba(200,169,110,.12);border:1px solid rgba(200,169,110,.3);border-radius:3px;padding:8px;text-align:center;">
+            <div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--gray);margin-bottom:3px;">L3</div>
+            <div style="font-weight:700;color:${sim.l3===0&&_calRecommended.l3_dollars>0?'#E07070':'var(--white)'};">${Math.round(sim.l3/b*100)}%</div>
+            <div style="color:var(--gray);">${fmt$(sim.l3)}</div>
+          </div>
+          <div style="background:rgba(122,143,168,.12);border:1px solid rgba(122,143,168,.3);border-radius:3px;padding:8px;text-align:center;">
+            <div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--gray);margin-bottom:3px;">L4</div>
+            <div style="font-weight:700;color:var(--white);">${Math.round(sim.l4/b*100)}%</div>
+            <div style="color:var(--gray);">${fmt$(sim.l4)}</div>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--gray);margin-bottom:8px;">Projected guaranteed income: <strong style="color:var(--warm);">${fmt$(simTotalNet)}/mo net</strong> (SS ${fmt$(Math.round(ssNet))}/mo + L1 ${fmt$(simL1Net)}/mo)</div>`;
+
+      if (forcedChanges.length > 0) {
+        warnEl.innerHTML =
+          `<div class="cal-warning-title">⚠ Forced Trade-Offs — Review With Client Before Proceeding</div>` +
+          `<div style="font-size:11px;color:var(--warm);margin-bottom:8px;">This is what the allocation would actually look like:</div>` +
+          outcomeHTML +
+          `<div style="margin-bottom:8px;">` +
+          forcedChanges.map(w => `<div class="cal-feasibility-item" style="margin-bottom:4px;">• ${w}</div>`).join('') +
+          `</div>` +
+          (warnings.length > 0 ? warnings.map(w => `<div class="cal-feasibility-item" style="color:var(--gray);font-size:11px;">• ${w}</div>`).join('') : '') +
+          `<div style="margin-top:10px;font-size:11px;color:var(--gray);">The advisor should walk through these consequences with the client explicitly. ` +
+          `Clicking "Proceed" will produce this allocation and document the trade-offs in the override log.</div>` +
+          `<div><button class="cal-feasibility-accept" onclick="runCalibration(true)">Client Understands — Proceed</button>` +
+          `<button class="cal-feasibility-revise" onclick="document.getElementById('cal-warning').style.display='none'">Revise Inputs</button></div>`;
+      } else {
+        warnEl.innerHTML =
+          `<div class="cal-warning-title">⚠ Review Before Proceeding</div>` +
+          outcomeHTML +
+          warnings.map(w => `<div class="cal-feasibility-item">• ${w}</div>`).join('') +
+          `<div><button class="cal-feasibility-accept" onclick="runCalibration(true)">Understood — Proceed</button>` +
+          `<button class="cal-feasibility-revise" onclick="document.getElementById('cal-warning').style.display='none'">Revise Inputs</button></div>`;
+      }
+      warnEl.style.display = 'block';
+      return;
+    }
   }
 
   // ── Proportional redistribution across unlocked layers ────
+  
+    // ── Proportional redistribution across unlocked layers ────
   // No preset order. Unlocked layers each give up or receive
   // a proportional share of the difference based on their
   // recommended sizes. The client sets targets — the math
@@ -1916,7 +2095,9 @@ function renderCalibrationResult(adj) {
   }
   if (adj.overrides.l3Target !== null) {
     entries.push(`<div class="cal-override-entry"><strong>L3 override:</strong> Client directed L3 to ${fmt$(adj.l3_dollars)} (model recommended ${fmt$(rec.l3_dollars)}).` +
-      (adj.l3_dollars === 0 ? ' ETA structure not to be implemented per client direction.' : '') +
+      (adj.l3_dollars === 0 ?
+        ' ETA structure not to be implemented per client direction.' +
+        ' <span style="color:var(--gold);"><strong>Advisor note — L1 structure requires review:</strong> The IncomeArc™ L1 Roth annuity relies on the L3 leveraged structure to finance the tax cost of the Roth conversion. With L3 at $0, the financing mechanism is eliminated. Advisor should discuss the following alternatives with the client: (1) Qualified annuity — purchased inside the qualified plan, income is taxable but the guarantee structure remains; (2) Non-qualified annuity — funded with after-tax dollars, growth tax-deferred with exclusion ratio on distributions; (3) Roth conversion paid out of pocket — client uses outside cash to cover the conversion tax, preserving the tax-free Roth annuity income without L3 financing. Document the agreed approach before proceeding.</span>' : '') +
       (adj.notes.l3 ? ` Advisor note: ${adj.notes.l3}` : '') + '</div>');
   }
   if (adj.overrides.l4Target !== null) {
@@ -2004,6 +2185,7 @@ function restoreChartToRecommended() {
 
 function resetCalibration() {
   restoreChartToRecommended();
+  document.getElementById('cal-warning').style.display = 'none';
   ['l1','l2','l3','l4'].forEach(l => {
     document.getElementById('cal-'+l).value = '';
     document.getElementById('cal-'+l).classList.remove('has-val','error');
