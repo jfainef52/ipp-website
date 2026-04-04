@@ -1940,9 +1940,70 @@ function renderCalibrationResult(adj) {
   document.getElementById('cal-result').classList.add('visible');
   document.getElementById('cal-saved-badge').style.display = 'none';
   document.getElementById('cal-result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  // Update the donut chart to reflect client-adjusted allocations
+  updateChartForCalibration(adj);
 }
 
+function updateChartForCalibration(adj) {
+  if (!allocChart || !adj) return;
+  const adjPcts = [adj.l1, adj.l2, adj.l3, adj.l4].map(p => Math.round(p * 100));
+  allocChart.data.datasets[0].data = adjPcts;
+  allocChart.update();
+
+  // Update legend to match adjusted values
+  const COLORS = ['#4A7FB5','#7BAF84','#C8A96E','#7A8FA8'];
+  const LABELS = ['L1 — Guaranteed Income','L2 — LTC & Legacy','L3 — Tax Efficiency & Growth','L4 — Liquidity Bridge'];
+  const amts = [adj.l1_dollars, adj.l2_dollars, adj.l3_dollars, adj.l4_dollars];
+  document.getElementById('chart-legend').innerHTML = LABELS.map((lbl,i)=>`
+    <div class="legend-item">
+      <div class="legend-dot" style="background:${COLORS[i]}"></div>
+      <div class="legend-label">${lbl}</div>
+      <div>
+        <div class="legend-pct">${adjPcts[i]}%</div>
+        <div class="legend-amt">${fmt$(amts[i])}</div>
+      </div>
+    </div>`).join('');
+
+  // Add a "Client Adjusted" badge above the chart
+  const chartWrap = document.querySelector('.chart-wrap');
+  if (chartWrap && !document.getElementById('cal-chart-badge')) {
+    const badge = document.createElement('div');
+    badge.id = 'cal-chart-badge';
+    badge.style.cssText = 'text-align:center;font-family:"Barlow Condensed",sans-serif;font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--gold);margin-bottom:6px;';
+    badge.textContent = '⚖ Client-Adjusted Allocation';
+    chartWrap.insertBefore(badge, chartWrap.firstChild);
+  }
+}
+
+function restoreChartToRecommended() {
+  if (!allocChart || !_calRecommended) return;
+  const recPcts = [_calRecommended.l1, _calRecommended.l2, _calRecommended.l3, _calRecommended.l4].map(p => Math.round(p * 100));
+  allocChart.data.datasets[0].data = recPcts;
+  allocChart.update();
+
+  // Restore legend
+  const COLORS = ['#4A7FB5','#7BAF84','#C8A96E','#7A8FA8'];
+  const LABELS = ['L1 — Guaranteed Income','L2 — LTC & Legacy','L3 — Tax Efficiency & Growth','L4 — Liquidity Bridge'];
+  const amts = [_calRecommended.l1_dollars, _calRecommended.l2_dollars, _calRecommended.l3_dollars, _calRecommended.l4_dollars];
+  document.getElementById('chart-legend').innerHTML = LABELS.map((lbl,i)=>`
+    <div class="legend-item">
+      <div class="legend-dot" style="background:${COLORS[i]}"></div>
+      <div class="legend-label">${lbl}</div>
+      <div>
+        <div class="legend-pct">${recPcts[i]}%</div>
+        <div class="legend-amt">${fmt$(amts[i])}</div>
+      </div>
+    </div>`).join('');
+
+  // Remove client-adjusted badge
+  const badge = document.getElementById('cal-chart-badge');
+  if (badge) badge.remove();
+}
+
+
 function resetCalibration() {
+  restoreChartToRecommended();
   ['l1','l2','l3','l4'].forEach(l => {
     document.getElementById('cal-'+l).value = '';
     document.getElementById('cal-'+l).classList.remove('has-val','error');
@@ -2038,6 +2099,8 @@ function exitCalibrationMode() {
   document.getElementById('main-content').style.display = 'block';
   document.getElementById('btn-cal-mode').classList.remove('active');
   document.getElementById('btn-print').style.display = '';
+  // Restore chart to recommended allocation when returning to results view
+  restoreChartToRecommended();
   window.scrollTo({top:0, behavior:'smooth'});
 }
 
