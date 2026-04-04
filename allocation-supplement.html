@@ -389,21 +389,24 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
       <div class="step-dot"></div>
       <div><div class="step-label">4 · Expenses &amp; Cash Flow</div></div>
     </div>
-    <div class="nav-step" onclick="goToSection(4)" id="nav-4">
-      <div class="step-dot"></div>
-      <div><div class="step-label">5 · Risk Profile</div></div>
+    <div class="nav-step" id="nav-4" onclick="goToSection(4)" style="display:none;" id="nav-inherited">
+      <div><div class="step-label">5 · Inherited Plan</div></div>
     </div>
     <div class="nav-step" onclick="goToSection(5)" id="nav-5">
       <div class="step-dot"></div>
-      <div><div class="step-label">6 · Protection Inventory</div></div>
+      <div><div class="step-label">6 · Risk Profile</div></div>
     </div>
     <div class="nav-step" onclick="goToSection(6)" id="nav-6">
       <div class="step-dot"></div>
-      <div><div class="step-label">7 · Goals Hierarchy</div></div>
+      <div><div class="step-label">7 · Protection Inventory</div></div>
     </div>
     <div class="nav-step" onclick="goToSection(7)" id="nav-7">
       <div class="step-dot"></div>
-      <div><div class="step-label">8 · Advisor Observations</div></div>
+      <div><div class="step-label">8 · Goals Hierarchy</div></div>
+    </div>
+    <div class="nav-step" onclick="goToSection(8)" id="nav-8">
+      <div class="step-dot"></div>
+      <div><div class="step-label">9 · Advisor Observations</div></div>
     </div>
     <div style="flex:1;"></div>
     <div class="side-progress">
@@ -422,7 +425,7 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
 
     <!-- ── SECTION 1: Identity ───────────────── -->
     <div class="form-section active" id="section-0">
-      <div class="section-eyebrow">Section 1 of 8</div>
+      <div class="section-eyebrow">Section 1 of 9</div>
       <div class="section-title">Identity &amp; <em>Context</em></div>
       <div class="section-desc">Pre-populated from the StructureReview™. Confirm and fill any gaps before proceeding.</div>
       <div class="section-rule"></div>
@@ -573,7 +576,7 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
 
     <!-- ── SECTION 2: Financial Position ────────── -->
     <div class="form-section" id="section-1">
-      <div class="section-eyebrow">Section 2 of 8</div>
+      <div class="section-eyebrow">Section 2 of 9</div>
       <div class="section-title">Financial <em>Position</em></div>
       <div class="section-desc">Exact balances from most recent statements. These numbers drive the allocation algorithm directly — precision matters.</div>
       <div class="section-rule"></div>
@@ -603,45 +606,6 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
               <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--warm);cursor:pointer;"><input type="checkbox" value="TSP" class="acct-type-cb" style="width:auto;"> TSP</label>
               <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--warm);cursor:pointer;"><input type="checkbox" value="DB" class="acct-type-cb" style="width:auto;"> Defined Benefit / Cash Balance</label>
             </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Inherited QP — only shown if flagged in SR -->
-      <div class="form-group" id="inherited-qp-group" style="display:none;">
-        <div class="group-title">Inherited Qualified Plan</div>
-        <div style="background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.25);border-radius:3px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--gold);line-height:1.6;">
-          <strong>SECURE Act Note:</strong> Most non-spouse beneficiaries who inherit an IRA or 401(k) must fully distribute the account within 10 years. Rather than viewing this as a burden, these mandatory distributions can be strategically timed to serve as bridge income — covering living expenses during the period before other retirement income sources come fully online. The timing and amount directly affect how much liquid bridge capital you need to set aside.
-        </div>
-        <div class="form-row cols3">
-          <div class="form-field">
-            <label>Inherited Account Balance <span class="required">required</span></label>
-            <div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="f_inherited_qp_balance" placeholder="e.g. 350,000" oninput="calcExpenses()"></div>
-            <div class="field-hint">Current balance of the inherited account</div>
-          </div>
-          <div class="form-field">
-            <label>Year inherited</label>
-            <input type="number" id="f_inherited_qp_year" min="2020" max="2026" placeholder="e.g. 2022" oninput="calcInheritedYearsRemaining()">
-            <div class="field-hint" id="inherited-years-hint">10-year SECURE Act window starts the year after inheritance</div>
-          </div>
-          <div class="form-field">
-            <label>Years remaining in window</label>
-            <input type="number" id="f_inherited_qp_years_remaining" min="1" max="10" placeholder="Auto-calculated" style="color:var(--gold);" oninput="updateInheritedCalc()">
-            <div class="field-hint">Can override if you know the exact figure</div>
-          </div>
-          <div class="form-field">
-            <label>Currently taking distributions?</label>
-            <select id="f_inherited_qp_distributions" onchange="updateInheritedCalc()">
-              <option value="">Select…</option>
-              <option value="inh_dist_yes">Yes — taking distributions now</option>
-              <option value="inh_dist_no">Not yet</option>
-              <option value="inh_dist_unsure">Unsure of the rules</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-row cols1" id="inherited-calc-result" style="display:none;">
-          <div class="form-field">
-            <div style="background:var(--navy3);border:1px solid var(--border);border-radius:3px;padding:12px 16px;font-size:12px;color:var(--gray);line-height:1.7;" id="inherited-calc-display"></div>
           </div>
         </div>
       </div>
@@ -686,7 +650,7 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
 
     <!-- ── SECTION 3: Income Architecture ───────── -->
     <div class="form-section" id="section-2">
-      <div class="section-eyebrow">Section 3 of 8</div>
+      <div class="section-eyebrow">Section 3 of 9</div>
       <div class="section-title">Income <em>Architecture</em></div>
       <div class="section-desc">All guaranteed and semi-guaranteed income sources. These determine the income gap that Layer 1 must fund.</div>
       <div class="section-rule"></div>
@@ -808,7 +772,7 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
 
     <!-- ── SECTION 4: Expenses ───────────────────── -->
     <div class="form-section" id="section-3">
-      <div class="section-eyebrow">Section 4 of 8</div>
+      <div class="section-eyebrow">Section 4 of 9</div>
       <div class="section-title">Expenses &amp; <em>Cash Flow</em></div>
       <div class="section-desc">The essential vs. discretionary split drives the income gap calculation. Be as specific as possible — this is the most important input for Layer 1 sizing.</div>
       <div class="section-rule"></div>
@@ -921,13 +885,66 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
 
       <div class="section-nav">
         <button class="btn-secondary" onclick="goToSection(2)">&#8592; Back</button>
-        <button class="btn-primary" onclick="goToSection(4)">Next: Risk Profile &#8594;</button>
+        <button class="btn-primary" onclick="goToSection(5)">Next: Inherited Plan &#8594;</button>
+      </div>
+    </div>
+
+    <!-- ── SECTION 4b: Inherited QP Analysis ───── -->
+    <div class="form-section" id="section-4" style="display:none;">
+      <div class="section-eyebrow">Section 5 of 9</div>
+      <div class="section-title">Inherited <em>Plan Analysis</em></div>
+      <div class="section-desc">You indicated an inherited qualified plan in your StructureReview™. These funds must be distributed within the SECURE Act 10-year window — but rather than viewing this as a tax burden, it is a strategic bridge income asset that can reduce what you need to set aside in Layer 4.</div>
+      <div class="section-rule"></div>
+
+      <div class="form-group">
+        <div class="group-title">Inherited Plan Details</div>
+        <div style="background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.25);border-radius:3px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:var(--gold);line-height:1.6;">
+          <strong>SECURE Act:</strong> Most non-spouse beneficiaries must fully distribute an inherited IRA or 401(k) within 10 years. These mandatory distributions can be strategically timed to serve as bridge income — covering living expenses before other retirement income comes fully online. The timing and amount directly affect how much capital Layer 4 needs to hold.
+        </div>
+        <div class="form-row cols3">
+          <div class="form-field">
+            <label>Inherited Account Balance <span class="required">required</span></label>
+            <div class="input-prefix"><span>$</span><input type="text" inputmode="numeric" pattern="[0-9,]*" id="f_inherited_qp_balance" placeholder="e.g. 350,000" oninput="updateInheritedCalc()"></div>
+            <div class="field-hint">Current balance of the inherited account</div>
+          </div>
+          <div class="form-field">
+            <label>Year inherited</label>
+            <input type="number" id="f_inherited_qp_year" min="2020" max="2026" placeholder="e.g. 2022" oninput="calcInheritedYearsRemaining()">
+            <div class="field-hint" id="inherited-years-hint">10-year window starts the year after inheritance</div>
+          </div>
+          <div class="form-field">
+            <label>Years remaining in window</label>
+            <input type="number" id="f_inherited_qp_years_remaining" min="1" max="10" placeholder="Auto-calculated" style="color:var(--gold);" oninput="updateInheritedCalc()">
+            <div class="field-hint">Override if you know the exact figure</div>
+          </div>
+        </div>
+        <div class="form-row cols2">
+          <div class="form-field">
+            <label>Currently taking distributions?</label>
+            <select id="f_inherited_qp_distributions" onchange="updateInheritedCalc()">
+              <option value="">Select…</option>
+              <option value="inh_dist_yes">Yes — taking distributions now</option>
+              <option value="inh_dist_no">Not yet</option>
+              <option value="inh_dist_unsure">Unsure of the rules</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group" id="inherited-calc-result" style="display:none;">
+        <div class="group-title">Bridge Income Analysis</div>
+        <div style="background:var(--navy3);border:1px solid var(--border);border-radius:4px;padding:16px 20px;font-size:13px;color:var(--gray);line-height:1.8;" id="inherited-calc-display"></div>
+      </div>
+
+      <div class="section-nav">
+        <button class="btn-secondary" onclick="goToSection(3)">&#8592; Back</button>
+        <button class="btn-primary" onclick="goToSection(5)">Next: Risk Profile &#8594;</button>
       </div>
     </div>
 
     <!-- ── SECTION 5: Risk Profile ───────────────── -->
-    <div class="form-section" id="section-4">
-      <div class="section-eyebrow">Section 5 of 8</div>
+    <div class="form-section" id="section-5">
+      <div class="section-eyebrow">Section 6 of 9</div>
       <div class="section-title">Risk <em>Profile</em></div>
       <div class="section-desc">Five advisor-guided questions scored 1–5. Total score maps to a named risk profile that feeds directly into the allocation algorithm. Read each question aloud and let the client respond naturally.</div>
       <div class="section-rule"></div>
@@ -1018,14 +1035,14 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
       </div>
 
       <div class="section-nav">
-        <button class="btn-secondary" onclick="goToSection(3)">&#8592; Back</button>
-        <button class="btn-primary" onclick="goToSection(5)">Next: Protection Inventory &#8594;</button>
+        <button class="btn-secondary" onclick="goToSection(document.getElementById('section-4')?.style.display!=='none'?4:3)">&#8592; Back</button>
+        <button class="btn-primary" onclick="goToSection(6)">Next: Protection Inventory &#8594;</button>
       </div>
     </div>
 
     <!-- ── SECTION 6: Protection Inventory ──────── -->
-    <div class="form-section" id="section-5">
-      <div class="section-eyebrow">Section 6 of 8</div>
+    <div class="form-section" id="section-6">
+      <div class="section-eyebrow">Section 7 of 9</div>
       <div class="section-title">Protection <em>Inventory</em></div>
       <div class="section-desc">Every existing policy and protection structure. Understanding what's already in place prevents duplication and identifies true gaps.</div>
       <div class="section-rule"></div>
@@ -1135,14 +1152,14 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
       </div>
 
       <div class="section-nav">
-        <button class="btn-secondary" onclick="goToSection(4)">&#8592; Back</button>
-        <button class="btn-primary" onclick="goToSection(6)">Next: Goals Hierarchy &#8594;</button>
+        <button class="btn-secondary" onclick="goToSection(5)">&#8592; Back</button>
+        <button class="btn-primary" onclick="goToSection(7)">Next: Goals Hierarchy &#8594;</button>
       </div>
     </div>
 
     <!-- ── SECTION 7: Goals Hierarchy ───────────── -->
-    <div class="form-section" id="section-6">
-      <div class="section-eyebrow">Section 7 of 8</div>
+    <div class="form-section" id="section-7">
+      <div class="section-eyebrow">Section 8 of 9</div>
       <div class="section-title">Goals <em>Hierarchy</em></div>
       <div class="section-desc">Ask the client to rank these five priorities from 1 (most important) to 5 (least). This forces a real decision rather than "all of the above." The ranking feeds the allocation algorithm and documents the client's stated priorities.</div>
       <div class="section-rule"></div>
@@ -1261,14 +1278,14 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
       </div>
 
       <div class="section-nav">
-        <button class="btn-secondary" onclick="goToSection(5)">&#8592; Back</button>
-        <button class="btn-primary" onclick="goToSection(7)">Next: Advisor Observations &#8594;</button>
+        <button class="btn-secondary" onclick="goToSection(6)">&#8592; Back</button>
+        <button class="btn-primary" onclick="goToSection(8)">Next: Advisor Observations &#8594;</button>
       </div>
     </div>
 
     <!-- ── SECTION 8: Advisor Observations ──────── -->
-    <div class="form-section" id="section-7">
-      <div class="section-eyebrow">Section 8 of 8</div>
+    <div class="form-section" id="section-8">
+      <div class="section-eyebrow">Section 9 of 9</div>
       <div class="section-title">Advisor <em>Observations</em></div>
       <div class="section-desc">This section is never shown to the client. It documents your professional judgment — behavioral observations, competitive dynamics, and implementation sequence recommendations.</div>
       <div class="section-rule"></div>
@@ -1329,7 +1346,7 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:#0E1C2E;color:#
       </div>
 
       <div class="section-nav">
-        <button class="btn-secondary" onclick="goToSection(6)">&#8592; Back</button>
+        <button class="btn-secondary" onclick="goToSection(7)">&#8592; Back</button>
         <button class="btn-complete" onclick="completeSuplement()">&#10003; Complete Supplement &amp; Run Allocation</button>
       </div>
     </div>
@@ -1565,10 +1582,18 @@ function suggestMarginalRate() {
 }
 
 function toggleInheritedQP() {
-  const has = document.getElementById('f_has_inherited_qp')?.value === 'true';
+  // Legacy: hide/show the old inline group in section-2 (now empty, kept for compat)
   const group = document.getElementById('inherited-qp-group');
-  if (group) group.style.display = has ? '' : 'none';
-  if (has) updateInheritedCalc();
+  if (group) group.style.display = 'none'; // always hidden — moved to section-4
+}
+
+function toggleInheritedSection() {
+  const has = document.getElementById('f_has_inherited_qp')?.value === 'true';
+  const sec = document.getElementById('section-4');
+  const nav = document.getElementById('nav-4');
+  // Show or hide the dedicated inherited QP section and its nav item
+  if (sec) sec.style.display = has ? '' : 'none';
+  if (nav) nav.style.display = has ? '' : 'none';
 }
 
 function calcInheritedYearsRemaining() {
@@ -1593,33 +1618,58 @@ function updateInheritedCalc() {
   const display = document.getElementById('inherited-calc-display');
   if (!yearsRemaining || !balance) { if (result) result.style.display = 'none'; return; }
 
-  const annualForced = Math.round(balance / yearsRemaining);
   const fmtD = v => '$' + Math.round(v).toLocaleString();
   const marginalRate = parseFloat(document.getElementById('f_current_marginal_rate')?.value) || 0.24;
-  const netAnnual = Math.round(annualForced * (1 - marginalRate));
 
+  // Project balance forward at 5% assumed growth before annualizing distributions
+  const GROWTH_RATE = 0.05;
+  const projectedTotal = balance * Math.pow(1 + GROWTH_RATE, yearsRemaining);
+  const annualGross = Math.round(projectedTotal / yearsRemaining);
+  const annualNet = Math.round(annualGross * (1 - marginalRate));
+
+  // Income gap is now available — this section runs after Section 4 (Expenses)
   const incomeGap = parseFloat(document.getElementById('f_income_gap_annual')?.value) || 0;
-  const gapCoverageNote = incomeGap > 0
-    ? netAnnual >= incomeGap
-      ? `At ${fmtD(netAnnual)}/yr net, the inherited QP distributions <strong style="color:var(--gold);">fully cover your income gap</strong> of ${fmtD(incomeGap)}/yr for the next ${yearsRemaining} year${yearsRemaining!==1?'s':''}. This substantially reduces or eliminates the bridge capital needed in Layer 4.`
-      : `At ${fmtD(netAnnual)}/yr net, these distributions cover <strong style="color:var(--gold);">${Math.round(netAnnual/incomeGap*100)}% of your income gap</strong> of ${fmtD(incomeGap)}/yr. The remaining ${fmtD(incomeGap - netAnnual)}/yr gap would be covered by Layer 4.`
-    : `Estimated net distributions of ${fmtD(netAnnual)}/yr can be applied directly toward living expenses, reducing what Layer 4 needs to hold.`;
+  
+  let gapAnalysis = '';
+  if (incomeGap > 0) {
+    const coveragePct = Math.min(100, Math.round(annualNet / incomeGap * 100));
+    const covered = annualNet >= incomeGap;
+    gapAnalysis = `
+    <div style="margin-top:14px;padding:12px 14px;background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.3);border-radius:3px;">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);margin-bottom:8px;">Gap Coverage Analysis</div>
+      <div style="font-size:13px;color:var(--white);">
+        Your income gap: <strong>${fmtD(incomeGap)}/yr</strong><br>
+        Inherited QP net distributions: <strong style="color:var(--gold);">${fmtD(annualNet)}/yr</strong><br>
+        Coverage: <strong style="color:var(--gold);">${coveragePct}% of income gap ${covered ? '— fully covered' : `— ${fmtD(incomeGap - annualNet)}/yr remaining for Layer 4`}</strong>
+      </div>
+      ${covered 
+        ? `<div style="font-size:12px;color:var(--gray);margin-top:8px;">The inherited QP distributions alone cover your bridge income need for the ${yearsRemaining}-year window. Layer 4 capital requirement is substantially reduced.</div>`
+        : `<div style="font-size:12px;color:var(--gray);margin-top:8px;">The remaining gap of ${fmtD(incomeGap - annualNet)}/yr would be covered by Layer 4 bridge capital. The inherited QP significantly reduces the Layer 4 requirement.</div>`
+      }
+    </div>`;
+  } else {
+    gapAnalysis = `<div style="font-size:12px;color:var(--gray);margin-top:10px;">Complete Section 4 (Expenses) to see gap coverage analysis.</div>`;
+  }
 
   const distNote = dists === 'inh_dist_yes'
-    ? `Currently taking distributions — these are already flowing as income. The algorithm applies this toward your bridge income needs.`
+    ? `Currently taking distributions — these are flowing as bridge income now.`
     : dists === 'inh_dist_no'
-    ? `Not yet taking distributions. These funds must be distributed within the remaining window. Your advisor can help time withdrawals to align with your income needs and minimize tax impact.`
+    ? `Not yet distributing. Your advisor will coordinate timing with your income needs to maximize the bridge offset.`
     : `Distribution status to be confirmed with your advisor.`;
 
   if (display) display.innerHTML = `
-    <strong style="color:var(--white);">Inherited QP — Bridge Income Analysis</strong><br><br>
-    Annual distribution required: <strong style="color:var(--white);">${fmtD(annualForced)}/yr</strong> (${fmtD(balance)} over ${yearsRemaining} years)<br>
-    After-tax at ${Math.round(marginalRate*100)}%: <strong style="color:var(--white);">${fmtD(netAnnual)}/yr net income</strong><br><br>
-    ${gapCoverageNote}<br><br>
-    <span style="color:var(--gray);font-size:11px;">${distNote}</span>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:4px;">
+      <div><div style="font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--gray);margin-bottom:4px;">Current Balance</div><div style="font-size:18px;color:var(--white);">${fmtD(balance)}</div></div>
+      <div><div style="font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--gray);margin-bottom:4px;">Projected at 5% Growth</div><div style="font-size:18px;color:var(--white);">${fmtD(projectedTotal)}</div></div>
+      <div><div style="font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--gray);margin-bottom:4px;">Est. Annual Net (after ${Math.round(marginalRate*100)}% tax)</div><div style="font-size:18px;color:var(--gold);">${fmtD(annualNet)}/yr</div></div>
+    </div>
+    <div style="font-size:12px;color:var(--gray);margin-bottom:4px;">${distNote}</div>
+    ${gapAnalysis}
   `;
   if (result) result.style.display = '';
 }
+
+
 
 
 
@@ -1841,31 +1891,40 @@ function collectFormData(){
 // A field is satisfied if it has a non-empty value.
 // Risk section uses the riskScores object instead of field IDs.
 const SECTION_REQUIRED = [
-  // S1 — Identity: must have first name, last name, age, filing status, and coverage preference
+  // S1 — Identity
   ['f_primary_first_name','f_primary_last_name','f_primary_age','f_filing_status','f_fixed_expense_coverage_pref'],
-  // S2 — Financial Position: must have QP balance total
+  // S2 — Financial Position
   ['f_qp_balance_total'],
-  // S3 — Income Architecture: must have SS monthly and claim age
+  // S3 — Income Architecture
   ['f_ss_primary_monthly','f_ss_primary_claim_age'],
-  // S4 — Expenses: must have essential monthly total
+  // S4 — Expenses
   ['f_essential_monthly'],
-  // S5 — Risk Profile: all 5 questions must be answered (checked via riskScores)
+  // S5 — Inherited QP (conditional — only required if section is visible)
   [],
-  // S6 — Protection Inventory: must have health status and LTC answer
+  // S6 — Risk Profile (checked via riskScores)
+  [],
+  // S7 — Protection Inventory
   ['f_health_status_primary','f_has_ltc_policy'],
-  // S7 — Goals Hierarchy: must have at least income security and tax priority ranked
+  // S8 — Goals Hierarchy
   ['f_priority_income_security','f_priority_tax_efficiency','f_priority_care_protection',
    'f_priority_legacy','f_priority_liquidity'],
-  // S8 — Advisor Observations: must have urgency assessment
+  // S9 — Advisor Observations
   ['f_urgency_assessment'],
 ];
 
 function isSectionComplete(idx){
   const required = SECTION_REQUIRED[idx];
-  // Special case: risk section — Q1-Q4 must be scored (Q5 is readiness, still required)
+  // Section 4 — Inherited QP: only required if visible (SR flagged)
   if(idx === 4){
-    return Object.keys(riskScores).filter(k => k !== 'rq5' ? riskScores[k] > 0 : true).length === 5
-      && riskScores.rq1 > 0 && riskScores.rq2 > 0 && riskScores.rq3 > 0 && riskScores.rq4 > 0 && riskScores.rq5 > 0;
+    const sec = document.getElementById('section-4');
+    if(sec && sec.style.display === 'none') return true; // skip if hidden
+    return !!(document.getElementById('f_inherited_qp_balance')?.value &&
+              document.getElementById('f_inherited_qp_years_remaining')?.value &&
+              document.getElementById('f_inherited_qp_distributions')?.value);
+  }
+  // Section 5 — Risk Profile: Q1-Q4 must be scored, Q5 is readiness
+  if(idx === 5){
+    return riskScores.rq1 > 0 && riskScores.rq2 > 0 && riskScores.rq3 > 0 && riskScores.rq4 > 0 && riskScores.rq5 > 0;
   }
   // All required fields must have a non-empty value
   return required.every(id=>{
@@ -1891,7 +1950,7 @@ function refreshSectionStates(){
 
 // ── Navigation ────────────────────────────────────────────────
 function goToSection(idx){
-  if(idx < 0 || idx > 7) return;
+  if(idx < 0 || idx > 8) return;
   // Enforce completion when moving forward
   if(idx > currentSection && !isSectionComplete(currentSection)){
     const missing = SECTION_REQUIRED[currentSection].filter(id=>{
@@ -1927,11 +1986,13 @@ function goToSection(idx){
   refreshSectionStates();
   window.scrollTo({top:0,behavior:'smooth'});
   scheduleAutoSave();
+  // Refresh inherited QP calc when arriving at section 4 (has income gap data from S4)
+  if (idx === 4) setTimeout(updateInheritedCalc, 100);
 }
 
 function updateProgress(){
-  const completed = Array.from({length:8},(_,i)=>isSectionComplete(i)).filter(Boolean).length;
-  const pct = Math.round((completed / 8) * 100);
+  const completed = Array.from({length:9},(_,i)=>isSectionComplete(i)).filter(Boolean).length;
+  const pct = Math.round((completed / 9) * 100);
   document.getElementById('progress-pct').textContent = pct+'%';
   document.getElementById('progress-fill').style.width = pct+'%';
 }
@@ -2286,6 +2347,7 @@ function prefillFromSR(answers){
   if(answers.has_inherited_qp === 'inh_yes'){
     const hiddenEl = document.getElementById('f_has_inherited_qp');
     if(hiddenEl) hiddenEl.value = 'true';
+    toggleInheritedSection();
     toggleInheritedQP();
     // Pre-fill timing and distributions from SR if available
     if(answers.inherited_qp_timing){
@@ -2331,7 +2393,7 @@ function restoreFromSupplement(s){
   }
   if(s.has_inherited_qp !== undefined) {
     const el = document.getElementById('f_has_inherited_qp');
-    if(el) { el.value = s.has_inherited_qp ? 'true' : 'false'; toggleInheritedQP(); }
+    if(el) { el.value = s.has_inherited_qp ? 'true' : 'false'; toggleInheritedQP(); toggleInheritedSection(); }
   }
   if(s.inherited_qp_balance) { const el = document.getElementById('f_inherited_qp_balance'); if(el) el.value = s.inherited_qp_balance; }
   if(s.inherited_qp_year) { const el = document.getElementById('f_inherited_qp_year'); if(el) { el.value = s.inherited_qp_year; calcInheritedYearsRemaining(); } }
