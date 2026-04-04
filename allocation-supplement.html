@@ -2252,7 +2252,7 @@ async function completeSuplement(){
     });
   }
 
-  // DocuSign signature request — non-blocking, skipped if not configured
+  // DocuSign signature request — non-blocking, silently skipped if not configured
   if(window._clientId && window._supplementId){
     (async () => {
       try {
@@ -2269,15 +2269,15 @@ async function completeSuplement(){
             client_id: window._clientId
           })
         });
-        if(!res.ok){ setDocuSignStatus('error', 'DocuSign not configured — skipped.'); return; }
+        if(!res.ok){ setDocuSignStatus('idle'); return; } // not configured — hide silently
         const result = await res.json();
         if(result.success){
           setDocuSignStatus('sent', result.message);
         } else {
-          setDocuSignStatus('error', result.error || 'DocuSign send failed');
+          setDocuSignStatus('idle'); // suppress error, not yet deployed
         }
       } catch(e){
-        setDocuSignStatus('error', 'DocuSign not configured — skipped.');
+        setDocuSignStatus('idle'); // network error or not deployed — hide silently
       }
     })();
   }
@@ -2286,6 +2286,7 @@ async function completeSuplement(){
 function setDocuSignStatus(state, msg){
   const el = document.getElementById('docusign-status');
   if(!el) return;
+  if(state === 'idle'){ el.style.display = 'none'; return; }
   const icons = { sending:'⏳', sent:'✉️', error:'⚠️' };
   const colors = { sending:'var(--gold)', sent:'var(--success)', error:'var(--error)' };
   const msgs = {
