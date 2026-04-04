@@ -435,8 +435,19 @@ function runAllocationAlgorithm(s) {
   const externalLiquid = taxableInvest + (externalRothIra * 0.80);
   // 80% of external Roth — don't want to fully consume it
 
-  // Large known expenses
-  const largeExpenses  = s.large_expenses_total || 0;
+  // Inherited qualified plan (SECURE Act 10-year forced distribution)
+  const hasInheritedQP      = s.has_inherited_qp === true || s.has_inherited_qp === 'inh_yes';
+  const inheritedQPBalance  = s.inherited_qp_balance || 0;
+  const inheritedQPTakingDist = s.inherited_qp_distributions === 'inh_dist_yes';
+  // Use exact years remaining from supplement (supplement calculates from year inherited)
+  // Fall back to timing bucket if exact not available
+  const timingFallback = s.inherited_qp_timing === 'inh_recent' ? 8
+    : s.inherited_qp_timing === 'inh_mid' ? 5
+    : s.inherited_qp_timing === 'inh_older' ? 2 : 6;
+  const inheritedYearsRemaining = s.inherited_qp_years_remaining || timingFallback;
+  // Annual forced distribution: balance ÷ exact years remaining
+  const inheritedAnnualDist = hasInheritedQP && inheritedQPBalance > 0 && inheritedYearsRemaining > 0
+    ? inheritedQPBalance / inheritedYearsRemaining : 0;
 
   // LTC / health
   const healthPrimary       = s.health_status_primary       || 'good';
@@ -557,8 +568,16 @@ function runAllocationAlgorithm(s) {
     // Annual income L1 will produce (existing + new L1 structure)
     const annualL1Income = existingGuaranteedAnnual + (L1_dollars * 0.05);
 
-    // What L4 needs to cover annually
-    const annualL4Burden = Math.max(0, totalExpensesAnnual - annualL1Income);
+    // Inherited QP distributions — if already flowing, offset L4 burden
+    // Taxable so apply marginal rate haircut for net income
+    const inheritedDistIncome = inheritedQPTakingDist
+      ? inheritedAnnualDist * (1 - marginalRate) : 0;
+
+    // Known large upcoming expenses
+    const largeExpenses = s.large_expenses_total || 0;
+
+    // What L4 needs to cover annually (after L1 and inherited distributions)
+    const annualL4Burden = Math.max(0, totalExpensesAnnual - annualL1Income - inheritedDistIncome);
 
     // Raw bridge need
     const rawBridge = annualL4Burden * bridgeYears;
@@ -579,6 +598,7 @@ function runAllocationAlgorithm(s) {
         bridge_years: bridgeYears,
         years_to_retirement: yearsToRet,
         annual_l1_income: Math.round(annualL1Income),
+        inherited_dist_income: Math.round(inheritedDistIncome),
         annual_l4_burden: Math.round(annualL4Burden),
         raw_bridge: Math.round(rawBridge),
         sequence_factor: SEQUENCE_FACTOR,
@@ -587,7 +607,7 @@ function runAllocationAlgorithm(s) {
         external_liquid: Math.round(externalLiquid),
         floor_applied: netL4 < balance * 0.10
       },
-      `${bridgeYears} bridge year${bridgeYears !== 1 ? 's' : ''} required (10 years minus ${yearsToRet} years to retirement). L1 income (existing + new structure): ${fmt$(annualL1Income)}/yr. Annual L4 burden: ${fmt$(annualL4Burden)}/yr. Raw bridge: ${fmt$(rawBridge)}. Sequence-of-returns factor 0.70 applied: ${fmt$(adjustedBridge)}. ${largeExpenses > 0 ? 'Known large expenses: '+fmt$(largeExpenses)+'. ' : ''}${externalLiquid > 0 ? 'External liquid assets deducted: '+fmt$(externalLiquid)+'. ' : ''}Final L4: ${fmt$(L4_dollars)}.${netL4 < balance*0.10 ? ' (10% hard floor applied)' : ''}`
+      `${bridgeYears} bridge year${bridgeYears !== 1 ? 's' : ''} required (10 years minus ${yearsToRet} years to retirement). L1 income (existing + new structure): ${fmt$(annualL1Income)}/yr.${inheritedDistIncome > 0 ? ' Inherited QP distributions (net of tax): '+fmt$(inheritedDistIncome)+'/yr — reducing L4 burden.' : ''} Annual L4 burden: ${fmt$(annualL4Burden)}/yr. Raw bridge: ${fmt$(rawBridge)}. Sequence-of-returns factor 0.70 applied: ${fmt$(adjustedBridge)}. ${largeExpenses > 0 ? 'Known large expenses: '+fmt$(largeExpenses)+'. ' : ''}${externalLiquid > 0 ? 'External liquid assets deducted: '+fmt$(externalLiquid)+'. ' : ''}Final L4: ${fmt$(L4_dollars)}.${netL4 < balance*0.10 ? ' (10% hard floor applied)' : ''}`
     );
   }
 
@@ -735,6 +755,28 @@ function runAllocationAlgorithm(s) {
       addFactor('L3 floor re-enforced after risk adjustment', ['L3','L4'], 'adjustment',
         { recovered: Math.round(shave) },
         `Risk adjustment pushed L3 below 20% floor. ${fmt$(shave)} recovered from L4 to restore minimum L3 allocation.`
+      );
+    }
+  }
+
+  // Inherited QP — bridge income asset, not a tax emergency
+  // The inherited QP is a mandatory distribution stream. The intelligent approach
+  // is to use it as bridge income — it reduces L4 requirements directly.
+  // L4 reduction has already been applied in the bridge calculation above.
+  // Here we document the strategic picture for the advisor.
+  if (hasInheritedQP && inheritedQPBalance > 0) {
+    const inheritedNetAnnual = Math.round(inheritedAnnualDist * (1 - marginalRate));
+    const bridgeGapCovered = Math.min(inheritedNetAnnual / Math.max(1, incomeGapAnnual), 1);
+
+    if (inheritedQPTakingDist) {
+      addFactor('Inherited QP — active bridge income', ['L4'], 'down',
+        { years_remaining: inheritedYearsRemaining, annual_gross: Math.round(inheritedAnnualDist), annual_net: inheritedNetAnnual, gap_covered_pct: Math.round(bridgeGapCovered*100) },
+        `Inherited QP is currently distributing ~${fmt$(inheritedAnnualDist)}/yr gross (~${fmt$(inheritedNetAnnual)}/yr net at ${Math.round(marginalRate*100)}%). This is already reducing the L4 bridge requirement — ${Math.round(bridgeGapCovered*100)}% of the income gap is covered by this asset. ${bridgeGapCovered >= 1 ? 'Inherited distributions fully cover the bridge gap — L4 requirement is at its minimum floor.' : `Remaining gap of ~${fmt$(incomeGapAnnual - inheritedNetAnnual)}/yr is what L4 needs to fund.`} These funds must be fully distributed over the remaining ${inheritedYearsRemaining} year${inheritedYearsRemaining!==1?'s':''}.`
+      );
+    } else {
+      addFactor('Inherited QP — available bridge income (not yet started)', ['L4'], 'note',
+        { years_remaining: inheritedYearsRemaining, annual_gross: Math.round(inheritedAnnualDist), annual_net: inheritedNetAnnual, gap_covered_pct: Math.round(bridgeGapCovered*100) },
+        `Inherited QP has ${inheritedYearsRemaining} year${inheritedYearsRemaining!==1?'s':''} remaining in the SECURE Act 10-year window. When distributions begin, ~${fmt$(inheritedNetAnnual)}/yr net income becomes available — covering ${Math.round(bridgeGapCovered*100)}% of the income gap. Advisor should coordinate the distribution timing with the client's income needs to maximize the bridge offset and reduce reliance on L4. L4 sizing in this model assumes distributions begin; advisor may adjust based on client's preferred timing.`
       );
     }
   }
