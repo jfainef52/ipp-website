@@ -406,7 +406,7 @@ function runAllocationAlgorithm(s) {
   const isMFJ         = filingStatus === 'mfj';
   const isSingle      = ['single','divorced','widowed'].includes(filingStatus);
   const marginalRate  = s.current_marginal_rate || 0.24;
-  const riskScore     = s.risk_score_total  || 15;
+  const riskScore     = s.risk_score_total  || 10;  // 4-question, 20-point scale
   const riskProfile   = s.risk_profile      || 'Moderate';
 
   // Income inputs
@@ -644,13 +644,12 @@ function runAllocationAlgorithm(s) {
   // allocations — not a rounding error.
 
   const riskQ3 = s.risk_q3 || 3; // Q3 = retirement-specific market behavior
+  const riskQ5 = s.risk_q5 || 3; // Q5 = L3 readiness indicator (not in risk score)
 
   // ── OPTION B: Q3 direct L1 signal ────────────────────────
   // Q3 ≤ 2 means client anticipates panicking in a retirement
-  // downturn — this is a direct argument for more guaranteed
-  // income regardless of total risk score.
+  // downturn — direct argument for more guaranteed income
   if (riskQ3 <= 2) {
-    // Boost L1 by moving from L4 and L3
     const q3Boost = balance * 0.06;
     const fromL4 = Math.min(q3Boost * 0.60, L4_dollars - balance * 0.10);
     const fromL3 = Math.min(q3Boost * 0.40, L3_dollars - balance * 0.20);
@@ -660,53 +659,67 @@ function runAllocationAlgorithm(s) {
     L3_dollars -= Math.max(0, fromL3);
     addFactor('Q3 retirement stress signal — direct L1 boost', ['L1','L4','L3'], 'up',
       { boost: Math.round(actualBoost), q3_score: riskQ3 },
-      `Q3 (retirement market behavior) scored ${riskQ3}/5 — client anticipates wanting to protect assets immediately if markets drop in retirement. This is a direct signal that the guaranteed income floor must be larger. L1 boosted by ${fmt$(actualBoost)} regardless of total risk score, drawn from L4 bridge and L3 remainder.`
+      `Q3 (retirement market behavior) scored ${riskQ3}/5 — client anticipates wanting to protect assets immediately if markets drop in retirement. Direct L1 boost of ${fmt$(actualBoost)} applied regardless of total risk score.`
+    );
+  }
+
+  // ── Q5 L3 readiness signal ────────────────────────────────
+  // Q5 is NOT in the risk score — it measures openness to
+  // tax-efficient planning under complexity. Low Q5 means
+  // the advisor needs more education time before L3 resonates.
+  if (riskQ5 <= 2) {
+    addFactor('Q5 L3 readiness — low (advisor note)', ['L3'], 'note',
+      { q5_score: riskQ5 },
+      `Q5 (L3 readiness) scored ${riskQ5}/5 — client expressed hesitation about additional planning complexity. L3 allocation is unchanged by this signal, but advisor should invest more time educating on the ETA/EP structure before presenting the recommendation. Client may need to see the tax liability math made concrete.`
+    );
+  } else if (riskQ5 >= 4) {
+    addFactor('Q5 L3 readiness — high (advisor note)', ['L3'], 'note',
+      { q5_score: riskQ5 },
+      `Q5 (L3 readiness) scored ${riskQ5}/5 — client is motivated to explore tax-efficient repositioning even knowing it requires planning effort. L3 conversation should be straightforward. Prioritize L3 implementation in the planning sequence.`
     );
   }
 
   // ── Risk profile — material L1/L4 rebalancing ────────────
-  // These shifts are intentionally significant. A Conservative
-  // and a Growth client should see meaningfully different output.
-  if (riskScore <= 9) {
+  // 4-question, 20-point scale. Thresholds updated accordingly.
+  if (riskScore <= 7) {
     // Conservative: large shift toward guaranteed income
-    // Client cannot tolerate market exposure on their income source
     const shift = Math.min(L4_dollars * 0.25, balance * 0.08);
     L4_dollars -= shift; L1_dollars += shift;
-    addFactor('Conservative risk profile (≤9/25)', ['L1','L4'], 'up',
+    addFactor('Conservative risk profile (≤7/20)', ['L1','L4'], 'up',
       { shift: Math.round(shift) },
-      `Risk score ${riskScore}/25 — Conservative. Client has low tolerance for income variability in retirement. ${fmt$(shift)} shifted from L4 (market-exposed bridge) to L1 (guaranteed income floor). The guaranteed income layer must carry significantly more of the income burden for this client.`
+      `Risk score ${riskScore}/20 — Conservative. Client has low tolerance for income variability in retirement. ${fmt$(shift)} shifted from L4 (market-exposed bridge) to L1 (guaranteed income floor).`
     );
-  } else if (riskScore <= 13) {
+  } else if (riskScore <= 10) {
     // Moderate-Conservative: meaningful shift toward guaranteed
     const shift = Math.min(L4_dollars * 0.15, balance * 0.05);
     L4_dollars -= shift; L1_dollars += shift;
-    addFactor('Moderate-Conservative risk profile (10–13/25)', ['L1','L4'], 'up',
+    addFactor('Moderate-Conservative risk profile (8–10/20)', ['L1','L4'], 'up',
       { shift: Math.round(shift) },
-      `Risk score ${riskScore}/25 — Moderate-Conservative. Preference for income certainty over flexibility. ${fmt$(shift)} shifted from L4 to L1 to increase the guaranteed income floor.`
+      `Risk score ${riskScore}/20 — Moderate-Conservative. Preference for income certainty. ${fmt$(shift)} shifted from L4 to L1.`
+    );
+  } else if (riskScore <= 14) {
+    // Moderate: base sizing stands
+    addFactor('Moderate risk profile (11–14/20)', [], 'neutral',
+      {},
+      `Risk score ${riskScore}/20 — Moderate. Client-derived layer sizing is appropriate. No risk-driven adjustment applied.`
     );
   } else if (riskScore <= 17) {
-    // Moderate: base sizing stands — no adjustment
-    addFactor('Moderate risk profile (14–17/25)', [], 'neutral',
-      {},
-      `Risk score ${riskScore}/25 — Moderate. Client-derived layer sizing is appropriate. No risk-driven adjustment applied.`
-    );
-  } else if (riskScore <= 21) {
-    // Moderate-Growth: shift toward flexible L4, trim L1
+    // Moderate-Growth: shift toward flexible L4
     const shift = Math.min(L1_dollars * 0.15, balance * 0.05);
     const actualShift = L1_dollars - shift > 0 ? shift : 0;
     L1_dollars -= actualShift; L4_dollars += actualShift;
-    addFactor('Moderate-Growth risk profile (18–21/25)', ['L1','L4'], 'adjustment',
+    addFactor('Moderate-Growth risk profile (15–17/20)', ['L1','L4'], 'adjustment',
       { shift: Math.round(actualShift) },
-      `Risk score ${riskScore}/25 — Moderate-Growth. Client comfortable with market participation. ${fmt$(actualShift)} shifted from L1 guaranteed income toward L4 flexible bridge, reflecting preference for upside participation over certainty.`
+      `Risk score ${riskScore}/20 — Moderate-Growth. Comfortable with market participation. ${fmt$(actualShift)} shifted from L1 to L4.`
     );
   } else {
-    // Growth: significant shift toward L4, L1 at minimum meaningful level
+    // Growth: significant shift toward L4
     const shift = Math.min(L1_dollars * 0.25, balance * 0.08);
     const actualShift = L1_dollars - shift > 0 ? shift : 0;
     L1_dollars -= actualShift; L4_dollars += actualShift;
-    addFactor('Growth risk profile (22–25/25)', ['L1','L4'], 'down',
+    addFactor('Growth risk profile (18–20/20)', ['L1','L4'], 'down',
       { shift: Math.round(actualShift) },
-      `Risk score ${riskScore}/25 — Growth. Client has high tolerance for market variability and prioritizes flexibility and upside over income certainty. ${fmt$(actualShift)} shifted from L1 to L4. L1 retained at minimum meaningful level for behavioral safety floor only.`
+      `Risk score ${riskScore}/20 — Growth. High tolerance for market variability. ${fmt$(actualShift)} shifted from L1 to L4.`
     );
   }
 
@@ -797,6 +810,7 @@ function runAllocationAlgorithm(s) {
     rmdAt73,
     riskScore,
     riskQ3,
+    riskQ5,
     riskProfile,
     coveragePct,
     coveragePref,
@@ -896,7 +910,7 @@ function renderOutput(s, result, clientName) {
   document.getElementById('client-name-display').innerHTML =
     clientName.split(' ').map((w,i)=>i===clientName.split(' ').length-1?`<em>${w}</em>`:w).join(' ');
   document.getElementById('client-meta-display').textContent =
-    [s.filing_status==='mfj'?'Married Filing Jointly':'Single', s.state, `Age ${s.primary_age}`, metrics.riskProfile+' Risk'].filter(Boolean).join(' · ');
+    [s.filing_status==='mfj'?'Married Filing Jointly':'Single', s.state, `Age ${s.primary_age}`, metrics.riskProfile+' Risk ('+metrics.riskScore+'/20)'].filter(Boolean).join(' · ');
   document.getElementById('run-badge').textContent = 'Generated ' + new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
   document.getElementById('top-client-name').textContent = clientName;
 
@@ -977,7 +991,7 @@ function renderOutput(s, result, clientName) {
     ['Existing Guaranteed Income', fmt$(metrics.existingGuaranteedAnnual)+'/yr'],
     ['Fixed Expense Coverage Pref', coverageLabels[metrics.coveragePref] || '—'],
     ['Marginal Tax Rate', Math.round(metrics.marginalRate*100)+'% (estimate)'],
-    ['Risk Profile', metrics.riskProfile+' ('+metrics.riskScore+'/25)'],
+    ['Risk Profile', metrics.riskProfile+' ('+metrics.riskScore+'/20)'],
     ['Bridge Years (L4)', metrics.bridgeYears+' year'+(metrics.bridgeYears!==1?'s':'')],
     ['Client Age', s.primary_age],
     ['Filing Status', s.filing_status==='mfj'?'Married Filing Jointly':'Single'],
