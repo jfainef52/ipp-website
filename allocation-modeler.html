@@ -637,28 +637,93 @@ function runAllocationAlgorithm(s) {
   L3 = balance > 0 ? L3_dollars / balance : 0;
   L4 = balance > 0 ? L4_dollars / balance : 0;
 
-  // ── 5. ADJUSTMENT FACTORS (fine-tuning on top of base) ────
-  // NOTE: These no longer set the allocation — they document
-  // situational context and apply modest adjustments where
-  // the client-derived sizing may not fully capture nuance.
+  // ── 5. ADJUSTMENT FACTORS ────────────────────────────────
+  // Risk profile governs the L1/L4 balance meaningfully.
+  // A conservative client and a growth client with identical
+  // balances and expenses should get materially different
+  // allocations — not a rounding error.
 
-  // Risk profile — affects L1/L4 balance within the bridge
+  const riskQ3 = s.risk_q3 || 3; // Q3 = retirement-specific market behavior
+
+  // ── OPTION B: Q3 direct L1 signal ────────────────────────
+  // Q3 ≤ 2 means client anticipates panicking in a retirement
+  // downturn — this is a direct argument for more guaranteed
+  // income regardless of total risk score.
+  if (riskQ3 <= 2) {
+    // Boost L1 by moving from L4 and L3
+    const q3Boost = balance * 0.06;
+    const fromL4 = Math.min(q3Boost * 0.60, L4_dollars - balance * 0.10);
+    const fromL3 = Math.min(q3Boost * 0.40, L3_dollars - balance * 0.20);
+    const actualBoost = Math.max(0, fromL4) + Math.max(0, fromL3);
+    L1_dollars += actualBoost;
+    L4_dollars -= Math.max(0, fromL4);
+    L3_dollars -= Math.max(0, fromL3);
+    addFactor('Q3 retirement stress signal — direct L1 boost', ['L1','L4','L3'], 'up',
+      { boost: Math.round(actualBoost), q3_score: riskQ3 },
+      `Q3 (retirement market behavior) scored ${riskQ3}/5 — client anticipates wanting to protect assets immediately if markets drop in retirement. This is a direct signal that the guaranteed income floor must be larger. L1 boosted by ${fmt$(actualBoost)} regardless of total risk score, drawn from L4 bridge and L3 remainder.`
+    );
+  }
+
+  // ── Risk profile — material L1/L4 rebalancing ────────────
+  // These shifts are intentionally significant. A Conservative
+  // and a Growth client should see meaningfully different output.
   if (riskScore <= 9) {
-    // Very conservative — shift more bridge burden to L1 (guaranteed), less L4 (market)
-    const shift = Math.min(L4_dollars * 0.08, L1_dollars > 0 ? balance * 0.04 : 0);
+    // Conservative: large shift toward guaranteed income
+    // Client cannot tolerate market exposure on their income source
+    const shift = Math.min(L4_dollars * 0.25, balance * 0.08);
     L4_dollars -= shift; L1_dollars += shift;
-    addFactor('Conservative risk — shift bridge to guaranteed', ['L1','L4'], 'adjustment',
+    addFactor('Conservative risk profile (≤9/25)', ['L1','L4'], 'up',
       { shift: Math.round(shift) },
-      `Risk score ${riskScore}/25 (Conservative). Modest shift from L4 bridge to L1 guaranteed income — aligns with client preference for certainty over flexibility.`
+      `Risk score ${riskScore}/25 — Conservative. Client has low tolerance for income variability in retirement. ${fmt$(shift)} shifted from L4 (market-exposed bridge) to L1 (guaranteed income floor). The guaranteed income layer must carry significantly more of the income burden for this client.`
     );
-  } else if (riskScore >= 20) {
-    // Growth-oriented — client more comfortable with L4 market exposure
-    const shift = Math.min(L1_dollars * 0.08, balance * 0.03);
-    L1_dollars -= shift; L4_dollars += shift;
-    addFactor('Growth risk — shift to flexible L4', ['L1','L4'], 'adjustment',
+  } else if (riskScore <= 13) {
+    // Moderate-Conservative: meaningful shift toward guaranteed
+    const shift = Math.min(L4_dollars * 0.15, balance * 0.05);
+    L4_dollars -= shift; L1_dollars += shift;
+    addFactor('Moderate-Conservative risk profile (10–13/25)', ['L1','L4'], 'up',
       { shift: Math.round(shift) },
-      `Risk score ${riskScore}/25 (Growth). Modest shift from guaranteed L1 to flexible L4 — client comfortable with market exposure and values flexibility.`
+      `Risk score ${riskScore}/25 — Moderate-Conservative. Preference for income certainty over flexibility. ${fmt$(shift)} shifted from L4 to L1 to increase the guaranteed income floor.`
     );
+  } else if (riskScore <= 17) {
+    // Moderate: base sizing stands — no adjustment
+    addFactor('Moderate risk profile (14–17/25)', [], 'neutral',
+      {},
+      `Risk score ${riskScore}/25 — Moderate. Client-derived layer sizing is appropriate. No risk-driven adjustment applied.`
+    );
+  } else if (riskScore <= 21) {
+    // Moderate-Growth: shift toward flexible L4, trim L1
+    const shift = Math.min(L1_dollars * 0.15, balance * 0.05);
+    const actualShift = L1_dollars - shift > 0 ? shift : 0;
+    L1_dollars -= actualShift; L4_dollars += actualShift;
+    addFactor('Moderate-Growth risk profile (18–21/25)', ['L1','L4'], 'adjustment',
+      { shift: Math.round(actualShift) },
+      `Risk score ${riskScore}/25 — Moderate-Growth. Client comfortable with market participation. ${fmt$(actualShift)} shifted from L1 guaranteed income toward L4 flexible bridge, reflecting preference for upside participation over certainty.`
+    );
+  } else {
+    // Growth: significant shift toward L4, L1 at minimum meaningful level
+    const shift = Math.min(L1_dollars * 0.25, balance * 0.08);
+    const actualShift = L1_dollars - shift > 0 ? shift : 0;
+    L1_dollars -= actualShift; L4_dollars += actualShift;
+    addFactor('Growth risk profile (22–25/25)', ['L1','L4'], 'down',
+      { shift: Math.round(actualShift) },
+      `Risk score ${riskScore}/25 — Growth. Client has high tolerance for market variability and prioritizes flexibility and upside over income certainty. ${fmt$(actualShift)} shifted from L1 to L4. L1 retained at minimum meaningful level for behavioral safety floor only.`
+    );
+  }
+
+  // Re-enforce L3 floor after risk adjustments
+  const l3Floor = balance * 0.20;
+  if (L3_dollars < l3Floor) {
+    const deficit = l3Floor - L3_dollars;
+    const l4Headroom = Math.max(0, L4_dollars - balance * 0.10);
+    const shave = Math.min(deficit, l4Headroom);
+    L4_dollars -= shave;
+    L3_dollars += shave;
+    if (shave > 0) {
+      addFactor('L3 floor re-enforced after risk adjustment', ['L3','L4'], 'adjustment',
+        { recovered: Math.round(shave) },
+        `Risk adjustment pushed L3 below 20% floor. ${fmt$(shave)} recovered from L4 to restore minimum L3 allocation.`
+      );
+    }
   }
 
   // Single filer — elevate L4 (no spousal income backstop)
@@ -731,6 +796,7 @@ function runAllocationAlgorithm(s) {
     taxLiability,
     rmdAt73,
     riskScore,
+    riskQ3,
     riskProfile,
     coveragePct,
     coveragePref,
@@ -974,6 +1040,7 @@ async function saveOutput(clientId, supplementId, result, userId) {
       marginal_rate: metrics.marginalRate,
       risk_score: metrics.riskScore,
       risk_profile: metrics.riskProfile,
+      risk_q3: metrics.riskQ3,
       output_type: metrics.outputType,
       age: result._age,
       filing_status: result._filing,
