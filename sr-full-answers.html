@@ -95,6 +95,127 @@ nav{background:var(--navy);border-bottom:1px solid var(--gold-line);padding:0 2r
 .json-block{background:#0a1520;border:1px solid var(--gold-line);border-radius:var(--radius);padding:1.25rem;font-family:'SF Mono','Fira Code',monospace;font-size:12px;color:#8fa8c4;overflow-x:auto;white-space:pre;line-height:1.7;display:none;}
 .json-block.open{display:block;}
 footer{border-top:1px solid var(--gold-line);padding:1.5rem 2rem;text-align:center;font-size:12px;color:var(--text-dim);letter-spacing:0.04em;margin-top:4rem;}
+
+/* ── PRINT STYLES ── */
+@media print {
+  /* Hide nav, action bar, buttons, raw JSON toggle, footer */
+  nav,
+  .action-bar,
+  .json-toggle,
+  .json-block,
+  footer { display: none !important; }
+
+  /* Reset body and page */
+  body {
+    background: #fff !important;
+    color: #1a1a1a !important;
+    font-size: 11pt;
+    line-height: 1.5;
+  }
+
+  .page-wrap { padding: 0 !important; max-width: 100%; }
+
+  /* Breadcrumb — keep but simplify */
+  .breadcrumb { color: #666 !important; margin-bottom: 1rem; }
+  .breadcrumb a { color: #666 !important; }
+  .breadcrumb span { color: #8B6914 !important; }
+
+  /* Client header card */
+  .client-header {
+    background: #fff !important;
+    border: 1.5px solid #C8A96E !important;
+    border-radius: 6px;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .client-name { color: #8B6914 !important; }
+  .meta-label { color: #888 !important; }
+  .meta-value { color: #1a1a1a !important; }
+  .meta-value a { color: #8B6914 !important; }
+  .badge-new { background: #e8f5ee !important; color: #2d7a50 !important; border-color: #2d7a50 !important; }
+  .badge-done { background: #f0f0f0 !important; color: #666 !important; border-color: #aaa !important; }
+
+  /* SR ID bar */
+  .sr-id-bar {
+    background: #f7f7f7 !important;
+    border: 1px solid #ddd !important;
+    color: #555 !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .sr-id-bar span { color: #333 !important; }
+
+  /* Section labels */
+  .section-label {
+    color: #8B6914 !important;
+    border-bottom-color: #C8A96E !important;
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+  .section-label::before { background: #C8A96E !important; }
+
+  /* Planning tracks */
+  .track-chip {
+    background: #e8f5ee !important;
+    border-color: #2d7a50 !important;
+    color: #1a5c38 !important;
+  }
+  .tracks-row { page-break-inside: avoid; break-inside: avoid; }
+
+  /* Planning flag cards */
+  .flags-outer { page-break-inside: auto; }
+  .flag-card {
+    background: #fff !important;
+    border-radius: 4px;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    margin-bottom: 6pt;
+  }
+  .flag-card.high { border-left-color: #c0392b !important; }
+  .flag-card.medium { border-left-color: #d68910 !important; }
+  .flag-card.low { border-left-color: #aaa !important; }
+  .flag-card.high .flag-priority { color: #c0392b !important; }
+  .flag-card.medium .flag-priority { color: #d68910 !important; }
+  .flag-card.low .flag-priority { color: #aaa !important; }
+  .flag-track { color: #8B6914 !important; }
+  .flag-text { color: #333 !important; }
+
+  /* Answer grid */
+  .answers-grid {
+    background: #ddd !important;
+    border-color: #ccc !important;
+    gap: 1px;
+  }
+  .answer-cell {
+    background: #fff !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .answer-q { color: #888 !important; }
+  .answer-v { color: #1a1a1a !important; }
+  .answer-v.highlight { color: #8B6914 !important; }
+  .answer-v.empty { color: #aaa !important; }
+
+  /* Section headers inside grid */
+  .grid-section-header {
+    background: #f0ead8 !important;
+    color: #8B6914 !important;
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+
+  /* Page breaks between major sections */
+  .flags-outer { page-break-before: auto; }
+
+  /* Ensure links print as text */
+  a[href]::after { content: none !important; }
+
+  /* Page setup */
+  @page {
+    margin: 1.5cm 1.8cm;
+    size: letter portrait;
+  }
+}
 </style>
 </head>
 <body>
