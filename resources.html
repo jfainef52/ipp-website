@@ -1064,6 +1064,11 @@
     document.getElementById('video-section').style.display = visibleVideos.length ? '' : 'none';
     document.getElementById('video-strip').style.display = visibleVideos.length ? '' : 'none';
   }
-
   // Reveal animations
-  cons
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); } });
+  }, { threshold: 0.12 });
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+</script>
+</body>
+</html>
