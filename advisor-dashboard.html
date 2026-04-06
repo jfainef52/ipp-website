@@ -2952,9 +2952,13 @@ async function openClientDetail(clientId) {
   if (stage === 'prospect') {
     actionBtn = `<span style="font-size:12px;color:var(--gray);font-style:italic;">Waiting for StructureReview™ submission</span>`;
   } else if (stage === 'structure_review') {
-    actionBtn = `<a class="pipeline-action-btn" href="https://www.integratedplanningpartners.com/allocation-supplement.html?client_id=${c.id}${srId ? '&sr_id='+srId : ''}" target="_blank">
-      Begin Allocation Supplement &#8594;
-    </a>`;
+    actionBtn = `
+      ${srId ? `<a class="pipeline-action-btn" href="https://www.integratedplanningpartners.com/sr-full-answers.html?sr_id=${srId}" target="_blank" style="margin-right:8px;">
+        View Full Client Answers &#8594;
+      </a>` : ''}
+      <a class="pipeline-action-btn" href="https://www.integratedplanningpartners.com/allocation-supplement.html?client_id=${c.id}${srId ? '&sr_id='+srId : ''}" target="_blank">
+        Begin Allocation Supplement &#8594;
+      </a>`;
   } else if (stage === 'supplement' || stage === 'supplement_complete') {
     const supplementId = c.allocation_supplement_id || '';
     actionBtn = `
@@ -3425,6 +3429,7 @@ async function launchIncomeArchitect() {
     structure_review_confirmed:    true,
     structure_review_confirmed_at: new Date().toISOString(),
     structure_review_confirmed_by: session.user.id,
+    pipeline_stage:                'structure_review',
   }).eq('id', clientId).then(({ error }) => {
     if (error) console.warn('SR confirmation write failed:', error.message);
   });
@@ -3601,6 +3606,7 @@ async function submitIANewClient() {
     structure_review_confirmed:    true,
     structure_review_confirmed_at: new Date().toISOString(),
     structure_review_confirmed_by: session.user.id,
+    pipeline_stage:                'structure_review',
   };
 
   const { data: newClient, error } = await supabase
