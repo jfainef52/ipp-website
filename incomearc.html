@@ -1143,6 +1143,22 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });
 </script>
+<style>
+/* ── MOBILE NAV FIX ── */
+@media (max-width: 900px) {
+  nav, .nav { padding-left: 20px !important; padding-right: 20px !important; overflow: hidden !important; }
+  .nav-logo { min-width: 0 !important; flex-shrink: 1 !important; }
+  .nav-right { gap: 8px !important; flex-shrink: 0 !important; flex-wrap: nowrap !important; overflow: hidden !important; }
+  .nav-right li { display: none !important; }
+  .nav-right li:nth-last-child(1),
+  .nav-right li:nth-last-child(2) { display: flex !important; }
+}
+@media (max-width: 500px) {
+  nav, .nav { padding-left: 16px !important; padding-right: 16px !important; }
+  .nav-right li { display: none !important; }
+  .nav-right li:nth-last-child(1) { display: flex !important; }
+}
+</style>
 </head>
 <body>
 
