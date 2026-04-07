@@ -710,10 +710,7 @@
 
   /* ── RESPONSIVE ── */
   @media (max-width: 900px) {
-    nav { padding: 0 20px; overflow: hidden; }
-    .nav-logo { min-width: 0; flex-shrink: 1; }
-    .nav-right { gap: 10px; flex-shrink: 0; }
-    .nav-right li:not(:last-child):not(:nth-last-child(2)) { display: none; }
+    /* nav rules moved to mobile fix block */
     .page-header { padding: 120px 24px 64px; }
     .filter-bar-inner { padding: 0 24px; }
     .resources-section { padding: 56px 24px 80px; }
@@ -725,10 +722,6 @@
     .cta-band-actions { flex-direction: column; }
     footer { flex-direction: column; align-items: flex-start; }
     .footer-links { align-items: flex-start; }
-  }
-  @media (max-width: 600px) {
-    nav { padding: 0 16px; }
-    .nav-right li:not(:last-child):not(:nth-last-child(1)) { display: none; }
   }
 </style>
 <style>
