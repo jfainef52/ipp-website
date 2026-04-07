@@ -656,10 +656,7 @@
 
   /* ── RESPONSIVE ── */
   @media (max-width: 900px) {
-    nav { padding: 0 20px; overflow: hidden; }
-    .nav-logo { min-width: 0; flex-shrink: 1; }
-    .nav-right { gap: 10px; flex-shrink: 0; }
-    .nav-right li:not(:last-child):not(:nth-last-child(2)) { display: none; }
+    /* nav rules moved to mobile fix block */
     .page-header { padding: 110px 24px 60px; }
     .section-inner { padding: 72px 24px; }
     .manifesto-inner { padding: 72px 24px; grid-template-columns: 1fr; gap: 40px; }
@@ -669,10 +666,6 @@
     .cta-inner { padding: 60px 24px; flex-direction: column; }
     footer { flex-direction: column; padding: 40px 24px; }
     .footer-links { align-items: flex-start; }
-  }
-  @media (max-width: 600px) {
-    nav { padding: 0 16px; }
-    .nav-right li:not(:last-child):not(:nth-last-child(1)) { display: none; }
   }
 
   /* ── FAQ SECTION ── */
