@@ -427,7 +427,10 @@
     }
 
     @media (max-width: 640px) {
-      nav { padding: 0 20px; }
+      nav { padding: 0 16px; overflow: hidden; }
+      .nav-logo { min-width: 0; flex-shrink: 1; }
+      .nav-right { gap: 8px; flex-shrink: 0; }
+      .nav-right li:not(:last-child):not(:nth-last-child(1)) { display: none; }
       .steps-container { padding: 48px 20px 64px; }
       .steps-container::before { left: calc(20px + 26px); }
       .step-bullets { grid-template-columns: 1fr; }
