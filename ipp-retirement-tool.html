@@ -217,19 +217,19 @@ window.openScenarioSummary = function(inputs, clientInfo) {
           +row('Unfinanced Tax (IRA gross-up)',l1i>0?fmtYr(Math.round(l1i)):'—','red')
           +row('Total IRA Draw / yr',fmtYr(Math.round(l1tot)),'red'))
       ))
-    + ifv(arch, card('teal','Architecture — L3 · ETA (Tax Elimination)',
-        row('ETA Funding Amount',fmtK(inputs.etaFundingAmount),'teal')
-        +row('ETA Funding Age',inputs.etaFundingAge)
-        +row('ETA Annual Income',fmtYr(inputs.etaAnnualIncome),'teal')
-        +row('ETA Income Start Age',inputs.etaStartAge)
-        +row('ETA COLA Rate',(inputs.etaColaRate||0)+'%')
-      ))
     + ifv(arch, card('red','Architecture — L2 · LTC &amp; Legacy',
         row('Primary LTC Net Amount',fmtK(inputs.ltcNetAmount),'red')
         +row('Primary Funding Age',inputs.ltcFundingAge)
         +ifv(l2g>0,row('Gross IRA Draw (primary)',fmt$(Math.round(l2g)),'red')+row('Tax on Draw',fmt$(Math.round(l2t)),'red')+ifv(l2p>0,row('Early Withdrawal Penalty',fmt$(Math.round(l2p)),'amber')))
         +ifv(isMarried,'<div style="height:4px"></div>'+row('Spouse LTC Net Amount',fmtK(inputs.spouseLtcNetAmount||0),'red')+row('Spouse Funding Age',inputs.spouseLtcFundingAge||'—')+ifv(l2sg>0,row('Gross IRA Draw (spouse)',fmt$(Math.round(l2sg)),'red')+row('Tax on Draw',fmt$(Math.round(l2st)),'red')+ifv(l2sp>0,row('Spouse Early Penalty',fmt$(Math.round(l2sp)),'amber'))))
         +ifv(l2g>0||l2sg>0,totRow('Total Gross IRA Required',fmt$(Math.round(l2g+l2sg))))
+      ))
+    + ifv(arch, card('teal','Architecture — L3 · ETA (Tax Elimination)',
+        row('ETA Funding Amount',fmtK(inputs.etaFundingAmount),'teal')
+        +row('ETA Funding Age',inputs.etaFundingAge)
+        +row('ETA Annual Income',fmtYr(inputs.etaAnnualIncome),'teal')
+        +row('ETA Income Start Age',inputs.etaStartAge)
+        +row('ETA COLA Rate',(inputs.etaColaRate||0)+'%')
       ))
     + ifv(hasLtc||hasSpLtc, card('red','Health Event Modeling',
         ifv(hasLtc,
