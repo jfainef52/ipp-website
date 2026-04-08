@@ -634,12 +634,12 @@ function calcStateTax(sources, stateCode, inflFactor, customRate, stressAdder = 
     case 'partial':
       // Most partial states: SS exempt, qualified plan (IRA/pension) at 80% inclusion,
       // annuity gain (exclusion already applied) at 100%, part-time fully taxable.
-      stateOrdinary = (pension + rmd) * 0.80 + annuity + parttime + taxable * taxableGainRatio;
+      stateOrdinary = (pension + rmd) * 0.80 + annuity + parttime + taxable * (sources.taxableGainRatio || 1);
       break;
     case 'full':
     default:
       // All retirement income taxed; SS at 85%, annuity gain at 100% (exclusion already applied)
-      stateOrdinary = pension + rmd + annuity + parttime + ss * 0.85 + taxable * taxableGainRatio;
+      stateOrdinary = pension + rmd + annuity + parttime + ss * 0.85 + taxable * (sources.taxableGainRatio || 1);
       break;
   }
 
@@ -935,6 +935,45 @@ function projectArc(inputs) {
   magiHistory[retireAge - 2] = preRetireMagi;
   magiHistory[retireAge - 1] = preRetireMagi;
 
+  // grossUpIterative — declared as a function statement so it is hoisted to the top of
+  // projectArc and available on the very first retirement loop iteration. This is necessary
+  // for already-retired clients (currentAge === retireAge) where ltcFundingAge === retireAge
+  // causes the LTC funding draw to fire immediately in iteration 0, before the point where
+  // the function was previously defined as a const inside the loop.
+  // Pure utility — no closure over loop-local variables.
+  function grossUpIterative(netNeeded, brackets, currentAGI) {
+    let grossSoFar = 0, taxSoFar = 0, netSoFar = 0;
+    let position = currentAGI;
+    for (const b of brackets) {
+      if (netSoFar >= netNeeded) break;
+      if (position >= b.limit) continue;
+      const spaceGross = b.limit - position;
+      const netRate = 1 - b.rate;
+      const spaceNet = spaceGross * netRate;
+      const stillNeed = netNeeded - netSoFar;
+      if (spaceNet >= stillNeed) {
+        const grossSlice = netRate > 0 ? stillNeed / netRate : stillNeed;
+        grossSoFar += grossSlice;
+        taxSoFar += grossSlice * b.rate;
+        netSoFar = netNeeded;
+        break;
+      } else {
+        grossSoFar += spaceGross;
+        taxSoFar += spaceGross * b.rate;
+        netSoFar += spaceNet;
+        position = b.limit;
+      }
+    }
+    if (netSoFar < netNeeded) {
+      const topRate = brackets[brackets.length - 1].rate;
+      const stillNeed = netNeeded - netSoFar;
+      const grossSlice = topRate < 1 ? stillNeed / (1 - topRate) : stillNeed * 5;
+      grossSoFar += grossSlice;
+      taxSoFar += grossSlice * topRate;
+    }
+    return { grossDraw: grossSoFar, taxOnDraw: taxSoFar };
+  }
+
   for (let age = retireAge; age <= planToAge; age++) {
     const yr = age - retireAge;
     const inflFactor = Math.pow(1 + inflation, yr);
@@ -945,6 +984,15 @@ function projectArc(inputs) {
       : portfolioReturn;
     const row = { age, sources: {}, totalIncome: 0, totalExpense: 0, gap: 0 };
     row.yearReturn = yearReturn; // stored for chart annotation
+
+    // effectiveStatus must be declared before any funding draws.
+    // The LTC gross-up uses tax brackets that depend on filing status.
+    // Original placement was after the LTC block, causing a temporal dead zone
+    // ReferenceError on the first retirement loop iteration when ltcFundingAge === retireAge
+    // (already-retired clients). Pre-retirees are unaffected — their ltcFundingAge is
+    // always a pre-retirement age so those conditions never fire in the retirement loop.
+    const spouseAlive = filingStatus === 'mfj' && (primaryDeathAge === 0 || age <= primaryDeathAge);
+    const effectiveStatus = spouseAlive ? 'mfj' : 'single';
 
     // ── ETA Lump-Sum Funding Event ──
     // Tax AND any early withdrawal penalty are financed externally (bank loan / policy financing).
@@ -1017,8 +1065,7 @@ function projectArc(inputs) {
     }
 
     // Determine effective filing status this year (primary death triggers surviving spouse scenario)
-    const spouseAlive = filingStatus === 'mfj' && (primaryDeathAge === 0 || age <= primaryDeathAge);
-    const effectiveStatus = spouseAlive ? 'mfj' : 'single';
+    // spouseAlive and effectiveStatus are declared at the top of this loop iteration (before funding draws).
     row.spouseAlive = spouseAlive;
     row.primaryDiedThisYear = (filingStatus === 'mfj' && primaryDeathAge > 0 && age === primaryDeathAge);
 
@@ -1330,38 +1377,7 @@ function projectArc(inputs) {
       + (row.sources.annuity||0); // gain portion only (exclusion already applied)
     const baseOrdAGI = Math.max(0, ordIncomeBeforeDraw - stdDed);
 
-    const grossUpIterative = (netNeeded, brackets, currentAGI) => {
-      let grossSoFar = 0, taxSoFar = 0, netSoFar = 0;
-      let position = currentAGI;
-      for (const b of brackets) {
-        if (netSoFar >= netNeeded) break;
-        if (position >= b.limit) continue;
-        const spaceGross = b.limit - position;
-        const netRate = 1 - b.rate;
-        const spaceNet = spaceGross * netRate;
-        const stillNeed = netNeeded - netSoFar;
-        if (spaceNet >= stillNeed) {
-          const grossSlice = netRate > 0 ? stillNeed / netRate : stillNeed;
-          grossSoFar += grossSlice;
-          taxSoFar += grossSlice * b.rate;
-          netSoFar = netNeeded;
-          break;
-        } else {
-          grossSoFar += spaceGross;
-          taxSoFar += spaceGross * b.rate;
-          netSoFar += spaceNet;
-          position = b.limit;
-        }
-      }
-      if (netSoFar < netNeeded) {
-        const topRate = brackets[brackets.length - 1].rate;
-        const stillNeed = netNeeded - netSoFar;
-        const grossSlice = topRate < 1 ? stillNeed / (1 - topRate) : stillNeed * 5;
-        grossSoFar += grossSlice;
-        taxSoFar += grossSlice * topRate;
-      }
-      return { grossDraw: grossSoFar, taxOnDraw: taxSoFar };
-    };
+    // grossUpIterative is declared as a hoisted function statement above the retirement loop.
 
     // ── Gap-fill with bracket-creep-aware gross-up ──
     // For LTC years: compute how much of the gap is specifically due to LTC cost,
