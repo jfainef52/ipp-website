@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Your IRA Balance Isn't What You Think It Is — Integrated Planning Partners</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root { --navy:#0B1220; --navy-mid:#152035; --navy-light:#1E2E48; --gold:#C8A96E; --gold-light:#DFC49A; --teal:#3A8C9E; --white:#FFFFFF; --off-white:#F9F6F0; --text-body:#2A2A2A; --text-muted:#6B6760; --border:rgba(200,169,110,0.18); }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Barlow',sans-serif;background:var(--off-white);color:var(--text-body);font-size:17px;line-height:1.8;-webkit-font-smoothing:antialiased}
+  .site-header{background:var(--navy);padding:18px 48px;display:flex;align-items:center;justify-content:space-between}
+  .site-header .brand{font-size:11px;font-weight:500;letter-spacing:.18em;text-transform:uppercase;color:var(--gold)}
+  .site-header .tagline{font-size:11px;font-weight:300;letter-spacing:.1em;color:rgba(255,255,255,.35)}
+  .hero{background:var(--navy);padding:88px 48px 80px;position:relative;overflow:hidden}
+  .hero::before{content:'';position:absolute;top:-100px;right:-100px;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(200,169,110,.07) 0%,transparent 65%);pointer-events:none}
+  .hero-eyebrow{font-size:10px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);margin-bottom:22px}
+  .hero-title{font-family:'Cormorant Garamond',serif;font-size:clamp(36px,5vw,60px);font-weight:500;color:var(--white);line-height:1.1;max-width:700px;margin-bottom:28px}
+  .hero-title em{font-style:italic;color:var(--gold-light)}
+  .hero-deck{font-size:18px;font-weight:300;color:rgba(255,255,255,.6);max-width:580px;line-height:1.7;margin-bottom:36px}
+  .hero-rule{width:48px;height:2px;background:var(--gold);margin-bottom:28px}
+  .hero-meta{font-size:12px;font-weight:400;letter-spacing:.08em;color:rgba(255,255,255,.28)}
+  .article-wrap{max-width:760px;margin:0 auto;padding:68px 32px 100px}
+  .section{margin-bottom:60px}
+  .section-eyebrow{font-size:10px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--teal);margin-bottom:10px}
+  .section-title{font-family:'Cormorant Garamond',serif;font-size:clamp(26px,3.5vw,36px);font-weight:500;color:var(--navy);line-height:1.18;margin-bottom:24px}
+  .section-title em{font-style:italic;color:var(--teal)}
+  p{margin-bottom:20px;font-weight:400}
+  p:last-child{margin-bottom:0}
+  .pull-quote{border-left:3px solid var(--gold);margin:40px 0;padding:4px 0 4px 28px;font-family:'Cormorant Garamond',serif;font-size:clamp(20px,2.8vw,27px);font-style:italic;color:var(--navy);line-height:1.45}
+  .pull-quote strong{font-style:normal;font-weight:600;color:var(--gold)}
+  .scenario{background:var(--navy);border-radius:10px;padding:36px 40px;margin:36px 0;position:relative;overflow:hidden}
+  .scenario::after{content:'';position:absolute;bottom:-40px;right:-40px;width:160px;height:160px;border-radius:50%;background:rgba(200,169,110,.06);pointer-events:none}
+  .scenario-label{font-size:10px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);margin-bottom:14px}
+  .scenario p{color:rgba(255,255,255,.78);font-size:16px;font-weight:300;line-height:1.75;margin-bottom:12px}
+  .scenario p:last-child{margin-bottom:0}
+  .scenario strong{color:var(--white);font-weight:500}
+  .scenario em{color:var(--gold-light);font-style:italic}
+  .benefit-list{list-style:none;display:flex;flex-direction:column;gap:12px;margin:28px 0}
+  .benefit-list li{display:flex;gap:18px;align-items:flex-start;padding:20px 22px;background:var(--white);border-radius:8px;border:0.5px solid var(--border)}
+  .benefit-icon{flex-shrink:0;width:28px;height:28px;border-radius:50%;background:rgba(200,169,110,.1);display:flex;align-items:center;justify-content:center;margin-top:2px}
+  .benefit-icon svg{width:13px;height:13px}
+  .benefit-list li p{font-size:15px;margin:0;line-height:1.65}
+  .benefit-list li strong{font-weight:600;color:var(--navy);display:block;margin-bottom:4px;font-size:14px;letter-spacing:.02em}
+  .life-rate-block{background:linear-gradient(135deg,var(--navy) 0%,var(--navy-light) 100%);border:1px solid rgba(200,169,110,.22);border-radius:12px;padding:44px 44px 40px;margin:40px 0;text-align:center}
+  .lr-eyebrow{font-size:10px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);margin-bottom:12px}
+  .lr-term{font-family:'Cormorant Garamond',serif;font-size:48px;font-weight:500;color:var(--white);margin-bottom:14px;line-height:1}
+  .lr-term sup{font-size:24px;color:var(--gold);vertical-align:super}
+  .lr-equation{display:flex;align-items:center;justify-content:center;gap:14px;margin:18px 0 22px;flex-wrap:wrap}
+  .lr-pill{background:rgba(255,255,255,.08);border:0.5px solid rgba(200,169,110,.25);border-radius:4px;padding:8px 18px;font-size:13px;font-weight:400;color:rgba(255,255,255,.8);letter-spacing:.04em}
+  .lr-op{font-family:'Cormorant Garamond',serif;font-size:28px;color:var(--gold);font-weight:400;line-height:1}
+  .lr-result{background:rgba(200,169,110,.12);border:1px solid rgba(200,169,110,.3);border-radius:4px;padding:8px 22px;font-size:13px;font-weight:600;color:var(--gold-light);letter-spacing:.06em;text-transform:uppercase}
+  .lr-def{font-size:15px;font-weight:300;color:rgba(255,255,255,.55);max-width:460px;margin:0 auto;line-height:1.65}
+  .income-flow{display:flex;flex-direction:column;gap:2px;margin:28px 0}
+  .flow-step{display:flex;align-items:stretch;gap:0}
+  .flow-num{width:48px;flex-shrink:0;display:flex;flex-direction:column;align-items:center}
+  .flow-circle{width:32px;height:32px;border-radius:50%;background:var(--teal);color:var(--white);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0;margin-top:14px}
+  .flow-line{width:1px;flex:1;background:rgba(58,140,158,.25);margin:4px auto 0;min-height:20px}
+  .flow-step:last-child .flow-line{display:none}
+  .flow-body{flex:1;background:var(--white);border:0.5px solid var(--border);border-radius:8px;padding:18px 22px;margin-bottom:8px}
+  .flow-body strong{font-size:14px;font-weight:600;color:var(--navy);display:block;margin-bottom:5px}
+  .flow-body p{font-size:15px;color:var(--text-muted);margin:0;line-height:1.6;font-weight:300}
+  .flow-body.highlighted{background:var(--navy);border-color:rgba(200,169,110,.25)}
+  .flow-body.highlighted strong{color:var(--gold-light)}
+  .flow-body.highlighted p{color:rgba(255,255,255,.65)}
+  .section-divider{border:none;border-top:0.5px solid rgba(200,169,110,.2);margin:56px 0}
+  .layer-stack{display:flex;flex-direction:column;gap:6px;margin:28px 0}
+  .layer-bar{display:flex;align-items:center;border-radius:6px;overflow:hidden;height:62px}
+  .layer-num{width:56px;height:100%;display:flex;align-items:center;justify-content:center;font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:600;flex-shrink:0}
+  .layer-content{flex:1;padding:0 18px;display:flex;flex-direction:column;justify-content:center}
+  .layer-content .lname{font-size:13px;font-weight:600;letter-spacing:.03em}
+  .layer-content .ldesc{font-size:12px;font-weight:300;opacity:.78;margin-top:2px}
+  .layer-pct{padding:0 18px;font-size:13px;font-weight:500;opacity:.65}
+  .l1{background:#1A3A5C;color:#A8D4F0} .l1 .layer-num{background:#0F2540;color:#5AAFC2}
+  .l2{background:#2A4A2A;color:#A8D4A8} .l2 .layer-num{background:#1A3020;color:#6CBE6C}
+  .l3{background:#3A2A10;color:#DFC49A} .l3 .layer-num{background:#251A08;color:#C8A96E}
+  .l4{background:#252530;color:#A8A8C8} .l4 .layer-num{background:#18181E;color:#7878A8}
+  .l3-featured{border:2px solid var(--gold);box-shadow:0 0 0 4px rgba(200,169,110,.1)}
+  .article-cta{background:var(--navy);padding:64px 48px;text-align:center}
+  .article-cta .cta-eyebrow{font-size:10px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);margin-bottom:18px}
+  .article-cta h2{font-family:'Cormorant Garamond',serif;font-size:clamp(28px,4vw,42px);font-weight:500;color:var(--white);margin-bottom:18px;line-height:1.2}
+  .article-cta p{font-size:16px;font-weight:300;color:rgba(255,255,255,.52);max-width:500px;margin:0 auto 36px;line-height:1.7}
+  .cta-btn{display:inline-block;background:var(--gold);color:var(--navy);font-size:12px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;text-decoration:none;padding:16px 40px;border-radius:3px}
+  .site-footer{background:#080E1A;padding:28px 48px;display:flex;flex-direction:column;gap:8px}
+  .site-footer p{font-size:11px;color:rgba(255,255,255,.22);font-weight:300;margin:0;line-height:1.6}
+  @media(max-width:600px){.site-header,.hero,.article-cta{padding-left:24px;padding-right:24px}.article-wrap{padding:40px 20px 72px}.life-rate-block{padding:32px 24px}.lr-equation{gap:8px}.scenario{padding:28px 24px}}
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <span class="brand">Integrated Planning Partners</span>
+  <span class="tagline">Your Retirement · Your Income</span>
+</header>
+
+<section class="hero">
+  <div class="hero-eyebrow">A Conversation About Your Retirement</div>
+  <h1 class="hero-title">Your IRA Balance<br>Isn't What You<br><em>Think It Is</em></h1>
+  <div class="hero-rule"></div>
+  <p class="hero-deck">There's a debt embedded in every traditional retirement account. Most people never settle it on their own terms — and pay dearly for it later.</p>
+  <p class="hero-meta">By Jeffrey Faine, CLU &nbsp;·&nbsp; Integrated Planning Partners &nbsp;·&nbsp; integratedplanningpartners.com</p>
+</section>
+
+<main class="article-wrap">
+
+  <section class="section">
+    <div class="section-eyebrow">Let's Start Here</div>
+    <h2 class="section-title">The Number on Your Statement<br><em>Isn't Your Number</em></h2>
+    <p>If you've spent your career putting money into a traditional IRA or 401(k), you've done everything right. You saved consistently. You let it grow. You deferred the taxes because that was the deal — pay them later, when you presumably earn less.</p>
+    <p>But look at that balance on your statement. That number belongs to two parties — you, and the IRS. The government has a standing claim on a significant portion of every dollar in that account. It isn't a future possibility. It isn't contingent on anything. It's a debt that already exists, embedded in the account, accruing in silence while the balance grows.</p>
+    <p>When you withdraw, you pay it. When you turn 73, Required Minimum Distributions force you to start paying it whether you're ready or not — on a schedule set by the IRS, not by you. And the rate? Congress determines that. Not you.</p>
+    <div class="pull-quote">The balance on your statement is not what you have. It's what you have <strong>before the debt is settled.</strong></div>
+    <p>A Roth conversion is the process of settling that debt on your own terms — paying the tax now, at today's rates, in amounts you control — so that what remains is fully and permanently yours. It grows tax-free. It comes out tax-free. It never forces a withdrawal you didn't choose.</p>
+    <p>Think of it as retiring the debt before the creditor sets the repayment schedule for you. Because eventually, one way or another, that debt gets paid. The only question is whether you control the terms.</p>
+  </section>
+
+  <hr class="section-divider">
+
+  <section class="section">
+    <div class="section-eyebrow">What Actually Changes</div>
+    <h2 class="section-title">The Difference a Roth<br>Makes in <em>Real Life</em></h2>
+    <p>The financial case for converting is compelling. But the real impact isn't on a spreadsheet — it's in how your retirement actually feels from year to year.</p>
+    <div class="scenario">
+      <div class="scenario-label">Picture This</div>
+      <p>You're 68. You want $8,000 for a vacation you've been planning for years. With a traditional IRA, $8,000 isn't what you withdraw — it's what you need to net after taxes. To put $8,000 in your pocket, you may need to pull $10,500 to $11,500 or more from the account, depending on your bracket. That extra $2,500 to $3,500 goes straight to the IRS. It also counts as income — potentially pushing you into a higher bracket, increasing your Medicare premiums, and causing more of your Social Security benefit to be taxed.</p>
+      <p>With a Roth IRA, you withdraw exactly $8,000. That is what hits your account. No gross-up. No income event. No Medicare surcharge. No bracket math.</p>
+      <p><strong>Same trip. Meaningfully different cost — depending entirely on which account you're drawing from.</strong></p>
+    </div>
+    <ul class="benefit-list">
+      <li>
+        <div class="benefit-icon"><svg viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="5.5" stroke="#C8A96E" stroke-width="1"/><path d="M4 6.5l2 2 3-3" stroke="#C8A96E" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <p><strong>You control when you take money out — not the IRS.</strong> Required Minimum Distributions don't apply to Roth IRAs. You withdraw on your schedule, for your reasons, in the amounts you choose.</p>
+      </li>
+      <li>
+        <div class="benefit-icon"><svg viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="5.5" stroke="#C8A96E" stroke-width="1"/><path d="M4 6.5l2 2 3-3" stroke="#C8A96E" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <p><strong>Everything that grows is yours — including the growth.</strong> A $200,000 conversion that becomes $400,000 over 15 years produces $200,000 of completely tax-free growth. That's not a projection — that's how Roth accounts work.</p>
+      </li>
+      <li>
+        <div class="benefit-icon"><svg viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="5.5" stroke="#C8A96E" stroke-width="1"/><path d="M4 6.5l2 2 3-3" stroke="#C8A96E" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <p><strong>Your Social Security becomes more valuable.</strong> Traditional IRA withdrawals count as income and can cause up to 85% of your Social Security benefit to be taxed. Roth distributions don't count. That difference adds up significantly over a long retirement.</p>
+      </li>
+      <li>
+        <div class="benefit-icon"><svg viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="5.5" stroke="#C8A96E" stroke-width="1"/><path d="M4 6.5l2 2 3-3" stroke="#C8A96E" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <p><strong>What you leave behind is cleaner.</strong> When your children or grandchildren inherit a Roth IRA, they receive it tax-free. A traditional IRA inheritance comes with a tax bill attached. Converting now is one of the most direct ways to protect what you pass on.</p>
+      </li>
+      <li>
+        <div class="benefit-icon"><svg viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="5.5" stroke="#C8A96E" stroke-width="1"/><path d="M4 6.5l2 2 3-3" stroke="#C8A96E" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <p><strong>Future tax changes don't threaten you.</strong> Nobody knows what brackets will look like in 10 years. A Roth eliminates an entire category of future tax exposure. That certainty has real value — especially when you're living on a fixed income.</p>
+      </li>
+    </ul>
+  </section>
+
+  <hr class="section-divider">
+
+  <section class="section">
+    <div class="section-eyebrow">The Honest Truth</div>
+    <h2 class="section-title">Why Most People<br><em>Never Finish</em> a Conversion</h2>
+    <p>Everything above is true. And yet the vast majority of people who understand it — and genuinely want to do it — never complete a Roth conversion at the scale that would actually change their retirement. There's a reason for that, and it's not a lack of willpower.</p>
+    <p>A Roth conversion doesn't make your taxes disappear. It moves them forward. You pay them this year, on the amount you convert, at ordinary income rates. That means if you have $1.5 million in a traditional IRA and you want to convert it all, you're looking at a tax bill that could easily reach $400,000 to $600,000 or more.</p>
+    <p>You can instruct your custodian to withhold that tax directly from the IRA — but doing so means a significant portion of your balance never makes it into the Roth. If you convert $1.5 million and withhold $450,000 to cover the taxes, you've converted $1.05 million to Roth and permanently forfeited $450,000 of tax-free growth potential. The money that paid the tax bill will never compound inside the Roth. It's gone, along with every dollar of future growth it would have generated.</p>
+    <p>The mathematically superior approach — and the one that actually maximizes the benefit — is to pay the tax from assets outside the IRA, so the full balance converts and compounds tax-free. For most people with $1.5 million or more in a qualified plan, that outside cash simply doesn't exist in the amounts required. And that is precisely where the strategy breaks down.</p>
+    <p>The second problem is time. The standard advice is to convert gradually — a little each year, staying within a comfortable tax bracket. It's a reasonable strategy. But for accounts over $1.5 million, the math starts working against you. Your account keeps growing while you're converting. Required Minimum Distributions kick in at 73 and force taxable income on top of whatever you're already converting. The 15-year window you thought you had turns out to be closer to 8 — and you've converted maybe 40% of what you needed to.</p>
+    <div class="pull-quote">The problem isn't the idea. The problem is that <strong>most people try to retire a large debt with tools designed for a small one.</strong></div>
+    <p>This is the gap that most retirement conversations never address. The strategy is correct. The execution is where it breaks down — and where a structured approach makes all the difference.</p>
+  </section>
+
+  <hr class="section-divider">
+
+  <section class="section" style="page-break-before:always">
+    <div class="section-eyebrow">A Different Approach</div>
+    <h2 class="section-title">What Changes When the<br><em>Tax Bill Is Financed</em></h2>
+    <p>Remember what we established earlier: the tax on your IRA isn't a future event — it's an existing debt. The government already holds a lien on a significant portion of your retirement account. That lien doesn't disappear. It gets paid one way or another, on terms that are largely set by someone else.</p>
+    <p>With IncomeArc™, we do one better — we pay the tax from outside the IRA using the bank's money.</p>
+    <p>What IncomeArc™ does is refinance that debt. Instead of leaving the government's lien in place — accruing silently, subject to whatever tax rates Congress sets, forced into repayment on the IRS's schedule at 73 — we replace it with bank financing on terms you control. The outstanding tax obligation owed to the government is retired using the bank's capital, not yours.</p>
+    <p>And here is what most people don't expect when they hear the word "bank": there is no personal guaranty. The loan is secured solely by the life insurance policy itself. Your home, your savings, your other accounts — none of them are on the hook. The liability hasn't changed in size since it was owed to the government. But what changed are two things that matter enormously: the timeline, and the rate.</p>
+    <p>The government's effective rate on this debt is your marginal income tax bracket — 24%, 32%, 37%, or higher, depending on your situation, and subject to increase any time Congress chooses. The bank's rate is approximately 5% to 6%. That is the refinancing. You are trading a 24% to 40% obligation on the government's repayment schedule for a 5% to 6% obligation on yours. In any other context — a mortgage, a business loan, a line of credit — that would be an obvious decision. Applied to the largest debt most retirees are carrying without knowing it, it changes the entire financial picture of retirement.</p>
+    <div class="pull-quote">Your interest rate will never be as high as your tax rate. And your tax rate will never be as low as your interest rate.</div>
+    <p>But the refinancing doesn't stop with the bank. As the policy accumulates cash value over time, the next step is to refinance again — this time replacing the bank loan with a policy loan from the insurance company. This is simply changing the lender one more time. The bank is paid off. The insurance company becomes the new creditor. And the rate on a policy loan is typically even more favorable than the bank's.</p>
+    <p>This step matters for a specific reason: the bank must be repaid before you can begin drawing tax-free income from the policy. Once the bank is retired and the policy loan is in place, the cash value inside the IUL becomes accessible as tax-free income — drawn against the policy's accumulated value without triggering a taxable event. That is the income the policy was built to produce.</p>
+    <p>From that point forward, the remaining policy loan — now held by the insurance company, not the bank — simply rides. There is no required repayment schedule. No personal guaranty. No forced distribution. When you pass, the gross death benefit repays the outstanding policy loan in full. What remains — the net death benefit — passes to your beneficiaries completely tax-free.</p>
+    <p>Consider what that means in contrast to the alternative. An inherited traditional IRA or qualified retirement plan comes with the full pre-tax tax liability attached. Your beneficiaries are required to draw it down within ten years and pay ordinary income tax on every dollar. What you leave them is not a gift — it is a tax bill with your name on it. What the IncomeArc™ structure leaves them is a tax-free inheritance, after a debt that began as a government lien quietly settled itself from within the policy.</p>
+    <p>Here's what that makes possible. The bank financing activates both layers of the IncomeArc™ structure — and while each layer does its own independent job, they are designed to work together for a better combined outcome than either produces alone:</p>
+    <p><strong>Layer 3 — Tax Deferral and long-term growth.</strong> The distribution proceeds fund an Indexed Universal Life policy — accumulating cash value with tax-deferred growth, protected from market downside, and accessible tax-free. The bank loan services the tax obligation on the distribution. Your personal savings stay intact. Over time, the IUL grows, the bank is refinanced through a policy loan, and the cash value becomes the source of additional tax-free income from Layer 3.</p>
+    <p><strong>Layer 1 — The Guaranteed Income Foundation.</strong> The converted Roth balance funds a guaranteed annuity — contractual, permanent, completely tax-free income for life. This is Layer 1, and it can be funded independently of Layer 3. What Layer 3 does is remove the cashflow friction that limits how much gets funded. Without the leverage component, a significant portion of the conversion is consumed by the tax bill. With it, far more of the converted balance reaches Layer 1 intact — which means a larger, more complete guaranteed income foundation.</p>
+    <p>This is the competitive advantage of the IncomeArc™ system. The architecture itself — four layers, each doing a distinct job — is more complete than what most retirement planning delivers. But what takes it to the next level is the leverage: bringing bank financing into the structure removes the cashflow drag of taxes and allows the system to work at a scale that conventional planning simply cannot reach. Layer 1 is designed to target your Life Rate™ as the income foundation. Layer 3 is what allows it to do so more fully.</p>
+  </section>
+
+  <hr class="section-divider">
+
+  <section class="section">
+    <div class="section-eyebrow">The Foundation of Your Retirement</div>
+    <h2 class="section-title">Covering Your <em>Life Rate™</em> —<br>Guaranteed, Tax-Free, Forever</h2>
+    <div class="life-rate-block">
+      <div class="lr-eyebrow">Introducing</div>
+      <div class="lr-term">Life Rate<sup>™</sup></div>
+      <div class="lr-equation">
+        <div class="lr-pill">Fixed living expenses</div>
+        <div class="lr-op">+</div>
+        <div class="lr-pill">Lifestyle expenses</div>
+        <div class="lr-op">=</div>
+        <div class="lr-result">Your Life Rate™</div>
+      </div>
+      <div class="lr-def">The total annual cost of your life — what it takes to live well, not just survive. The number your retirement income plan must cover, completely and reliably, for as long as you live.</div>
+    </div>
+    <p>Every retirement conversation eventually comes down to one question: will I have enough income to cover my life — not just the necessities, but the retirement I've been building toward?</p>
+    <p>We call that number your Life Rate™. It's the combination of your fixed living expenses — housing, healthcare, utilities, insurance — and your lifestyle expenses — travel, family, giving, the things that make retirement feel like retirement. Together, they represent what your life actually costs.</p>
+    <p>The goal of the IncomeArc™ architecture is to target your Life Rate™ with income that is guaranteed, that you cannot outlive, and that generates no tax bill when you spend it.</p>
+    <p>Here is how the pieces connect:</p>
+    <div class="income-flow">
+      <div class="flow-step">
+        <div class="flow-num"><div class="flow-circle">1</div><div class="flow-line"></div></div>
+        <div class="flow-body">
+          <strong>Layer 3 finances the tax — so none of the conversion is lost to it.</strong>
+          <p>The Enhanced Tax Advantage structure uses bank financing to cover the tax on the qualified plan distribution. The distribution proceeds fund the IUL policy. The bank loan handles the tax obligation. Your savings stay intact — and critically, the full converted amount moves into the Roth IRA without being reduced by the tax bill.</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num"><div class="flow-circle">2</div><div class="flow-line"></div></div>
+        <div class="flow-body">
+          <strong>The full converted balance funds Layer 1 — the Guaranteed Income Foundation.</strong>
+          <p>Because Layer 3 absorbed the tax cost, the entire converted balance reaches the Roth IRA. Those proceeds fund a guaranteed annuity — the contractual, lifetime income vehicle at the core of Layer 1 in the IncomeArc™ architecture.</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num"><div class="flow-circle">3</div><div class="flow-line"></div></div>
+        <div class="flow-body highlighted">
+          <strong>Layer 1 is designed to target your Life Rate™ — tax-free, guaranteed, for life.</strong>
+          <p>Every dollar from that guaranteed annuity comes out of your Roth tax-free. Fixed expenses are targeted. Lifestyle spending is supported. None of it creates a taxable event, triggers a Medicare surcharge, or depends on what Congress does next. The government's lien is gone. The income is yours.</p>
+        </div>
+      </div>
+    </div>
+    <p>This is what changes when the foundation of your retirement is built with intention. The anxiety that drives most retirement conversations — will I run out, what if taxes go up, what if markets drop — is significantly reduced for the income that Layer 1 is designed to provide. It's guaranteed. It's tax-free. And it's structured to hold regardless of what the market does.</p>
+    <div class="pull-quote">The goal isn't to minimize taxes on a spreadsheet. It's to build a retirement where <strong>as much of your life as possible</strong> is funded by income the government can never touch again.</div>
+    <p>Everything above that foundation — additional growth, legacy assets, reserves — is upside. But the floor is solid. That's the difference IncomeArc™ is designed to make.</p>
+    <div class="layer-stack" style="margin-top:36px">
+      <div class="layer-bar l1"><div class="layer-num">1</div><div class="layer-content"><span class="lname">Guaranteed Income Foundation</span><span class="ldesc">Targets your Life Rate™ · Tax-free · Guaranteed for life</span></div></div>
+      <div class="layer-bar l2"><div class="layer-num">2</div><div class="layer-content"><span class="lname">Protection &amp; Legacy</span><span class="ldesc">Long-term care coverage · What you leave behind</span></div></div>
+      <div class="layer-bar l3 l3-featured"><div class="layer-num">3</div><div class="layer-content"><span class="lname">Tax Efficiency &amp; Growth</span><span class="ldesc">Reduces cashflow drag · Leverages bank financing · Long-term IUL growth</span></div></div>
+      <div class="layer-bar l4"><div class="layer-num">4</div><div class="layer-content"><span class="lname">Liquidity Reserve</span><span class="ldesc">Access when you need it · Peace of mind</span></div></div>
+    </div>
+  </section>
+
+</main>
+
+<section class="article-cta">
+  <div class="cta-eyebrow">Your Next Step</div>
+  <h2>Let's Look at<br>Your Numbers Together</h2>
+  <p>A StructureReview™ takes about an hour and shows you exactly what your Life Rate™ is, what it would take to fund it tax-free, and whether the IncomeArc™ architecture is the right fit for your situation.</p>
+  <a href="https://www.integratedplanningpartners.com" class="cta-btn">Schedule a StructureReview™</a>
+</section>
+
+<footer class="site-footer">
+  <p>© 2025 Integrated Planning Partners · All rights reserved</p>
+  <p><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="4b183e3b3b24393f0b22253f2e2c392a3f2e2f3b272a252522252c3b2a393f252e393865282426">[email&#160;protected]</a> &nbsp;·&nbsp; 773-318-9608 &nbsp;·&nbsp; integratedplanningpartners.com</p>
+  <p style="margin-top:8px;max-width:680px">This material is provided for educational purposes only and does not constitu
