@@ -4,7 +4,7 @@
 //   GET /api/notion?action=page&slug=...   → returns single article + blocks
 
 const NOTION_TOKEN = process.env.NOTION_TOKEN;
-const DATABASE_ID  = '330b2b2f372180eaa5a6d2d4d71194f8';
+const DATABASE_ID  = process.env.NOTION_DATABASE_ID;
 
 const headers = {
   'Authorization': `Bearer ${NOTION_TOKEN}`,
