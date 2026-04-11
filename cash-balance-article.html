@@ -130,6 +130,141 @@
 
 
 
+
+
+  /* ── NAV ── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 48px;
+      height: 68px;
+      background: rgba(14, 28, 46, 0.95);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+    }
+  
+    .nav-logo {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      flex-shrink: 0;
+    }
+  
+    .nav-logo-sub {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 9px;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      color: var(--gold);
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+  
+    /* Visible nav items (right side of bar) */
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      list-style: none;
+    }
+  
+    .nav-right a {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 10.5px;
+      font-weight: 500;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--warm);
+      text-decoration: none;
+      transition: color 0.2s;
+      white-space: nowrap;
+    }
+  
+    .nav-right a:hover { color: var(--gold); }
+    .nav-right a span { text-transform: none; }
+  
+    .nav-advisor {
+      color: var(--gold) !important;
+      border: 1px solid var(--gold-dim);
+      padding: 7px 18px;
+      border-radius: 2px;
+      transition: border-color 0.2s, background 0.2s !important;
+    }
+  
+    .nav-advisor:hover {
+      border-color: var(--gold) !important;
+      background: rgba(200,169,110,0.08) !important;
+      color: var(--gold2) !important;
+    }
+  
+    .nav-cta {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: none;
+      color: var(--navy) !important;
+      background: var(--gold);
+      padding: 9px 22px;
+      border-radius: 2px;
+      transition: background 0.2s !important;
+    }
+  
+    .nav-cta:hover { background: var(--gold2) !important; color: var(--navy) !important; }
+  
+    /* Hamburger button */
+    .nav-menu-btn {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 5px;
+      width: 36px;
+      height: 36px;
+      cursor: pointer;
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      padding: 0;
+      transition: border-color 0.2s;
+      flex-shrink: 0;
+    }
+  
+    .nav-menu-btn:hover { border-color: var(--gold-dim); }
+  
+    .nav-menu-btn span {
+      display: block;
+      width: 16px;
+      height: 1px;
+      background: var(--warm);
+      transition: background 0.2s;
+      letter-spacing: 0;
+      text-transform: none;
+      font-size: 0;
+    }
+  
+    .nav-menu-btn:hover span { background: var(--gold); }
+  
+    /* ── DRAWER OVERLAY ── */
+    .drawer-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 20, 34, 0.6);
+      z-index: 300;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+      backdrop-filter: blur(2px);
+    }
+  
+    .drawer-overlay.open {
+      opacity: 1;
+      pointer-events: all;
+    }
 </style>
 </head>
 <body>
@@ -554,16 +689,16 @@
   </div>
     <div class="footer-links">
     <a href="index.html#what-we-do">What We Do</a>
-    <a href="index.html#structure-review"><span style="text-transform:none;">StructureReviewâ¢</span></a>
-    <a href="incomearc.html"><span style="text-transform:none;">IncomeArcâ¢</span></a>
-    <a href="income-architect-modeler.html"><span style="text-transform:none;">IncomeArchitectâ¢ Modeler</span></a>
+    <a href="index.html#structure-review"><span style="text-transform:none;">StructureReview™</span></a>
+    <a href="incomearc.html"><span style="text-transform:none;">IncomeArc™</span></a>
+    <a href="income-architect-modeler.html"><span style="text-transform:none;">IncomeArchitect™ Modeler</span></a>
     <a href="index.html#book">Architecture of Retirement</a>
     <a href="about.html">About Us</a>
     <a href="index.html#contact">Contact Us</a>
     <a href="advisor-portal.html">Advisor Portal</a>
   </div>
   <div class="footer-bottom">
-    <div>Â© 2026 Integrated Planning Partners. IncomeArcâ¢ and StructureReviewâ¢ are trademarks of Integrated Planning Partners.</div>
+    <div>© 2026 Integrated Planning Partners. IncomeArc™ and StructureReview™ are trademarks of Integrated Planning Partners.</div>
     <div>For informational purposes only. Not financial, tax, legal, or investment advice.</div>
   </div>
 </footer>
