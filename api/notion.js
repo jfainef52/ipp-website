@@ -9,7 +9,8 @@ const DATABASE_ID  = process.env.NOTION_DATABASE_ID;
 const headers = {
   'Authorization': `Bearer ${NOTION_TOKEN}`,
   'Notion-Version': '2022-06-28',
-  'Content-Type': 'application/json',
+  'Content-Type': 'application/json'
+  
 };
 
 // ── CORS headers for browser fetch from integratedplanningpartners.com
