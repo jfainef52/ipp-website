@@ -24,6 +24,11 @@ export default async function handler(req, res) {
       const r = await fetch(`https://api.notion.com/v1/pages/${pageId}`, { method: 'PATCH', headers, body: JSON.stringify({ archived: true }) });
       return res.status(r.status).json(await r.json());
     }
+    if (action === 'updateDb') {
+      const { database_id, properties } = body;
+      const r = await fetch(`https://api.notion.com/v1/databases/${database_id}`, { method: 'PATCH', headers, body: JSON.stringify({ properties }) });
+      return res.status(r.status).json(await r.json());
+    }
     return res.status(400).json({ error: 'Unknown action' });
   } catch (err) {
     return res.status(500).json({ error: err.message });
