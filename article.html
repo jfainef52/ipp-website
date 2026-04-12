@@ -192,6 +192,15 @@
     color: var(--gray);
   }
   .article-meta-divider { color: var(--border); }
+  .article-author {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    color: var(--gray);
+    margin-top: 8px;
+    text-transform: none;
+  }
 
   /* ── ARTICLE BODY ── */
   .article-body {
@@ -630,6 +639,7 @@ document.addEventListener('DOMContentLoaded', function() {
           ${article.readTime ? `<span>${article.readTime}</span>` : ''}
           ${article.type ? `<span class="article-meta-divider">·</span><span>${article.type}</span>` : ''}
         </div>
+        ${article.author ? `<div class="article-author">By ${article.author}</div>` : ''}
       </div>`;
 
     const bodyHTML = `<div class="article-body">${renderBlocks(blocks)}</div>`;
