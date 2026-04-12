@@ -521,7 +521,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- ── FOOTER ── -->
 <footer id="contact">
   <div class="footer-logo">
-    <svg id="Layer_2" style="height:56px;width:auto;display:block;" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="875 1789 3260 1462">
+    <svg id="Layer_2" style="height:56px;width:125px;display:block;" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="875 1789 3260 1462">
   <!-- Generator: Adobe Illustrator 30.0.0, SVG Export Plug-In . SVG Version: 2.1.1 Build 123)  -->
   <defs></defs>
   <g>
@@ -586,6 +586,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </footer>
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+
   const slug = new URLSearchParams(window.location.search).get('slug');
 
   // ── LOAD ARTICLE
@@ -647,10 +648,11 @@ document.addEventListener('DOMContentLoaded', function() {
       if (block.type !== 'numbered_list_item' && olOpen) { html += '</ol>'; olOpen = false; }
 
       switch (block.type) {
-        case 'paragraph':
+        case 'paragraph': {
           const pText = richText(block.paragraph?.rich_text);
           if (pText) html += `<p class="n-p">${pText}</p>`;
           break;
+        }
 
         case 'heading_1':
           html += `<h2 class="n-h1">${richText(block.heading_1?.rich_text)}</h2>`;
@@ -735,4 +737,11 @@ document.addEventListener('DOMContentLoaded', function() {
   }
   function closeDrawer() {
     document.getElementById('drawer').classList.remove('open');
-    document.getEle
+    document.getElementById('drawerOverlay').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+  document.addEventListener('DOMContentLoaded', loadArticle);
+
+</script>
+</body>
+</html>
