@@ -79,6 +79,7 @@ async function handleList(res) {
       category: getProp(props, 'Category',       'select'),
       type:     getProp(props, 'Type',           'select'),
       readTime: getProp(props, 'ReadTime',       'rich_text'),
+      author:   getProp(props, 'Author',         'rich_text'),
       date:     getProp(props, 'PublishedDate',  'date'),
     };
   }).filter(a => a.slug); // only return articles that have a slug
