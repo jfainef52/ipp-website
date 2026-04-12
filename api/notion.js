@@ -137,6 +137,7 @@ async function handlePage(res, slug) {
       category: getProp(props, 'Category',       'select'),
       type:     getProp(props, 'Type',           'select'),
       readTime: getProp(props, 'ReadTime',       'rich_text'),
+      author:   getProp(props, 'Author',         'rich_text'),
       date:     getProp(props, 'PublishedDate',  'date'),
     },
     blocks: blocksData.results,
