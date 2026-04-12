@@ -9,6 +9,11 @@ export default async function handler(req, res) {
       const r = await fetch('https://api.notion.com/v1/pages', { method: 'POST', headers, body: JSON.stringify(body) });
       return res.status(r.status).json(await r.json());
     }
+    if (action === 'updatePage') {
+      const { pageId, properties } = body;
+      const r = await fetch(`https://api.notion.com/v1/pages/${pageId}`, { method: 'PATCH', headers, body: JSON.stringify({ properties }) });
+      return res.status(r.status).json(await r.json());
+    }
     if (action === 'append') {
       const { pageId, children } = body;
       const r = await fetch(`https://api.notion.com/v1/blocks/${pageId}/children`, { method: 'PATCH', headers, body: JSON.stringify({ children }) });
