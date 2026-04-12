@@ -1261,6 +1261,44 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 </script>
+  <!-- Structured Data: Organization + Person -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://www.integratedplanningpartners.com/#organization",
+        "name": "Integrated Planning Partners",
+        "url": "https://www.integratedplanningpartners.com",
+        "logo": "https://www.integratedplanningpartners.com/og-image.png",
+        "description": "Retirement income planning firm specializing in distribution-phase architecture for clients with $1M+ in qualified plan assets. IncomeArc smart income system, StructureReview diagnostic, and tax elimination strategies.",
+        "email": "support@integratedplanningpartners.com",
+        "telephone": "+1-773-318-9608",
+        "address": {"@type": "PostalAddress", "addressCountry": "US"},
+        "knowsAbout": ["Retirement Income Planning","Qualified Plan Distribution","Tax Elimination Strategies","Long-Term Care Planning","Roth Conversion Strategy","Leveraged Life Insurance","IncomeArc Smart Income System"]
+      },
+      {
+        "@type": "Person",
+        "@id": "https://www.integratedplanningpartners.com/#jeffrey-faine",
+        "name": "Jeffrey Faine",
+        "honorificSuffix": "CLU, RICP",
+        "jobTitle": "Founder & Principal",
+        "worksFor": {"@id": "https://www.integratedplanningpartners.com/#organization"},
+        "url": "https://www.integratedplanningpartners.com",
+        "knowsAbout": ["Retirement Income Planning","Enhanced Tax Advantage Strategy","Enhanced Pension Strategy","Long-Term Care Planning","Qualified Plan Distribution","IncomeArc Smart Income System"],
+        "author": {"@type": "Book","name": "Architecture of Retirement","description": "A framework for retirement income that prioritizes contractual guarantees, tax elimination, and protection over accumulation."}
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://www.integratedplanningpartners.com/#website",
+        "url": "https://www.integratedplanningpartners.com",
+        "name": "Integrated Planning Partners",
+        "publisher": {"@id": "https://www.integratedplanningpartners.com/#organization"}
+      }
+    ]
+  }
+  </script>
 </head>
 <body>
 
