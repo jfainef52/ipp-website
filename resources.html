@@ -885,6 +885,12 @@
       el.textContent = u + String.fromCharCode(64) + d;
     }
   })();
+
+  // Render email via JS — bypasses Cloudflare static HTML scanning
+  (function() {
+    var el = document.getElementById('footer-email-addr');
+    if (el) { el.textContent = 'support' + String.fromCharCode(64) + 'integratedplanningpartners.com'; }
+  })();
   loadArticles();
 
   // Load More button
