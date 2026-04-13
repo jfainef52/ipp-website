@@ -762,7 +762,8 @@
       const matchSearch = !q ||
         (a.title  || '').toLowerCase().includes(q) ||
         (a.summary|| '').toLowerCase().includes(q) ||
-        (a.category||'').toLowerCase().includes(q);
+        (a.category||'').toLowerCase().includes(q) ||
+        (a.keywords||'').toLowerCase().includes(q);
       return matchFilter && matchSearch;
     });
 
