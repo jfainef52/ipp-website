@@ -529,7 +529,42 @@
     .search-wrap input { width: 100%; }
     .cta-band-actions { flex-direction: column; }
   }
-</style>
+
+  /* Load More */
+  .load-more-wrap {
+    text-align: center;
+    padding: 32px 0 48px;
+  }
+  .load-more-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 36px;
+    background: transparent;
+    border: 1px solid var(--gold);
+    color: var(--gold);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+  }
+  .load-more-btn:hover {
+    background: var(--gold);
+    color: var(--navy);
+  }
+  .results-count {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.3);
+    text-align: center;
+    padding: 0 0 16px;
+  }
+  </style>
 </head>
 <body>
 
@@ -635,6 +670,7 @@
     </div>
 
     <div class="section-label">Articles &amp; Guides</div>
+    <div class="results-count" id="results-count"></div>
     <div class="resources-grid" id="resources-grid">
       <!-- Loading shimmer -->
       <div class="state-message" id="loading-state">
@@ -733,6 +769,8 @@
   let allArticles = [];
   let activeFilter = 'all';
   let searchQuery = '';
+  let visibleCount = 12;
+  const PAGE_SIZE = 12;
 
   // &rarr;&rarr; FETCH articles from Vercel API
   async function loadArticles() {
@@ -755,6 +793,8 @@
   // &rarr;&rarr; RENDER the grid based on current filter + search
   function renderGrid() {
     const grid = document.getElementById('resources-grid');
+    const loadMoreWrap = document.getElementById('load-more-wrap');
+    const resultsCount = document.getElementById('results-count');
 
     const filtered = allArticles.filter(a => {
       const matchFilter = activeFilter === 'all' || (a.category || '').toLowerCase() === activeFilter;
@@ -773,10 +813,15 @@
           <p>No articles found</p>
           <span>${searchQuery ? 'Try a different search term.' : 'Check back soon &mdash; new content is on the way.'}</span>
         </div>`;
+      if (loadMoreWrap) loadMoreWrap.style.display = 'none';
+      if (resultsCount) resultsCount.textContent = '';
       return;
     }
 
-    grid.innerHTML = filtered.map(a => `
+    const visible = filtered.slice(0, visibleCount);
+    const hasMore = filtered.length > visibleCount;
+
+    grid.innerHTML = visible.map(a => `
       <a href="article.html?slug=${a.slug}" class="resource-card" data-category="${(a.category||'').toLowerCase()}">
         <div class="card-type">${a.type || 'Article'}</div>
         <div class="card-title">${a.title || ''}</div>
@@ -786,10 +831,23 @@
           <span class="card-arrow">&rarr;</span>
         </div>
       </a>`).join('');
+
+    // Show/hide Load More
+    if (loadMoreWrap) loadMoreWrap.style.display = hasMore ? 'block' : 'none';
+
+    // Update results count
+    if (resultsCount) {
+      if (filtered.length > PAGE_SIZE) {
+        resultsCount.textContent = `Showing ${visible.length} of ${filtered.length} articles`;
+      } else {
+        resultsCount.textContent = '';
+      }
+    }
   }
 
   // &rarr;&rarr; FILTER
   function filterCards(category, btn) {
+    visibleCount = PAGE_SIZE;
     activeFilter = category;
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
@@ -798,6 +856,7 @@
 
   // &rarr;&rarr; SEARCH
   function searchCards(query) {
+    visibleCount = PAGE_SIZE;
     searchQuery = query;
     renderGrid();
   }
@@ -817,6 +876,18 @@
 
   // &rarr;&rarr; INIT
   loadArticles();
+
+  // Load More button
+  document.getElementById('load-more-btn')?.addEventListener('click', () => {
+    visibleCount += PAGE_SIZE;
+    renderGrid();
+    // Scroll to the new articles smoothly
+    const grid = document.getElementById('resources-grid');
+    const cards = grid.querySelectorAll('.resource-card');
+    if (cards.length > visibleCount - PAGE_SIZE) {
+      cards[visibleCount - PAGE_SIZE]?.scrollIntoView({behavior: 'smooth', block: 'start'});
+    }
+  });
 </script>
 </body>
 </html>
