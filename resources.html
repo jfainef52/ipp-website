@@ -891,6 +891,7 @@
     var el = document.getElementById('footer-email-addr');
     if (el) {
       var addr = 'support' + String.fromCharCode(64) + 'integratedplanningpartners.com';
+      el.innerHTML = '';
       var a = document.createElement('a');
       a.href = 'mail' + 'to:' + addr;
       a.textContent = addr;
