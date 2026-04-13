@@ -745,7 +745,7 @@
     <span>Built for Planning. Designed for Execution.</span>
   </div>
   <div class="footer-contact">
-    <a href="/cdn-cgi/l/email-protection#ccbfb9bcbca3beb88ca5a2b8a9abbeadb8a9a8bca0ada2a2a5a2abbcadbeb8a2a9bebfe2afa3a1"><span class="__cf_email__" data-cfemail="11626461617e636551787f6574766370657475617d707f7f787f76617063657f7463623f727e7c">[email&#160;protected]</span></a>
+    <span id="footer-email-addr" class="footer-email"></span>
     <div><a href="tel:7733189608">773-318-9608</a></div>
     <div><a href="https://integratedplanningpartners.com">integratedplanningpartners.com</a></div>
   </div>
@@ -876,6 +876,15 @@
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
 
   // &rarr;&rarr; INIT
+
+  // Inject email address — bypasses Cloudflare email obfuscation
+  (function() {
+    const el = document.getElementById('footer-email-addr');
+    if (el) {
+      const u = 'support'; const d = 'integratedplanningpartners.com';
+      el.textContent = u + String.fromCharCode(64) + d;
+    }
+  })();
   loadArticles();
 
   // Load More button
