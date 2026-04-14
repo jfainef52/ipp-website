@@ -2961,9 +2961,14 @@ function App() {
   // Main confidence ring: when architecture OFF + health events ON, show uninsured MC score
   // When architecture ON, show full architecture score (confidenceClean with arch layers)
   const years = yearsWithLtc;
-  const confidence = (hasLtcEvent || hasSpouseLtcEvent)
-    ? confidenceWithLtc
-    : confidenceClean;
+  // Ring always shows rptArchStormConf when Architecture is ON — same value the report uses.
+  // This guarantees the live ring and report sc3Arch are always identical.
+  // When Architecture is OFF, use confidenceWithLtc (uninsured stress) or confidenceClean.
+  const confidence = inputs.architectureEnabled
+    ? rptArchStormConf
+    : (hasLtcEvent || hasSpouseLtcEvent)
+      ? confidenceWithLtc
+      : confidenceClean;
 
   // LTC comparison projections — only when architecture is enabled and LTC inputs are set.
   // IMPORTANT: both projections zero out ltcNetAmount/spouseLtcNetAmount so the funding draw
@@ -6604,8 +6609,7 @@ function App() {
                     </div>
                   </div>
                 )}
-                <div style={{background:"#ff0",color:"#000",fontSize:10,padding:"2px 6px",marginBottom:4,fontFamily:"monospace",borderRadius:3,textAlign:"center"}}>LIVE: ring={confidence}% rptStorm={rptArchStormConf}%</div>
-            <ConfidenceRing score={confidence} note={inputs.sorrEnabled && inputs.architectureEnabled ? 'Reflects randomized returns; chart shows deterministic stress scenario' : inputs.sorrEnabled ? `SORR ${inputs.sorrMode==='mid'?'deferred 5yr':inputs.sorrMode==='late'?'deferred 10yr':'immediate'} — applied in all 1,000 trials` : null}/>
+                <ConfidenceRing score={confidence} note={inputs.sorrEnabled && inputs.architectureEnabled ? 'Reflects randomized returns; chart shows deterministic stress scenario' : inputs.sorrEnabled ? `SORR ${inputs.sorrMode==='mid'?'deferred 5yr':inputs.sorrMode==='late'?'deferred 10yr':'immediate'} — applied in all 1,000 trials` : null}/>
               </div>
             </div>
 
