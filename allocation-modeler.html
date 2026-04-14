@@ -128,6 +128,16 @@ html,body{min-height:100vh;font-family:'Barlow',sans-serif;background:#0E1C2E;co
 
 /* ── Factor log ── */
 .factor-section{margin-bottom:28px;}
+.tax-panel-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.tax-panel-title{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:rgba(200,169,110,.8);}
+.tax-panel-status{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;}
+.tax-panel-sub{font-size:11px;color:#8A9EB8;line-height:1.6;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.07);}
+.tax-panel-table{width:100%;border-collapse:collapse;margin-bottom:10px;}
+.tax-panel-table tr{border-bottom:1px solid rgba(255,255,255,.04);}
+.tax-panel-table tr:last-child{border-bottom:none;}
+.tpk{padding:5px 0;font-size:11px;color:#6E8299;}
+.tpv{padding:5px 0;font-size:12px;font-weight:600;text-align:right;}
+.tax-panel-note{font-size:11px;color:#C47A7A;line-height:1.65;background:rgba(196,122,122,.07);border-left:3px solid rgba(196,122,122,.4);padding:10px 14px;margin-top:8px;}
 .factor-table{width:100%;border-collapse:collapse;font-size:12px;}
 .factor-table th{
   font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:700;
@@ -552,6 +562,9 @@ html,body{min-height:100vh;font-family:'Barlow',sans-serif;background:#0E1C2E;co
   <!-- Layer cards -->
   <div id="algo-warnings"></div>
   <div class="alloc-grid" id="layer-cards"></div>
+
+  <!-- Tax Financing Coverage Panel — shown when L1 or L3 is funded -->
+  <div id="tax-financing-panel" style="display:none;margin-bottom:28px;background:#0E1B2E;border:1px solid rgba(200,169,110,.25);padding:18px 20px;"></div>
 
 
 
@@ -1136,6 +1149,117 @@ function runAllocationAlgorithm(s) {
     );
   }
 
+  // ── 5b. L3 TAX FINANCING COVERAGE CHECK ──────────────────────────────────
+  // The ETA/EP structure finances the tax on L3 distributions via a bank loan,
+  // up to 55% of the L3 premium. L1 (Roth conversion) has NO financing capacity.
+  //
+  // Combined tax burden = (L1_dollars + L3_dollars) × marginalRate
+  // L3 financing capacity = L3_dollars × 0.55
+  //
+  // If financing capacity ≥ combined tax → fully covered, note it.
+  // If financing capacity < combined tax → shortfall exists.
+  //   Shortfall gross-up = shortfall / (1 − marginalRate)
+  //   Step 1: Cover from L4 above its 20% hard floor.
+  //   Step 2: If L4 floor is hit, trim L1 for the remainder.
+  //           Trimming L1 by $X reduces the tax burden by X × marginalRate,
+  //           so the required L1 trim = remainingGrossUp × (1 − marginalRate) / marginalRate.
+  //           L3 is recalculated as the new remainder after L1/L2/L4.
+  //
+  // A separate line item (taxGrossUpFromL4, taxGrossUpFromL1Trim) is surfaced in
+  // the output so the advisor can clearly communicate how the tax overage is funded.
+
+  let taxGrossUpFromL4 = 0;
+  let taxGrossUpFromL1Trim = 0;
+
+  {
+    const L3_TAX_FINANCING_RATE = 0.55;
+    const combinedTaxBurden   = (L1_dollars + L3_dollars) * marginalRate;
+    const l3FinancingCapacity = L3_dollars * L3_TAX_FINANCING_RATE;
+    const taxShortfall        = Math.max(0, combinedTaxBurden - l3FinancingCapacity);
+
+    if (taxShortfall === 0) {
+      // Financing fully covers both layers — document it
+      addFactor('L3 tax financing — fully covered', ['L3','L1'], 'note',
+        {
+          combined_tax: Math.round(combinedTaxBurden),
+          l3_financing_capacity: Math.round(l3FinancingCapacity),
+          l3_financing_rate: L3_TAX_FINANCING_RATE,
+          l1_tax: Math.round(L1_dollars * marginalRate),
+          l3_tax: Math.round(L3_dollars * marginalRate),
+        },
+        `L3 bank financing (55% of ${fmt$(L3_dollars)} = ${fmt$(l3FinancingCapacity)}) fully covers the combined tax burden of ${fmt$(combinedTaxBurden)} — ${fmt$(Math.round(L1_dollars * marginalRate))} on the L1 Roth conversion and ${fmt$(Math.round(L3_dollars * marginalRate))} on the L3 distribution. No gross-up draw required from the portfolio.`
+      );
+    } else {
+      // Shortfall exists — gross-up required
+      const grossUpRequired = taxShortfall / (1 - marginalRate);
+      const L4_HARD_FLOOR_DOLLARS = balance * 0.20;
+      const l4Headroom = Math.max(0, L4_dollars - L4_HARD_FLOOR_DOLLARS);
+
+      if (l4Headroom >= grossUpRequired) {
+        // Step 1: Full gross-up covered by L4 above its floor
+        taxGrossUpFromL4 = grossUpRequired;
+        L4_dollars -= taxGrossUpFromL4;
+
+        addFactor('L3 tax financing — shortfall covered from L4', ['L4','L3','L1'], 'adjustment',
+          {
+            combined_tax: Math.round(combinedTaxBurden),
+            l3_financing_capacity: Math.round(l3FinancingCapacity),
+            tax_shortfall: Math.round(taxShortfall),
+            gross_up_required: Math.round(grossUpRequired),
+            gross_up_from_l4: Math.round(taxGrossUpFromL4),
+            l3_financing_rate: L3_TAX_FINANCING_RATE,
+          },
+          `L3 bank financing (55% of ${fmt$(L3_dollars)} = ${fmt$(l3FinancingCapacity)}) covers ${fmt$(l3FinancingCapacity)} of the ${fmt$(combinedTaxBurden)} combined tax burden (L1 conversion: ${fmt$(Math.round(L1_dollars * marginalRate))} + L3 distribution: ${fmt$(Math.round(L3_dollars * marginalRate))}). Shortfall: ${fmt$(taxShortfall)}. Gross-up draw required: ${fmt$(grossUpRequired)} (at ${Math.round(marginalRate*100)}% marginal rate). Funded by reducing L4 by ${fmt$(taxGrossUpFromL4)}. L4 remains above its 20% floor. ADVISOR NOTE: ${fmt$(taxGrossUpFromL4)} IRA gross-up draw at installation funds the tax overage not covered by L3 bank financing. This draw is sourced from Layer 4 and must be disclosed in the client presentation.`
+        );
+
+      } else {
+        // Step 1 partial: drain L4 headroom down to floor
+        taxGrossUpFromL4 = l4Headroom;
+        L4_dollars = L4_HARD_FLOOR_DOLLARS;
+        const remainingGrossUp = grossUpRequired - taxGrossUpFromL4;
+
+        // Step 2: Trim L1 for the rest.
+        // Reducing L1 by $X lowers the combined tax by X × marginalRate.
+        // We need: remainingGrossUp = netShortfall / (1 − r)
+        // where netShortfall = remainingGrossUp × (1 − r)
+        // L1 trim needed = remainingGrossUp × (1 − marginalRate) / marginalRate
+        // This is because each $1 of L1 trim saves $r in tax and eliminates the need
+        // for $r/(1−r) in gross-up, so trim = remainingGrossUp × (1−r)/r
+        const l1TrimNeeded = remainingGrossUp * (1 - marginalRate) / marginalRate;
+        const actualL1Trim = Math.min(l1TrimNeeded, L1_dollars * 0.50); // cap at 50% of L1
+        const l3FinancingCapacityInitial = l3FinancingCapacity; // capacity before L1 trim
+        taxGrossUpFromL1Trim = actualL1Trim;
+        L1_dollars -= actualL1Trim;
+        // L3 is recalculated as the new remainder
+        L3_dollars = balance - L1_dollars - L2_dollars - L4_dollars;
+        const l3FinancingCapacityFinal = L3_dollars * L3_TAX_FINANCING_RATE;
+        const combinedTaxFinal = (L1_dollars + L3_dollars) * marginalRate;
+
+        const stillUnfunded = Math.max(0, combinedTaxFinal - l3FinancingCapacityFinal - taxGrossUpFromL4);
+
+        addFactor('L3 tax financing — shortfall split L4 + L1 trim', ['L4','L1','L3'], 'adjustment',
+          {
+            combined_tax: Math.round(combinedTaxBurden),
+            l3_financing_capacity: Math.round(l3FinancingCapacity),
+            tax_shortfall: Math.round(taxShortfall),
+            gross_up_required: Math.round(grossUpRequired),
+            gross_up_from_l4: Math.round(taxGrossUpFromL4),
+            l1_trim: Math.round(actualL1Trim),
+            gross_up_from_l1_trim: Math.round(taxGrossUpFromL1Trim),
+            still_unfunded: Math.round(stillUnfunded),
+          },
+          `L3 bank financing (55% of ${fmt$(L3_dollars)} = ${fmt$(Math.round(l3FinancingCapacityFinal))}) covers the combined tax of ${fmt$(Math.round(combinedTaxFinal))} after structure adjustment. Initial shortfall: ${fmt$(taxShortfall)} → gross-up required: ${fmt$(grossUpRequired)}. L4 contributed ${fmt$(taxGrossUpFromL4)} (now at 20% hard floor). L1 trimmed by ${fmt$(actualL1Trim)} reducing L1 tax burden by ${fmt$(Math.round(actualL1Trim * marginalRate))}. L3 recalculated as new remainder: ${fmt$(L3_dollars)}.` +
+          (stillUnfunded > 0 ? ` WARNING: ${fmt$(stillUnfunded)} in tax gross-up remains unfunded after L1 trim cap (50% of L1). Consider reducing coverage preference or increasing balance threshold.` : '') +
+          ` ADVISOR NOTE: This case requires careful presentation sequencing — the gross-up draw must be disclosed as a separate IRA distribution at installation, distinct from the L1 conversion and L3 premium.`
+        );
+
+        if (stillUnfunded > 0) {
+          warn.push(`Tax financing shortfall of ${fmt$(stillUnfunded)} remains after L4 and L1 trim. Review coverage preference or structure sizing with advisor.`);
+        }
+      }
+    }
+  }
+
   // ── 6. FINAL NORMALIZATION ────────────────────────────────
   // Re-derive percentages after adjustments
   L1 = balance > 0 ? L1_dollars / balance : 0;
@@ -1155,7 +1279,7 @@ function runAllocationAlgorithm(s) {
 
   addFactor('Guardrail documentation', ['L1','L2','L3','L4'], 'note',
     {},
-    `L2 hard floor: ${fmt$(125000)} net per insurable life (scales with QP balance, ceiling ${fmt$(1000000)} net). L3 floor guardrail: 20% of QP. L4 minimum: 10% of QP. Payout rate assumption: 5% (estimate — pending carrier illustration data).`
+    `L2 hard floor: ${fmt$(125000)} net per insurable life (scales with QP balance, ceiling ${fmt$(1000000)} net). L3 floor guardrail: 20% of QP. L4 minimum: 20% of QP. L3 bank financing rate: 55% of L3 premium. Payout rate assumption: 4% (estimate — pending carrier illustration data).`
   );
 
   // ── 7. METRICS ───────────────────────────────────────────
@@ -1181,6 +1305,11 @@ function runAllocationAlgorithm(s) {
     coveragePref,
     outputType,
     warnings: warn,
+    taxGrossUpFromL4:    Math.round(taxGrossUpFromL4),
+    taxGrossUpFromL1Trim: Math.round(taxGrossUpFromL1Trim),
+    l3FinancingRate:     0.55,
+    combinedTaxBurden:   Math.round((L1_dollars + L3_dollars) * marginalRate),
+    l3FinancingCapacity: Math.round(L3_dollars * 0.55),
   };
 
   // ── 8. RATIONALES ────────────────────────────────────────
@@ -1202,6 +1331,12 @@ function runAllocationAlgorithm(s) {
     l1: L1, l2: L2, l3: L3, l4: L4,
     l1_dollars: L1_dollars, l2_dollars: L2_dollars,
     l3_dollars: L3_dollars, l4_dollars: L4_dollars,
+    taxGrossUpFromL4:     Math.round(taxGrossUpFromL4),
+    taxGrossUpFromL1Trim: Math.round(taxGrossUpFromL1Trim),
+    l3FinancingRate:      0.55,
+    combinedTaxBurden:    Math.round((L1_dollars + L3_dollars) * marginalRate),
+    l3FinancingCapacity:  Math.round(L3_dollars * 0.55),
+    taxFullyCovered:      Math.round(L3_dollars * 0.55) >= Math.round((L1_dollars + L3_dollars) * marginalRate),
     factorLog: log,
     rationales,
     metrics,
@@ -1338,6 +1473,66 @@ function renderOutput(s, result, clientName) {
       <div class="layer-rationale">${ld.rat}</div>
     </div>`).join('');
 
+  // ── Tax Financing Disclosure Panel ──────────────────────────────────────
+  // Show whenever architecture is present (L1 or L3 > 0).
+  // Surfaces combined tax burden, L3 financing capacity, and any gross-up draws
+  // so the advisor has full disclosure before going into the IncomeArchitect™ Modeler.
+  const taxPanel = document.getElementById('tax-financing-panel');
+  if (taxPanel && (result.l1_dollars > 0 || result.l3_dollars > 0)) {
+    const combinedTax    = result.combinedTaxBurden    || 0;
+    const l3Capacity     = result.l3FinancingCapacity  || 0;
+    const grossUpL4      = result.taxGrossUpFromL4     || 0;
+    const grossUpL1Trim  = result.taxGrossUpFromL1Trim || 0;
+    const fullyConvered  = result.taxFullyCovered;
+    const margR          = Math.round(metrics.marginalRate * 100);
+
+    const surplus = l3Capacity - combinedTax;
+    const statusColor  = fullyConvered ? '#7BAF84' : '#C47A7A';
+    const statusLabel  = fullyConvered ? '✓ Fully Financed' : '⚠ Shortfall — See Notes Below';
+
+    const rows = [
+      ['L1 Roth Conversion tax (' + margR + '%)',    fmt$(Math.round(result.l1_dollars * metrics.marginalRate)), '#4A7FB5'],
+      ['L3 Distribution tax (' + margR + '%)',       fmt$(Math.round(result.l3_dollars * metrics.marginalRate)), '#C8A96E'],
+      ['Combined tax burden',                        fmt$(combinedTax), '#EDE8DE'],
+      ['L3 bank financing (55% of ' + fmt$(result.l3_dollars) + ')', fmt$(l3Capacity), '#C8A96E'],
+      ['Financing surplus / (shortfall)',            (surplus >= 0 ? '+' : '') + fmt$(surplus), surplus >= 0 ? '#7BAF84' : '#C47A7A'],
+    ];
+
+    if (grossUpL4 > 0) {
+      rows.push(['Gross-up draw from L4 (tax overage)', fmt$(grossUpL4), '#C47A7A']);
+    }
+    if (grossUpL1Trim > 0) {
+      rows.push(['L1 trim to reduce tax burden', fmt$(grossUpL1Trim), '#C47A7A']);
+    }
+
+    taxPanel.innerHTML = `
+      <div class="tax-panel-header">
+        <span class="tax-panel-title">L3 Tax Financing Coverage</span>
+        <span class="tax-panel-status" style="color:${statusColor}">${statusLabel}</span>
+      </div>
+      <div class="tax-panel-sub">
+        L3 bank financing covers up to 55% of the L3 premium toward the combined tax on the L1 Roth conversion and L3 distribution.
+        Any unfunded overage is sourced from a gross-up IRA draw, reducing L4 or trimming L1 as described below.
+        <strong>This must be disclosed to the client at presentation.</strong>
+      </div>
+      <table class="tax-panel-table">
+        ${rows.map(([k,v,c]) => `<tr>
+          <td class="tpk">${k}</td>
+          <td class="tpv" style="color:${c}">${v}</td>
+        </tr>`).join('')}
+      </table>
+      ${grossUpL4 > 0 || grossUpL1Trim > 0 ? `
+      <div class="tax-panel-note">
+        <strong>Advisor Disclosure Required:</strong>
+        ${grossUpL4 > 0 ? `A gross-up IRA distribution of <strong>${fmt$(grossUpL4)}</strong> is drawn from Layer 4 at installation to cover the tax overage not financed by L3 bank financing. This is a separate distribution from the L1 conversion and L3 premium and must be presented to the client as such.` : ''}
+        ${grossUpL1Trim > 0 ? ` Layer 1 was reduced by <strong>${fmt$(grossUpL1Trim)}</strong> to lower the conversion tax burden and bring the structure within financeable limits.` : ''}
+      </div>` : ''}
+    `;
+    taxPanel.style.display = 'block';
+  } else if (taxPanel) {
+    taxPanel.style.display = 'none';
+  }
+
   // Factor log
   const LAYER_CLASSES = {L1:'badge-l1',L2:'badge-l2',L3:'badge-l3',L4:'badge-l4'};
   document.getElementById('factor-tbody').innerHTML = factorLog.map(f=>`
@@ -1364,7 +1559,12 @@ function renderOutput(s, result, clientName) {
     ['Legacy Priority', ['','Nice to have','Important','Non-negotiable'][s.legacy_importance||1]],
     ['RMD Projection (Age 73)', fmt$(metrics.rmdAt73)+'/yr'],
     ['Est. Tax Liability', fmt$(metrics.taxLiability)],
-    ['Payout Rate Assumption', '5.0% (estimate — pending carrier data)'],
+    ['Combined Tax Burden (L1+L3)', fmt$(result.combinedTaxBurden || 0)],
+    ['L3 Financing Capacity (55%)', fmt$(result.l3FinancingCapacity || 0)],
+    ['Tax Fully Financed', result.taxFullyCovered ? 'Yes' : 'No — see tax financing panel'],
+    ['Gross-Up Draw from L4', result.taxGrossUpFromL4 > 0 ? fmt$(result.taxGrossUpFromL4) : 'None'],
+    ['L1 Trim for Tax Relief', result.taxGrossUpFromL1Trim > 0 ? fmt$(result.taxGrossUpFromL1Trim) : 'None'],
+    ['Payout Rate Assumption', '4.0% (estimate — pending carrier data)'],
   ];
   document.getElementById('defensibility-items').innerHTML = defItems.map(([k,v])=>
     `<div class="def-item"><strong>${k}:</strong> ${v}</div>`).join('');
