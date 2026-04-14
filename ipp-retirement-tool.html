@@ -2939,6 +2939,7 @@ function App() {
   // These drive the IncomeArc™ ring scores in the PDF report
   const { confidence: rptArchBaseConf } = projectArc({ ...baseProjectionInputs, architectureEnabled: true, sorrEnabled: false, expenseShockEnabled: false, ltcEventAge: 0, spouseLtcEventAge: 0, ltcInsured: false });
   const { confidence: rptArchStormConf } = projectArc({ ...baseProjectionInputs, architectureEnabled: true, sorrEnabled: true, expenseShockEnabled: true, expenseShockAmount: inputs.expenseShockAmount||50000, expenseShockFrequency: inputs.expenseShockFrequency||8, ltcInsured: true, spouseLtcInsured: inputs.filingStatus==='mfj' });
+  console.log('DEBUG rptArchStormConf:', rptArchStormConf, '| bpi.portfolioReturn:', baseProjectionInputs.portfolioReturn, '| bpi.sorrEnabled:', baseProjectionInputs.sorrEnabled, '| bpi.expenseShock:', baseProjectionInputs.expenseShockEnabled, '| bpi.shockFreq:', baseProjectionInputs.expenseShockFrequency, '| bpi.etaIncome:', baseProjectionInputs.etaAnnualIncome, '| bpi.l1monthly:', baseProjectionInputs.rothAnnuityMonthly);
 
   const hasLtcEvent = inputs.ltcEventEnabled && inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
   const hasSpouseLtcEvent = (inputs.filingStatus === 'mfj') && inputs.spouseLtcEventEnabled && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
