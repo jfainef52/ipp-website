@@ -138,6 +138,15 @@ html,body{min-height:100vh;font-family:'Barlow',sans-serif;background:#0E1C2E;co
 .tpk{padding:5px 0;font-size:11px;color:#6E8299;}
 .tpv{padding:5px 0;font-size:12px;font-weight:600;text-align:right;}
 .tax-panel-note{font-size:11px;color:#C47A7A;line-height:1.65;background:rgba(196,122,122,.07);border-left:3px solid rgba(196,122,122,.4);padding:10px 14px;margin-top:8px;}
+.l2-breakdown{margin:10px 0 12px;padding:10px 12px;background:rgba(123,175,132,.06);border:1px solid rgba(123,175,132,.2);border-radius:4px;}
+.l2-row{display:flex;justify-content:space-between;align-items:baseline;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);}
+.l2-row:last-child{border-bottom:none;}
+.l2-label{font-size:10px;color:#8A9EB8;}
+.l2-value{font-size:11px;font-weight:500;color:#EDE8DE;text-align:right;}
+.l2-tax-val{color:#C47A7A!important;}
+.l2-net-val{color:#7BAF84!important;font-size:13px!important;}
+.l2-row.l2-net{border-top:1px solid rgba(123,175,132,.25);margin-top:3px;padding-top:6px;}
+.layer-amount-note{font-size:9px;opacity:.6;font-style:italic;}
 .factor-table{width:100%;border-collapse:collapse;font-size:12px;}
 .factor-table th{
   font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:700;
@@ -808,19 +817,24 @@ function runAllocationAlgorithm(s) {
   let L1_dollars = 0, L2_dollars = 0, L3_dollars = 0, L4_dollars = 0;
 
   // ── L2: Hard floor, scales to ceiling ────────────────────
+  let L2_netPerPerson = 0, L2_grossPerPerson = 0, L2_insurableLives = 1;
+
   if (l2Needed) {
     const insurableLives = isMFJ ? 2 : 1;
+    L2_insurableLives = insurableLives;
     // Scaling: $125k + 8% of balance above $1M, capped at $1M net per person
     const netPerPerson = Math.min(
       125000 + Math.max(0, balance - 1000000) * 0.08,
       1000000
     );
     const grossPerPerson = netPerPerson / (1 - marginalRate);
+    L2_netPerPerson   = netPerPerson;
+    L2_grossPerPerson = grossPerPerson;
     L2_dollars = grossPerPerson * insurableLives;
 
     addFactor('L2 sizing', ['L2'], 'calculated',
       { net_per_person: Math.round(netPerPerson), gross_per_person: Math.round(grossPerPerson), lives: insurableLives },
-      `${fmt$(netPerPerson)} net per insurable life × ${insurableLives} ${isMFJ ? 'lives' : 'life'}, grossed up at ${Math.round(marginalRate*100)}% marginal rate = ${fmt$(grossPerPerson)} gross per person. Total L2 allocation: ${fmt$(L2_dollars)}.`
+      `${fmt$(netPerPerson)} net premium per insurable life × ${insurableLives} ${isMFJ ? 'lives' : 'life'} = ${fmt$(netPerPerson * insurableLives)} total net premium. Grossed up at ${Math.round(marginalRate*100)}% marginal rate: ${fmt$(grossPerPerson)} gross IRA draw per person = ${fmt$(L2_dollars)} total gross IRA draw. NOTE: The policy is funded with the NET amount (${fmt$(netPerPerson)} per person). The gross IRA draw is larger to cover the tax cost of the distribution.`
     );
   } else {
     if (hasAdequateLtc) {
@@ -1319,7 +1333,7 @@ function runAllocationAlgorithm(s) {
       : `Layer 1 allocation is zero. Existing guaranteed income sources cover the client's target fixed expense coverage, or client selected no coverage preference.`,
 
     l2: l2Needed
-      ? `Layer 2 is allocated ${fmtPct(L2)} (${fmt$(L2_dollars)}) for the leveraged life and long-term care structure. This represents ${fmt$(L2_dollars / (isMFJ ? 2 : 1))} gross per insurable life — netting approximately ${fmt$(L2_dollars / (isMFJ ? 2 : 1) * (1 - marginalRate))} after the ${Math.round(marginalRate*100)}% distribution tax cost. ${familyLtcPrimary || familyLtcSpouse ? 'Family LTC history elevates the case for dedicated care protection.' : ''} At this allocation level, leveraged life/LTC structure provides dedicated care coverage and death benefit without relying on qualified plan assets for care costs.`
+      ? `Layer 2 requires a gross IRA draw of ${fmt$(L2_dollars)} (${fmtPct(L2)} of QP). This funds a net policy premium of ${fmt$(L2_netPerPerson * L2_insurableLives)} — the difference of ${fmt$(L2_dollars - L2_netPerPerson * L2_insurableLives)} covers the ${Math.round(marginalRate*100)}% income tax on the IRA distribution. Per insurable life: ${fmt$(L2_grossPerPerson)} gross IRA draw → ${fmt$(L2_netPerPerson)} net premium into the policy. ${isMFJ ? '(×2 lives = ' + fmt$(L2_dollars) + ' gross / ' + fmt$(L2_netPerPerson * 2) + ' net total.) ' : ''}${familyLtcPrimary || familyLtcSpouse ? 'Family LTC history elevates the case for dedicated care protection. ' : ''}The leveraged life/LTC structure provides dedicated care coverage and death benefit. IMPORTANT: Use the NET figure (${fmt$(L2_netPerPerson)} per person) when funding the policy — not the gross draw amount.`
       : `Layer 2 allocation is zero. ${hasAdequateLtc ? 'Existing LTC coverage with adequate benefit period in place.' : 'Coverage unavailable due to health or underwriting status — see recalibration recommendation.'}`,
 
     l3: `Layer 3/ETA receives ${fmtPct(L3)} (${fmt$(L3_dollars)}) — the largest single threat to this client's retirement wealth is the ${fmt$(taxLiability)} embedded tax liability growing inside the qualified plan at ${Math.round(marginalRate*100)}%. At ${fmt$(balance)}, the estimated RMD at age 73 is ${fmt$(rmdAt73)}/yr — added to other income, this forces a tax obligation the client cannot defer or avoid. The ETA structure repositions pre-tax qualified dollars into a tax-free, 0%-floor-protected asset. Income accessible via policy loans after the 10-year seasoning period. ${yearsToRmd <= 5 ? 'With only '+yearsToRmd+' years before RMDs begin, this is the most time-sensitive installation.' : ''}`,
@@ -1331,6 +1345,13 @@ function runAllocationAlgorithm(s) {
     l1: L1, l2: L2, l3: L3, l4: L4,
     l1_dollars: L1_dollars, l2_dollars: L2_dollars,
     l3_dollars: L3_dollars, l4_dollars: L4_dollars,
+    // L2 gross/net breakdown — l2_dollars is GROSS (IRA draw). l2_net is what funds the policy.
+    l2_gross_per_person:  Math.round(L2_grossPerPerson),
+    l2_net_per_person:    Math.round(L2_netPerPerson),
+    l2_gross_total:       Math.round(L2_dollars),
+    l2_net_total:         Math.round(L2_netPerPerson * L2_insurableLives),
+    l2_insurable_lives:   L2_insurableLives,
+    l2_tax_cost:          Math.round(L2_dollars - L2_netPerPerson * L2_insurableLives),
     taxGrossUpFromL4:     Math.round(taxGrossUpFromL4),
     taxGrossUpFromL1Trim: Math.round(taxGrossUpFromL1Trim),
     l3FinancingRate:      0.55,
@@ -1460,7 +1481,33 @@ function renderOutput(s, result, clientName) {
     { cls:'l3', tag:'Layer 3 / ETA', name:'Tax Efficiency & Growth', pct:l3, rat:rationales.l3 },
     { cls:'l4', tag:'Layer 4', name:'Liquidity & Income Bridge',     pct:l4, rat:rationales.l4 },
   ];
-  document.getElementById('layer-cards').innerHTML = LAYER_DATA.map((ld,i)=>`
+  document.getElementById('layer-cards').innerHTML = LAYER_DATA.map((ld,i)=>{
+    const isL2 = i === 1;
+    const l2GrossTotal = result.l2_gross_total || 0;
+    const l2NetTotal   = result.l2_net_total   || 0;
+    const l2TaxCost    = result.l2_tax_cost     || 0;
+    const l2Lives      = result.l2_insurable_lives || 1;
+    const l2GrossPer   = result.l2_gross_per_person || 0;
+    const l2NetPer     = result.l2_net_person || result.l2_net_per_person || 0;
+
+    const l2Breakdown = isL2 && l2GrossTotal > 0 ? `
+      <div class="l2-breakdown">
+        <div class="l2-row l2-gross">
+          <span class="l2-label">Gross IRA draw (funds tax + policy)</span>
+          <span class="l2-value">${fmt$(l2GrossTotal)}</span>
+        </div>
+        <div class="l2-row l2-tax">
+          <span class="l2-label">Less: income tax on distribution</span>
+          <span class="l2-value l2-tax-val">−${fmt$(l2TaxCost)}</span>
+        </div>
+        <div class="l2-row l2-net">
+          <span class="l2-label"><strong>Net premium into policy</strong></span>
+          <span class="l2-value l2-net-val"><strong>${fmt$(l2NetTotal)}</strong></span>
+        </div>
+        ${l2Lives > 1 ? `<div class="l2-row l2-per"><span class="l2-label">Per insurable life</span><span class="l2-value">${fmt$(l2GrossPer)} gross → ${fmt$(l2NetPer)} net</span></div>` : `<div class="l2-row l2-per"><span class="l2-label">Per insurable life</span><span class="l2-value">${fmt$(l2GrossPer)} gross → ${fmt$(l2NetPer)} net</span></div>`}
+      </div>` : '';
+
+    return `
     <div class="layer-card ${ld.cls}">
       <div class="layer-tag">${ld.tag}</div>
       <div class="layer-name">${ld.name}</div>
@@ -1468,10 +1515,12 @@ function renderOutput(s, result, clientName) {
         <div class="layer-pct">${Math.round(ld.pct*100)}</div>
         <div class="layer-pct-sign">%</div>
       </div>
-      <div class="layer-amount">${fmt$(b*ld.pct)} of qualified plan assets</div>
+      <div class="layer-amount">${fmt$(b*ld.pct)} gross IRA draw${isL2 ? ` <span class="layer-amount-note">(see breakdown below)</span>` : ' of qualified plan assets'}</div>
       <div class="layer-bar-bg"><div class="layer-bar-fill" style="width:${Math.round(ld.pct*100)}%"></div></div>
+      ${l2Breakdown}
       <div class="layer-rationale">${ld.rat}</div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
   // ── Tax Financing Disclosure Panel ──────────────────────────────────────
   // Show whenever architecture is present (L1 or L3 > 0).
