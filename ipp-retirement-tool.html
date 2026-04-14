@@ -2957,16 +2957,27 @@ function App() {
       })
     : { years: yearsClean, confidence: confidenceClean };
 
+  // confidenceStressed: used when SORR or expense shocks are on but health events are off.
+  // Passes baseProjectionInputs directly so SORR/expense toggles are reflected.
+  // Only computed when needed (stress toggles on, no health events active).
+  const needsStressedConf = (inputs.sorrEnabled || inputs.expenseShockEnabled)
+    && !hasLtcEvent && !hasSpouseLtcEvent;
+  const { confidence: confidenceStressed } = needsStressedConf
+    ? projectArc({ ...baseProjectionInputs, ltcEventAge: 0, spouseLtcEventAge: 0, ltcInsured: false, spouseLtcInsured: false })
+    : { confidence: null };
 
-  // Main confidence ring — must match the report exactly.
-  // When Architecture is ON and health events are active, use rptArchStormConf — the
-  // same variable the report uses for its perfect storm ring. They are guaranteed identical.
-  // When Architecture is OFF and health events are active, use confidenceWithLtc (uninsured).
-  // When no health events, fall back to confidenceClean.
+  // Main confidence ring: always reflects exactly what the advisor has toggled.
+  // - Health events ON (any): use confidenceWithLtc — respects arch state (ltcInsured)
+  //   and all other toggles via baseProjectionInputs (SORR, expense shock).
+  // - SORR or expense shock ON, health events OFF: use confidenceStressed — same
+  //   baseProjectionInputs but no LTC event, so SORR/shock stress is reflected.
+  // - All stress OFF: use confidenceClean — clean baseline.
   const years = yearsWithLtc;
   const confidence = (hasLtcEvent || hasSpouseLtcEvent)
-    ? (inputs.architectureEnabled ? rptArchStormConf : confidenceWithLtc)
-    : confidenceClean;
+    ? confidenceWithLtc
+    : needsStressedConf
+      ? confidenceStressed
+      : confidenceClean;
 
   // LTC comparison projections — only when architecture is enabled and LTC inputs are set.
   // IMPORTANT: both projections zero out ltcNetAmount/spouseLtcNetAmount so the funding draw
