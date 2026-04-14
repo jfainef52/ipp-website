@@ -1760,7 +1760,7 @@ function projectArc(inputs) {
   const _preRetYrs = retireAge - currentAge;
   const _gf = Math.pow(1 + portfolioReturn, _preRetYrs);
   const _cFV = (r, c, n) => r > 0 ? c * ((Math.pow(1+r,n)-1)/r) * (1+r) : c * n;
-  const mcStartBalance = (
+  let mcStartBalance = (
     traditionalBalance * _gf
     + _cFV(portfolioReturn, annualTradContribution || 0, _preRetYrs)
     + rothBalance * _gf
@@ -1769,6 +1769,30 @@ function projectArc(inputs) {
     + (spouseTraditionalBalance || 0) * _gf
     + _cFV(portfolioReturn, annualSpouseTradContribution || 0, _preRetYrs)
   );
+
+  // Adjust mcStartBalance for architecture draws that fire AT retireAge (in retirement loop year 0).
+  // The reconstruction above uses raw input balances grown to retirement — it does not account
+  // for L1/L2/L3 draws. Draws firing at retireAge reduce the portfolio in year 0 of the
+  // retirement loop, after mcStartBalance is computed. We subtract them here so the MC
+  // starts from the actual post-funding portfolio.
+  if (architectureEnabled) {
+    const _mcMargRate = preRetMarginalRate || 0.24;
+    const _mcPenalty = retireAge < 59.5 ? 0.10 : 0;
+    if (archEtaFundingAmount > 0 && etaFundingAge === retireAge) {
+      mcStartBalance = Math.max(0, mcStartBalance - archEtaFundingAmount);
+    }
+    if (archRothConversionAmount > 0 && rothConversionAge === retireAge) {
+      mcStartBalance = Math.max(0, mcStartBalance - archRothConversionAmount);
+    }
+    if (archLtcNetAmount > 0 && ltcFundingAge === retireAge) {
+      const _gLtc = archLtcNetAmount / Math.max(0.01, 1 - _mcMargRate - _mcPenalty);
+      mcStartBalance = Math.max(0, mcStartBalance - _gLtc - (_gLtc * _mcPenalty));
+    }
+    if (archSpouseLtcNetAmount > 0 && spouseLtcFundingAge === retireAge) {
+      const _gSLtc = archSpouseLtcNetAmount / Math.max(0.01, 1 - _mcMargRate - _mcPenalty);
+      mcStartBalance = Math.max(0, mcStartBalance - _gSLtc - (_gSLtc * _mcPenalty));
+    }
+  }
   const mcYears = planToAge - retireAge;
   const ssAtMcStart = ssIncomeY1; // MC starts at retirement — no inflation offset needed
   const expensesAtMcStart = totalExpensesY1;
@@ -2961,7 +2985,7 @@ function App() {
   // Main confidence ring: when architecture OFF + health events ON, show uninsured MC score
   // When architecture ON, show full architecture score (confidenceClean with arch layers)
   const years = yearsWithLtc;
-  const confidence = (hasLtcEvent || hasSpouseLtcEvent) && !inputs.architectureEnabled
+  const confidence = (hasLtcEvent || hasSpouseLtcEvent)
     ? confidenceWithLtc
     : confidenceClean;
 
