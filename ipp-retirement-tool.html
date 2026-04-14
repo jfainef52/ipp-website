@@ -534,7 +534,7 @@ function runMonteCarlo(startBalance, annualWithdraw, years, trials=1000, mean=0.
       const spouseLtcShock = (spouseLtcShockYear >= 0 && y >= spouseLtcShockYear && y < spouseLtcShockYear + spouseLtcShockDuration)
         ? (spouseLtcShockAnnual * ltcCareInflFactor) / (1 - MC_TAX_RATE) : 0;
       // Expense shock — recurring unplanned expense every N years, inflation-adjusted, grossed up
-      const expShock = (expenseShockAmount > 0 && expenseShockFrequency > 0 && y % expenseShockFrequency === 0)
+      const expShock = (expenseShockAmount > 0 && expenseShockFrequency > 0 && y >= expenseShockFrequency && y % expenseShockFrequency === 0)
         ? (expenseShockAmount * inflFactor) / (1 - MC_TAX_RATE) : 0;
       bal = bal * (1 + r) - grossDraw + surplusReinvest - ltcShock - spouseLtcShock - expShock;
       if (bal <= 0) { failed = true; break; }
@@ -1760,7 +1760,7 @@ function projectArc(inputs) {
   const _preRetYrs = retireAge - currentAge;
   const _gf = Math.pow(1 + portfolioReturn, _preRetYrs);
   const _cFV = (r, c, n) => r > 0 ? c * ((Math.pow(1+r,n)-1)/r) * (1+r) : c * n;
-  let mcStartBalance = (
+  const mcStartBalance = (
     traditionalBalance * _gf
     + _cFV(portfolioReturn, annualTradContribution || 0, _preRetYrs)
     + rothBalance * _gf
@@ -1769,30 +1769,6 @@ function projectArc(inputs) {
     + (spouseTraditionalBalance || 0) * _gf
     + _cFV(portfolioReturn, annualSpouseTradContribution || 0, _preRetYrs)
   );
-
-  // Adjust mcStartBalance for architecture draws that fire AT retireAge (in retirement loop year 0).
-  // The reconstruction above uses raw input balances grown to retirement — it does not account
-  // for L1/L2/L3 draws. Draws firing at retireAge reduce the portfolio in year 0 of the
-  // retirement loop, after mcStartBalance is computed. We subtract them here so the MC
-  // starts from the actual post-funding portfolio.
-  if (architectureEnabled) {
-    const _mcMargRate = preRetMarginalRate || 0.24;
-    const _mcPenalty = retireAge < 59.5 ? 0.10 : 0;
-    if (archEtaFundingAmount > 0 && etaFundingAge === retireAge) {
-      mcStartBalance = Math.max(0, mcStartBalance - archEtaFundingAmount);
-    }
-    if (archRothConversionAmount > 0 && rothConversionAge === retireAge) {
-      mcStartBalance = Math.max(0, mcStartBalance - archRothConversionAmount);
-    }
-    if (archLtcNetAmount > 0 && ltcFundingAge === retireAge) {
-      const _gLtc = archLtcNetAmount / Math.max(0.01, 1 - _mcMargRate - _mcPenalty);
-      mcStartBalance = Math.max(0, mcStartBalance - _gLtc - (_gLtc * _mcPenalty));
-    }
-    if (archSpouseLtcNetAmount > 0 && spouseLtcFundingAge === retireAge) {
-      const _gSLtc = archSpouseLtcNetAmount / Math.max(0.01, 1 - _mcMargRate - _mcPenalty);
-      mcStartBalance = Math.max(0, mcStartBalance - _gSLtc - (_gSLtc * _mcPenalty));
-    }
-  }
   const mcYears = planToAge - retireAge;
   const ssAtMcStart = ssIncomeY1; // MC starts at retirement — no inflation offset needed
   const expensesAtMcStart = totalExpensesY1;
