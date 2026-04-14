@@ -2955,22 +2955,19 @@ function App() {
         ltcEventAge: hasLtcEvent ? inputs.ltcEventAge : 0,
         spouseLtcEventAge: hasSpouseLtcEvent ? inputs.spouseLtcEventAge : 0,
       })
-    // No health events — run baseProjectionInputs directly so SORR and expense shock
-    // toggles are still reflected in confidenceWithLtc for the ring score.
-    : { years: yearsClean, confidence: projectArc({ ...baseProjectionInputs, ltcInsured: false, ltcEventAge: 0, spouseLtcEventAge: 0 }).confidence };
+    : { years: yearsClean, confidence: confidenceClean };
 
 
-  // Main confidence ring: show the score that reflects what the user has toggled on.
-  // confidenceWithLtc includes all active stress via baseProjectionInputs (SORR, expense
-  // shock, health events). Use it whenever any stress is active — health events, SORR,
-  // or expense shocks. Fall back to confidenceClean only when everything is off.
-  // Note: when hasLtcEvent is false, confidenceWithLtc === confidenceClean already
-  // (the ternary falls back), so this is safe regardless of health event state.
+  // Main confidence ring: reflect whatever stress toggles the advisor has active.
+  // When health events are ON, use confidenceWithLtc regardless of Architecture state.
+  // confidenceWithLtc already passes ltcInsured=true when Architecture is ON, so
+  // the ring correctly shows the Architecture-protected score under stress.
+  // Previously, Architecture ON always forced confidenceClean (no events, no SORR,
+  // no expense shock) — causing the ring to show 100% even in perfect storm mode.
   const years = yearsWithLtc;
-  const anySressActive = (hasLtcEvent || hasSpouseLtcEvent)
-    || inputs.sorrEnabled
-    || inputs.expenseShockEnabled;
-  const confidence = anySressActive ? confidenceWithLtc : confidenceClean;
+  const confidence = (hasLtcEvent || hasSpouseLtcEvent)
+    ? confidenceWithLtc
+    : confidenceClean;
 
   // LTC comparison projections — only when architecture is enabled and LTC inputs are set.
   // IMPORTANT: both projections zero out ltcNetAmount/spouseLtcNetAmount so the funding draw
