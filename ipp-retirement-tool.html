@@ -6609,6 +6609,11 @@ function App() {
                     </div>
                   </div>
                 )}
+                <div style={{background:"#ff0",color:"#000",fontSize:9,padding:"2px 4px",marginBottom:4,fontFamily:"monospace",borderRadius:3,lineHeight:1.5}}>
+                  ring={confidence}% rptStorm={rptArchStormConf}% hasLtc={String(hasLtcEvent)} ltcAge={inputs.ltcEventAge} ltcCost={inputs.ltcMonthlyCost}<br/>
+                  bpi.sorr={String(baseProjectionInputs.sorrEnabled)} bpi.shock={String(baseProjectionInputs.expenseShockEnabled)} shockAmt={baseProjectionInputs.expenseShockAmount} shockFreq={baseProjectionInputs.expenseShockFrequency}<br/>
+                  bpi.ltcIns={String(baseProjectionInputs.ltcInsured)} bpi.ltcAge={baseProjectionInputs.ltcEventAge} bpi.arch={String(baseProjectionInputs.architectureEnabled)} bpi.ltcEnabled={String(baseProjectionInputs.ltcEventEnabled)}
+                </div>
                 <ConfidenceRing score={confidence} note={inputs.sorrEnabled && inputs.architectureEnabled ? 'Reflects randomized returns; chart shows deterministic stress scenario' : inputs.sorrEnabled ? `SORR ${inputs.sorrMode==='mid'?'deferred 5yr':inputs.sorrMode==='late'?'deferred 10yr':'immediate'} — applied in all 1,000 trials` : null}/>
               </div>
             </div>
