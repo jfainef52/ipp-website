@@ -935,12 +935,6 @@ function projectArc(inputs) {
   magiHistory[retireAge - 2] = preRetireMagi;
   magiHistory[retireAge - 1] = preRetireMagi;
 
-  // Capture portfolio balance AFTER all pre-retirement architecture draws (L1/L2/L3)
-  // but BEFORE the retirement loop. This is the correct MC starting balance —
-  // the original reconstruction from raw traditionalBalance * gf overstated the
-  // portfolio by the full amount repositioned into architecture layers.
-  const mcStartBalanceActual = trad + roth + taxable + spouseTrad;
-
   for (let age = retireAge; age <= planToAge; age++) {
     const yr = age - retireAge;
     const inflFactor = Math.pow(1 + inflation, yr);
@@ -1766,12 +1760,15 @@ function projectArc(inputs) {
   const _preRetYrs = retireAge - currentAge;
   const _gf = Math.pow(1 + portfolioReturn, _preRetYrs);
   const _cFV = (r, c, n) => r > 0 ? c * ((Math.pow(1+r,n)-1)/r) * (1+r) : c * n;
-  // mcStartBalance: use actual portfolio at start of retirement after all
-  // pre-retirement architecture draws (L1/L2/L3) have been deducted.
-  // The previous reconstruction from raw traditionalBalance * gf ignored
-  // funding draws, overstating the MC starting balance by the full amount
-  // repositioned into architecture layers — inflating confidence scores.
-  const mcStartBalance = mcStartBalanceActual;
+  const mcStartBalance = (
+    traditionalBalance * _gf
+    + _cFV(portfolioReturn, annualTradContribution || 0, _preRetYrs)
+    + rothBalance * _gf
+    + taxableBalance * _gf
+    + _cFV(portfolioReturn, annualTaxableContribution || 0, _preRetYrs)
+    + (spouseTraditionalBalance || 0) * _gf
+    + _cFV(portfolioReturn, annualSpouseTradContribution || 0, _preRetYrs)
+  );
   const mcYears = planToAge - retireAge;
   const ssAtMcStart = ssIncomeY1; // MC starts at retirement — no inflation offset needed
   const expensesAtMcStart = totalExpensesY1;
@@ -2962,11 +2959,9 @@ function App() {
 
 
   // Main confidence ring — must match the report exactly.
-  // rptArchStormConf is already computed above with the correct full-stress parameters.
-  // When Architecture is ON and health events are active, use rptArchStormConf so the
-  // ring shows the identical number the report shows for the perfect storm scenario.
-  // When Architecture is OFF and health events are active, use confidenceWithLtc
-  // (uninsured MC — the true unprotected score).
+  // When Architecture is ON and health events are active, use rptArchStormConf — the
+  // same variable the report uses for its perfect storm ring. They are guaranteed identical.
+  // When Architecture is OFF and health events are active, use confidenceWithLtc (uninsured).
   // When no health events, fall back to confidenceClean.
   const years = yearsWithLtc;
   const confidence = (hasLtcEvent || hasSpouseLtcEvent)
