@@ -2957,27 +2957,13 @@ function App() {
       })
     : { years: yearsClean, confidence: confidenceClean };
 
-  // confidenceStressed: used when SORR or expense shocks are on but health events are off.
-  // Passes baseProjectionInputs directly so SORR/expense toggles are reflected.
-  // Only computed when needed (stress toggles on, no health events active).
-  const needsStressedConf = (inputs.sorrEnabled || inputs.expenseShockEnabled)
-    && !hasLtcEvent && !hasSpouseLtcEvent;
-  const { confidence: confidenceStressed } = needsStressedConf
-    ? projectArc({ ...baseProjectionInputs, ltcEventAge: 0, spouseLtcEventAge: 0, ltcInsured: false, spouseLtcInsured: false })
-    : { confidence: null };
 
-  // Main confidence ring: always reflects exactly what the advisor has toggled.
-  // - Health events ON (any): use confidenceWithLtc — respects arch state (ltcInsured)
-  //   and all other toggles via baseProjectionInputs (SORR, expense shock).
-  // - SORR or expense shock ON, health events OFF: use confidenceStressed — same
-  //   baseProjectionInputs but no LTC event, so SORR/shock stress is reflected.
-  // - All stress OFF: use confidenceClean — clean baseline.
+  // Main confidence ring: when architecture OFF + health events ON, show uninsured MC score
+  // When architecture ON, show full architecture score (confidenceClean with arch layers)
   const years = yearsWithLtc;
-  const confidence = (hasLtcEvent || hasSpouseLtcEvent)
+  const confidence = (hasLtcEvent || hasSpouseLtcEvent) && !inputs.architectureEnabled
     ? confidenceWithLtc
-    : needsStressedConf
-      ? confidenceStressed
-      : confidenceClean;
+    : confidenceClean;
 
   // LTC comparison projections — only when architecture is enabled and LTC inputs are set.
   // IMPORTANT: both projections zero out ltcNetAmount/spouseLtcNetAmount so the funding draw
