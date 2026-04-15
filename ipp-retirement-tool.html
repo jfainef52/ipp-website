@@ -468,7 +468,7 @@ function seededRandom(seed) {
   };
 }
 
-function runMonteCarlo(startBalance, annualWithdraw, years, trials=1000, mean=0.065, inflation=0.028, ssIncome=0, fixedStreams=[], totalExpensesY1=0, ltcShockYear=-1, ltcShockAnnual=0, ltcShockDuration=0, spouseLtcShockYear=-1, spouseLtcShockAnnual=0, spouseLtcShockDuration=0, ltcCareInflation=0.04, expenseShockAmount=0, expenseShockFrequency=8, sorrSchedule=null) {
+function runMonteCarlo(startBalance, annualWithdraw, years, trials=1000, mean=0.065, inflation=0.028, ssIncome=0, fixedStreams=[], totalExpensesY1=0, ltcShockYear=-1, ltcShockAnnual=0, ltcShockDuration=0, spouseLtcShockYear=-1, spouseLtcShockAnnual=0, spouseLtcShockDuration=0, ltcCareInflation=0.04, expenseShockAmount=0, expenseShockFrequency=8, sorrSchedule=null, startIra=null, startTaxable=null, taxableBasisPct=0.4) {
   // ltcShockAnnual / spouseLtcShockAnnual: today's-dollar NET care costs.
   // MC grosses up by 1/(1-MC_TAX_RATE) and inflates to care-year dollars.
   // netDraw also grossed up — withdrawing $X net from IRA requires ~$X/(1-0.28) gross.
@@ -503,41 +503,59 @@ function runMonteCarlo(startBalance, annualWithdraw, years, trials=1000, mean=0.
   const rand = seededRandom(seedVal);
   const sorrYears = sorrSchedule ? sorrSchedule.length : 0;
 
+  // Use separate IRA and taxable balances when provided for correct draw-order tax treatment.
+  // Taxable drawn first (lower effective tax), IRA second (full ordinary income gross-up).
+  // Effective taxable gross-up: gains-only at 15% cap gains. Basis returned tax-free.
+  // Effective IRA gross-up: full ordinary income at MC_TAX_RATE.
+  const useAcctSplit = startIra !== null && startTaxable !== null;
+  const capGainsRate = 0.15;
+
   for (let t = 0; t < trials; t++) {
-    let bal = startBalance;
+    let ira      = useAcctSplit ? startIra      : startBalance;
+    let taxAcct  = useAcctSplit ? startTaxable  : 0;
     let failed = false;
     for (let y = 0; y < years; y++) {
-      // Use fixed SORR return for first N years of every trial, then random
       const r = (y < sorrYears)
         ? sorrSchedule[y]
         : mean + stddev * (Math.sqrt(-2*Math.log(rand())) * Math.cos(2*Math.PI*rand()));
       const inflFactor = Math.pow(1 + inflation, y);
       const expensesThisYear = totalExpensesY1 * inflFactor;
       const ssThisYear = ssIncome * inflFactor;
-      const fixedThisYear = streams.reduce((sum, s) => sum + (y >= s.yearOffset ? s.annual : 0), 0);
-      // Net surplus or shortfall — income sources vs expenses
-      // When guaranteed income (SS + fixed streams) exceeds expenses, the after-tax surplus
-      // is reinvested into the portfolio balance, exactly mirroring the deterministic projection.
+      const fixedThisYear = streams.reduce((sum, s) => sum + (y >= s.yearOffset ? s.annual * (s.colaRate > 0 ? Math.pow(1 + s.colaRate, y - s.yearOffset) : 1) : 0), 0);
       const netCoveredByGuaranteed = ssThisYear + fixedThisYear;
       const netShortfall = Math.max(0, expensesThisYear - netCoveredByGuaranteed);
       const netSurplus   = Math.max(0, netCoveredByGuaranteed - expensesThisYear);
-      // Gross up shortfall — IRA draw needs to cover both expense and tax on the draw
-      const grossDraw = netShortfall > 0 ? netShortfall / (1 - MC_TAX_RATE) : 0;
-      // After-tax surplus: guaranteed income already net of tax at MC_TAX_RATE approximation.
-      // Surplus is reinvested at 100% basis — no additional tax on deposit, earns full return next year.
-      const surplusReinvest = netSurplus * (1 - MC_TAX_RATE); // approximate after-tax net of surplus
-      // Primary care cost: inflate using care-specific inflation rate to event-year dollars, then gross up
+      // Surplus reinvested proportionally into taxable first (preserving tax-advantaged growth)
+      const surplusReinvest = netSurplus * (1 - MC_TAX_RATE);
       const ltcCareInflFactor = Math.pow(1 + ltcCareInflation, y);
       const ltcShock = (ltcShockYear >= 0 && y >= ltcShockYear && y < ltcShockYear + ltcShockDuration)
         ? (ltcShockAnnual * ltcCareInflFactor) / (1 - MC_TAX_RATE) : 0;
-      // Spouse care cost: independent event, same care inflation rate
       const spouseLtcShock = (spouseLtcShockYear >= 0 && y >= spouseLtcShockYear && y < spouseLtcShockYear + spouseLtcShockDuration)
         ? (spouseLtcShockAnnual * ltcCareInflFactor) / (1 - MC_TAX_RATE) : 0;
-      // Expense shock — recurring unplanned expense every N years, inflation-adjusted, grossed up
       const expShock = (expenseShockAmount > 0 && expenseShockFrequency > 0 && y >= expenseShockFrequency && y % expenseShockFrequency === 0)
         ? (expenseShockAmount * inflFactor) / (1 - MC_TAX_RATE) : 0;
-      bal = bal * (1 + r) - grossDraw + surplusReinvest - ltcShock - spouseLtcShock - expShock;
-      if (bal <= 0) { failed = true; break; }
+      // Total gross need from portfolio
+      const totalNeed = netShortfall + ltcShock + spouseLtcShock + expShock;
+      if (useAcctSplit && totalNeed > 0) {
+        // Draw from taxable first — effective gross-up only on gain portion
+        // Gain fraction of current taxable balance (basis erodes as gains are drawn)
+        const gainFraction = Math.max(0, 1 - taxableBasisPct);
+        const taxableGrossUpRate = gainFraction * capGainsRate; // effective tax on taxable draw
+        const taxableCapacity = taxAcct; // can draw all of it
+        // How much net expense can taxable cover?
+        const netFromTaxable = Math.min(totalNeed, taxableCapacity * (1 - taxableGrossUpRate));
+        const taxableGross = netFromTaxable > 0 ? netFromTaxable / (1 - taxableGrossUpRate) : 0;
+        taxAcct = Math.max(0, taxAcct * (1 + r) - taxableGross);
+        // Remaining need covered by IRA at full gross-up
+        const remainingNeed = totalNeed - netFromTaxable;
+        const iraGross = remainingNeed > 0 ? remainingNeed / (1 - MC_TAX_RATE) : 0;
+        ira = ira * (1 + r) - iraGross + surplusReinvest;
+      } else {
+        // Single-account fallback (arch OFF or no split data)
+        const grossDraw = totalNeed > 0 ? totalNeed / (1 - MC_TAX_RATE) : 0;
+        ira = ira * (1 + r) - grossDraw + surplusReinvest;
+      }
+      if (ira + taxAcct <= 0) { failed = true; break; }
     }
     if (!failed) successes++;
   }
@@ -934,6 +952,36 @@ function projectArc(inputs) {
     + (partTimeMonthly > 0 ? partTimeMonthly * 12 : 0);
   magiHistory[retireAge - 2] = preRetireMagi;
   magiHistory[retireAge - 1] = preRetireMagi;
+
+  // ── MC Starting Balance — actual post-funding portfolio ──
+  // Capture trad+taxable AFTER the pre-retirement loop (which already deducted any
+  // draws that fired before retireAge, e.g. L2 at age 64) but BEFORE the retirement
+  // loop (where L1/L3 draw at retireAge). Then subtract L1 and L3 principal draws
+  // that fire at retireAge in year 0 of the retirement loop.
+  // This gives the true L4 bridge portfolio the MC should test against.
+  // Note: L1 tax is financed (not from portfolio) so we only subtract the principal.
+  // Split MC starting balance into IRA (taxable draws) and taxable (lower effective tax).
+  // Architecture draws all come from trad (IRA), so taxable is unaffected.
+  // All draws subtract from IRA component only.
+  let _mcBOY_ira = trad + roth + spouseTrad;
+  const _mcBOY_taxable = taxable; // taxable account unaffected by architecture draws
+  if (architectureEnabled) {
+    if (archEtaFundingAmount > 0 && etaFundingAge === retireAge)
+      _mcBOY_ira = Math.max(0, _mcBOY_ira - archEtaFundingAmount);
+    if (archRothConversionAmount > 0 && rothConversionAge === retireAge)
+      _mcBOY_ira = Math.max(0, _mcBOY_ira - archRothConversionAmount);
+    if (archLtcNetAmount > 0 && ltcFundingAge === retireAge) {
+      const _p = retireAge < 59.5 ? 0.10 : 0;
+      const _g = archLtcNetAmount / Math.max(0.01, 1 - preRetMarginalRate - _p);
+      _mcBOY_ira = Math.max(0, _mcBOY_ira - _g);
+    }
+    if (archSpouseLtcNetAmount > 0 && spouseLtcFundingAge === retireAge) {
+      const _p = retireAge < 59.5 ? 0.10 : 0;
+      const _g = archSpouseLtcNetAmount / Math.max(0.01, 1 - preRetMarginalRate - _p);
+      _mcBOY_ira = Math.max(0, _mcBOY_ira - _g);
+    }
+  }
+  let _mcBOY = _mcBOY_ira + _mcBOY_taxable; // total for backward compat
 
   for (let age = retireAge; age <= planToAge; age++) {
     const yr = age - retireAge;
@@ -1757,18 +1805,12 @@ function projectArc(inputs) {
   // years[0].totalPortfolio is EOY after year-1 return + draws — inconsistent when SORR
   // is on (partially penalizes year 1 but ignores years 2-5). Use reconstructed pre-retirement
   // accumulated balance so the MC starts from the same point regardless of SORR toggle.
-  const _preRetYrs = retireAge - currentAge;
-  const _gf = Math.pow(1 + portfolioReturn, _preRetYrs);
-  const _cFV = (r, c, n) => r > 0 ? c * ((Math.pow(1+r,n)-1)/r) * (1+r) : c * n;
-  const mcStartBalance = (
-    traditionalBalance * _gf
-    + _cFV(portfolioReturn, annualTradContribution || 0, _preRetYrs)
-    + rothBalance * _gf
-    + taxableBalance * _gf
-    + _cFV(portfolioReturn, annualTaxableContribution || 0, _preRetYrs)
-    + (spouseTraditionalBalance || 0) * _gf
-    + _cFV(portfolioReturn, annualSpouseTradContribution || 0, _preRetYrs)
-  );
+  // mcStartBalance: actual post-funding portfolio (IRA + taxable combined).
+  // Pass components separately to MC for correct draw-order tax treatment.
+  const mcStartBalance = _mcBOY; // total — kept for seed calc and backward compat
+  const mcStartIra = _mcBOY_ira;
+  const mcStartTaxable = _mcBOY_taxable;
+  const mcTaxableBasisPct = taxableBasisPct / 100; // 0.0–1.0
   const mcYears = planToAge - retireAge;
   const ssAtMcStart = ssIncomeY1; // MC starts at retirement — no inflation offset needed
   const expensesAtMcStart = totalExpensesY1;
@@ -1806,11 +1848,10 @@ function projectArc(inputs) {
     fixedStreams.push({ yearOffset: offset, annual: archNonQualAnnuityMonthly * 12 });
   }
 
-  // ETA policy loan income — only when architecture is enabled (Layer 3 product)
-  // MC uses Year 1 amount as a conservative floor — COLA growth is reflected in the main projection arc
+  // ETA policy loan income — grows at etaColaRate (same as deterministic projection)
   if (archEtaAnnualIncome > 0) {
     const offset = Math.max(0, etaStartAge - mcStartAge);
-    fixedStreams.push({ yearOffset: offset, annual: archEtaAnnualIncome });
+    fixedStreams.push({ yearOffset: offset, annual: archEtaAnnualIncome, colaRate: etaColaRate || 0 });
   }
 
   // Note: RMDs are NOT added as a fixed stream. The full traditional IRA balance is already
@@ -1845,7 +1886,10 @@ function projectArc(inputs) {
     ltcCareInflationRate,
     expenseShockEnabled ? (expenseShockAmount || 50000) : 0,
     expenseShockEnabled ? (expenseShockFrequency || 8) : 0,
-    mcSorrSchedule
+    mcSorrSchedule,
+    mcStartIra,
+    mcStartTaxable,
+    mcTaxableBasisPct
   );
 
   return { years, confidence, fixedStreams, mcStartAge };
