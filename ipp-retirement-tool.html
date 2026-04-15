@@ -2931,8 +2931,6 @@ function App() {
     inflation: inputs.inflation / 100,
     etaColaRate: (inputs.etaColaRate || 0) / 100,
     ltcCareInflationRate: (inputs.ltcCareInflationRate || 4) / 100,
-    // Apply defaults for shock params — null from Supabase causes null > 0 = false in MC,
-    // silently disabling expense shocks. Use same defaults as rptArchStormConf.
     expenseShockAmount: inputs.expenseShockAmount || 50000,
     expenseShockFrequency: inputs.expenseShockFrequency || 8,
   };
@@ -2942,7 +2940,8 @@ function App() {
   // Report arch baselines — always architectureEnabled: true regardless of UI toggle
   // These drive the IncomeArc™ ring scores in the PDF report
   const { confidence: rptArchBaseConf } = projectArc({ ...baseProjectionInputs, architectureEnabled: true, sorrEnabled: false, expenseShockEnabled: false, ltcEventAge: 0, spouseLtcEventAge: 0, ltcInsured: false });
-  const { confidence: rptArchStormConf } = projectArc({ ...baseProjectionInputs, architectureEnabled: true, sorrEnabled: true, expenseShockEnabled: true, expenseShockAmount: inputs.expenseShockAmount||50000, expenseShockFrequency: inputs.expenseShockFrequency||8, ltcInsured: true, spouseLtcInsured: inputs.filingStatus==='mfj' });
+  // rptArchStormConf: perfect storm baseline — same parameters as stormArch in report
+  const { confidence: rptArchStormConf } = projectArc({ ...baseProjectionInputs, architectureEnabled: true, sorrEnabled: true, expenseShockEnabled: true, ltcInsured: true, spouseLtcInsured: inputs.filingStatus==='mfj' });
 
   const hasLtcEvent = inputs.ltcEventEnabled && inputs.ltcEventAge > 0 && inputs.ltcMonthlyCost > 0;
   const hasSpouseLtcEvent = (inputs.filingStatus === 'mfj') && inputs.spouseLtcEventEnabled && inputs.spouseLtcEventAge > 0 && inputs.spouseLtcMonthlyCost > 0;
@@ -3580,9 +3579,11 @@ function App() {
                   const sc2SQ   = hcConf;
                   const sc2Arch = hcInsConf;
 
-                  // Scenario 3 (perfect storm): stormSQConf vs always-on arch storm
+                  // Scenario 3 (perfect storm): stormSQConf vs stormArchConf
+                  // Use stormArchConf — computed fresh at report time from current inputs,
+                  // identical parameters to the ring's confidenceWithLtc calculation.
                   const sc3SQ   = stormSQConf;
-                  const sc3Arch = rptArchStormConf;
+                  const sc3Arch = stormArchConf;
 
                   const sc1SVG = ringPairSVG(sc1SQ, sc1Arch);
                   const sc2SVG = ringPairSVG(sc2SQ, sc2Arch);
