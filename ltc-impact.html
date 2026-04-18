@@ -837,6 +837,159 @@ footer {
   footer { padding: 40px 24px; flex-direction: column; align-items: flex-start; }
   .footer-links { align-items: flex-start; }
 }
+
+/* ── VIDEO SECTION ── */
+.video-section {
+  background: var(--navy);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 72px 48px;
+  position: relative;
+  z-index: 1;
+}
+.video-section::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(135deg, rgba(200,169,110,0.03) 1px, transparent 1px),
+    linear-gradient(45deg, rgba(200,169,110,0.03) 1px, transparent 1px);
+  background-size: 80px 80px;
+  pointer-events: none;
+}
+.video-inner {
+  max-width: 800px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 1;
+}
+.video-eyebrow {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--gold);
+  text-align: center;
+  margin-bottom: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+.video-eyebrow::before,
+.video-eyebrow::after {
+  content: '';
+  display: block;
+  height: 1px;
+  width: 40px;
+  background: var(--gold);
+  opacity: .5;
+}
+.video-wrap {
+  position: relative;
+  padding-bottom: 56.25%;
+  height: 0;
+  overflow: hidden;
+  background: var(--navy2);
+  border: 1px solid var(--border);
+}
+.video-wrap iframe {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+}
+@media(max-width:768px) {
+  .video-section { padding: 56px 24px; }
+}
+
+
+/* ── LEAD CAPTURE SECTION ── */
+.lead-capture {
+  background: var(--navy2);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--gold-dim);
+  padding: 40px;
+  margin-bottom: 24px;
+}
+.lead-capture-inner {
+  max-width: 640px;
+}
+.lead-eyebrow {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--gold-dim);
+  margin-bottom: 12px;
+}
+.lead-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(20px, 2.5vw, 26px);
+  font-weight: 300;
+  color: var(--off-white);
+  margin-bottom: 10px;
+  line-height: 1.2;
+}
+.lead-title em { font-style: italic; color: var(--gold); }
+.lead-body {
+  font-size: 14px;
+  color: var(--warm);
+  line-height: 1.75;
+  margin-bottom: 24px;
+}
+.lead-form {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.lead-form input {
+  flex: 1;
+  min-width: 160px;
+  height: 44px;
+  padding: 0 14px;
+  font-size: 14px;
+  font-family: 'Barlow', sans-serif;
+  background: var(--navy3);
+  border: 1px solid var(--border);
+  color: var(--off-white);
+  transition: border-color 0.2s;
+}
+.lead-form input::placeholder { color: var(--gray); }
+.lead-form input:focus { outline: none; border-color: var(--gold-dim); }
+.lead-form button {
+  height: 44px;
+  padding: 0 24px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--navy);
+  background: var(--gold-dim);
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+.lead-form button:hover { background: var(--gold); }
+.lead-form button:disabled { opacity: 0.6; cursor: not-allowed; }
+.lead-status {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--warm);
+  display: none;
+  line-height: 1.6;
+}
+.lead-status.success { color: var(--gold); }
+.lead-status.error   { color: #C47A7A; }
+.lead-note {
+  font-size: 11px;
+  color: var(--gray);
+  margin-top: 10px;
+  font-style: italic;
+}
+
 </style>
 </head>
 <body>
@@ -995,6 +1148,23 @@ footer {
     <div class="gold-bar" id="goldBar"></div>
   </div>
 
+<!-- ── VIDEO ── -->
+<section class="video-section">
+  <div class="video-inner">
+    <div class="video-eyebrow">The numbers tell part of the story</div>
+    <div class="video-wrap">
+      <!-- Replace VIMEO_ID with your HeyGen/Vimeo video ID once produced -->
+      <iframe
+        src="https://player.vimeo.com/video/1184289066?h=fef4cdab2b&badge=0&autopause=0&player_id=0&app_id=58479&title=0&byline=0&portrait=0"
+        frameborder="0"
+        allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media"
+        allowfullscreen
+        title="Layer 2 — The Family Picture">
+      </iframe>
+    </div>
+  </div>
+</section>
+
   <div class="family-box">
     <div class="fb-t">The family picture</div>
     <div class="fb-b">A care need rarely arrives at the end of a long life. It arrives after a fall, a diagnosis, a stroke — in the middle of the retirement both partners spent decades building toward. The spouse who becomes the primary caregiver did not retire to be a caregiver. The daughter who reorganizes her career around the care schedule did not plan to. The son driving four hours every weekend did not agree to that role. When there is no plan, the family becomes the plan — and the qualified plan absorbs every dollar of care, fully taxed, at whatever price the market offers that day. Layer 2 converts a family obligation into a contractual benefit. The care is funded. The family is freed. The portfolio keeps compounding.</div>
@@ -1012,6 +1182,22 @@ footer {
     <div class="ne-t">If the care event never comes</div>
     <div class="ne-b">It is a repositioning of assets you already own into a structure that continues to accumulate value throughout your lifetime. Whatever you do not use for care is available to you as tax-free income during your lifetime. The remaining value passes tax-free to your beneficiaries of choice — nothing wasted, nothing lost, and your family was protected the entire time.</div>
   </div>
+
+<!-- ── LEAD CAPTURE ── -->
+<div class="lead-capture">
+  <div class="lead-capture-inner">
+    <div class="lead-eyebrow">Layer 2 Overview · Free Download</div>
+    <div class="lead-title">Not ready for a full review?<br>Download the <em>Layer 2 Overview.</em></div>
+    <p class="lead-body">See the numbers, the family impact, and how the IncomeArc™ system addresses both — in a two-page overview you can read in under five minutes.</p>
+    <div class="lead-form" id="leadForm">
+      <input type="text"  id="lead-name"  placeholder="Your name"         autocomplete="name"  />
+      <input type="email" id="lead-email" placeholder="Your email address" autocomplete="email" />
+      <button onclick="submitLead('ipp')">Send me the overview →</button>
+    </div>
+    <div class="lead-status" id="leadStatus"></div>
+    <p class="lead-note">No spam. No obligation. One email with your download link.</p>
+  </div>
+</div>
 
   <div class="calc-cta">
     <div class="cc-eyebrow">Layer 2 · StructureReview™</div>
