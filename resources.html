@@ -663,6 +663,7 @@
         <button class="filter-btn" onclick="filterCards('tax', this)">Tax Strategy</button>
         <button class="filter-btn" onclick="filterCards('leverage', this)">Leverage</button>
         <button class="filter-btn" onclick="filterCards('planning', this)">Planning</button>
+        <button class="filter-btn" onclick="filterCards('ltc', this)">LTC</button>
       </div>
       <div class="search-wrap">
         <span class="search-icon">&#9906;</span>
@@ -802,7 +803,16 @@
     const resultsCount = document.getElementById('results-count');
 
     const filtered = allArticles.filter(a => {
-      const matchFilter = activeFilter === 'all' || (a.category || '').toLowerCase() === activeFilter;
+      const cat = (a.category || '').toLowerCase();
+      const tags = (a.tags || a.keywords || '').toLowerCase();
+      let matchFilter;
+      if (activeFilter === 'all') {
+        matchFilter = true;
+      } else if (activeFilter === 'ltc') {
+        matchFilter = cat === 'ltc' || tags.includes('ltc') || tags.includes('long-term care') || tags.includes('layer 2');
+      } else {
+        matchFilter = cat === activeFilter;
+      }
       const q = searchQuery.toLowerCase();
       const matchSearch = !q ||
         (a.title  || '').toLowerCase().includes(q) ||
