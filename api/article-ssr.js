@@ -13,7 +13,7 @@
 
     if (!article || !article.title) {
       return res.status(404).send('Article not found');
-    }
+    } 
 
     const escape = (str = '') =>
       str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
