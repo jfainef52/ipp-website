@@ -29,7 +29,7 @@ export default async function handler(req, res) {
       method: 'POST', headers: notionHeaders(),
       body: JSON.stringify({ filter: { property: 'Slug', rich_text: { equals: slug } }, page_size: 1 }),
     });
-    if (!qr.ok) throw new Error(`Notion query: ${qr.status}`);
+  if (!qr.ok) { const e = await qr.text(); throw new Error(`Notion query ${qr.status}: ${e}`); }
     const qd = await qr.json();
     const page = qd.results?.[0];
     if (!page) return res.status(404).send('Article not found');
