@@ -1,4 +1,4 @@
-·—export default async function handler(req, res) {
+ ·—export default async function handler(req, res) {
   const { slug } = req.query;
   if (!slug) return res.status(400).send('Missing slug');
 
