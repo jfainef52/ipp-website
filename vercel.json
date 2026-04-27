@@ -1,0 +1,15 @@
+{
+    "rewrites": [
+          {
+                  "source": "/article.html",
+                  "has": [
+                            {
+                                        "type": "header",
+                                        "key": "user-agent",
+                                        "value": "(?i)googlebot|bingbot|crawler|spider|slurp|duckduckbot|baiduspider|yandexbot"
+                            }
+                  ],
+                  "destination": "/api/article-ssr?slug=:slug"
+          }
+    ]
+}
