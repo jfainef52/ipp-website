@@ -32,7 +32,7 @@ export default async function handler(req, res) {
   if (!qr.ok) { const e = await qr.text(); throw new Error(`Notion query ${qr.status}: ${e}`); }
     const qd = await qr.json();
     const page = qd.results?.[0];
-    if (!page) return res.status(404).send('Article not found');
+    if (!page) return res.status(404).json({ debug: true, results_count: qd.results?.length, raw: qd });
     const p = page.properties;
     const title = escHtml(richText(p.Name?.title || []));
     const summary = escHtml(richText(p.Summary?.rich_text || []));
