@@ -1,4 +1,4 @@
-export default async function handler(req, res) {
+·—export default async function handler(req, res) {
   const { slug } = req.query;
   if (!slug) return res.status(400).send('Missing slug');
 
@@ -7,7 +7,9 @@ export default async function handler(req, res) {
   try {
     const apiRes = await fetch(`${base}/api/notion?action=page&slug=${encodeURIComponent(slug)}`);
     if (!apiRes.ok) throw new Error(`notion API returned ${apiRes.status}`);
-    const article = await apiRes.json();
+        const data = await apiRes.json();
+        const article = data.article || data;
+        const blocks = data.blocks || [];
 
     if (!article || !article.title) {
       return res.status(404).send('Article not found');
@@ -15,8 +17,7 @@ export default async function handler(req, res) {
 
     const escape = (str = '') =>
       str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-
-    const bodyHtml = article.body || article.content || '';
+        const bodyHtml = blocks.map(b => { const t = b.type; const rt = (b[t] && b[t].rich_text) || []; const txt = rt.map(r => escape(r.plain_text||'')).join(''); if (!txt) return ''; return t==='heading_1'?`<h2>${txt}</h2>`:t==='heading_2'?`<h3>${txt}</h3>`:t==='heading_3'?`<h4>${txt}</h4>`:t==='bulleted_list_item'||t==='numbered_list_item'?`<li>${txt}</li>`:t==='quote'?`<blockquote>${txt}</blockquote>`:`<p>${txt}</p>`; }).join('\n');
     const title    = escape(article.title);
     const summary  = escape(article.summary || article.description || '');
     const author   = escape(article.author || 'Jeffrey Faine, CLU · RICP');
