@@ -1,4 +1,35 @@
-<!DOCTYPE html>
+<!Dfunction submitOptIn(num) {
+  var first = document.getElementById('optin'+num+'-first').value.trim();
+  var last  = document.getElementById('optin'+num+'-last').value.trim();
+  var email = document.getElementById('optin'+num+'-email').value.trim();
+  var statusEl = document.getElementById('optinStatus'+num);
+  var formEl   = document.getElementById('optinForm'+num);
+  if(!first||!last||!email){ if(statusEl){statusEl.textContent='Please fill in all fields.';statusEl.style.color='#e05';} return; }
+  var btn = formEl ? formEl.querySelector('button') : null;
+  if(btn){btn.disabled=true;btn.textContent='Sending...';}
+  fetch('https://hook.us2.make.com/fnsm3jx756odz9ti77uwij697blmp5sx',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      firstName:first,lastName:last,email:email,
+      source:'ltc-impact-optin'+num,
+      page:window.location.href,
+      time:new Date().toISOString(),
+      type:'layer2-overview',
+      lossAmount:window._lastHhTotal?Math.round(window._lastHhTotal):null
+    })
+  })
+  .then(function(r){return r.ok?r.text():Promise.reject(r);})
+  .then(function(){
+    if(formEl)formEl.style.display='none';
+    if(statusEl){statusEl.innerHTML='&#10003; Check your inbox &mdash; your Layer 2 Overview is on its way.';statusEl.style.color='var(--gold)';statusEl.style.fontSize='15px';statusEl.style.fontFamily="'Cormorant Garamond',serif";}
+  })
+  .catch(function(){
+    if(btn){btn.disabled=false;btn.textContent='Send my Layer 2 overview →';}
+    if(statusEl){statusEl.textContent='Something went wrong. Please try again.';statusEl.style.color='#e05';}
+  });
+}
+
+OCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1021,6 +1052,18 @@ footer {
   color: var(--gray);
 }
 
+
+.optin-block { padding: 28px 32px; background: rgba(200,169,110,0.06); border: 1px solid rgba(200,169,110,0.25); border-top: 3px solid var(--gold); }
+.optin-loss-label { font-family: 'Barlow Condensed', sans-serif; font-size: 10px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); margin-bottom: 6px; }
+.optin-loss-val { font-family: 'Cormorant Garamond', serif; font-size: clamp(28px,4vw,44px); font-weight: 300; color: var(--gold); line-height: 1; margin-bottom: 6px; }
+.optin-loss-sub { font-size: 12px; color: var(--warm); line-height: 1.5; margin-bottom: 20px; letter-spacing: 0.02em; }
+.optin-form { display: flex; gap: 10px; flex-wrap: wrap; }
+.optin-form input { flex: 1 1 140px; height: 42px; background: rgba(255,255,255,0.05); border: 1px solid rgba(200,169,110,0.3); color: var(--off-white); font-family: 'Barlow',sans-serif; font-size: 13px; padding: 0 14px; outline: none; transition: border-color 0.2s; }
+.optin-form input:focus { border-color: var(--gold); }
+.optin-form input::placeholder { color: rgba(255,255,255,0.3); }
+.optin-form button { height: 42px; padding: 0 22px; background: var(--gold); color: var(--navy); font-family: 'Barlow Condensed',sans-serif; font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; border: none; cursor: pointer; white-space: nowrap; transition: background 0.2s; }
+.optin-form button:hover { background: var(--gold2); }
+.optin-note { font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 10px; }
 </style>
 </head>
 <body>
@@ -1180,6 +1223,22 @@ footer {
   </div>
 
 <!-- ── VIDEO ── -->
+    <!-- OPT-IN 1 -->
+    <div class="optin-block" id="optinBlock1">
+      <div class="optin-loss-label">Total household wealth protected by Layer 2</div>
+      <div class="optin-loss-val" id="optinLossVal1">&#8212;</div>
+      <div class="optin-loss-sub" id="optinLossSub1">Both insureds &middot; mid-retirement window &middot; 3-year event &middot; 52.9&times; combined leverage ratio</div>
+      <div class="optin-form" id="optinForm1">
+        <input type="text"  id="optin1-first" placeholder="First name" autocomplete="given-name" />
+        <input type="text"  id="optin1-last"  placeholder="Last name"  autocomplete="family-name" />
+        <input type="email" id="optin1-email" placeholder="Email address" autocomplete="email" />
+        <button onclick="submitOptIn(1)">Send my Layer 2 overview &rarr;</button>
+      </div>
+      <div class="lead-status" id="optinStatus1"></div>
+      <p class="optin-note">You&#8217;ll hear from us with relevant planning insights. Unsubscribe anytime.</p>
+    </div>
+
+
 <section class="video-section">
   <div class="video-inner">
     <div class="video-eyebrow">The numbers tell part of the story</div>
@@ -1202,6 +1261,22 @@ footer {
     <div class="repo-quote">"You're not spending money. You're moving money you already own — a small portion of your qualified plan — into a structure that grows tax-free, pays tax-free, and protects your family permanently."</div>
     <div class="repo-note">Funded over 5 annual draws from existing qualified plan assets. No out-of-pocket contribution required.</div>
   </div>
+
+    <!-- OPT-IN 2 -->
+    <div class="optin-block" id="optinBlock2">
+      <div class="optin-loss-label">Total household wealth protected by Layer 2</div>
+      <div class="optin-loss-val" id="optinLossVal2">&#8212;</div>
+      <div class="optin-loss-sub" id="optinLossSub2">Both insureds &middot; mid-retirement window &middot; 3-year event &middot; 52.9&times; combined leverage ratio</div>
+      <div class="optin-form" id="optinForm2">
+        <input type="text"  id="optin2-first" placeholder="First name" autocomplete="given-name" />
+        <input type="text"  id="optin2-last"  placeholder="Last name"  autocomplete="family-name" />
+        <input type="email" id="optin2-email" placeholder="Email address" autocomplete="email" />
+        <button onclick="submitOptIn(2)">Send my Layer 2 overview &rarr;</button>
+      </div>
+      <div class="lead-status" id="optinStatus2"></div>
+      <p class="optin-note">You&#8217;ll hear from us with relevant planning insights. Unsubscribe anytime.</p>
+    </div>
+
 
   <div class="family-box">
     <div class="fb-t">The family picture</div>
@@ -1464,6 +1539,8 @@ function calculate(){
       </div>
     </div>`;
 
+  window._lastHhTotal = hhTotal;
+  window._lastHhLeverage = hhLeverage;
   document.getElementById('goldBar').innerHTML=
     `<div>
       <div class="gb-label">Total household wealth protected by Layer 2</div>
@@ -1471,6 +1548,12 @@ function calculate(){
     </div>
     <div class="gb-val">${fmtM(hhTotal)}</div>`;
 
+  ['1','2'].forEach(function(n){
+    var lv=document.getElementById('optinLossVal'+n);
+    var ls=document.getElementById('optinLossSub'+n);
+    if(lv) lv.textContent=fmtM(hhTotal);
+    if(ls) ls.textContent=(married?'Both insureds · ':'')+' mid-retirement window · 3-year event · '+hhLeverage+'× combined leverage ratio';
+  });
   document.getElementById('results').classList.add('show');
   setTimeout(()=>document.getElementById('results').scrollIntoView({behavior:'smooth',block:'start'}),100);
 }
