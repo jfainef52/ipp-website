@@ -639,6 +639,7 @@ function calcStateTax(sources, stateCode, inflFactor, customRate, stressAdder = 
   const parttime = sources.parttime|| 0;
   const annuity  = sources.annuity || 0;
   const taxable  = sources.taxable || 0;
+  const taxableGainRatio = (sources.taxableGainRatio !== undefined) ? Math.max(0, Math.min(1, sources.taxableGainRatio)) : 1.0;
   // Roth always tax-free
 
   let stateOrdinary = 0;
