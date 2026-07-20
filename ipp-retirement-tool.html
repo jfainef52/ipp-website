@@ -35,7 +35,11 @@ window.openScenarioSummary = function(inputs, clientInfo) {
     ? [[23200,.10],[94300,.12],[201050,.22],[383900,.24],[487450,.32],[731200,.35],[1e9,.37]]
     : [[11600,.10],[47150,.12],[100525,.22],[191950,.24],[243725,.32],[609350,.35],[1e9,.37]];
   var txbl = Math.max(0,(inputs.householdIncome||0)-(mfj?29200:14600));
-  var pr = (br.filter(function(b){return txbl<=b[0];})[0]||br[br.length-1])[1];
+  var fedRate = (br.filter(function(b){return txbl<=b[0];})[0]||br[br.length-1])[1];
+  // State tax + stress adder — same STATE_TAX_DATA lookup and formula used at line ~1663.
+  // Path 1 previously used fedRate alone with no state component.
+  var stateRate = (STATE_TAX_DATA[inputs.stateCode]?.rate || 0) + (inputs.taxRateStressAdder ? inputs.taxRateStressAdder/100 : 0);
+  var pr = Math.min(fedRate + stateRate, 0.99);
   var prPct = Math.round(pr*100)+'%';
   var l1a=inputs.rothConversionAmount||0, l1f=Math.min(inputs.rothConversionFinanced||0,l1a);
   var l1t=l1a*pr, l1i=Math.max(0,l1t-l1f), l1tot=l1a+l1i;
