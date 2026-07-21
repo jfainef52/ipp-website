@@ -6196,17 +6196,15 @@ function App() {
                     <div style={{fontSize:12,color:'#8DAFC8',marginBottom:8,lineHeight:1.5}}>
                       Enter the net amount needed — the model calculates the required gross IRA withdrawal to net that amount after tax.
                     </div>
-                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
-                      <Field label="Net Amount Needed" hint="Amount needed after tax to fund the LTC policy premium">
-                        <NumInput value={inputs.ltcNetAmount} onChange={v=>set('ltcNetAmount',v)} prefix="$"/>
-                      </Field>
-                      <Field label="Draw Age" hint="Primary's age at which the IRA distribution occurs">
-                        <NumInput value={inputs.ltcFundingAge} onChange={v=>set('ltcFundingAge',v)} suffix="yrs"/>
-                      </Field>
-                      <Field label="Death Benefit" hint="Initial face amount + APB rider, from the carrier illustration — the effective care benefit pool. Static value; does not project corridor-driven growth under DB Option A.">
-                        <NumInput value={inputs.ltcDeathBenefit} onChange={v=>set('ltcDeathBenefit',v)} prefix="$"/>
-                      </Field>
-                    </div>
+                    <Field label="Net Amount Needed" hint="Amount needed after tax to fund the LTC policy premium">
+                      <NumInput value={inputs.ltcNetAmount} onChange={v=>set('ltcNetAmount',v)} prefix="$"/>
+                    </Field>
+                    <Field label="Draw Age" hint="Primary's age at which the IRA distribution occurs">
+                      <NumInput value={inputs.ltcFundingAge} onChange={v=>set('ltcFundingAge',v)} suffix="yrs"/>
+                    </Field>
+                    <Field label="Death Benefit" hint="Initial face amount, from the carrier illustration">
+                      <NumInput value={inputs.ltcDeathBenefit} onChange={v=>set('ltcDeathBenefit',v)} prefix="$"/>
+                    </Field>
                     {inputs.ltcNetAmount > 0 && inputs.ltcFundingAge > 0 && (() => {
                       // Preview gross-up using estimated marginal rate
 
@@ -6294,17 +6292,15 @@ function App() {
                       <div style={{fontSize:12,color:'#8DAFC8',marginBottom:8,lineHeight:1.5}}>
                         Enter the net amount needed — the model calculates the required gross IRA withdrawal to net that amount after tax.
                       </div>
-                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
-                        <Field label="Net Amount Needed" hint="Amount needed after tax to fund the spouse LTC policy premium">
-                          <NumInput value={inputs.spouseLtcNetAmount} onChange={v=>set('spouseLtcNetAmount',v)} prefix="$"/>
-                        </Field>
-                        <Field label="Draw Age" hint="Primary's age at which this IRA distribution occurs">
-                          <NumInput value={inputs.spouseLtcFundingAge} onChange={v=>set('spouseLtcFundingAge',v)} suffix="yrs"/>
-                        </Field>
-                        <Field label="Death Benefit" hint="Spouse's initial face amount + APB rider, from the carrier illustration. Static value; does not project corridor-driven growth under DB Option A.">
-                          <NumInput value={inputs.spouseLtcDeathBenefit} onChange={v=>set('spouseLtcDeathBenefit',v)} prefix="$"/>
-                        </Field>
-                      </div>
+                      <Field label="Net Amount Needed" hint="Amount needed after tax to fund the spouse LTC policy premium">
+                        <NumInput value={inputs.spouseLtcNetAmount} onChange={v=>set('spouseLtcNetAmount',v)} prefix="$"/>
+                      </Field>
+                      <Field label="Draw Age" hint="Primary's age at which this IRA distribution occurs">
+                        <NumInput value={inputs.spouseLtcFundingAge} onChange={v=>set('spouseLtcFundingAge',v)} suffix="yrs"/>
+                      </Field>
+                      <Field label="Death Benefit" hint="Spouse's initial face amount, from the carrier illustration">
+                        <NumInput value={inputs.spouseLtcDeathBenefit} onChange={v=>set('spouseLtcDeathBenefit',v)} prefix="$"/>
+                      </Field>
                       {inputs.spouseLtcNetAmount > 0 && inputs.spouseLtcFundingAge > 0 && (() => {
 
                         const _mfj = inputs.filingStatus === 'mfj';
