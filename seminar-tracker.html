@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seminar Tracker | Integrated Planning Partners</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --navy:#0B1F3A;
+    --navy-light:#13294B;
+    --gold:#C9A24B;
+    --gold-light:#E4CD8C;
+    --cream:#F7F5F0;
+    --ink:#1C2430;
+    --muted:#6B7688;
+    --line:#E3E2DC;
+    --good:#2E7D5B;
+    --warn:#B5892B;
+    --bad:#A6412E;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+    background:var(--cream); color:var(--ink);
+  }
+  header{
+    background:var(--navy); color:#fff; padding:18px 24px;
+    display:flex; align-items:center; justify-content:space-between;
+    position:sticky; top:0; z-index:10;
+  }
+  header .brand{display:flex; align-items:baseline; gap:10px;}
+  header .brand h1{font-size:17px; margin:0; font-weight:600; letter-spacing:.3px;}
+  header .brand span{font-size:12px; color:var(--gold-light); letter-spacing:.5px; text-transform:uppercase;}
+  header button{
+    background:transparent; border:1px solid rgba(255,255,255,.3); color:#fff;
+    padding:7px 14px; border-radius:6px; font-size:13px; cursor:pointer;
+  }
+  header button:hover{border-color:var(--gold);}
+  #app{max-width:1180px; margin:0 auto; padding:20px 20px 60px;}
+
+  /* Login */
+  #login-screen{
+    min-height:80vh; display:flex; align-items:center; justify-content:center;
+  }
+  .login-card{
+    background:#fff; border:1px solid var(--line); border-radius:10px;
+    padding:36px 32px; width:100%; max-width:360px; box-shadow:0 4px 20px rgba(11,31,58,.06);
+  }
+  .login-card h2{margin:0 0 4px; font-size:19px; color:var(--navy);}
+  .login-card p{margin:0 0 22px; font-size:13px; color:var(--muted);}
+  .login-card input{
+    width:100%; padding:10px 12px; margin-bottom:12px; border:1px solid var(--line);
+    border-radius:6px; font-size:14px;
+  }
+  .login-card button{
+    width:100%; background:var(--navy); color:#fff; border:none; padding:11px;
+    border-radius:6px; font-size:14px; font-weight:600; cursor:pointer;
+  }
+  .login-card button:hover{background:var(--navy-light);}
+  .login-error{color:var(--bad); font-size:12.5px; margin-top:8px;}
+
+  /* Tabs */
+  .tabs{display:flex; gap:4px; margin:20px 0 18px; border-bottom:1px solid var(--line);}
+  .tab{
+    padding:10px 16px; font-size:13.5px; font-weight:600; color:var(--muted);
+    cursor:pointer; border-bottom:2px solid transparent; user-select:none;
+  }
+  .tab.active{color:var(--navy); border-bottom-color:var(--gold);}
+  .panel{display:none;}
+  .panel.active{display:block;}
+
+  /* Cards / layout */
+  .card{
+    background:#fff; border:1px solid var(--line); border-radius:10px;
+    padding:18px 20px; margin-bottom:16px;
+  }
+  .card h3{margin:0 0 14px; font-size:14.5px; color:var(--navy); font-weight:700;}
+  .row{display:flex; gap:12px; flex-wrap:wrap;}
+  .row > *{flex:1; min-width:140px;}
+  label{display:block; font-size:11.5px; color:var(--muted); margin-bottom:4px; font-weight:600; text-transform:uppercase; letter-spacing:.3px;}
+  input, select, textarea{
+    width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:6px;
+    font-size:15px; font-family:inherit; background:#fff; min-height:40px;
+  }
+  textarea{resize:vertical; min-height:70px;}
+  .btn{
+    background:var(--navy); color:#fff; border:none; padding:11px 18px;
+    border-radius:6px; font-size:14px; font-weight:600; cursor:pointer; min-height:40px;
+  }
+  .btn:hover{background:var(--navy-light);}
+  .btn-gold{background:var(--gold); color:var(--navy);}
+  .btn-gold:hover{background:var(--gold-light);}
+  .btn-ghost{background:transparent; color:var(--navy); border:1px solid var(--line);}
+  .btn-small{padding:5px 10px; font-size:12px;}
+
+  /* Event picker */
+  .event-picker{display:flex; gap:10px; align-items:end; flex-wrap:wrap;}
+  .event-picker select{max-width:320px;}
+
+  /* Stats strip */
+  .stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; margin-bottom:16px;}
+  .stat{background:#fff; border:1px solid var(--line); border-radius:8px; padding:12px 14px;}
+  .stat .num{font-size:22px; font-weight:700; color:var(--navy);}
+  .stat .lbl{font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.3px; margin-top:2px;}
+  .stat.gold .num{color:var(--warn);}
+  .stat.good .num{color:var(--good);}
+
+  /* Table */
+  table{width:100%; border-collapse:collapse; font-size:12.8px;}
+  th{
+    text-align:left; padding:8px 8px; background:var(--navy); color:#fff;
+    font-size:10.5px; text-transform:uppercase; letter-spacing:.3px; position:sticky; top:0;
+  }
+  td{padding:7px 8px; border-bottom:1px solid var(--line); vertical-align:middle;}
+  tr:hover td{background:#FAFAF6;}
+  .table-wrap{overflow-x:auto; border:1px solid var(--line); border-radius:8px;}
+  .pill{
+    display:inline-block; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:600;
+  }
+  .pill-yes{background:#E4F2EA; color:var(--good);}
+  .pill-no{background:#F5E4E1; color:var(--bad);}
+  .pill-pending{background:#F1EEE6; color:var(--muted);}
+  input[type=checkbox]{width:24px; height:24px; margin:0; accent-color:var(--navy);}
+  td{padding:10px 8px;}
+  td input[type=text], td input[type=number], td input[type=date], td select{
+    padding:8px 8px; font-size:13.5px; min-width:90px; min-height:38px;
+  }
+  .rev-input{width:100px;}
+  @media (hover:none){ .btn, button, select, input, td{ font-size:15px; } }
+
+  .toolbar{display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;}
+  .muted{color:var(--muted); font-size:12.5px;}
+  .section-title{font-size:15px; font-weight:700; color:var(--navy); margin:26px 0 10px;}
+  .chart-wrap{background:#fff; border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px;}
+  .empty{padding:30px; text-align:center; color:var(--muted); font-size:13px;}
+  .zip-rev{font-weight:700; color:var(--navy);}
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <div class="login-card">
+    <h2>Seminar Tracker</h2>
+    <p>Integrated Planning Partners — sign in</p>
+    <input type="email" id="login-email" placeholder="Email">
+    <input type="password" id="login-password" placeholder="Password">
+    <button onclick="doLogin()">Sign In</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<div id="main-app" style="display:none;">
+  <header>
+    <div class="brand"><h1>IPP Seminar Tracker</h1><span>IncomeArc™ Dinner Series</span></div>
+    <button onclick="doLogout()">Sign Out</button>
+  </header>
+
+  <div id="app">
+
+    <div class="tabs">
+      <div class="tab active" data-tab="events" onclick="switchTab('events')">Events</div>
+      <div class="tab" data-tab="funnel" onclick="switchTab('funnel')">Funnel</div>
+      <div class="tab" data-tab="expenses" onclick="switchTab('expenses')">Expenses</div>
+      <div class="tab" data-tab="dashboard" onclick="switchTab('dashboard')">Performance</div>
+    </div>
+
+    <!-- EVENTS -->
+    <div class="panel active" id="panel-events">
+      <div class="card">
+        <h3>Add a Seminar Event</h3>
+        <div class="row">
+          <div><label>Event Name</label><input id="ev-name" placeholder="Oakbrook, IL - Aug 24"></div>
+          <div><label>Date</label><input type="date" id="ev-date"></div>
+          <div><label>Market</label><input id="ev-market" placeholder="Chicago"></div>
+        </div>
+        <div class="row" style="margin-top:10px;">
+          <div><label>Venue</label><input id="ev-venue" placeholder="Restaurant / venue name"></div>
+          <div><label>City</label><input id="ev-city" placeholder="Oakbrook"></div>
+          <div><label>State</label><input id="ev-state" placeholder="IL"></div>
+          <div><label>Venue Zip</label><input id="ev-zip" placeholder="60523"></div>
+        </div>
+        <div style="margin-top:14px;"><button class="btn" onclick="addEvent()">Add Event</button></div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Event</th><th>Date</th><th>Market</th><th>Venue</th><th>Invited</th><th>RSVPs</th><th>Attendees</th><th>Revenue</th><th></th></tr></thead>
+          <tbody id="events-table"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- FUNNEL -->
+    <div class="panel" id="panel-funnel">
+      <div class="toolbar">
+        <div class="event-picker">
+          <div><label>Event</label><select id="funnel-event-select" onchange="loadFunnel()"></select></div>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn-ghost btn" onclick="openBulkImport()">Bulk Import (CSV)</button>
+          <button class="btn-gold btn" onclick="openHouseholdForm()">+ Add Household</button>
+        </div>
+      </div>
+
+      <div class="stats" id="funnel-stats"></div>
+
+      <div id="household-form" class="card" style="display:none;">
+        <h3>Add Household</h3>
+        <div class="row">
+          <div><label>Household Name</label><input id="hh-name" placeholder="John &amp; Mary Smith"></div>
+          <div><label>Phone</label><input id="hh-phone"></div>
+          <div><label>Email</label><input id="hh-email"></div>
+          <div><label>Home Zip</label><input id="hh-zip" placeholder="60523"></div>
+          <div><label>Invite Source</label><input id="hh-source" placeholder="Mailer / referral"></div>
+        </div>
+        <div style="margin-top:12px; display:flex; gap:8px;">
+          <button class="btn" onclick="addHousehold()">Save Household</button>
+          <button class="btn-ghost btn" onclick="closeHouseholdForm()">Cancel</button>
+        </div>
+      </div>
+
+      <div id="bulk-import-form" class="card" style="display:none;">
+        <h3>Bulk Import Households</h3>
+        <p class="muted" style="margin-top:-6px;">Paste rows as: <strong>Name, Phone, Email, Zip, Source</strong> — one household per line. Phone/email/source are optional, but keep the commas as placeholders (e.g. <em>John Smith,,,60523,Mailer</em>).</p>
+        <textarea id="bulk-csv" rows="8" placeholder="John &amp; Mary Smith, 630-555-0100, jsmith@email.com, 60523, AcquireUp Mailer&#10;Bob Jones,,,60559, Referral"></textarea>
+        <div style="margin-top:12px; display:flex; gap:8px;">
+          <button class="btn" onclick="submitBulkImport()">Import Households</button>
+          <button class="btn-ghost btn" onclick="closeBulkImport()">Cancel</button>
+        </div>
+        <div id="bulk-import-status" class="muted" style="margin-top:8px;"></div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Household</th><th>Zip</th><th>Source</th><th>RSVP</th><th>Party</th>
+            <th>Call Done</th><th>Attended</th><th># Heads</th>
+            <th>SR Booked</th><th>SR Held</th><th>Client</th><th>Revenue</th><th>Notes</th>
+          </tr></thead>
+          <tbody id="funnel-table"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- EXPENSES -->
+    <div class="panel" id="panel-expenses">
+      <div class="toolbar">
+        <div class="event-picker">
+          <div><label>Event</label><select id="exp-event-select" onchange="loadExpenses()"></select></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Add Expense</h3>
+        <div class="row">
+          <div><label>Category</label>
+            <select id="exp-category">
+              <option>Venue</option><option>Food &amp; Beverage</option><option>Mailer</option>
+              <option>AcquireUp Fee</option><option>Printing / Collateral</option><option>Other</option>
+            </select>
+          </div>
+          <div><label>Description</label><input id="exp-desc"></div>
+          <div><label>Amount</label><input type="number" step="0.01" id="exp-amount"></div>
+          <div><label>Date</label><input type="date" id="exp-date"></div>
+        </div>
+        <div style="margin-top:12px;"><button class="btn" onclick="addExpense()">Add Expense</button></div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Category</th><th>Description</th><th>Amount</th><th>Date</th><th></th></tr></thead>
+          <tbody id="expenses-table"></tbody>
+        </table>
+      </div>
+      <div style="margin-top:10px; font-weight:700; color:var(--navy);" id="expenses-total"></div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div class="panel" id="panel-dashboard">
+      <div class="stats" id="overall-stats"></div>
+
+      <div class="section-title">Revenue by Home Zip Code</div>
+      <div class="chart-wrap"><canvas id="zip-chart" height="90"></canvas></div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Zip</th><th>Invited</th><th>RSVPs</th><th>Attendees</th><th>Clients Won</th><th>Total Revenue</th><th>Revenue / Attendee</th></tr></thead>
+          <tbody id="zip-table"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ============================================================
+// CONFIG — same Supabase project as the IPP advisor portal
+// ============================================================
+const SUPABASE_URL = 'https://piixgvxrasddphklgazh.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_acvdk0hBniaB6qOD8_k8XQ_9R6FNbP_';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let currentEvents = [];
+let zipChart = null;
+
+// ---------- AUTH ----------
+async function checkSession(){
+  const { data:{ session } } = await sb.auth.getSession();
+  if(session){ showApp(); } else { showLogin(); }
+}
+function showLogin(){
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('main-app').style.display='none';
+}
+function showApp(){
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('main-app').style.display='block';
+  loadEvents();
+}
+async function doLogin(){
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  errEl.textContent = '';
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if(error){ errEl.textContent = error.message; return; }
+  showApp();
+}
+async function doLogout(){
+  await sb.auth.signOut();
+  showLogin();
+}
+
+// ---------- TABS ----------
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  if(name==='funnel') loadFunnel();
+  if(name==='expenses') loadExpenses();
+  if(name==='dashboard') loadDashboard();
+}
+
+// ---------- EVENTS ----------
+async function loadEvents(){
+  const { data, error } = await sb.from('seminar_event_summary').select('*').order('event_date', { ascending:false });
+  if(error){ console.error(error); return; }
+  currentEvents = data || [];
+  renderEventsTable();
+  populateEventSelects();
+}
+function renderEventsTable(){
+  const tbody = document.getElementById('events-table');
+  if(!currentEvents.length){ tbody.innerHTML = '<tr><td colspan="9" class="empty">No events yet — add your first one above.</td></tr>'; return; }
+  tbody.innerHTML = currentEvents.map(e => `
+    <tr>
+      <td><strong>${esc(e.name)}</strong></td>
+      <td>${fmtDate(e.event_date)}</td>
+      <td>${esc(e.market||'')}</td>
+      <td>${esc(e.venue_zip||'')}</td>
+      <td>${e.total_invited}</td>
+      <td>${e.rsvps}</td>
+      <td>${e.attendees}</td>
+      <td>${fmtMoney(e.total_revenue)}</td>
+      <td><button class="btn-ghost btn btn-small" onclick="deleteEvent('${e.event_id}')">Delete</button></td>
+    </tr>
+  `).join('');
+}
+function populateEventSelects(){
+  const opts = currentEvents.map(e => `<option value="${e.event_id}">${esc(e.name)} — ${fmtDate(e.event_date)}</option>`).join('');
+  ['funnel-event-select','exp-event-select'].forEach(id=>{
+    const sel = document.getElementById(id);
+    const prev = sel.value;
+    sel.innerHTML = opts || '<option value="">No events yet</option>';
+    if(prev) sel.value = prev;
+  });
+}
+async function addEvent(){
+  const payload = {
+    name: document.getElementById('ev-name').value.trim(),
+    event_date: document.getElementById('ev-date').value || null,
+    market: document.getElementById('ev-market').value.trim(),
+    venue: document.getElementById('ev-venue').value.trim(),
+    city: document.getElementById('ev-city').value.trim(),
+    state: document.getElementById('ev-state').value.trim(),
+    zip: document.getElementById('ev-zip').value.trim(),
+  };
+  if(!payload.name || !payload.event_date){ alert('Event name and date are required.'); return; }
+  const { error } = await sb.from('seminar_events').insert(payload);
+  if(error){ alert(error.message); return; }
+  ['ev-name','ev-date','ev-market','ev-venue','ev-city','ev-state','ev-zip'].forEach(id=>document.getElementById(id).value='');
+  loadEvents();
+}
+async function deleteEvent(id){
+  if(!confirm('Delete this event and all its household/expense data?')) return;
+  await sb.from('seminar_events').delete().eq('id', id);
+  loadEvents();
+}
+
+// ---------- FUNNEL ----------
+function openHouseholdForm(){ document.getElementById('household-form').style.display='block'; document.getElementById('bulk-import-form').style.display='none'; }
+function closeHouseholdForm(){ document.getElementById('household-form').style.display='none'; }
+function openBulkImport(){ document.getElementById('bulk-import-form').style.display='block'; document.getElementById('household-form').style.display='none'; }
+function closeBulkImport(){ document.getElementById('bulk-import-form').style.display='none'; document.getElementById('bulk-csv').value=''; document.getElementById('bulk-import-status').textContent=''; }
+
+async function submitBulkImport(){
+  const eventId = document.getElementById('funnel-event-select').value;
+  if(!eventId){ alert('Select an event first.'); return; }
+  const raw = document.getElementById('bulk-csv').value.trim();
+  if(!raw){ return; }
+  const lines = raw.split('\n').map(l=>l.trim()).filter(l=>l);
+  const rows = lines.map(line => {
+    const parts = line.split(',').map(p=>p.trim());
+    return {
+      event_id: eventId,
+      household_name: parts[0] || '',
+      phone: parts[1] || '',
+      email: parts[2] || '',
+      home_zip: parts[3] || '',
+      invite_source: parts[4] || '',
+    };
+  }).filter(r => r.household_name);
+  if(!rows.length){ document.getElementById('bulk-import-status').textContent = 'No valid rows found.'; return; }
+  const statusEl = document.getElementById('bulk-import-status');
+  statusEl.textContent = `Importing ${rows.length} households...`;
+  const { error } = await sb.from('seminar_households').insert(rows);
+  if(error){ statusEl.textContent = 'Error: ' + error.message; return; }
+  statusEl.textContent = `Imported ${rows.length} households.`;
+  loadFunnel();
+  loadEvents();
+  setTimeout(closeBulkImport, 1200);
+}
+
+async function loadFunnel(){
+  const eventId = document.getElementById('funnel-event-select').value;
+  if(!eventId){ document.getElementById('funnel-table').innerHTML='<tr><td class="empty">Add an event first.</td></tr>'; document.getElementById('funnel-stats').innerHTML=''; return; }
+  const { data, error } = await sb.from('seminar_households').select('*').eq('event_id', eventId).order('household_name');
+  if(error){ console.error(error); return; }
+  renderFunnelStats(data||[]);
+  renderFunnelTable(data||[], eventId);
+}
+function renderFunnelStats(rows){
+  const invited = rows.length;
+  const rsvps = rows.filter(r=>r.rsvp_status==='yes').length;
+  const attendees = rows.filter(r=>r.attended).reduce((s,r)=>s+(r.attendee_count||0),0);
+  const reviews = rows.filter(r=>r.structure_review_held).length;
+  const clients = rows.filter(r=>r.became_client).length;
+  const revenue = rows.reduce((s,r)=>s+(parseFloat(r.revenue_amount)||0),0);
+  document.getElementById('funnel-stats').innerHTML = `
+    <div class="stat"><div class="num">${invited}</div><div class="lbl">Invited</div></div>
+    <div class="stat"><div class="num">${rsvps}</div><div class="lbl">RSVPs</div></div>
+    <div class="stat gold"><div class="num">${attendees}</div><div class="lbl">Attendees</div></div>
+    <div class="stat"><div class="num">${reviews}</div><div class="lbl">Reviews Held</div></div>
+    <div class="stat good"><div class="num">${clients}</div><div class="lbl">Clients Won</div></div>
+    <div class="stat good"><div class="num">${fmtMoney(revenue)}</div><div class="lbl">Revenue</div></div>
+  `;
+}
+function renderFunnelTable(rows, eventId){
+  const tbody = document.getElementById('funnel-table');
+  if(!rows.length){ tbody.innerHTML = '<tr><td colspan="13" class="empty">No households added yet.</td></tr>'; return; }
+  tbody.innerHTML = rows.map(r => `
+    <tr data-id="${r.id}">
+      <td><strong>${esc(r.household_name)}</strong><br><span class="muted">${esc(r.phone||'')}</span></td>
+      <td><input type="text" value="${esc(r.home_zip||'')}" onchange="updateHousehold('${r.id}','home_zip',this.value)"></td>
+      <td><input type="text" value="${esc(r.invite_source||'')}" onchange="updateHousehold('${r.id}','invite_source',this.value)"></td>
+      <td>
+        <select onchange="updateHousehold('${r.id}','rsvp_status',this.value)">
+          <option value="pending" ${r.rsvp_status==='pending'?'selected':''}>Pending</option>
+          <option value="yes" ${r.rsvp_status==='yes'?'selected':''}>Yes</option>
+          <option value="no" ${r.rsvp_status==='no'?'selected':''}>No</option>
+        </select>
+      </td>
+      <td><input type="number" style="width:55px" value="${r.party_size||1}" onchange="updateHousehold('${r.id}','party_size',parseInt(this.value)||0)"></td>
+      <td style="text-align:center"><input type="checkbox" ${r.confirmation_call_done?'checked':''} onchange="updateHousehold('${r.id}','confirmation_call_done',this.checked)"></td>
+      <td style="text-align:center"><input type="checkbox" ${r.attended?'checked':''} onchange="updateHousehold('${r.id}','attended',this.checked)"></td>
+      <td><input type="number" style="width:55px" value="${r.attendee_count||0}" onchange="updateHousehold('${r.id}','attendee_count',parseInt(this.value)||0)"></td>
+      <td style="text-align:center"><input type="checkbox" ${r.structure_review_booked?'checked':''} onchange="updateHousehold('${r.id}','structure_review_booked',this.checked)"></td>
+      <td style="text-align:center"><input type="checkbox" ${r.structure_review_held?'checked':''} onchange="updateHousehold('${r.id}','structure_review_held',this.checked)"></td>
+      <td style="text-align:center"><input type="checkbox" ${r.became_client?'checked':''} onchange="updateHousehold('${r.id}','became_client',this.checked)"></td>
+      <td><input type="number" class="rev-input" step="0.01" value="${r.revenue_amount||0}" onchange="updateHousehold('${r.id}','revenue_amount',parseFloat(this.value)||0)"></td>
+      <td><input type="text" value="${esc(r.notes||'')}" onchange="updateHousehold('${r.id}','notes',this.value)" style="min-width:120px"></td>
+    </tr>
+  `).join('');
+}
+async function addHousehold(){
+  const eventId = document.getElementById('funnel-event-select').value;
+  if(!eventId){ alert('Select an event first.'); return; }
+  const payload = {
+    event_id: eventId,
+    household_name: document.getElementById('hh-name').value.trim(),
+    phone: document.getElementById('hh-phone').value.trim(),
+    email: document.getElementById('hh-email').value.trim(),
+    home_zip: document.getElementById('hh-zip').value.trim(),
+    invite_source: document.getElementById('hh-source').value.trim(),
+  };
+  if(!payload.household_name){ alert('Household name is required.'); return; }
+  const { error } = await sb.from('seminar_households').insert(payload);
+  if(error){ alert(error.message); return; }
+  ['hh-name','hh-phone','hh-email','hh-zip','hh-source'].forEach(id=>document.getElementById(id).value='');
+  closeHouseholdForm();
+  loadFunnel();
+  loadEvents();
+}
+async function updateHousehold(id, field, value){
+  const payload = { [field]: value, updated_at: new Date().toISOString() };
+  const { error } = await sb.from('seminar_households').update(payload).eq('id', id);
+  if(error){ alert(error.message); return; }
+  loadFunnel();
+  loadEvents();
+}
+
+// ---------- EXPENSES ----------
+async function loadExpenses(){
+  const eventId = document.getElementById('exp-event-select').value;
+  if(!eventId){ document.getElementById('expenses-table').innerHTML='<tr><td class="empty">Add an event first.</td></tr>'; document.getElementById('expenses-total').textContent=''; return; }
+  const { data, error } = await sb.from('seminar_expenses').select('*').eq('event_id', eventId).order('expense_date');
+  if(error){ console.error(error); return; }
+  renderExpensesTable(data||[]);
+}
+function renderExpensesTable(rows){
+  const tbody = document.getElementById('expenses-table');
+  if(!rows.length){ tbody.innerHTML = '<tr><td colspan="5" class="empty">No expenses logged yet.</td></tr>'; document.getElementById('expenses-total').textContent=''; return; }
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td>${esc(r.category)}</td>
+      <td>${esc(r.description||'')}</td>
+      <td>${fmtMoney(r.amount)}</td>
+      <td>${fmtDate(r.expense_date)}</td>
+      <td><button class="btn-ghost btn btn-small" onclick="deleteExpense('${r.id}')">Delete</button></td>
+    </tr>
+  `).join('');
+  const total = rows.reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
+  document.getElementById('expenses-total').textContent = 'Total Expenses: ' + fmtMoney(total);
+}
+async function addExpense(){
+  const eventId = document.getElementById('exp-event-select').value;
+  if(!eventId){ alert('Select an event first.'); return; }
+  const payload = {
+    event_id: eventId,
+    category: document.getElementById('exp-category').value,
+    description: document.getElementById('exp-desc').value.trim(),
+    amount: parseFloat(document.getElementById('exp-amount').value)||0,
+    expense_date: document.getElementById('exp-date').value || null,
+  };
+  const { error } = await sb.from('seminar_expenses').insert(payload);
+  if(error){ alert(error.message); return; }
+  ['exp-desc','exp-amount','exp-date'].forEach(id=>document.getElementById(id).value='');
+  loadExpenses();
+  loadEvents();
+}
+async function deleteExpense(id){
+  await sb.from('seminar_expenses').delete().eq('id', id);
+  loadExpenses();
+}
+
+// ---------- DASHBOARD ----------
+async function loadDashboard(){
+  await loadEvents();
+  const totalInvited = currentEvents.reduce((s,e)=>s+(e.total_invited||0),0);
+  const totalRsvps = currentEvents.reduce((s,e)=>s+(e.rsvps||0),0);
+  const totalAttendees = currentEvents.reduce((s,e)=>s+(e.attendees||0),0);
+  const totalClients = currentEvents.reduce((s,e)=>s+(e.clients_won||0),0);
+  const totalRevenue = currentEvents.reduce((s,e)=>s+(parseFloat(e.total_revenue)||0),0);
+  const totalExpenses = currentEvents.reduce((s,e)=>s+(parseFloat(e.total_expenses)||0),0);
+
+  document.getElementById('overall-stats').innerHTML = `
+    <div class="stat"><div class="num">${currentEvents.length}</div><div class="lbl">Events</div></div>
+    <div class="stat"><div class="num">${totalInvited}</div><div class="lbl">Total Invited</div></div>
+    <div class="stat"><div class="num">${totalAttendees}</div><div class="lbl">Total Attendees</div></div>
+    <div class="stat good"><div class="num">${totalClients}</div><div class="lbl">Clients Won</div></div>
+    <div class="stat good"><div class="num">${fmtMoney(totalRevenue)}</div><div class="lbl">Total Revenue</div></div>
+    <div class="stat"><div class="num">${fmtMoney(totalExpenses)}</div><div class="lbl">Total Expenses</div></div>
+  `;
+
+  const { data: zipData, error } = await sb.from('seminar_zip_performance').select('*').order('total_revenue', { ascending:false });
+  if(error){ console.error(error); return; }
+  renderZipTable(zipData||[]);
+  renderZipChart(zipData||[]);
+}
+function renderZipTable(rows){
+  const tbody = document.getElementById('zip-table');
+  if(!rows.length){ tbody.innerHTML = '<tr><td colspan="7" class="empty">No zip-level data yet — enter home zips on the Funnel tab.</td></tr>'; return; }
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td><strong>${esc(r.home_zip)}</strong></td>
+      <td>${r.households_invited}</td>
+      <td>${r.rsvps}</td>
+      <td>${r.attendees}</td>
+      <td>${r.clients_won}</td>
+      <td class="zip-rev">${fmtMoney(r.total_revenue)}</td>
+      <td>${fmtMoney(r.revenue_per_attendee)}</td>
+    </tr>
+  `).join('');
+}
+function renderZipChart(rows){
+  const top = rows.slice(0,10);
+  const ctx = document.getElementById('zip-chart').getContext('2d');
+  if(zipChart) zipChart.destroy();
+  zipChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: top.map(r=>r.home_zip),
+      datasets: [{
+        label: 'Revenue',
+        data: top.map(r=>r.total_revenue),
+        backgroundColor: '#C9A24B',
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display:false } },
+      scales: {
+        y: { beginAtZero:true, ticks: { callback: v => '$'+v.toLocaleString() } }
+      }
+    }
+  });
+}
+
+// ---------- HELPERS ----------
+function esc(s){ return (s===null||s===undefined) ? '' : String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtMoney(n){ n = parseFloat(n)||0; return '$' + n.toLocaleString(undefined, {maximumFractionDigits:0}); }
+function fmtDate(d){ if(!d) return ''; const dt = new Date(d+'T00:00:00'); return dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+
+checkSession();
+</script>
+</body>
+</html>
