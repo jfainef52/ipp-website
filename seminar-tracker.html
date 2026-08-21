@@ -38,7 +38,7 @@
     padding:7px 14px; border-radius:6px; font-size:13px; cursor:pointer;
   }
   header button:hover{border-color:var(--gold);}
-  #app{max-width:1180px; margin:0 auto; padding:20px 20px 60px;}
+  #app{max-width:1580px; margin:0 auto; padding:20px 24px 60px;}
 
   /* Login */
   #login-screen{
@@ -142,11 +142,18 @@
 
 <div id="login-screen">
   <div class="login-card">
-    <h2>Seminar Tracker</h2>
-    <p>Integrated Planning Partners — sign in</p>
-    <input type="email" id="login-email" placeholder="Email">
-    <input type="password" id="login-password" placeholder="Password">
-    <button onclick="doLogin()">Sign In</button>
+    <h2 id="login-title">Seminar Tracker</h2>
+    <p id="login-subtitle">Integrated Planning Partners — sign in</p>
+    <div id="login-fields">
+      <input type="email" id="login-email" placeholder="Email">
+      <input type="password" id="login-password" placeholder="Password">
+      <button onclick="doLogin()">Sign In</button>
+    </div>
+    <div id="set-password-fields" style="display:none;">
+      <input type="password" id="new-password" placeholder="New password">
+      <input type="password" id="new-password-confirm" placeholder="Confirm password">
+      <button onclick="doSetPassword()">Set Password &amp; Continue</button>
+    </div>
     <div class="login-error" id="login-error"></div>
   </div>
 </div>
@@ -236,8 +243,8 @@
         <table>
           <thead><tr>
             <th>Household</th><th>Zip</th><th>Source</th><th>RSVP</th><th>Party</th>
-            <th>Call Done</th><th>Attended</th><th># Heads</th>
-            <th>SR Booked</th><th>SR Held</th><th>Client</th><th>Revenue</th><th>Notes</th>
+            <th>1st Call</th><th>2nd Call</th><th>Attended</th><th># Heads</th>
+            <th>SR Booked</th><th>SR Held</th><th>Client</th><th>Revenue</th><th>Notes</th><th></th>
           </tr></thead>
           <tbody id="funnel-table"></tbody>
         </table>
@@ -308,12 +315,52 @@ let zipChart = null;
 
 // ---------- AUTH ----------
 async function checkSession(){
+  // Handle invite / recovery links: Supabase puts the tokens in the URL hash
+  // e.g. #access_token=...&type=invite  or  type=recovery
+  const hash = window.location.hash;
+  if(hash && hash.includes('access_token')){
+    const params = new URLSearchParams(hash.substring(1));
+    const access_token = params.get('access_token');
+    const refresh_token = params.get('refresh_token');
+    const type = params.get('type');
+    if(access_token && (type === 'invite' || type === 'recovery')){
+      const { error } = await sb.auth.setSession({ access_token, refresh_token });
+      if(!error){
+        showSetPasswordScreen();
+        return;
+      }
+    }
+  }
   const { data:{ session } } = await sb.auth.getSession();
   if(session){ showApp(); } else { showLogin(); }
+}
+function showSetPasswordScreen(){
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('main-app').style.display='none';
+  document.getElementById('login-title').textContent = 'Set Your Password';
+  document.getElementById('login-subtitle').textContent = 'Choose a password to finish setting up your account';
+  document.getElementById('login-fields').style.display='none';
+  document.getElementById('set-password-fields').style.display='block';
+}
+async function doSetPassword(){
+  const pw = document.getElementById('new-password').value;
+  const pw2 = document.getElementById('new-password-confirm').value;
+  const errEl = document.getElementById('login-error');
+  errEl.textContent = '';
+  if(pw.length < 8){ errEl.textContent = 'Password must be at least 8 characters.'; return; }
+  if(pw !== pw2){ errEl.textContent = 'Passwords do not match.'; return; }
+  const { error } = await sb.auth.updateUser({ password: pw });
+  if(error){ errEl.textContent = error.message; return; }
+  window.location.hash = '';
+  showApp();
 }
 function showLogin(){
   document.getElementById('login-screen').style.display='flex';
   document.getElementById('main-app').style.display='none';
+  document.getElementById('login-fields').style.display='block';
+  document.getElementById('set-password-fields').style.display='none';
+  document.getElementById('login-title').textContent = 'Seminar Tracker';
+  document.getElementById('login-subtitle').textContent = 'Integrated Planning Partners — sign in';
 }
 function showApp(){
   document.getElementById('login-screen').style.display='none';
@@ -460,10 +507,13 @@ function renderFunnelStats(rows){
 }
 function renderFunnelTable(rows, eventId){
   const tbody = document.getElementById('funnel-table');
-  if(!rows.length){ tbody.innerHTML = '<tr><td colspan="13" class="empty">No households added yet.</td></tr>'; return; }
+  if(!rows.length){ tbody.innerHTML = '<tr><td colspan="15" class="empty">No households added yet.</td></tr>'; return; }
   tbody.innerHTML = rows.map(r => `
     <tr data-id="${r.id}">
-      <td><strong>${esc(r.household_name)}</strong><br><span class="muted">${esc(r.phone||'')}</span></td>
+      <td>
+        <input type="text" value="${esc(r.household_name)}" onchange="updateHousehold('${r.id}','household_name',this.value)" style="min-width:130px; font-weight:600;">
+        <input type="text" value="${esc(r.phone||'')}" placeholder="Phone" onchange="updateHousehold('${r.id}','phone',this.value)" style="min-width:110px; margin-top:4px;">
+      </td>
       <td><input type="text" value="${esc(r.home_zip||'')}" onchange="updateHousehold('${r.id}','home_zip',this.value)"></td>
       <td><input type="text" value="${esc(r.invite_source||'')}" onchange="updateHousehold('${r.id}','invite_source',this.value)"></td>
       <td>
@@ -474,7 +524,22 @@ function renderFunnelTable(rows, eventId){
         </select>
       </td>
       <td><input type="number" style="width:55px" value="${r.party_size||1}" onchange="updateHousehold('${r.id}','party_size',parseInt(this.value)||0)"></td>
-      <td style="text-align:center"><input type="checkbox" ${r.confirmation_call_done?'checked':''} onchange="updateHousehold('${r.id}','confirmation_call_done',this.checked)"></td>
+      <td>
+        <select onchange="updateHousehold('${r.id}','first_call_status',this.value)">
+          <option value="" ${!r.first_call_status?'selected':''}>—</option>
+          <option value="Confirmed" ${r.first_call_status==='Confirmed'?'selected':''}>Confirmed</option>
+          <option value="Cancelled" ${r.first_call_status==='Cancelled'?'selected':''}>Cancelled</option>
+          <option value="No Answer" ${r.first_call_status==='No Answer'?'selected':''}>No Answer</option>
+        </select>
+      </td>
+      <td>
+        <select onchange="updateHousehold('${r.id}','second_call_status',this.value)">
+          <option value="" ${!r.second_call_status?'selected':''}>—</option>
+          <option value="Reconfirmed" ${r.second_call_status==='Reconfirmed'?'selected':''}>Reconfirmed</option>
+          <option value="Cancelled" ${r.second_call_status==='Cancelled'?'selected':''}>Cancelled</option>
+          <option value="No Answer" ${r.second_call_status==='No Answer'?'selected':''}>No Answer</option>
+        </select>
+      </td>
       <td style="text-align:center"><input type="checkbox" ${r.attended?'checked':''} onchange="updateHousehold('${r.id}','attended',this.checked)"></td>
       <td><input type="number" style="width:55px" value="${r.attendee_count||0}" onchange="updateHousehold('${r.id}','attendee_count',parseInt(this.value)||0)"></td>
       <td style="text-align:center"><input type="checkbox" ${r.structure_review_booked?'checked':''} onchange="updateHousehold('${r.id}','structure_review_booked',this.checked)"></td>
@@ -482,8 +547,16 @@ function renderFunnelTable(rows, eventId){
       <td style="text-align:center"><input type="checkbox" ${r.became_client?'checked':''} onchange="updateHousehold('${r.id}','became_client',this.checked)"></td>
       <td><input type="number" class="rev-input" step="0.01" value="${r.revenue_amount||0}" onchange="updateHousehold('${r.id}','revenue_amount',parseFloat(this.value)||0)"></td>
       <td><input type="text" value="${esc(r.notes||'')}" onchange="updateHousehold('${r.id}','notes',this.value)" style="min-width:120px"></td>
+      <td><button class="btn-ghost btn btn-small" onclick="deleteHousehold('${r.id}','${esc(r.household_name).replace(/'/g,"\\'")}')">Delete</button></td>
     </tr>
   `).join('');
+}
+async function deleteHousehold(id, name){
+  if(!confirm(`Delete "${name}" from this event? This can't be undone.`)) return;
+  const { error } = await sb.from('seminar_households').delete().eq('id', id);
+  if(error){ alert(error.message); return; }
+  loadFunnel();
+  loadEvents();
 }
 async function addHousehold(){
   const eventId = document.getElementById('funnel-event-select').value;
