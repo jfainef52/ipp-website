@@ -4450,7 +4450,7 @@ function App() {
           <div style="flex:1; background:white; border:1pt solid #DDD; border-top:2.5pt solid #5B8FA8; border-radius:0 3pt 3pt 0; padding:5pt 8pt;">
             <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2pt;">
               <div style="font-size:8pt; font-weight:800; color:#1A2B3C;">Living Benefits IUL — ${clientLabel}</div>
-              <div style="font-size:7pt; font-weight:700; color:#5B8FA8;">Chronic Care · Tax-Free Income · Tax-Free Benefit Pool</div>
+              <div style="font-size:7pt; font-weight:700; color:#5B8FA8;">Chronic Care · Tax-Free Income<br>Tax-Free Death Benefit</div>
             </div>
             <div style="font-size:6.5pt; color:#445566; line-height:1.5;">QP gross draws fund total net premium of ${l2TotalNetP > 0 ? fmtD(l2TotalNetP) : '[net premium]'}${l2YearsP > 1 ? ' ('+fmtD(inputs.ltcNetAmount)+'/yr &times; '+l2YearsP+' yrs, starting age '+inputs.ltcFundingAge+')' : ''}${inputs.ltcDeathBenefit > 0 ? ' &middot; '+fmtD(inputs.ltcDeathBenefit)+' initial death benefit' : ''}. Chronic illness benefit accelerates tax-free — portfolio never touched during a care event. Death benefit preserved if care never needed.</div>
           </div>
@@ -4472,7 +4472,7 @@ function App() {
           <div style="flex:1; background:white; border:1pt solid #DDD; border-top:2.5pt solid #5B8FA8; border-radius:0 3pt 3pt 0; padding:5pt 8pt; opacity:0.9;">
             <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2pt;">
               <div style="font-size:8pt; font-weight:800; color:#1A2B3C;">Living Benefits IUL — ${clientInfo.spouseName || 'Spouse'}</div>
-              <div style="font-size:7pt; font-weight:700; color:#5B8FA8;">Chronic Care · Tax-Free Income · Tax-Free Benefit Pool</div>
+              <div style="font-size:7pt; font-weight:700; color:#5B8FA8;">Chronic Care · Tax-Free Income<br>Tax-Free Death Benefit</div>
             </div>
             <div style="font-size:6.5pt; color:#445566; line-height:1.5;">Mirrors primary Layer 2 structure. Separate policy — both partners fully protected. QP gross draws starting age ${inputs.spouseLtcFundingAge || inputs.ltcFundingAge || 60} fund total net premium of ${l2TotalNetS > 0 ? fmtD(l2TotalNetS) : '[spouse net premium]'}${l2YearsS > 1 ? ' ('+fmtD(inputs.spouseLtcNetAmount)+'/yr &times; '+l2YearsS+' yrs)' : ''}${inputs.spouseLtcDeathBenefit > 0 ? ' &middot; '+fmtD(inputs.spouseLtcDeathBenefit)+' initial death benefit' : ''}.</div>
           </div>
@@ -5364,7 +5364,7 @@ function App() {
           <div style="flex:1; background:white; border:1pt solid #DDD; border-top:2.5pt solid #5B8FA8; border-radius:0 3pt 3pt 0; padding:5pt 8pt;">
             <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2pt;">
               <div style="font-size:8pt; font-weight:800; color:#1A2B3C;">Living Benefits IUL — ${clientLabel}</div>
-              <div style="font-size:7pt; font-weight:700; color:#5B8FA8;">Chronic Care · Tax-Free Income · Tax-Free Benefit Pool</div>
+              <div style="font-size:7pt; font-weight:700; color:#5B8FA8;">Chronic Care · Tax-Free Income<br>Tax-Free Death Benefit</div>
             </div>
             <div style="font-size:6.5pt; color:#445566; line-height:1.5;">QP gross draws fund total net premium of ${l2TotalNetP > 0 ? fmtD(l2TotalNetP) : '[net premium]'}${l2YearsP > 1 ? ' ('+fmtD(inputs.ltcNetAmount)+'/yr &times; '+l2YearsP+' yrs, starting age '+inputs.ltcFundingAge+')' : ''}${inputs.ltcDeathBenefit > 0 ? ' &middot; '+fmtD(inputs.ltcDeathBenefit)+' initial death benefit' : ''}.</div>
           </div>
@@ -5385,7 +5385,7 @@ function App() {
           <div style="flex:1; background:white; border:1pt solid #DDD; border-top:2.5pt solid #5B8FA8; border-radius:0 3pt 3pt 0; padding:5pt 8pt; opacity:0.9;">
             <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2pt;">
               <div style="font-size:8pt; font-weight:800; color:#1A2B3C;">Living Benefits IUL — ${clientInfo.spouseName || 'Spouse'}</div>
-              <div style="font-size:7pt; font-weight:700; color:#5B8FA8;">Chronic Care · Tax-Free Income · Tax-Free Benefit Pool</div>
+              <div style="font-size:7pt; font-weight:700; color:#5B8FA8;">Chronic Care · Tax-Free Income<br>Tax-Free Death Benefit</div>
             </div>
             <div style="font-size:6.5pt; color:#445566; line-height:1.5;">Mirrors primary Layer 2 structure. QP gross draws starting age ${inputs.spouseLtcFundingAge || inputs.ltcFundingAge || 60} fund total net premium of ${l2TotalNetS > 0 ? fmtD(l2TotalNetS) : '[spouse net premium]'}${l2YearsS > 1 ? ' ('+fmtD(inputs.spouseLtcNetAmount)+'/yr &times; '+l2YearsS+' yrs)' : ''}${inputs.spouseLtcDeathBenefit > 0 ? ' &middot; '+fmtD(inputs.spouseLtcDeathBenefit)+' initial death benefit' : ''}.</div>
           </div>
