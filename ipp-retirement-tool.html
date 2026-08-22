@@ -56,9 +56,9 @@ window.openScenarioSummary = function(inputs, clientInfo) {
   var prPct = Math.round(pr*100)+'%';
   var l1a=inputs.rothConversionAmount||0, l1f=Math.min(inputs.rothConversionFinanced||0,l1a);
   var l1t=l1a*pr, l1i=Math.max(0,l1t-l1f), l1tot=l1a+l1i;
-  var l2e=(inputs.ltcFundingAge||0)<59.5?.10:0, l2n=inputs.ltcNetAmount||0;
+  var l2e=(inputs.ltcFundingAge||0)<59.5?.10:0, l2n=(inputs.ltcNetAmount||0)*Math.max(1,Math.round(inputs.ltcFundingYears||1));
   var l2g=l2n>0?l2n/Math.max(.01,1-pr-l2e):0, l2t=l2g*pr, l2p=l2g*l2e;
-  var l2se=(inputs.spouseLtcFundingAge||0)<59.5?.10:0, l2sn=inputs.spouseLtcNetAmount||0;
+  var l2se=(inputs.spouseLtcFundingAge||0)<59.5?.10:0, l2sn=(inputs.spouseLtcNetAmount||0)*Math.max(1,Math.round(inputs.spouseLtcFundingYears||1));
   var l2sg=l2sn>0?l2sn/Math.max(.01,1-pr-l2se):0, l2st=l2sg*pr, l2sp=l2sg*l2se;
   var cr=(inputs.ltcCareInflationRate||4)/100, ret=inputs.retireAge||65;
   var ltcInfl=hasLtc?Math.round(inputs.ltcMonthlyCost*Math.pow(1+cr,inputs.ltcEventAge-ret)):0;
@@ -242,11 +242,12 @@ window.openScenarioSummary = function(inputs, clientInfo) {
         +row('ETA COLA Rate',(inputs.etaColaRate||0)+'%')
       ))
     + ifv(arch, card('red','Architecture — L2 · LTC &amp; Legacy',
-        row('Primary LTC Net Amount',fmtK(inputs.ltcNetAmount),'red')
-        +row('Primary Funding Age',inputs.ltcFundingAge)
+        row('Primary Net Premium (Annual)',fmtK(inputs.ltcNetAmount),'red')
+        +row('Primary Funding Age / Years',inputs.ltcFundingAge+' for '+Math.max(1,Math.round(inputs.ltcFundingYears||1))+' yr'+(Math.max(1,Math.round(inputs.ltcFundingYears||1))>1?'s':''))
+        +row('Primary Total Net Premium',fmtK(l2n),'red')
         +ifv(inputs.ltcDeathBenefit>0,row('Primary Death Benefit',fmtK(inputs.ltcDeathBenefit),'green'))
-        +ifv(l2g>0,row('Gross IRA Draw (primary)',fmt$(Math.round(l2g)),'red')+row('Tax on Draw',fmt$(Math.round(l2t)),'red')+ifv(l2p>0,row('Early Withdrawal Penalty',fmt$(Math.round(l2p)),'amber')))
-        +ifv(isMarried,'<div style="height:4px"></div>'+row('Spouse LTC Net Amount',fmtK(inputs.spouseLtcNetAmount||0),'red')+row('Spouse Funding Age',inputs.spouseLtcFundingAge||'—')+ifv(inputs.spouseLtcDeathBenefit>0,row('Spouse Death Benefit',fmtK(inputs.spouseLtcDeathBenefit),'green'))+ifv(l2sg>0,row('Gross IRA Draw (spouse)',fmt$(Math.round(l2sg)),'red')+row('Tax on Draw',fmt$(Math.round(l2st)),'red')+ifv(l2sp>0,row('Spouse Early Penalty',fmt$(Math.round(l2sp)),'amber'))))
+        +ifv(l2g>0,row('Gross IRA Draw (primary, total)',fmt$(Math.round(l2g)),'red')+row('Tax on Draw',fmt$(Math.round(l2t)),'red')+ifv(l2p>0,row('Early Withdrawal Penalty',fmt$(Math.round(l2p)),'amber')))
+        +ifv(isMarried,'<div style="height:4px"></div>'+row('Spouse Net Premium (Annual)',fmtK(inputs.spouseLtcNetAmount||0),'red')+row('Spouse Funding Age / Years',(inputs.spouseLtcFundingAge||'—')+' for '+Math.max(1,Math.round(inputs.spouseLtcFundingYears||1))+' yr'+(Math.max(1,Math.round(inputs.spouseLtcFundingYears||1))>1?'s':''))+row('Spouse Total Net Premium',fmtK(l2sn),'red')+ifv(inputs.spouseLtcDeathBenefit>0,row('Spouse Death Benefit',fmtK(inputs.spouseLtcDeathBenefit),'green'))+ifv(l2sg>0,row('Gross IRA Draw (spouse, total)',fmt$(Math.round(l2sg)),'red')+row('Tax on Draw',fmt$(Math.round(l2st)),'red')+ifv(l2sp>0,row('Spouse Early Penalty',fmt$(Math.round(l2sp)),'amber'))))
         +ifv(l2g>0||l2sg>0,totRow('Total Gross IRA Required',fmt$(Math.round(l2g+l2sg))))
         +ifv((inputs.ltcDeathBenefit>0)||(inputs.spouseLtcDeathBenefit>0),totRow('Combined Initial Death Benefit',fmtK((inputs.ltcDeathBenefit||0)+(inputs.spouseLtcDeathBenefit||0))))
       ))
@@ -837,8 +838,8 @@ function projectArc(inputs) {
     ltcCareInflationRate = 0.04,
     spouseLtcEventAge = 0, spouseLtcMonthlyCost = 0, spouseLtcDuration = 3,
     spouseLtcMonthlyBenefit = 0, spouseLtcBenefitDuration = 3, spouseLtcInsured = false,
-    ltcNetAmount = 0, ltcFundingAge = 0,
-    spouseLtcNetAmount = 0, spouseLtcFundingAge = 0,
+    ltcNetAmount = 0, ltcFundingAge = 0, ltcFundingYears = 1,
+    spouseLtcNetAmount = 0, spouseLtcFundingAge = 0, spouseLtcFundingYears = 1,
     portfolioReturn = 0.065,
     inflation = 0.028,
     sorrEnabled = false,
@@ -913,6 +914,8 @@ function projectArc(inputs) {
   let spouseTrad = (filingStatus === 'mfj') ? (spouseTraditionalBalance || 0) : 0;
 
   // Pre-retirement marginal rate — from householdIncome. Falls back to 0.24 if not set.
+  // Still used as a fallback/estimate elsewhere; the LTC/L2 funding draws below now use
+  // the bracket-aware grossUpIterative helper instead of this flat rate.
   const preRetMarginalRate = (() => {
     if (!householdIncome || householdIncome <= 0) return 0.24;
     const mfj = filingStatus === 'mfj';
@@ -922,6 +925,51 @@ function projectArc(inputs) {
     const taxable = Math.max(0, householdIncome - (mfj ? 29200 : 14600));
     return (br.find(b => taxable <= b.l) || br[br.length-1]).r;
   })();
+
+  // Iterative bracket-aware gross-up helper — hoisted above BOTH the pre-retirement
+  // and retirement loops since LTC/L2 funding draws can now fire in either one.
+  // (Previously declared ~400 lines further down inside the retirement loop, which
+  // threw a ReferenceError — temporal dead zone on a const — every time an LTC/L2
+  // funding draw fired, silently skipping the IRA/TSP deduction for that draw and
+  // leaving the L4 remainder overstated.)
+  const grossUpIterative = (netNeeded, brackets, currentAGI) => {
+    let grossSoFar = 0, taxSoFar = 0, netSoFar = 0;
+    let position = currentAGI;
+    for (const b of brackets) {
+      if (netSoFar >= netNeeded) break;
+      if (position >= b.limit) continue;
+      const spaceGross = b.limit - position;
+      const netRate = 1 - b.rate;
+      const spaceNet = spaceGross * netRate;
+      const stillNeed = netNeeded - netSoFar;
+      if (spaceNet >= stillNeed) {
+        const grossSlice = netRate > 0 ? stillNeed / netRate : stillNeed;
+        grossSoFar += grossSlice;
+        taxSoFar += grossSlice * b.rate;
+        netSoFar = netNeeded;
+        break;
+      } else {
+        grossSoFar += spaceGross;
+        taxSoFar += spaceGross * b.rate;
+        netSoFar += spaceNet;
+        position = b.limit;
+      }
+    }
+    if (netSoFar < netNeeded) {
+      const topRate = brackets[brackets.length - 1].rate;
+      const stillNeed = netNeeded - netSoFar;
+      const grossSlice = topRate < 1 ? stillNeed / (1 - topRate) : stillNeed * 5;
+      grossSoFar += grossSlice;
+      taxSoFar += grossSlice * topRate;
+    }
+    return { grossDraw: grossSoFar, taxOnDraw: taxSoFar };
+  };
+
+  // Pre-retirement ordinary tax brackets (2025 table; not inflation-adjusted here since
+  // pre-retirement years are typically near-term). Used for LTC/L2 funding draws below.
+  const preRetBrackets = filingStatus === 'mfj' ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025;
+  const ltcFundingYearsN       = Math.max(1, Math.round(ltcFundingYears || 1));
+  const spouseLtcFundingYearsN = Math.max(1, Math.round(spouseLtcFundingYears || 1));
 
   if (currentAge < retireAge) {
     const tradStopAge    = tradContributionEndAge    > 0 ? tradContributionEndAge    : retireAge;
@@ -939,16 +987,27 @@ function projectArc(inputs) {
       if (archRothConversionAmount > 0 && rothConversionAge > 0 && a === rothConversionAge) {
         trad = Math.max(0, trad - archRothConversionAmount);
       }
-      // LTC policy funding draw — reduce trad balance (pre-retirement, approximate gross-up at 24% + penalty)
-      if (archLtcNetAmount > 0 && ltcFundingAge > 0 && a === ltcFundingAge) {
-        const preRetPenalty = ltcFundingAge < 59.5 ? 0.10 : 0;
-        const approxGross = archLtcNetAmount / Math.max(0.01, 1 - preRetMarginalRate - preRetPenalty);
-        trad = Math.max(0, trad - approxGross - (approxGross * preRetPenalty));
+      // LTC/L2 policy funding draw — ANNUAL net premium drawn each year for a specified
+      // number of years (ltcFundingYearsN), starting at ltcFundingAge. Each year's gross-up
+      // uses that year's actual current AGI and real marginal brackets (grossUpIterative),
+      // not a flat estimated rate — so spreading the premium across several smaller annual
+      // draws genuinely shows less bracket creep than one lump-sum draw, rather than just
+      // approximating it.
+      if (archLtcNetAmount > 0 && ltcFundingAge > 0 && a >= ltcFundingAge && a < ltcFundingAge + ltcFundingYearsN) {
+        const preRetPenalty = a < 59.5 ? 0.10 : 0;
+        const preRetAGI = (pensionMonthly > 0 && a >= pensionStartAge ? pensionMonthly * 12 : 0)
+          + (partTimeMonthly > 0 ? partTimeMonthly * 12 : 0);
+        const { grossDraw: ltcGrossPre } = grossUpIterative(archLtcNetAmount, preRetBrackets, preRetAGI);
+        const ltcFundPre = Math.min(ltcGrossPre, trad);
+        trad = Math.max(0, trad - ltcFundPre - (ltcFundPre * preRetPenalty));
       }
-      if (archSpouseLtcNetAmount > 0 && spouseLtcFundingAge > 0 && a === spouseLtcFundingAge) {
-        const preRetPenaltySp = spouseLtcFundingAge < 59.5 ? 0.10 : 0;
-        const approxGrossSp = archSpouseLtcNetAmount / Math.max(0.01, 1 - preRetMarginalRate - preRetPenaltySp);
-        trad = Math.max(0, trad - approxGrossSp - (approxGrossSp * preRetPenaltySp));
+      if (archSpouseLtcNetAmount > 0 && spouseLtcFundingAge > 0 && a >= spouseLtcFundingAge && a < spouseLtcFundingAge + spouseLtcFundingYearsN) {
+        const preRetPenaltySp = a < 59.5 ? 0.10 : 0;
+        const preRetAGISp = (pensionMonthly > 0 && a >= pensionStartAge ? pensionMonthly * 12 : 0)
+          + (partTimeMonthly > 0 ? partTimeMonthly * 12 : 0);
+        const { grossDraw: ltcGrossPreSp } = grossUpIterative(archSpouseLtcNetAmount, preRetBrackets, preRetAGISp);
+        const ltcFundPreSp = Math.min(ltcGrossPreSp, trad);
+        trad = Math.max(0, trad - ltcFundPreSp - (ltcFundPreSp * preRetPenaltySp));
       }
       // Grow existing balance then add contribution (end-of-year)
       trad    = trad    * (1 + portfolioReturn) + tradContrib;
@@ -986,19 +1045,36 @@ function projectArc(inputs) {
   let _mcBOY_ira = trad + roth + spouseTrad;
   const _mcBOY_taxable = taxable; // taxable account unaffected by architecture draws
   if (architectureEnabled) {
-    if (archEtaFundingAmount > 0 && etaFundingAge === retireAge)
-      _mcBOY_ira = Math.max(0, _mcBOY_ira - archEtaFundingAmount);
-    if (archRothConversionAmount > 0 && rothConversionAge === retireAge)
-      _mcBOY_ira = Math.max(0, _mcBOY_ira - archRothConversionAmount);
-    if (archLtcNetAmount > 0 && ltcFundingAge === retireAge) {
-      const _p = retireAge < 59.5 ? 0.10 : 0;
-      const _g = archLtcNetAmount / Math.max(0.01, 1 - preRetMarginalRate - _p);
-      _mcBOY_ira = Math.max(0, _mcBOY_ira - _g);
-    }
-    if (archSpouseLtcNetAmount > 0 && spouseLtcFundingAge === retireAge) {
-      const _p = retireAge < 59.5 ? 0.10 : 0;
-      const _g = archSpouseLtcNetAmount / Math.max(0.01, 1 - preRetMarginalRate - _p);
-      _mcBOY_ira = Math.max(0, _mcBOY_ira - _g);
+    // Replay every architecture funding event that lands at or after retireAge (events
+    // before retireAge were already applied to `trad` in the pre-retirement loop above).
+    // This generalizes the old single-year-only check (fundingAge === retireAge) to
+    // handle events landing on any age, and multi-year LTC/L2 funding windows, so the
+    // Monte Carlo confidence-score engine starts from the correct post-funding balance
+    // regardless of exactly which age(s) each layer funds on.
+    const lastFundingAge = Math.max(
+      retireAge,
+      (archEtaFundingAmount > 0 && etaFundingAge > 0) ? etaFundingAge : 0,
+      (archRothConversionAmount > 0 && rothConversionAge > 0) ? rothConversionAge : 0,
+      (archLtcNetAmount > 0 && ltcFundingAge > 0) ? ltcFundingAge + ltcFundingYearsN - 1 : 0,
+      (archSpouseLtcNetAmount > 0 && spouseLtcFundingAge > 0) ? spouseLtcFundingAge + spouseLtcFundingYearsN - 1 : 0
+    );
+    for (let _a = retireAge; _a <= lastFundingAge; _a++) {
+      if (archEtaFundingAmount > 0 && etaFundingAge > 0 && _a === etaFundingAge)
+        _mcBOY_ira = Math.max(0, _mcBOY_ira - archEtaFundingAmount);
+      if (archRothConversionAmount > 0 && rothConversionAge > 0 && _a === rothConversionAge)
+        _mcBOY_ira = Math.max(0, _mcBOY_ira - archRothConversionAmount);
+      if (archLtcNetAmount > 0 && ltcFundingAge > 0 && _a >= ltcFundingAge && _a < ltcFundingAge + ltcFundingYearsN) {
+        const _p = _a < 59.5 ? 0.10 : 0;
+        const _brk = filingStatus === 'mfj' ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025;
+        const { grossDraw: _g } = grossUpIterative(archLtcNetAmount, _brk, 0);
+        _mcBOY_ira = Math.max(0, _mcBOY_ira - _g - (_g * _p));
+      }
+      if (archSpouseLtcNetAmount > 0 && spouseLtcFundingAge > 0 && _a >= spouseLtcFundingAge && _a < spouseLtcFundingAge + spouseLtcFundingYearsN) {
+        const _ps = _a < 59.5 ? 0.10 : 0;
+        const _brkS = filingStatus === 'mfj' ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025;
+        const { grossDraw: _gs } = grossUpIterative(archSpouseLtcNetAmount, _brkS, 0);
+        _mcBOY_ira = Math.max(0, _mcBOY_ira - _gs - (_gs * _ps));
+      }
     }
   }
   let _mcBOY = _mcBOY_ira + _mcBOY_taxable; // total for backward compat
@@ -1045,7 +1121,7 @@ function projectArc(inputs) {
     // ── Primary LTC Policy Funding Draw ──
     // User enters NET amount needed (policy premium after tax). We gross up from IRA to net that amount.
     // Tax is NOT financed. Early withdrawal penalty (age < 59½) applied as additional IRA deduction.
-    if (archLtcNetAmount > 0 && ltcFundingAge > 0 && age === ltcFundingAge) {
+    if (archLtcNetAmount > 0 && ltcFundingAge > 0 && age >= ltcFundingAge && age < ltcFundingAge + ltcFundingYearsN) {
       // Build stressed ordinary brackets at this point in the loop
       const ordBracketsLtc = (effectiveStatus === 'mfj' ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025)
         .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
@@ -1066,7 +1142,7 @@ function projectArc(inputs) {
     }
 
     // ── Spouse LTC Policy Funding Draw ──
-    if (archSpouseLtcNetAmount > 0 && spouseLtcFundingAge > 0 && age === spouseLtcFundingAge) {
+    if (archSpouseLtcNetAmount > 0 && spouseLtcFundingAge > 0 && age >= spouseLtcFundingAge && age < spouseLtcFundingAge + spouseLtcFundingYearsN) {
       const ordBracketsSpLtc = (effectiveStatus === 'mfj' ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025)
         .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
       const currentAGISp = (row.sources.ss||0)*0.85 + (row.sources.pension||0) + (row.sources.rmd||0) + (row.sources.parttime||0) + (row.sources.annuity||0);
@@ -1397,39 +1473,6 @@ function projectArc(inputs) {
       + (row.sources.parttime||0)
       + (row.sources.annuity||0); // gain portion only (exclusion already applied)
     const baseOrdAGI = Math.max(0, ordIncomeBeforeDraw - stdDed);
-
-    const grossUpIterative = (netNeeded, brackets, currentAGI) => {
-      let grossSoFar = 0, taxSoFar = 0, netSoFar = 0;
-      let position = currentAGI;
-      for (const b of brackets) {
-        if (netSoFar >= netNeeded) break;
-        if (position >= b.limit) continue;
-        const spaceGross = b.limit - position;
-        const netRate = 1 - b.rate;
-        const spaceNet = spaceGross * netRate;
-        const stillNeed = netNeeded - netSoFar;
-        if (spaceNet >= stillNeed) {
-          const grossSlice = netRate > 0 ? stillNeed / netRate : stillNeed;
-          grossSoFar += grossSlice;
-          taxSoFar += grossSlice * b.rate;
-          netSoFar = netNeeded;
-          break;
-        } else {
-          grossSoFar += spaceGross;
-          taxSoFar += spaceGross * b.rate;
-          netSoFar += spaceNet;
-          position = b.limit;
-        }
-      }
-      if (netSoFar < netNeeded) {
-        const topRate = brackets[brackets.length - 1].rate;
-        const stillNeed = netNeeded - netSoFar;
-        const grossSlice = topRate < 1 ? stillNeed / (1 - topRate) : stillNeed * 5;
-        grossSoFar += grossSlice;
-        taxSoFar += grossSlice * topRate;
-      }
-      return { grossDraw: grossSoFar, taxOnDraw: taxSoFar };
-    };
 
     // ── Gap-fill with bracket-creep-aware gross-up ──
     // For LTC years: compute how much of the gap is specifically due to LTC cost,
@@ -2968,8 +3011,8 @@ function App() {
     etaFundingAmount: 0, etaFundingAge: 60,
     architectureEnabled: false,
     rothConversionAmount: 0, rothConversionAge: 60, rothConversionFinanced: 0,
-    ltcNetAmount: 0, ltcFundingAge: 60,
-    spouseLtcNetAmount: 0, spouseLtcFundingAge: 60,
+    ltcNetAmount: 0, ltcFundingAge: 60, ltcFundingYears: 1,
+    spouseLtcNetAmount: 0, spouseLtcFundingAge: 60, spouseLtcFundingYears: 1,
     // Initial face amount (+ APB rider) from the carrier illustration — the "effective care
     // benefit pool," distinct from net premium (which is money going in, not benefit available).
     // Static initial value only. Most FlexLife LTC-focused policies are DB Option A (level),
@@ -3680,6 +3723,21 @@ function App() {
                   const peakMargRatePct  = Math.round((peakMarginalRate||allInMarginalRate||fedMarginalRate||0) * 100);
                   const peakMargRateDisp = peakMargRatePct ? peakMargRatePct+'%' : '32%';
                   const iraBalance       = fmtD(inputs.traditionalBalance || 0);
+                  // ── L2 total premiums (annual net × funding years) and a properly
+                  // grossed-up L4 remainder for the flow-of-funds one-pager. Previously
+                  // this card subtracted only the raw annual net premium (not the gross
+                  // IRA draw, and not multiplied by funding years) from the QP balance,
+                  // which overstated L4 by roughly the tax+penalty on the full L2 draw.
+                  const l2YearsP   = Math.max(1, Math.round(inputs.ltcFundingYears || 1));
+                  const l2YearsS   = Math.max(1, Math.round(inputs.spouseLtcFundingYears || 1));
+                  const l2TotalNetP = (inputs.ltcNetAmount || 0) * l2YearsP;
+                  const l2TotalNetS = (inputs.spouseLtcNetAmount || 0) * l2YearsS;
+                  const l4MargRate  = allInMarginalRate || fedMarginalRate || 0.24;
+                  const l4EarlyPenP = (inputs.ltcFundingAge || 0) < 59.5 ? 0.10 : 0;
+                  const l4EarlyPenS = (inputs.spouseLtcFundingAge || 0) < 59.5 ? 0.10 : 0;
+                  const l4GrossP = l2TotalNetP > 0 ? l2TotalNetP / Math.max(0.01, 1 - l4MargRate - l4EarlyPenP) : 0;
+                  const l4GrossS = l2TotalNetS > 0 ? l2TotalNetS / Math.max(0.01, 1 - l4MargRate - l4EarlyPenS) : 0;
+                  const l4RemainderVal = Math.max(0, (inputs.traditionalBalance || 0) - (inputs.rothConversionAmount || 0) - (inputs.etaFundingAmount || 0) - l4GrossP - l4GrossS);
                   // Risk 1 card and "tax eliminated" comparison both use the fixed status-quo
                   // baseline (totalEstTaxSQ), not the toggle-dependent totalEstTax — otherwise
                   // this figure understates the problem whenever architecture happens to be ON,
@@ -3708,7 +3766,7 @@ function App() {
                   const rptPTotalCare = rptPCareRows.reduce((s,r) => s+(r.ltcAnnualCost||0), 0);
                   const rptPMargRate  = rptPCareRows.length > 0 ? rptPCareRows.reduce((s,r) => s+(r.allInMarginalRate||r.effectiveTaxRate||0.28),0)/rptPCareRows.length : (allInMarginalRate||0.28);
                   const rptPGrossUp   = rptPTotalCare * rptPMargRate / (1 - rptPMargRate);
-                  const rptPPolicyNet = inputs.ltcNetAmount || 0;
+                  const rptPPolicyNet = (inputs.ltcNetAmount || 0) * Math.max(1, Math.round(inputs.ltcFundingYears || 1));
                   const rptPPolicyGrossUp = rptPPolicyNet * rptPMargRate / (1 - rptPMargRate);
 
                   // Spouse
@@ -3718,7 +3776,7 @@ function App() {
                   const rptSTotalCare = rptSCareRows.reduce((s,r) => s+(r.spouseLtcAnnualCost||0), 0);
                   const rptSMargRate  = rptSCareRows.length > 0 ? rptSCareRows.reduce((s,r) => s+(r.allInMarginalRate||r.effectiveTaxRate||0.28),0)/rptSCareRows.length : (allInMarginalRate||0.28);
                   const rptSGrossUp   = rptSTotalCare * rptSMargRate / (1 - rptSMargRate);
-                  const rptSPolicyNet = inputs.spouseLtcNetAmount || 0;
+                  const rptSPolicyNet = (inputs.spouseLtcNetAmount || 0) * Math.max(1, Math.round(inputs.spouseLtcFundingYears || 1));
                   const rptSPolicyGrossUp = rptSPolicyNet * rptSMargRate / (1 - rptSMargRate);
 
                   // Combined — same formula as panel
@@ -4358,12 +4416,12 @@ function App() {
               <div style="font-size:8pt; font-weight:800; color:#1A2B3C;">Living Benefits IUL — ${clientLabel}</div>
               <div style="font-size:7pt; font-weight:700; color:#5B8FA8;">Chronic Care · Tax-Free Income · Tax-Free Death Benefit</div>
             </div>
-            <div style="font-size:6.5pt; color:#445566; line-height:1.5;">QP gross draw funds net premium of ${inputs.ltcNetAmount > 0 ? fmtD(inputs.ltcNetAmount) : '[net premium]'}${inputs.ltcDeathBenefit > 0 ? ' &middot; '+fmtD(inputs.ltcDeathBenefit)+' initial death benefit' : ''}. Chronic illness benefit accelerates tax-free — portfolio never touched during a care event. Death benefit preserved if care never needed.</div>
+            <div style="font-size:6.5pt; color:#445566; line-height:1.5;">QP gross draws fund total net premium of ${l2TotalNetP > 0 ? fmtD(l2TotalNetP) : '[net premium]'}${l2YearsP > 1 ? ' ('+fmtD(inputs.ltcNetAmount)+'/yr &times; '+l2YearsP+' yrs, starting age '+inputs.ltcFundingAge+')' : ''}${inputs.ltcDeathBenefit > 0 ? ' &middot; '+fmtD(inputs.ltcDeathBenefit)+' initial death benefit' : ''}. Chronic illness benefit accelerates tax-free — portfolio never touched during a care event. Death benefit preserved if care never needed.</div>
           </div>
           <div style="width:60pt; flex-shrink:0; text-align:center;">
             <div style="background:rgba(91,143,168,0.08); border:1pt solid rgba(91,143,168,0.3); border-radius:3pt; padding:4pt 5pt;">
               <div style="font-size:6pt; color:#5B8FA8; text-transform:uppercase; letter-spacing:.5pt;">Net Prem.</div>
-              <div style="font-size:8pt; font-weight:700; color:#1A2B3C;">${inputs.ltcNetAmount > 0 ? fmtD(inputs.ltcNetAmount) : '—'}</div>
+              <div style="font-size:8pt; font-weight:700; color:#1A2B3C;">${l2TotalNetP > 0 ? fmtD(l2TotalNetP) : '—'}</div>
               <div style="font-size:5.5pt; color:#7A95A8;">annual</div>
             </div>
           </div>
@@ -4380,12 +4438,12 @@ function App() {
               <div style="font-size:8pt; font-weight:800; color:#1A2B3C;">Living Benefits IUL — ${clientInfo.spouseName || 'Spouse'}</div>
               <div style="font-size:7pt; font-weight:700; color:#5B8FA8;">Chronic Care · Tax-Free Income · Tax-Free Death Benefit</div>
             </div>
-            <div style="font-size:6.5pt; color:#445566; line-height:1.5;">Mirrors primary Layer 2 structure. Separate policy — both partners fully protected. QP gross draw at age ${inputs.spouseLtcFundingAge || inputs.ltcFundingAge || 60} funds net premium of ${inputs.spouseLtcNetAmount > 0 ? fmtD(inputs.spouseLtcNetAmount) : '[spouse net premium]'}${inputs.spouseLtcDeathBenefit > 0 ? ' &middot; '+fmtD(inputs.spouseLtcDeathBenefit)+' initial death benefit' : ''}.</div>
+            <div style="font-size:6.5pt; color:#445566; line-height:1.5;">Mirrors primary Layer 2 structure. Separate policy — both partners fully protected. QP gross draws starting age ${inputs.spouseLtcFundingAge || inputs.ltcFundingAge || 60} fund total net premium of ${l2TotalNetS > 0 ? fmtD(l2TotalNetS) : '[spouse net premium]'}${l2YearsS > 1 ? ' ('+fmtD(inputs.spouseLtcNetAmount)+'/yr &times; '+l2YearsS+' yrs)' : ''}${inputs.spouseLtcDeathBenefit > 0 ? ' &middot; '+fmtD(inputs.spouseLtcDeathBenefit)+' initial death benefit' : ''}.</div>
           </div>
           <div style="width:60pt; flex-shrink:0; text-align:center;">
             <div style="background:rgba(91,143,168,0.08); border:1pt solid rgba(91,143,168,0.3); border-radius:3pt; padding:4pt 5pt;">
               <div style="font-size:6pt; color:#5B8FA8; text-transform:uppercase; letter-spacing:.5pt;">Net Prem.</div>
-              <div style="font-size:8pt; font-weight:700; color:#1A2B3C;">${inputs.spouseLtcNetAmount > 0 ? fmtD(inputs.spouseLtcNetAmount) : '—'}</div>
+              <div style="font-size:8pt; font-weight:700; color:#1A2B3C;">${l2TotalNetS > 0 ? fmtD(l2TotalNetS) : '—'}</div>
               <div style="font-size:5.5pt; color:#7A95A8;">annual</div>
             </div>
           </div>
@@ -4427,7 +4485,7 @@ function App() {
           <div style="width:60pt; flex-shrink:0; text-align:center;">
             <div style="background:rgba(200,169,110,0.08); border:1pt solid rgba(200,169,110,0.3); border-radius:3pt; padding:4pt 5pt;">
               <div style="font-size:6pt; color:#C8A96E; text-transform:uppercase; letter-spacing:.5pt;">Remains</div>
-              <div style="font-size:8pt; font-weight:700; color:#1A2B3C;">${inputs.traditionalBalance > 0 ? fmtD(Math.max(0, inputs.traditionalBalance - (inputs.rothConversionAmount||0) - (inputs.etaFundingAmount||0) - (inputs.ltcNetAmount||0) - (inputs.spouseLtcNetAmount||0))) : '—'}</div>
+              <div style="font-size:8pt; font-weight:700; color:#1A2B3C;">${inputs.traditionalBalance > 0 ? fmtD(l4RemainderVal) : '—'}</div>
               <div style="font-size:5.5pt; color:#7A95A8;">stays in QP</div>
             </div>
           </div>
@@ -4470,7 +4528,7 @@ function App() {
         (() => {
           const parts = [];
           if (inputs.rothConversionAmount > 0) parts.push(`Layer 1 converts ${fmtD(inputs.rothConversionAmount)} into guaranteed tax-free income of $${Math.round(inputs.rothAnnuityMonthly||0).toLocaleString()}/mo beginning age ${inputs.rothAnnuityStartAge||70}`);
-          if (inputs.ltcNetAmount > 0) parts.push(`Layer 2 funds chronic care protection (${fmtD(inputs.ltcNetAmount)} net premium) for ${clientLabel}${inputs.filingStatus==='mfj'&&inputs.spouseLtcNetAmount>0?' and '+(clientInfo.spouseName||'Spouse'):''} — portfolio untouched during any care event`);
+          if (inputs.ltcNetAmount > 0) parts.push(`Layer 2 funds chronic care protection (${fmtD(l2TotalNetP)} net premium${l2YearsP>1?' over '+l2YearsP+' years':''}) for ${clientLabel}${inputs.filingStatus==='mfj'&&inputs.spouseLtcNetAmount>0?' and '+(clientInfo.spouseName||'Spouse'):''} — portfolio untouched during any care event`);
           if (inputs.etaFundingAmount > 0) parts.push(`Layer 3 repositions ${fmtD(inputs.etaFundingAmount)} via bank non-recourse loan — eliminating the distribution tax and permanently reducing the RMD base`);
           parts.push(`Layer 4 preserves the remaining QP balance for liquidity, discretionary access, and continued tax-deferred growth`);
           return parts.join('. ') + '. The layers do not compete — each owns a distinct piece of the problem, so the portfolio is never forced to do the wrong thing at the wrong time.';
@@ -6207,20 +6265,25 @@ function App() {
                     {!inputs.architectureEnabled && <span style={{fontSize:11,color:'#6B8FA8',fontStyle:'italic'}}>activates with Architecture</span>}
                   </div>
                     <div style={{fontSize:12,color:'#8DAFC8',marginBottom:8,lineHeight:1.5}}>
-                      Enter the net amount needed — the model calculates the required gross IRA withdrawal to net that amount after tax.
+                      Enter the net amount needed per year — the model calculates the required gross IRA withdrawal to net that amount after tax, each year, for the number of funding years specified. Spreading the draw across several years (instead of one lump distribution) generally sits in lower brackets each year.
                     </div>
-                    <Field label="Net Amount Needed" hint="Amount needed after tax to fund the LTC policy premium">
+                    <Field label="Annual Net Premium" hint="Amount needed after tax, per year, to fund the LTC policy premium">
                       <NumInput value={inputs.ltcNetAmount} onChange={v=>set('ltcNetAmount',v)} prefix="$"/>
                     </Field>
-                    <Field label="Draw Age" hint="Primary's age at which the IRA distribution occurs">
+                    <Field label="Funding Start Age" hint="Primary's age when the first annual IRA distribution occurs">
                       <NumInput value={inputs.ltcFundingAge} onChange={v=>set('ltcFundingAge',v)} suffix="yrs"/>
+                    </Field>
+                    <Field label="Funding Years" hint="Number of consecutive years the annual distribution repeats (enter 1 for a single lump-sum draw)">
+                      <NumInput value={inputs.ltcFundingYears} onChange={v=>set('ltcFundingYears',Math.max(1,Math.round(v||1)))} suffix="yrs"/>
                     </Field>
                     <Field label="Death Benefit" hint="Initial face amount, from the carrier illustration">
                       <NumInput value={inputs.ltcDeathBenefit} onChange={v=>set('ltcDeathBenefit',v)} prefix="$"/>
                     </Field>
                     {inputs.ltcNetAmount > 0 && inputs.ltcFundingAge > 0 && (() => {
-                      // Preview gross-up using estimated marginal rate
-
+                      // Preview gross-up using estimated marginal rate (single-year preview;
+                      // exact per-year bracket-aware gross-up, reflecting bracket creep across
+                      // the full funding window, is calculated in the simulation).
+                      const _yrs = Math.max(1, Math.round(inputs.ltcFundingYears || 1));
                       const _mfj = inputs.filingStatus === 'mfj';
                       const _br = _mfj
                         ? [{l:23200,r:.10},{l:94300,r:.12},{l:201050,r:.22},{l:383900,r:.24},{l:487450,r:.32},{l:731200,r:.35},{l:Infinity,r:.37}]
@@ -6235,20 +6298,20 @@ function App() {
                         <div style={{marginTop:8,padding:'9px 12px',background:'rgba(155,126,200,.05)',border:'1px solid rgba(155,126,200,.15)',borderRadius:7}}>
                           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,textAlign:'center'}}>
                             <div>
-                              <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Net Needed</div>
+                              <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Net / Year</div>
                               <div style={{fontSize:14,fontWeight:600,color:'#9B7EC8',fontFamily:"'Cormorant Garamond',serif"}}>${Math.round(inputs.ltcNetAmount/1000)}K</div>
                             </div>
                             <div>
-                              <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Est. Gross Draw</div>
+                              <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Est. Gross Draw / Year</div>
                               <div style={{fontSize:14,fontWeight:600,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif"}}>${Math.round(estGross/1000)}K</div>
                             </div>
                             <div>
-                              <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Est. Tax Cost</div>
+                              <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Est. Tax / Year</div>
                               <div style={{fontSize:14,fontWeight:600,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif"}}>${Math.round(estTax/1000)}K</div>
                             </div>
                           </div>
                           <div style={{fontSize:11,color:'#6B8FA8',marginTop:6,textAlign:'center'}}>
-                            Preview at ~{Math.round((estRate)*100)}% marginal rate{inputs.ltcFundingAge < 59.5 ? ' + 10% early withdrawal penalty' : ''} · Exact gross-up calculated in simulation
+                            Preview at ~{Math.round((estRate)*100)}% marginal rate{inputs.ltcFundingAge < 59.5 ? ' + 10% early withdrawal penalty' : ''} · over {_yrs} year{_yrs>1?'s':''}, total net ${Math.round(inputs.ltcNetAmount*_yrs/1000)}K · Exact gross-up calculated in simulation
                           </div>
                         </div>
                       );
@@ -6303,19 +6366,22 @@ function App() {
                       {!inputs.architectureEnabled && <span style={{fontSize:11,color:'#6B8FA8',fontStyle:'italic'}}>activates with Architecture</span>}
                     </div>
                       <div style={{fontSize:12,color:'#8DAFC8',marginBottom:8,lineHeight:1.5}}>
-                        Enter the net amount needed — the model calculates the required gross IRA withdrawal to net that amount after tax.
+                        Enter the net amount needed per year — the model calculates the required gross IRA withdrawal to net that amount after tax, each year, for the number of funding years specified.
                       </div>
-                      <Field label="Net Amount Needed" hint="Amount needed after tax to fund the spouse LTC policy premium">
+                      <Field label="Annual Net Premium" hint="Amount needed after tax, per year, to fund the spouse LTC policy premium">
                         <NumInput value={inputs.spouseLtcNetAmount} onChange={v=>set('spouseLtcNetAmount',v)} prefix="$"/>
                       </Field>
-                      <Field label="Draw Age" hint="Primary's age at which this IRA distribution occurs">
+                      <Field label="Funding Start Age" hint="Primary's age when the first annual distribution for the spouse policy occurs">
                         <NumInput value={inputs.spouseLtcFundingAge} onChange={v=>set('spouseLtcFundingAge',v)} suffix="yrs"/>
+                      </Field>
+                      <Field label="Funding Years" hint="Number of consecutive years the annual distribution repeats (enter 1 for a single lump-sum draw)">
+                        <NumInput value={inputs.spouseLtcFundingYears} onChange={v=>set('spouseLtcFundingYears',Math.max(1,Math.round(v||1)))} suffix="yrs"/>
                       </Field>
                       <Field label="Death Benefit" hint="Spouse's initial face amount, from the carrier illustration">
                         <NumInput value={inputs.spouseLtcDeathBenefit} onChange={v=>set('spouseLtcDeathBenefit',v)} prefix="$"/>
                       </Field>
                       {inputs.spouseLtcNetAmount > 0 && inputs.spouseLtcFundingAge > 0 && (() => {
-
+                        const _yrsSp = Math.max(1, Math.round(inputs.spouseLtcFundingYears || 1));
                         const _mfj = inputs.filingStatus === 'mfj';
                         const _br = _mfj
                           ? [{l:23200,r:.10},{l:94300,r:.12},{l:201050,r:.22},{l:383900,r:.24},{l:487450,r:.32},{l:731200,r:.35},{l:Infinity,r:.37}]
@@ -6330,20 +6396,20 @@ function App() {
                           <div style={{marginTop:8,padding:'9px 12px',background:'rgba(155,126,200,.05)',border:'1px solid rgba(155,126,200,.15)',borderRadius:7}}>
                             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,textAlign:'center'}}>
                               <div>
-                                <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Net Needed</div>
+                                <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Net / Year</div>
                                 <div style={{fontSize:14,fontWeight:600,color:'#9B7EC8',fontFamily:"'Cormorant Garamond',serif"}}>${Math.round(inputs.spouseLtcNetAmount/1000)}K</div>
                               </div>
                               <div>
-                                <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Est. Gross Draw</div>
+                                <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Est. Gross Draw / Year</div>
                                 <div style={{fontSize:14,fontWeight:600,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif"}}>${Math.round(estGross/1000)}K</div>
                               </div>
                               <div>
-                                <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Est. Tax Cost</div>
+                                <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Est. Tax / Year</div>
                                 <div style={{fontSize:14,fontWeight:600,color:'#C47A7A',fontFamily:"'Cormorant Garamond',serif"}}>${Math.round(estTax/1000)}K</div>
                               </div>
                             </div>
                             <div style={{fontSize:11,color:'#6B8FA8',marginTop:6,textAlign:'center'}}>
-                              Preview at ~{Math.round((estRate)*100)}% marginal rate{inputs.spouseLtcFundingAge < 59.5 ? ' + 10% early withdrawal penalty' : ''} · Exact gross-up calculated in simulation
+                              Preview at ~{Math.round((estRate)*100)}% marginal rate{inputs.spouseLtcFundingAge < 59.5 ? ' + 10% early withdrawal penalty' : ''} · over {_yrsSp} year{_yrsSp>1?'s':''}, total net ${Math.round(inputs.spouseLtcNetAmount*_yrsSp/1000)}K · Exact gross-up calculated in simulation
                             </div>
                           </div>
                         );
@@ -6846,7 +6912,7 @@ function App() {
                 </div>
                 {/* Return on Protection — replaces MC score bars */}
                 {(() => {
-                  const policyNet = inputs.ltcNetAmount || 0;
+                  const policyNet = (inputs.ltcNetAmount || 0) * Math.max(1, Math.round(inputs.ltcFundingYears || 1));
                   const careRows = yearsUninsured?.filter(r => r.age >= ltcAge && r.age < ltcEnd) || [];
                   const avgRate = careRows.length > 0
                     ? careRows.reduce((s,r) => s+(r.allInMarginalRate||r.effectiveTaxRate||0.28),0) / careRows.length
@@ -6992,7 +7058,7 @@ function App() {
                 </div>
                 {/* Return on Protection — Spouse */}
                 {(() => {
-                  const spouseNet = inputs.spouseLtcNetAmount || 0;
+                  const spouseNet = (inputs.spouseLtcNetAmount || 0) * Math.max(1, Math.round(inputs.spouseLtcFundingYears || 1));
                   const spCareRows = yearsSpouseUninsured?.filter(r => r.age >= ltcAge && r.age < ltcEnd) || [];
                   const spAvgRate = spCareRows.length > 0
                     ? spCareRows.reduce((s,r) => s+(r.allInMarginalRate||r.effectiveTaxRate||0.28),0) / spCareRows.length
@@ -7082,8 +7148,8 @@ function App() {
             const totalPreserved  = totalTrueCost + totalCompounding;
 
             // Combined policy investment (grossed up)
-            const pPolicyNet = inputs.ltcNetAmount || 0;
-            const sPolicyNet = inputs.spouseLtcNetAmount || 0;
+            const pPolicyNet = (inputs.ltcNetAmount || 0) * Math.max(1, Math.round(inputs.ltcFundingYears || 1));
+            const sPolicyNet = (inputs.spouseLtcNetAmount || 0) * Math.max(1, Math.round(inputs.spouseLtcFundingYears || 1));
             const pPolicyGrossUp = pPolicyNet * pMargRate / (1 - pMargRate);
             const sPolicyGrossUp = sPolicyNet * sMargRate / (1 - sMargRate);
             const totalPolicyInvestment = (pPolicyNet + pPolicyGrossUp) + (sPolicyNet + sPolicyGrossUp);
