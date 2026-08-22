@@ -4450,7 +4450,7 @@ function App() {
           <div style="flex:1; background:white; border:1pt solid #DDD; border-top:2.5pt solid #5B8FA8; border-radius:0 3pt 3pt 0; padding:5pt 8pt;">
             <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2pt;">
               <div style="font-size:8pt; font-weight:800; color:#1A2B3C;">Living Benefits IUL — ${clientLabel}</div>
-              <div style="font-size:7pt; font-weight:700; color:#5B8FA8;">Chronic Care · Tax-Free Income · Tax-Free Death Benefit</div>
+              <div style="font-size:7pt; font-weight:700; color:#5B8FA8;">Chronic Care · Tax-Free Income · Tax-Free Benefit Pool</div>
             </div>
             <div style="font-size:6.5pt; color:#445566; line-height:1.5;">QP gross draws fund total net premium of ${l2TotalNetP > 0 ? fmtD(l2TotalNetP) : '[net premium]'}${l2YearsP > 1 ? ' ('+fmtD(inputs.ltcNetAmount)+'/yr &times; '+l2YearsP+' yrs, starting age '+inputs.ltcFundingAge+')' : ''}${inputs.ltcDeathBenefit > 0 ? ' &middot; '+fmtD(inputs.ltcDeathBenefit)+' initial death benefit' : ''}. Chronic illness benefit accelerates tax-free — portfolio never touched during a care event. Death benefit preserved if care never needed.</div>
           </div>
@@ -4472,7 +4472,7 @@ function App() {
           <div style="flex:1; background:white; border:1pt solid #DDD; border-top:2.5pt solid #5B8FA8; border-radius:0 3pt 3pt 0; padding:5pt 8pt; opacity:0.9;">
             <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2pt;">
               <div style="font-size:8pt; font-weight:800; color:#1A2B3C;">Living Benefits IUL — ${clientInfo.spouseName || 'Spouse'}</div>
-              <div style="font-size:7pt; font-weight:700; color:#5B8FA8;">Chronic Care · Tax-Free Income · Tax-Free Death Benefit</div>
+              <div style="font-size:7pt; font-weight:700; color:#5B8FA8;">Chronic Care · Tax-Free Income · Tax-Free Benefit Pool</div>
             </div>
             <div style="font-size:6.5pt; color:#445566; line-height:1.5;">Mirrors primary Layer 2 structure. Separate policy — both partners fully protected. QP gross draws starting age ${inputs.spouseLtcFundingAge || inputs.ltcFundingAge || 60} fund total net premium of ${l2TotalNetS > 0 ? fmtD(l2TotalNetS) : '[spouse net premium]'}${l2YearsS > 1 ? ' ('+fmtD(inputs.spouseLtcNetAmount)+'/yr &times; '+l2YearsS+' yrs)' : ''}${inputs.spouseLtcDeathBenefit > 0 ? ' &middot; '+fmtD(inputs.spouseLtcDeathBenefit)+' initial death benefit' : ''}.</div>
           </div>
@@ -4495,7 +4495,7 @@ function App() {
               <div style="font-size:8pt; font-weight:800; color:#1A2B3C;">ETA Life Policy (Layer 3)</div>
               <div style="font-size:7pt; font-weight:700; color:#4A9B7A;">Tax Elimination · RMD Reduction · Income Age ${inputs.etaStartAge || 70}</div>
             </div>
-            <div style="font-size:6.5pt; color:#445566; line-height:1.5;">Bank non-recourse loan covers IRA distribution tax — no personal guarantee. Full gross proceeds enter IUL policy tax-free. Permanently reduces QP balance → reduces future RMDs → reduces IRMAA exposure. Policy loan income begins age ${inputs.etaStartAge || 70}${inputs.etaAnnualIncome > 0 ? ' · $'+Math.round(inputs.etaAnnualIncome).toLocaleString()+'/yr' : ''}.</div>
+            <div style="font-size:6.5pt; color:#445566; line-height:1.5;">Bank non-recourse loan covers IRA distribution tax — no personal guarantee. Full gross proceeds enter IUL policy tax-free. Permanently reduces QP balance → reduces future RMDs → reduces IRMAA exposure. Tax-free income begins age ${inputs.etaStartAge || 70}${inputs.etaAnnualIncome > 0 ? ' · $'+Math.round(inputs.etaAnnualIncome).toLocaleString()+'/yr initial'+((inputs.etaColaRate||0) > 0 ? ', increasing '+inputs.etaColaRate+'%/yr' : '') : ''}.</div>
           </div>
           <div style="width:60pt; flex-shrink:0; text-align:center;">
             <div style="background:rgba(74,155,122,0.08); border:1pt solid rgba(74,155,122,0.3); border-radius:3pt; padding:4pt 5pt;">
@@ -5240,7 +5240,7 @@ function App() {
   .sc-table tr:nth-child(odd) td { background: #F7F7F7; }
   .sc-table tr:nth-child(even) td { background: white; }
   .sc-th-lbl { background: #0B1928; color: #C8A96E; font-weight: 700; text-align: left; font-size: 7.5pt; }
-  .sc-th-sq { background: #5C1A1A; color: #FFAAAA; font-weight: 700; text-align: center; font-size: 7pt; text-transform: uppercase; letter-spacing: .4pt; }
+  .sc-th-sq { background: #5C1A1A; color: #000000; font-weight: 700; text-align: center; font-size: 7pt; text-transform: uppercase; letter-spacing: .4pt; }
   .sc-th-arch { background: #0B1928; color: #4A9B7A; font-weight: 700; text-align: center; font-size: 7pt; text-transform: uppercase; letter-spacing: .4pt; }
 </style>
 </head>
@@ -5364,7 +5364,7 @@ function App() {
           <div style="flex:1; background:white; border:1pt solid #DDD; border-top:2.5pt solid #5B8FA8; border-radius:0 3pt 3pt 0; padding:5pt 8pt;">
             <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2pt;">
               <div style="font-size:8pt; font-weight:800; color:#1A2B3C;">Living Benefits IUL — ${clientLabel}</div>
-              <div style="font-size:7pt; font-weight:700; color:#5B8FA8;">Chronic Care · Tax-Free Income · Tax-Free Death Benefit</div>
+              <div style="font-size:7pt; font-weight:700; color:#5B8FA8;">Chronic Care · Tax-Free Income · Tax-Free Benefit Pool</div>
             </div>
             <div style="font-size:6.5pt; color:#445566; line-height:1.5;">QP gross draws fund total net premium of ${l2TotalNetP > 0 ? fmtD(l2TotalNetP) : '[net premium]'}${l2YearsP > 1 ? ' ('+fmtD(inputs.ltcNetAmount)+'/yr &times; '+l2YearsP+' yrs, starting age '+inputs.ltcFundingAge+')' : ''}${inputs.ltcDeathBenefit > 0 ? ' &middot; '+fmtD(inputs.ltcDeathBenefit)+' initial death benefit' : ''}.</div>
           </div>
@@ -5385,7 +5385,7 @@ function App() {
           <div style="flex:1; background:white; border:1pt solid #DDD; border-top:2.5pt solid #5B8FA8; border-radius:0 3pt 3pt 0; padding:5pt 8pt; opacity:0.9;">
             <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2pt;">
               <div style="font-size:8pt; font-weight:800; color:#1A2B3C;">Living Benefits IUL — ${clientInfo.spouseName || 'Spouse'}</div>
-              <div style="font-size:7pt; font-weight:700; color:#5B8FA8;">Chronic Care · Tax-Free Income · Tax-Free Death Benefit</div>
+              <div style="font-size:7pt; font-weight:700; color:#5B8FA8;">Chronic Care · Tax-Free Income · Tax-Free Benefit Pool</div>
             </div>
             <div style="font-size:6.5pt; color:#445566; line-height:1.5;">Mirrors primary Layer 2 structure. QP gross draws starting age ${inputs.spouseLtcFundingAge || inputs.ltcFundingAge || 60} fund total net premium of ${l2TotalNetS > 0 ? fmtD(l2TotalNetS) : '[spouse net premium]'}${l2YearsS > 1 ? ' ('+fmtD(inputs.spouseLtcNetAmount)+'/yr &times; '+l2YearsS+' yrs)' : ''}${inputs.spouseLtcDeathBenefit > 0 ? ' &middot; '+fmtD(inputs.spouseLtcDeathBenefit)+' initial death benefit' : ''}.</div>
           </div>
@@ -5407,7 +5407,7 @@ function App() {
               <div style="font-size:8pt; font-weight:800; color:#1A2B3C;">ETA Life Policy (Layer 3)</div>
               <div style="font-size:7pt; font-weight:700; color:#4A9B7A;">Tax Elimination · RMD Reduction · Income Age ${inputs.etaStartAge || 70}</div>
             </div>
-            <div style="font-size:6.5pt; color:#445566; line-height:1.5;">Bank non-recourse loan covers IRA distribution tax. Full gross proceeds enter IUL policy tax-free. Policy loan income begins age ${inputs.etaStartAge || 70}${inputs.etaAnnualIncome > 0 ? ' · $'+Math.round(inputs.etaAnnualIncome).toLocaleString()+'/yr' : ''}.</div>
+            <div style="font-size:6.5pt; color:#445566; line-height:1.5;">Bank non-recourse loan covers IRA distribution tax. Full gross proceeds enter IUL policy tax-free. Tax-free income begins age ${inputs.etaStartAge || 70}${inputs.etaAnnualIncome > 0 ? ' · $'+Math.round(inputs.etaAnnualIncome).toLocaleString()+'/yr initial'+((inputs.etaColaRate||0) > 0 ? ', increasing '+inputs.etaColaRate+'%/yr' : '') : ''}.</div>
           </div>
           <div style="width:60pt; flex-shrink:0; text-align:center;">
             <div style="background:rgba(74,155,122,0.08); border:1pt solid rgba(74,155,122,0.3); border-radius:3pt; padding:4pt 5pt;">
@@ -5440,6 +5440,8 @@ function App() {
 
       </div>
     </div>
+
+    <div style="font-size:5.5pt; color:#8A9AAA; font-style:italic; text-align:center; margin-top:5pt;">Insurance company full illustration required prior to issue and all guarantees disclosed in the illustration.</div>
 
   </div>
   <div class="footer-bar">
