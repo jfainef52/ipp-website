@@ -2972,6 +2972,8 @@ function App() {
   const [reportSent, setReportSent] = useState(false);
   const [reportError, setReportError] = useState('');
   const [reportStep, setReportStep] = useState('');
+  const [onePagerSending, setOnePagerSending] = useState(false);
+  const [onePagerError, setOnePagerError] = useState('');
   const [clientInfo, setClientInfo] = useState({
     primaryName: '', spouseName: '', advisorEmail: '', advisorName: '',
   });
@@ -3753,11 +3755,25 @@ function App() {
                   const l2TotalNetP = (inputs.ltcNetAmount || 0) * l2YearsP;
                   const l2TotalNetS = (inputs.spouseLtcNetAmount || 0) * l2YearsS;
                   const l4MargRate  = allInMarginalRate || fedMarginalRate || 0.24;
-                  const l4EarlyPenP = (inputs.ltcFundingAge || 0) < 59.5 ? 0.10 : 0;
-                  const l4EarlyPenS = (inputs.spouseLtcFundingAge || 0) < 59.5 ? 0.10 : 0;
-                  const l4GrossP = l2TotalNetP > 0 ? l2TotalNetP / Math.max(0.01, 1 - l4MargRate - l4EarlyPenP) : 0;
-                  const l4GrossS = l2TotalNetS > 0 ? l2TotalNetS / Math.max(0.01, 1 - l4MargRate - l4EarlyPenS) : 0;
-                  const l4RemainderVal = Math.max(0, (inputs.traditionalBalance || 0) - (inputs.rothConversionAmount || 0) - (inputs.etaFundingAmount || 0) - l4GrossP - l4GrossS);
+                  // ── L1 Roth-conversion overage ──
+                  // Same logic as the simulation engine's row._conversionOveragePending
+                  // resolution: full conversion is taxed at the marginal rate (no penalty —
+                  // conversions are penalty-exempt), L3 finances up to rothConversionFinanced
+                  // of that tax, and whatever's left ("overage") has to come out as a separate
+                  // straight IRA distribution — which DOES owe the early-withdrawal penalty,
+                  // since it's a distribution, not a conversion. Previously this card ignored
+                  // the overage entirely, silently assuming L3 financed 100% of L1's tax.
+                  const l1ConvAmt = inputs.rothConversionAmount || 0;
+                  const l1Financed = Math.min(inputs.rothConversionFinanced || 0, l1ConvAmt);
+                  const l1ConvTax = l1ConvAmt * l4MargRate;
+                  const l1OverageTax = Math.max(0, l1ConvTax - l1Financed);
+                  const l1OveragePenaltyRate = (inputs.rothConversionAge || 0) < 59.5 ? 0.10 : 0;
+                  const l1OverageDraw = l1OverageTax > 0
+                    ? l1OverageTax / Math.max(0.01, 1 - l4MargRate - l1OveragePenaltyRate)
+                    : 0;
+                  const l4GrossP = l2TotalNetP > 0 ? l2TotalNetP / Math.max(0.01, 1 - l4MargRate - ((inputs.ltcFundingAge || 0) < 59.5 ? 0.10 : 0)) : 0;
+                  const l4GrossS = l2TotalNetS > 0 ? l2TotalNetS / Math.max(0.01, 1 - l4MargRate - ((inputs.spouseLtcFundingAge || 0) < 59.5 ? 0.10 : 0)) : 0;
+                  const l4RemainderVal = Math.max(0, (inputs.traditionalBalance || 0) - (inputs.rothConversionAmount || 0) - (inputs.etaFundingAmount || 0) - l4GrossP - l4GrossS - l1OverageDraw);
                   // Risk 1 card and "tax eliminated" comparison both use the fixed status-quo
                   // baseline (totalEstTaxSQ), not the toggle-dependent totalEstTax — otherwise
                   // this figure understates the problem whenever architecture happens to be ON,
@@ -5114,6 +5130,300 @@ function App() {
               transition:'all .2s',
             }}>
             <span style={{fontSize:15}}>📤</span> Send Report
+          </button>
+          <button
+            onClick={async()=>{
+              if (onePagerSending) return;
+              setOnePagerSending(true); setOnePagerError('');
+              try {
+                const clientLabel = clientInfo.primaryName || 'Client';
+                const spouseLabel = inputs.filingStatus==='mfj'&&clientInfo.spouseName ? ` & ${clientInfo.spouseName}` : '';
+                const fullName = clientLabel + spouseLabel;
+                const fmtD = v => v >= 1000000 ? '$'+(v/1000000).toFixed(2)+'M' : v >= 1000 ? '$'+Math.round(v/1000)+'K' : '$0';
+                const iraBalance = fmtD(inputs.traditionalBalance || 0);
+
+                // ── Same computation as the discussion doc's flow-of-funds page ──
+                const l2YearsP = Math.max(1, Math.round(inputs.ltcFundingYears || 1));
+                const l2YearsS = Math.max(1, Math.round(inputs.spouseLtcFundingYears || 1));
+                const l2TotalNetP = (inputs.ltcNetAmount || 0) * l2YearsP;
+                const l2TotalNetS = (inputs.spouseLtcNetAmount || 0) * l2YearsS;
+                const l4MargRate = allInMarginalRate || fedMarginalRate || 0.24;
+                const l1ConvAmt = inputs.rothConversionAmount || 0;
+                const l1Financed = Math.min(inputs.rothConversionFinanced || 0, l1ConvAmt);
+                const l1ConvTax = l1ConvAmt * l4MargRate;
+                const l1OverageTax = Math.max(0, l1ConvTax - l1Financed);
+                const l1OveragePenaltyRate = (inputs.rothConversionAge || 0) < 59.5 ? 0.10 : 0;
+                const l1OverageDraw = l1OverageTax > 0 ? l1OverageTax / Math.max(0.01, 1 - l4MargRate - l1OveragePenaltyRate) : 0;
+                const l4GrossP = l2TotalNetP > 0 ? l2TotalNetP / Math.max(0.01, 1 - l4MargRate - ((inputs.ltcFundingAge||0) < 59.5 ? 0.10 : 0)) : 0;
+                const l4GrossS = l2TotalNetS > 0 ? l2TotalNetS / Math.max(0.01, 1 - l4MargRate - ((inputs.spouseLtcFundingAge||0) < 59.5 ? 0.10 : 0)) : 0;
+                const l4RemainderVal = Math.max(0, (inputs.traditionalBalance || 0) - (inputs.rothConversionAmount || 0) - (inputs.etaFundingAmount || 0) - l4GrossP - l4GrossS - l1OverageDraw);
+
+                // ── Headline summary figures ──
+                const l1AnnualIncome = (inputs.rothAnnuityMonthly || 0) * 12;
+                const isMFJ = inputs.filingStatus === 'mfj';
+                const hasSpouseL2 = isMFJ && ((inputs.spouseLtcDeathBenefit || 0) > 0 || (inputs.spouseLtcNetAmount || 0) > 0);
+                const l2CombinedBenefitPool = (inputs.ltcDeathBenefit || 0) + (hasSpouseL2 ? (inputs.spouseLtcDeathBenefit || 0) : 0);
+                const l3AnnualIncome = inputs.etaAnnualIncome || 0;
+                const l1LifeLabel = isMFJ ? "for both spouses' life" : 'for life';
+                const l2PoolLabel = hasSpouseL2 ? 'Combined Tax-Free Benefit Pool' : 'Tax-Free Benefit Pool';
+
+                const onePagerHtml = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', Arial, sans-serif; font-size: 9pt; color: #1A2B3C;
+         line-height: 1.5; background: white; }
+  @page { size: 11in 8.5in landscape; margin: 0.35in 0.45in 0.3in 0.45in; }
+  .page { overflow: hidden; display: flex; flex-direction: column; height: 7.85in; }
+  .page-body { flex: 1; overflow: hidden; }
+  .banner { background: #0B1928; border-radius: 5pt; padding: 9pt 16pt 8pt; margin-bottom: 11pt; }
+  .banner .sec-label { font-size: 6.5pt; font-weight: 700; color: #C8A96E; letter-spacing: 1.5pt;
+                       text-transform: uppercase; margin-bottom: 3pt; }
+  .banner h2 { font-size: 14pt; font-weight: 800; color: white; text-transform: uppercase;
+               letter-spacing: 0.3pt; margin-bottom: 3pt; }
+  .banner .sub { font-size: 8pt; color: #8DAFC8; font-style: italic; }
+  .sec-h { font-size: 8pt; font-weight: 700; color: #1A2B3C; letter-spacing: 0.1pt; margin-bottom: 4pt; }
+  .callout-row { display: flex; gap: 6pt; margin: 8pt 0 9pt; }
+  .callout { flex: 1; text-align: center; background: #0B1928; border-radius: 5pt; padding: 10pt 6pt; }
+  .callout .cv { font-size: 18pt; font-weight: 800; color: white; line-height: 1.1; margin-bottom: 3pt; }
+  .callout .cl { font-size: 6pt; font-weight: 700; color: #C8A96E; text-transform: uppercase; letter-spacing: 0.6pt; }
+  .callout .cs { font-size: 6.5pt; color: #8DAFC8; font-style: italic; margin-top: 3pt; }
+  .abox { border-left: 3.5pt solid; border-top: 1pt solid #DDD; border-right: 1pt solid #DDD;
+          border-bottom: 1pt solid #DDD; border-radius: 0 4pt 4pt 0; padding: 8pt 10pt; margin: 5pt 0 8pt; }
+  .abox .at { font-size: 9pt; font-weight: 700; color: #1A2B3C; margin-bottom: 3pt; }
+  .abox .ab { font-size: 8pt; color: #1A2B3C; line-height: 1.6; }
+  .takeaway-box { border-left-color: #C8A96E; background: #FBF5E8; }
+  .hdr-bar { display: flex; justify-content: space-between; align-items: flex-end;
+             border-bottom: 0.5pt solid #C8A96E; padding-bottom: 3pt; margin-bottom: 10pt; }
+  .hdr-logo-txt { font-size: 6.5pt; font-weight: 700; color: #C8A96E; letter-spacing: 1.4pt; text-transform: uppercase; display: block; }
+  .hdr-logo-sub { font-size: 9pt; font-weight: 700; color: #1A2B3C; display: block; margin-top: 1pt; }
+  .hdr-client { font-size: 7pt; color: #7A95A8; }
+  .footer-bar { display: flex; justify-content: space-between; align-items: center;
+                border-top: 0.5pt solid #2A3A4A; padding-top: 3pt; margin-top: auto;
+                font-size: 6pt; color: #8A9AAA; flex-shrink: 0; }
+  .footer-center { font-size: 5.5pt; color: #C8A96E; text-align: center; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="hdr-bar"><div><span class="hdr-logo-txt">Integrated Planning Partners</span><span class="hdr-logo-sub">IncomeArc™</span></div><div class="hdr-client">${fullName} &nbsp;·&nbsp; Integrated Planning Partners</div></div>
+  <div class="page-body">
+
+    <div class="banner">
+      <div class="sec-label">IncomeArc™ One-Pager</div>
+      <h2>Your Reallocation At A Glance</h2>
+      <div class="sub">One qualified plan. Four coordinated destinations.</div>
+    </div>
+
+    <!-- ── Headline summary ── -->
+    <div class="callout-row">
+      <div class="callout">
+        <div class="cv">${l1AnnualIncome > 0 ? fmtD(l1AnnualIncome) : '—'}</div>
+        <div class="cl">Annual Guaranteed Tax-Free Income</div>
+        <div class="cs">${l1LifeLabel}${inputs.rothAnnuityStartAge ? ', starting age '+inputs.rothAnnuityStartAge : ''}</div>
+      </div>
+      <div class="callout">
+        <div class="cv">${l2CombinedBenefitPool > 0 ? fmtD(l2CombinedBenefitPool) : '—'}</div>
+        <div class="cl">${l2PoolLabel}</div>
+        <div class="cs">chronic care &amp; legacy protection</div>
+      </div>
+      <div class="callout">
+        <div class="cv">${l3AnnualIncome > 0 ? fmtD(l3AnnualIncome) : '—'}</div>
+        <div class="cl">Tax-Free Income from Layer 3</div>
+        <div class="cs">starting age ${inputs.etaStartAge || 70}</div>
+      </div>
+      <div class="callout">
+        <div class="cv">${inputs.traditionalBalance > 0 ? fmtD(l4RemainderVal) : '—'}</div>
+        <div class="cl">Remains in the Plan</div>
+        <div class="cs">bridges income &amp; liquidity needs</div>
+      </div>
+    </div>
+
+    <div class="abox takeaway-box">
+      <div class="ab">By reallocating, ${fullName} moves toward ${l1AnnualIncome > 0 ? fmtD(l1AnnualIncome) : '$0'} of annual guaranteed tax-free income ${l1LifeLabel}, ${l2CombinedBenefitPool > 0 ? fmtD(l2CombinedBenefitPool) : '$0'} of ${hasSpouseL2 ? 'combined ' : ''}tax-free benefit pool, and ${l3AnnualIncome > 0 ? fmtD(l3AnnualIncome) : '$0'} of tax-free income from Layer 3 — while leaving ${inputs.traditionalBalance > 0 ? fmtD(l4RemainderVal) : '$0'} in the retirement plan to bridge income and unplanned liquidity needs.</div>
+    </div>
+
+    <!-- ── Central Flow Diagram ── -->
+    <div style="display:flex; gap:14pt; align-items:flex-start; margin-bottom:10pt;">
+
+      <!-- LEFT: QP Source box -->
+      <div style="width:100pt; flex-shrink:0;">
+        <div style="background:#0B1928; border-radius:5pt; padding:10pt 8pt; text-align:center; border:1.5pt solid #C8A96E;">
+          <div style="font-size:6pt; font-weight:700; color:#C8A96E; letter-spacing:1pt; text-transform:uppercase; margin-bottom:4pt;">Source</div>
+          <div style="font-size:11pt; font-weight:800; color:white; line-height:1.2; margin-bottom:3pt;">Qualified<br>Plan</div>
+          <div style="font-size:7.5pt; color:#8DAFC8; margin-bottom:5pt;">${iraBalance}</div>
+          <div style="width:100%; height:1pt; background:rgba(200,169,110,0.3); margin-bottom:5pt;"></div>
+          <div style="font-size:6.5pt; color:#C8A96E; font-style:italic;">IRA / 401(k)<br>Traditional QP</div>
+        </div>
+        <div style="text-align:center; margin-top:4pt;">
+          <svg width="90" height="18" viewBox="0 0 90 18" style="overflow:visible;">
+            <line x1="5" y1="9" x2="85" y2="9" stroke="#C8A96E" stroke-width="1.5" stroke-dasharray="3,2"/>
+            <polygon points="82,5 90,9 82,13" fill="#C8A96E"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- CENTER: layer cards -->
+      <div style="flex:1; display:flex; flex-direction:column; gap:6pt;">
+
+        <div style="display:flex; align-items:center; gap:8pt;">
+          <div style="width:22pt; text-align:center; flex-shrink:0;">
+            <div style="background:#9B7EC8; color:white; font-size:7pt; font-weight:800; border-radius:50%; width:18pt; height:18pt; display:flex; align-items:center; justify-content:center; margin:auto;">L1</div>
+          </div>
+          <div style="flex:1; background:white; border:1pt solid #DDD; border-top:2.5pt solid #9B7EC8; border-radius:0 3pt 3pt 0; padding:5pt 8pt;">
+            <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2pt;">
+              <div style="font-size:8pt; font-weight:800; color:#1A2B3C;">Roth Fixed Indexed Annuity</div>
+              <div style="font-size:7pt; font-weight:700; color:#9B7EC8;">${inputs.rothAnnuityMonthly > 0 ? '$'+Math.round(inputs.rothAnnuityMonthly).toLocaleString()+'/mo · tax-free' : 'Guaranteed Income · Tax-Free'}</div>
+            </div>
+            <div style="font-size:6.5pt; color:#445566; line-height:1.5;">QP funds repositioned → Roth annuity with GLWB rider. Guaranteed income begins age ${inputs.rothAnnuityStartAge || 70}. Markets cannot reduce it. Longevity cannot exhaust it.</div>
+          </div>
+          <div style="width:60pt; flex-shrink:0; text-align:center;">
+            <div style="background:rgba(155,126,200,0.08); border:1pt solid rgba(155,126,200,0.3); border-radius:3pt; padding:4pt 5pt;">
+              <div style="font-size:6pt; color:#9B7EC8; text-transform:uppercase; letter-spacing:.5pt;">Benefit</div>
+              <div style="font-size:8pt; font-weight:700; color:#1A2B3C; line-height:1.2;">${inputs.rothConversionAmount > 0 ? fmtD(inputs.rothConversionAmount) : '—'}</div>
+              <div style="font-size:5.5pt; color:#7A95A8;">converted</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:8pt;">
+          <div style="width:22pt; text-align:center; flex-shrink:0;">
+            <div style="background:#5B8FA8; color:white; font-size:7pt; font-weight:800; border-radius:50%; width:18pt; height:18pt; display:flex; align-items:center; justify-content:center; margin:auto;">L2</div>
+          </div>
+          <div style="flex:1; background:white; border:1pt solid #DDD; border-top:2.5pt solid #5B8FA8; border-radius:0 3pt 3pt 0; padding:5pt 8pt;">
+            <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2pt;">
+              <div style="font-size:8pt; font-weight:800; color:#1A2B3C;">Living Benefits IUL — ${clientLabel}</div>
+              <div style="font-size:7pt; font-weight:700; color:#5B8FA8;">Chronic Care · Tax-Free Income · Tax-Free Death Benefit</div>
+            </div>
+            <div style="font-size:6.5pt; color:#445566; line-height:1.5;">QP gross draws fund total net premium of ${l2TotalNetP > 0 ? fmtD(l2TotalNetP) : '[net premium]'}${l2YearsP > 1 ? ' ('+fmtD(inputs.ltcNetAmount)+'/yr &times; '+l2YearsP+' yrs, starting age '+inputs.ltcFundingAge+')' : ''}${inputs.ltcDeathBenefit > 0 ? ' &middot; '+fmtD(inputs.ltcDeathBenefit)+' initial death benefit' : ''}.</div>
+          </div>
+          <div style="width:60pt; flex-shrink:0; text-align:center;">
+            <div style="background:rgba(91,143,168,0.08); border:1pt solid rgba(91,143,168,0.3); border-radius:3pt; padding:4pt 5pt;">
+              <div style="font-size:6pt; color:#5B8FA8; text-transform:uppercase; letter-spacing:.5pt;">Net Prem.</div>
+              <div style="font-size:8pt; font-weight:700; color:#1A2B3C;">${l2TotalNetP > 0 ? fmtD(l2TotalNetP) : '—'}</div>
+              <div style="font-size:5.5pt; color:#7A95A8;">total</div>
+            </div>
+          </div>
+        </div>
+
+        ${inputs.filingStatus === 'mfj' ? `
+        <div style="display:flex; align-items:center; gap:8pt;">
+          <div style="width:22pt; text-align:center; flex-shrink:0;">
+            <div style="background:#5B8FA8; color:white; font-size:7pt; font-weight:800; border-radius:50%; width:18pt; height:18pt; display:flex; align-items:center; justify-content:center; margin:auto; opacity:0.75;">L2</div>
+          </div>
+          <div style="flex:1; background:white; border:1pt solid #DDD; border-top:2.5pt solid #5B8FA8; border-radius:0 3pt 3pt 0; padding:5pt 8pt; opacity:0.9;">
+            <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2pt;">
+              <div style="font-size:8pt; font-weight:800; color:#1A2B3C;">Living Benefits IUL — ${clientInfo.spouseName || 'Spouse'}</div>
+              <div style="font-size:7pt; font-weight:700; color:#5B8FA8;">Chronic Care · Tax-Free Income · Tax-Free Death Benefit</div>
+            </div>
+            <div style="font-size:6.5pt; color:#445566; line-height:1.5;">Mirrors primary Layer 2 structure. QP gross draws starting age ${inputs.spouseLtcFundingAge || inputs.ltcFundingAge || 60} fund total net premium of ${l2TotalNetS > 0 ? fmtD(l2TotalNetS) : '[spouse net premium]'}${l2YearsS > 1 ? ' ('+fmtD(inputs.spouseLtcNetAmount)+'/yr &times; '+l2YearsS+' yrs)' : ''}${inputs.spouseLtcDeathBenefit > 0 ? ' &middot; '+fmtD(inputs.spouseLtcDeathBenefit)+' initial death benefit' : ''}.</div>
+          </div>
+          <div style="width:60pt; flex-shrink:0; text-align:center;">
+            <div style="background:rgba(91,143,168,0.08); border:1pt solid rgba(91,143,168,0.3); border-radius:3pt; padding:4pt 5pt;">
+              <div style="font-size:6pt; color:#5B8FA8; text-transform:uppercase; letter-spacing:.5pt;">Net Prem.</div>
+              <div style="font-size:8pt; font-weight:700; color:#1A2B3C;">${l2TotalNetS > 0 ? fmtD(l2TotalNetS) : '—'}</div>
+              <div style="font-size:5.5pt; color:#7A95A8;">total</div>
+            </div>
+          </div>
+        </div>` : ''}
+
+        <div style="display:flex; align-items:center; gap:8pt;">
+          <div style="width:22pt; text-align:center; flex-shrink:0;">
+            <div style="background:#4A9B7A; color:white; font-size:7pt; font-weight:800; border-radius:50%; width:18pt; height:18pt; display:flex; align-items:center; justify-content:center; margin:auto;">L3</div>
+          </div>
+          <div style="flex:1; background:white; border:1pt solid #DDD; border-top:2.5pt solid #4A9B7A; border-radius:0 3pt 3pt 0; padding:5pt 8pt;">
+            <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2pt;">
+              <div style="font-size:8pt; font-weight:800; color:#1A2B3C;">ETA Life Policy (Layer 3)</div>
+              <div style="font-size:7pt; font-weight:700; color:#4A9B7A;">Tax Elimination · RMD Reduction · Income Age ${inputs.etaStartAge || 70}</div>
+            </div>
+            <div style="font-size:6.5pt; color:#445566; line-height:1.5;">Bank non-recourse loan covers IRA distribution tax. Full gross proceeds enter IUL policy tax-free. Policy loan income begins age ${inputs.etaStartAge || 70}${inputs.etaAnnualIncome > 0 ? ' · $'+Math.round(inputs.etaAnnualIncome).toLocaleString()+'/yr' : ''}.</div>
+          </div>
+          <div style="width:60pt; flex-shrink:0; text-align:center;">
+            <div style="background:rgba(74,155,122,0.08); border:1pt solid rgba(74,155,122,0.3); border-radius:3pt; padding:4pt 5pt;">
+              <div style="font-size:6pt; color:#4A9B7A; text-transform:uppercase; letter-spacing:.5pt;">Funded</div>
+              <div style="font-size:8pt; font-weight:700; color:#1A2B3C;">${inputs.etaFundingAmount > 0 ? fmtD(inputs.etaFundingAmount) : '—'}</div>
+              <div style="font-size:5.5pt; color:#7A95A8;">at age ${inputs.etaFundingAge || 60}</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:8pt;">
+          <div style="width:22pt; text-align:center; flex-shrink:0;">
+            <div style="background:#C8A96E; color:white; font-size:7pt; font-weight:800; border-radius:50%; width:18pt; height:18pt; display:flex; align-items:center; justify-content:center; margin:auto;">L4</div>
+          </div>
+          <div style="flex:1; background:white; border:1pt solid #DDD; border-top:2.5pt solid #C8A96E; border-radius:0 3pt 3pt 0; padding:5pt 8pt;">
+            <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2pt;">
+              <div style="font-size:8pt; font-weight:800; color:#1A2B3C;">Qualified Plan — Remainder (L4)</div>
+              <div style="font-size:7pt; font-weight:700; color:#C8A96E;">Immediate Liquidity · Tax-Deferred Growth · Reserve</div>
+            </div>
+            <div style="font-size:6.5pt; color:#445566; line-height:1.5;">Balance of the QP after L1–L3 funding, including the portion of Layer 1's conversion tax not financed by Layer 3. Accessible for emergencies and discretionary spending.</div>
+          </div>
+          <div style="width:60pt; flex-shrink:0; text-align:center;">
+            <div style="background:rgba(200,169,110,0.08); border:1pt solid rgba(200,169,110,0.3); border-radius:3pt; padding:4pt 5pt;">
+              <div style="font-size:6pt; color:#C8A96E; text-transform:uppercase; letter-spacing:.5pt;">Remains</div>
+              <div style="font-size:8pt; font-weight:700; color:#1A2B3C;">${inputs.traditionalBalance > 0 ? fmtD(l4RemainderVal) : '—'}</div>
+              <div style="font-size:5.5pt; color:#7A95A8;">stays in QP</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+  <div class="footer-bar">
+    <span>For discussion purposes only. All projections are hypothetical illustrations. Not investment, tax, or legal advice.</span>
+    <span class="footer-center">IncomeArc™ is proprietary to Integrated Planning Partners. This document is confidential.</span>
+    <span></span>
+  </div>
+</div>
+</body></html>`;
+
+                const fileName = `IncomeArc-OnePager-${(fullName).replace(/[^a-zA-Z0-9]/g,'-')}-${new Date().toISOString().slice(0,10)}.pdf`;
+                const pdfRes = await fetch('https://api.pdfshift.io/v3/convert/pdf', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Basic ' + btoa('api:sk_16ca63aa484a6cb3d2c5b071206cdcde035967d3'),
+                  },
+                  body: JSON.stringify({
+                    source: onePagerHtml,
+                    landscape: true,
+                    format: 'Letter',
+                    margin: '0',
+                    use_print: false,
+                  }),
+                });
+                if (!pdfRes.ok) {
+                  const errText = await pdfRes.text();
+                  throw new Error('PDFShift ' + pdfRes.status + ': ' + errText);
+                }
+                const pdfArrayBuffer = await pdfRes.arrayBuffer();
+                const pdfBytes = new Uint8Array(pdfArrayBuffer);
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                const blobUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = blobUrl; a.download = fileName; a.click();
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 15000);
+              } catch(e) {
+                console.error('One-pager export error:', e.message);
+                setOnePagerError(e.message || String(e));
+              } finally {
+                setOnePagerSending(false);
+              }
+            }}
+            style={{
+              padding:'8px 16px',borderRadius:7,fontSize:13,fontWeight:600,
+              fontFamily:"'DM Sans',sans-serif",cursor:'pointer',
+              background:'rgba(74,155,122,.12)',border:'1px solid rgba(74,155,122,.35)',
+              color:'#4A9B7A',letterSpacing:'.05em',display:'flex',alignItems:'center',gap:7,
+              transition:'all .2s',
+            }}>
+            <span style={{fontSize:15}}>📄</span> {onePagerSending ? 'Exporting…' : onePagerError ? 'Retry One-Pager' : 'Export One-Pager'}
           </button>
         </div>
       </div>
