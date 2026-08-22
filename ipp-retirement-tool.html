@@ -996,7 +996,8 @@ function projectArc(inputs) {
       if (archLtcNetAmount > 0 && ltcFundingAge > 0 && a >= ltcFundingAge && a < ltcFundingAge + ltcFundingYearsN) {
         const preRetPenalty = a < 59.5 ? 0.10 : 0;
         const preRetAGI = (pensionMonthly > 0 && a >= pensionStartAge ? pensionMonthly * 12 : 0)
-          + (partTimeMonthly > 0 ? partTimeMonthly * 12 : 0);
+          + (partTimeMonthly > 0 ? partTimeMonthly * 12 : 0)
+          + (householdIncome || 0);
         const { grossDraw: ltcGrossPre } = grossUpIterative(archLtcNetAmount, preRetBrackets, preRetAGI);
         const ltcFundPre = Math.min(ltcGrossPre, trad);
         trad = Math.max(0, trad - ltcFundPre - (ltcFundPre * preRetPenalty));
@@ -1004,7 +1005,8 @@ function projectArc(inputs) {
       if (archSpouseLtcNetAmount > 0 && spouseLtcFundingAge > 0 && a >= spouseLtcFundingAge && a < spouseLtcFundingAge + spouseLtcFundingYearsN) {
         const preRetPenaltySp = a < 59.5 ? 0.10 : 0;
         const preRetAGISp = (pensionMonthly > 0 && a >= pensionStartAge ? pensionMonthly * 12 : 0)
-          + (partTimeMonthly > 0 ? partTimeMonthly * 12 : 0);
+          + (partTimeMonthly > 0 ? partTimeMonthly * 12 : 0)
+          + (householdIncome || 0);
         const { grossDraw: ltcGrossPreSp } = grossUpIterative(archSpouseLtcNetAmount, preRetBrackets, preRetAGISp);
         const ltcFundPreSp = Math.min(ltcGrossPreSp, trad);
         trad = Math.max(0, trad - ltcFundPreSp - (ltcFundPreSp * preRetPenaltySp));
@@ -1066,13 +1068,15 @@ function projectArc(inputs) {
       if (archLtcNetAmount > 0 && ltcFundingAge > 0 && _a >= ltcFundingAge && _a < ltcFundingAge + ltcFundingYearsN) {
         const _p = _a < 59.5 ? 0.10 : 0;
         const _brk = filingStatus === 'mfj' ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025;
-        const { grossDraw: _g } = grossUpIterative(archLtcNetAmount, _brk, 0);
+        const _preRetActive = _a < ssClaimAge && (!(pensionMonthly > 0) || _a < pensionStartAge);
+        const { grossDraw: _g } = grossUpIterative(archLtcNetAmount, _brk, _preRetActive ? (householdIncome || 0) : 0);
         _mcBOY_ira = Math.max(0, _mcBOY_ira - _g - (_g * _p));
       }
       if (archSpouseLtcNetAmount > 0 && spouseLtcFundingAge > 0 && _a >= spouseLtcFundingAge && _a < spouseLtcFundingAge + spouseLtcFundingYearsN) {
         const _ps = _a < 59.5 ? 0.10 : 0;
         const _brkS = filingStatus === 'mfj' ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025;
-        const { grossDraw: _gs } = grossUpIterative(archSpouseLtcNetAmount, _brkS, 0);
+        const _preRetActiveSp = _a < ssClaimAge && (!(pensionMonthly > 0) || _a < pensionStartAge);
+        const { grossDraw: _gs } = grossUpIterative(archSpouseLtcNetAmount, _brkS, _preRetActiveSp ? (householdIncome || 0) : 0);
         _mcBOY_ira = Math.max(0, _mcBOY_ira - _gs - (_gs * _ps));
       }
     }
@@ -1089,6 +1093,15 @@ function projectArc(inputs) {
       : portfolioReturn;
     const row = { age, sources: {}, totalIncome: 0, totalExpense: 0, gap: 0 };
     row.yearReturn = yearReturn; // stored for chart annotation
+    // Pre-retirement household income — sets the tax rate during the IncomeArc
+    // implementation window (L1/L2/L3 funding years), before real retirement income
+    // (SS/pension) has started. Feeds into ordinary income the same way part-time
+    // work would, so it correctly stacks with — and is superseded by — modeled
+    // retirement income once SS/pension actually begin.
+    const _preRetIncomeActive = age < ssClaimAge && (!(pensionMonthly > 0) || age < pensionStartAge);
+    if (_preRetIncomeActive && (householdIncome || 0) > 0) {
+      row.sources.parttime = (row.sources.parttime || 0) + householdIncome;
+    }
 
     // ── ETA Lump-Sum Funding Event ──
     // Tax AND any early withdrawal penalty are financed externally (bank loan / policy financing).
@@ -1242,7 +1255,7 @@ function projectArc(inputs) {
     // Part-time income
     if (partTimeMonthly > 0 && age <= partTimeEndAge) {
       const ptAnnual = partTimeMonthly * 12 * inflFactor;
-      row.sources.parttime = ptAnnual;
+      row.sources.parttime = (row.sources.parttime || 0) + ptAnnual; // additive — pre-retirement household income may have already seeded this
       row.totalIncome += ptAnnual;
     }
 
@@ -1756,15 +1769,22 @@ function projectArc(inputs) {
     if (row._conversionOveragePending) {
       const { convAmt, financed } = row._conversionOveragePending;
       const allInRate = row.allInMarginalRate || taxResult.marginalRate;
-      const convTax = convAmt * allInRate;                              // actual tax on conversion
+      const convTax = convAmt * allInRate;                              // actual tax on conversion (no penalty — conversions are penalty-exempt)
       const overageTax = Math.max(0, convTax - financed);              // unfinanced portion — must come from IRA
+      // The overage draw itself is a STRAIGHT distribution, not a conversion — so if
+      // under 59.5 it owes the 10% early-withdrawal penalty on top of ordinary tax,
+      // same as any other IRA draw. Previously this only grossed up for the marginal
+      // rate, silently dropping the penalty and understating the draw (and overstating
+      // whatever balance — e.g. L4 — the shortfall was implicitly assumed to come from).
+      const overagePenaltyRate = age < 59.5 ? 0.10 : 0;
       if (overageTax > 0 && trad > 0) {
-        const grossUp = Math.min(trad, overageTax / (1 - allInRate));  // gross-up so net covers the overage
+        const grossUp = Math.min(trad, overageTax / Math.max(0.01, 1 - allInRate - overagePenaltyRate));  // gross-up so net covers the overage, tax AND penalty
         trad = Math.max(0, trad - grossUp);
         // NOT added to sources.rmd — tax-covering draw, not spendable income
         row.totalIncome += grossUp;
         row.rothConversionOverage = grossUp;
         row.rothConversionOverageTax = overageTax;
+        row.rothConversionOveragePenalty = grossUp * overagePenaltyRate;
         row.rothConversionMarginalRate = allInRate;
       }
       delete row._conversionOveragePending;
