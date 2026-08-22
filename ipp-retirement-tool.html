@@ -4602,7 +4602,8 @@ function App() {
           <strong>Taxable portfolio:</strong> ${fmtD(inputs.taxableBalance||0)} &nbsp;·&nbsp;
           <strong>SS ${clientLabel}:</strong> $${Math.round((inputs.ssIncome||0)/12).toLocaleString()}/mo at ${inputs.ssStartAge||67}${isMFJ && inputs.spouseSsIncome ? ` &nbsp;·&nbsp; <strong>SS ${clientInfo.spouseName||'Spouse'}:</strong> $${Math.round(inputs.spouseSsIncome/12).toLocaleString()}/mo` : ''}<br>
           <strong>Return:</strong> ${inputs.portfolioReturn}% mean (log-normal) &nbsp;·&nbsp; <strong>Inflation:</strong> ${inputs.inflation}%<br>
-          <strong>Horizon:</strong> ${horizonDesc} &nbsp;·&nbsp; <strong>Expenses:</strong> $${Math.round(((inputs.fixedExpenses||0)+(inputs.lifestyleExpenses||0))*12).toLocaleString()}/yr (inflation-adjusted) &nbsp;·&nbsp; <strong>Trials:</strong> 1,000
+          <strong>Horizon:</strong> ${horizonDesc} &nbsp;·&nbsp; <strong>Expenses:</strong> $${Math.round(((inputs.fixedExpenses||0)+(inputs.lifestyleExpenses||0))*12).toLocaleString()}/yr (inflation-adjusted)<br>
+          <strong>Trials:</strong> 1,000
         </div>
       </div>
     </div>
