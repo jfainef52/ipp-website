@@ -3,6 +3,14 @@
     {
       "source": "/api/article-ssr",
       "destination": "/api/article-ssr"
+    },
+    {
+      "source": "/lender-journey",
+      "destination": "/lender-journey.html"
+    },
+    {
+      "source": "/iul-mechanics",
+      "destination": "/iul-mechanics.html"
     }
   ]
 }
