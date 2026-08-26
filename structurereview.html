@@ -4618,6 +4618,12 @@ function netWorthWarrantsEstate(nw) {
   return ["nw_2_5m","nw_5_10m","nw_10_20m","nw_over20m"].includes(nw);
 }
 
+function fmtCurrency(v) {
+  const n = Number(v);
+  if (v===undefined || v===null || v==="" || isNaN(n)) return null;
+  return "$" + Math.round(n).toLocaleString("en-US");
+}
+
 // ─────────────────────────────────────────
 // QUESTION BANK
 // ─────────────────────────────────────────
@@ -4811,6 +4817,21 @@ const QUESTIONS = [
   { id:"net_worth", phase:"universal", type:"single", q:"Roughly what is your estimated total net worth — including all assets?",
     why:"Net worth helps us identify whether estate planning is a priority. State-level estate taxes can apply at lower thresholds than federal, and the structure of how assets transfer matters at many levels.",
     options:[{id:"nw_under500k",label:"Under $500,000"},{id:"nw_500k_1m",label:"$500,000 – $1,000,000"},{id:"nw_1_2m",label:"$1,000,000 – $2,000,000"},{id:"nw_2_5m",label:"$2,000,000 – $5,000,000"},{id:"nw_5_10m",label:"$5,000,000 – $10,000,000"},{id:"nw_10_20m",label:"$10,000,000 – $20,000,000"},{id:"nw_over20m",label:"Over $20,000,000"}] },
+  { id:"nq_balance", phase:"universal", type:"currency",
+    q:"Roughly how much do you have in non-qualified investment or brokerage accounts?",
+    placeholder:"e.g. 250000",
+    why:"Non-qualified (taxable) accounts are structured very differently than retirement accounts — there's no RMD obligation, but there are opportunities to improve tax efficiency and protect against market risk that qualified accounts don't offer.",
+  },
+  { id:"exp_fixed", phase:"universal", type:"currency",
+    q:"Roughly what are your monthly fixed living expenses — mortgage or rent, utilities, auto insurance, and similar recurring costs?",
+    placeholder:"e.g. 6500",
+    why:"Fixed expenses are the baseline income your plan has to guarantee, no matter what markets do. Knowing this number is the foundation for sizing a protected income floor.",
+  },
+  { id:"exp_lifestyle", phase:"universal", type:"currency",
+    q:"And roughly what are your monthly lifestyle expenses — dining out, travel, hobbies, and other discretionary spending?",
+    placeholder:"e.g. 3000",
+    why:"Lifestyle spending is where flexibility lives in a retirement plan. Separating it from fixed costs helps us decide how much income needs to be guaranteed versus how much can stay exposed to market growth.",
+  },
   // ── EXISTING ADVISORS ──
   { id:"has_cpa", phase:"universal", type:"single",
     q:"Do you have a CPA or tax advisor you work with?",
@@ -4913,9 +4934,10 @@ const QUESTIONS = [
       {id:"rp_all",     label:"Virtually all of it is in Roth"},
     ],
   },
-  { id:"qp_balance", phase:"qp", type:"single", q:"Roughly how much is in your qualified retirement accounts?",
+  { id:"qp_balance", phase:"qp", type:"currency", q:"Roughly how much is in your qualified retirement accounts?",
+    placeholder:"e.g. 750000",
     why:"The size of the account determines which repositioning strategies are economically meaningful — some require scale to work well.",
-    options:[{id:"under500k",label:"Under $500,000"},{id:"500k_1m",label:"$500,000 – $1,000,000"},{id:"1m_2m",label:"$1,000,000 – $2,000,000"},{id:"2m_5m",label:"$2,000,000 – $5,000,000"},{id:"over5m",label:"Over $5,000,000"}] },
+  },
   { id:"rmd_status", phase:"qp", type:"single",
     computedQ: true,
     q:"Do you have a plan to address the tax impact of your Required Minimum Distributions?",
@@ -5213,7 +5235,7 @@ function buildSequence(answers) {
   // the event type. Skip it and pre-populate via the report generator.
   const bizSaleRedundant = (emp==="business_owner"||asset==="business") && event==="business_sale";
 
-  const qpBig=["2m_5m","over5m"].includes(answers.qp_balance);
+  const qpBig=Number(answers.qp_balance)>=2000000;
   const leBig=["le_500_1m","le_over1m"].includes(answers.le_size);
   if (netWorthWarrantsEstate(nw)||qpBig||leBig||emp==="business_owner")
     seq.push(...QUESTIONS.filter(q=>q.phase==="estate"));
@@ -5307,7 +5329,7 @@ function generateReport(answers) {
   const retireAge=parseInt(answers.retire_age)||null;
   const yearsToRetire=(age!==null&&retireAge!==null&&retireAge>age)?retireAge-age:null;
 
-  if (answers.qp_balance&&answers.qp_balance!=="under500k") {
+  if (answers.qp_balance&&Number(answers.qp_balance)>=500000) {
     tracks.push("qp");
     if (answers.rmd_status === "rmd_no" || answers.rmd_status === "rmd_partial")
       flags.push({priority:"high",track:"IncomeArc™ QP",text:"RMDs are active or imminent — repositioning window is open now. A tax-free income structure via Roth FIA and ETA IUL should be modeled immediately."});
@@ -5445,6 +5467,38 @@ function NumberInput({value,onChange,placeholder,onNext}) {
   );
 }
 
+function CurrencyInput({value,onChange,placeholder,onNext}) {
+  // Keep the raw numeric string as the source of truth (passed to onChange),
+  // but display it comma-formatted so users can visually verify the amount.
+  const digitsOnly = s => (s||"").replace(/[^\d]/g,"");
+  const formatDisplay = s => {
+    const d = digitsOnly(s);
+    return d ? Number(d).toLocaleString("en-US") : "";
+  };
+  const [display,setDisplay]=useState(formatDisplay(value));
+
+  useEffect(()=>{ setDisplay(formatDisplay(value)); },[value]);
+
+  const handleChange = e => {
+    const raw = digitsOnly(e.target.value);
+    setDisplay(formatDisplay(raw));
+    onChange(raw);
+  };
+
+  return (
+    <div style={{animation:"fadeUp .3s ease .08s both"}}>
+      <div style={{position:"relative"}}>
+        <span style={{position:"absolute",left:16,top:"50%",transform:"translateY(-50%)",fontSize:22,fontWeight:600,color:"#6E8299",pointerEvents:"none"}}>$</span>
+        <input type="text" inputMode="numeric" value={display} placeholder={placeholder}
+          onChange={handleChange}
+          onKeyDown={e=>e.key==="Enter"&&value&&onNext()}
+          style={{width:"100%",padding:"15px 16px 15px 34px",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.12)",borderRadius:10,color:"#F5F2EC",fontSize:22,fontWeight:600,textAlign:"center",outline:"none",colorScheme:"dark"}}/>
+      </div>
+      <p style={{fontSize:11,color:"#6E8299",textAlign:"center",marginTop:8}}>Enter your best estimate — round numbers are fine</p>
+    </div>
+  );
+}
+
 // ── Question Screen ──
 // Anchored motivation questions get a split layout: fact block above, then question + choices below
 function QuestionScreen({question:questionProp,answer,onAnswer,onNext,onBack,stepNum,totalSteps,allAnswers={}}) {
@@ -5486,7 +5540,7 @@ function QuestionScreen({question:questionProp,answer,onAnswer,onNext,onBack,ste
 
   useEffect(()=>{
     setTextVal(answer||""); setMultiSel(Array.isArray(answer)?answer:[]); setShowWhy(false);
-    if((question.type==="text"||question.type==="number")&&inputRef.current) setTimeout(()=>inputRef.current?.focus(),100);
+    if((question.type==="text"||question.type==="number"||question.type==="currency")&&inputRef.current) setTimeout(()=>inputRef.current?.focus(),100);
   },[question.id]);
 
   const toggleMulti=id=>{const n=multiSel.includes(id)?multiSel.filter(x=>x!==id):[...multiSel,id];setMultiSel(n);onAnswer(n);};
@@ -5496,6 +5550,7 @@ function QuestionScreen({question:questionProp,answer,onAnswer,onNext,onBack,ste
     question.type==="email"?isValidEmail(textVal):
     question.type==="text"?(question.id==="open_concerns"||question.id==="retirement_vision"||question.id==="cpa_name"||question.id==="advisor_name"||question.id==="attorney_name"||question.id==="referring_advisor_name"||question.id==="phone"||textVal.trim().length>0):
     question.type==="number"?(!!answer&&parseInt(answer)>=30&&parseInt(answer)<=90):
+    question.type==="currency"?(answer!==undefined&&answer!==null&&answer!==""&&parseFloat(answer)>=0):
     question.type==="multi"?multiSel.length>0:
     question.type==="date"?(!!answer&&calcAge(answer)!==null):
     question.type==="select"?!!answer:
@@ -5614,6 +5669,7 @@ function QuestionScreen({question:questionProp,answer,onAnswer,onNext,onBack,ste
         )}
         {question.type==="date"&&<DateInput value={answer} onChange={onAnswer} dateDisplay={question.dateDisplay}/>}
         {question.type==="number"&&<NumberInput value={answer} onChange={onAnswer} placeholder={question.placeholder} onNext={onNext}/>}
+        {question.type==="currency"&&<CurrencyInput value={answer} onChange={onAnswer} placeholder={question.placeholder} onNext={onNext}/>}
         {question.type==="select"&&(
           <div style={{animation:"fadeUp .3s ease .08s both",position:"relative"}}>
             <select value={answer||""} onChange={e=>onAnswer(e.target.value)}
@@ -5642,7 +5698,7 @@ function QuestionScreen({question:questionProp,answer,onAnswer,onNext,onBack,ste
               color:"#6E8299",flexShrink:0,display:"flex",alignItems:"center",gap:6
             }}>← Back</button>
           )}
-          <button ref={continueRef} onClick={()=>{if(question.type==="text"||question.type==="number")onAnswer(textVal||answer);onNext();}} disabled={!canContinue} style={{
+          <button ref={continueRef} onClick={()=>{if(question.type==="text"||question.type==="number"||question.type==="currency")onAnswer(textVal||answer);onNext();}} disabled={!canContinue} style={{
             flex:1,padding:"15px",borderRadius:11,fontSize:14,fontWeight:700,letterSpacing:".03em",
             background:canContinue?"#C8A96E":"rgba(255,255,255,.06)",
             color:canContinue?"#0E1824":"#3A5268",
@@ -5957,8 +6013,7 @@ function CompletionScreen({onReport,onAdvisor,answers,report,advisorId,advisorCo
       // ── Step 2: Build email content ──
       const clientHtml = buildClientEmailHtml();
       const trackList = report.tracks.join(', ').toUpperCase();
-      const qpBalanceLabels = {'under500k':'Under $500,000','500k_1m':'$500,000 – $1,000,000','1m_2m':'$1,000,000 – $2,000,000','2m_5m':'$2,000,000 – $5,000,000','over5m':'Over $5,000,000'};
-      const qpBalanceLabel = qpBalanceLabels[answers.qp_balance] || answers.qp_balance || '—';
+      const qpBalanceLabel = fmtCurrency(answers.qp_balance) || answers.qp_balance || '—';
       const rmdLabels = {'rmd_yes':'Yes — strategy in place','rmd_partial':'Somewhat — thought about it','rmd_no':'Not on radar'};
       const rmdLabel = rmdLabels[answers.rmd_status] || answers.rmd_status || '—';
       const srLink = 'https://www.integratedplanningpartners.com/sr-full-answers.html?sr_id=' + (report.srId||'') + '&client_id=' + (report.clientId||'');
@@ -6159,6 +6214,7 @@ function AdvisorBrief({answers,report,onBack}) {
     if(!v)return"(not provided)";
     if(q.type==="text")return v;
     if(q.type==="number")return`Age ${v}${yearsToRetire!==null?` — ${yearsToRetire} year${yearsToRetire===1?"":"s"} from now (${retireYear})`:""}`;
+    if(q.type==="currency")return fmtCurrency(v)||v;
     if(q.type==="date")return`${formatDOB(v)}${calcAge(v)!==null?` (age ${calcAge(v)})`:""}`;
     if(q.type==="multi"&&Array.isArray(v))return v.map(id=>q.options?.find(o=>o.id===id)?.label).filter(Boolean).join(", ");
     if(q.type==="select")return q.options?.find(o=>o.id===v)?.label||v;
