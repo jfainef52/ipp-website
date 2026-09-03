@@ -902,7 +902,7 @@ function projectArc(inputs) {
 
   // Guard against invalid inputs that would crash the projection loop
   if (!retireAge || !planToAge || retireAge >= planToAge || currentAge > retireAge) {
-    return { years: [], confidence: 0, fixedStreams: [], mcStartAge: retireAge || 65 };
+    return { years: [], confidence: 0, fixedStreams: [], mcStartAge: retireAge || 65, preRetFundingLog: [] };
   }
 
   const years = [];
@@ -1025,6 +1025,16 @@ function projectArc(inputs) {
   const ltcFundingYearsN       = Math.max(1, Math.round(ltcFundingYears || 1));
   const spouseLtcFundingYearsN = Math.max(1, Math.round(spouseLtcFundingYears || 1));
 
+  // ── Pre-retirement funding event log ──
+  // The pre-retirement accumulation loop below (currentAge → retireAge) does NOT
+  // create row objects — those only exist from retireAge onward. That means any L1/L2/L3
+  // funding event landing BEFORE retireAge (the common case — these are implementation
+  // events, not retirement withdrawals, so they usually fire well before "retirement age")
+  // was previously invisible to any code summing row.etaFundingAmount / row.ltcFundingAmount /
+  // row.rothConversionOverage — those sums would silently see $0 for a real, correctly-modeled
+  // event. This log captures those events explicitly so report code can sum BOTH sources.
+  const preRetFundingLog = [];
+
   if (currentAge < retireAge) {
     const tradStopAge    = tradContributionEndAge    > 0 ? tradContributionEndAge    : retireAge;
     const taxableStopAge = taxableContributionEndAge > 0 ? taxableContributionEndAge : retireAge;
@@ -1035,11 +1045,35 @@ function projectArc(inputs) {
       const spouseTradContrib = (annualSpouseTradContribution > 0 && a < spouseTradStopAge) ? annualSpouseTradContribution : 0;
       // ETA funding event — reduce trad balance in the funding year (pre-retirement)
       if (archEtaFundingAmount > 0 && etaFundingAge > 0 && a === etaFundingAge) {
-        trad = Math.max(0, trad - archEtaFundingAmount);
+        const fundAmtPre = Math.min(archEtaFundingAmount, trad);
+        trad = Math.max(0, trad - fundAmtPre);
+        preRetFundingLog.push({ type: 'eta', amount: fundAmtPre, age: a });
       }
       // Roth conversion event — reduce trad balance in conversion year (pre-retirement)
       if (archRothConversionAmount > 0 && rothConversionAge > 0 && a === rothConversionAge) {
-        trad = Math.max(0, trad - archRothConversionAmount);
+        const convAmtPre = Math.min(archRothConversionAmount, trad);
+        trad = Math.max(0, trad - convAmtPre);
+        preRetFundingLog.push({ type: 'l1Conversion', amount: convAmtPre, age: a });
+        // Overage tax — same logic as the retirement loop's post-tax resolution (see
+        // row._conversionOveragePending below), adapted for pre-retirement since no
+        // calcAnnualTax call runs here. Uses the same bracket-aware AGI stack as the
+        // L2 pre-retirement draws for consistency. Previously this branch had NO tax
+        // handling at all — the conversion tax was silently assumed to be fully
+        // financed regardless of the rothConversionFinanced input, which understated
+        // the real IRA draw whenever a conversion landed before retireAge.
+        const preRetAGIConv = (pensionMonthly > 0 && a >= pensionStartAge ? pensionMonthly * 12 : 0)
+          + (partTimeMonthly > 0 ? partTimeMonthly * 12 : 0)
+          + (householdIncome || 0);
+        const convBracket = preRetBrackets.find(b => (preRetAGIConv + convAmtPre) <= b.limit) || preRetBrackets[preRetBrackets.length - 1];
+        const convMarginalRate = convBracket.rate;
+        const convTaxPre = convAmtPre * convMarginalRate; // no penalty — conversions are penalty-exempt
+        const financedPre = Math.min(rothConversionFinanced || 0, convAmtPre);
+        const overageTaxPre = Math.max(0, convTaxPre - financedPre);
+        if (overageTaxPre > 0 && trad > 0) {
+          const overageGrossUp = Math.min(trad, overageTaxPre / Math.max(0.01, 1 - convMarginalRate));
+          trad = Math.max(0, trad - overageGrossUp);
+          preRetFundingLog.push({ type: 'l1Overage', amount: overageGrossUp, age: a });
+        }
       }
       // LTC/L2 policy funding draw — ANNUAL net premium drawn each year for a specified
       // number of years (ltcFundingYearsN), starting at ltcFundingAge. Each year's gross-up
@@ -1055,6 +1089,7 @@ function projectArc(inputs) {
         const { grossDraw: ltcGrossPre } = l2GrossUpForYear(a - ltcFundingAge, archLtcNetAmount, preRetBrackets, preRetAGI);
         const ltcFundPre = Math.min(ltcGrossPre, trad);
         trad = Math.max(0, trad - ltcFundPre - (ltcFundPre * preRetPenalty));
+        preRetFundingLog.push({ type: 'l2', amount: ltcFundPre, age: a });
       }
       if (archSpouseLtcNetAmount > 0 && spouseLtcFundingAge > 0 && a >= spouseLtcFundingAge && a < spouseLtcFundingAge + spouseLtcFundingYearsN) {
         const preRetPenaltySp = a < 59.5 ? 0.10 : 0;
@@ -1064,6 +1099,7 @@ function projectArc(inputs) {
         const { grossDraw: ltcGrossPreSp } = l2GrossUpForYear(a - spouseLtcFundingAge, archSpouseLtcNetAmount, preRetBrackets, preRetAGISp);
         const ltcFundPreSp = Math.min(ltcGrossPreSp, trad);
         trad = Math.max(0, trad - ltcFundPreSp - (ltcFundPreSp * preRetPenaltySp));
+        preRetFundingLog.push({ type: 'l2Sp', amount: ltcFundPreSp, age: a });
       }
       // Grow existing balance then add contribution (end-of-year)
       trad    = trad    * (1 + portfolioReturn) + tradContrib;
@@ -2046,7 +2082,7 @@ function projectArc(inputs) {
     mcTaxableBasisPct
   );
 
-  return { years, confidence, fixedStreams, mcStartAge };
+  return { years, confidence, fixedStreams, mcStartAge, preRetFundingLog };
 }
 
 // ── Input field component ──
@@ -3837,20 +3873,26 @@ function App() {
                   // ongoing L2 rate toggle silently had NO effect on the L4 number shown
                   // here, even though it correctly changed the actual simulation. Pulling the
                   // real per-row funding amounts fixes that mismatch.
-                  const archTaxYears    = projectArc({ ...baseProjectionInputs, architectureEnabled: true, sorrEnabled: false, expenseShockEnabled: false, ltcEventAge: 0, spouseLtcEventAge: 0 }).years;
-                  // ── L1 Roth-conversion overage — real value from the simulation's
-                  // row.rothConversionOverage (set once L3 financing is applied), not a
-                  // re-derived approximation.
+                  const archProjection  = projectArc({ ...baseProjectionInputs, architectureEnabled: true, sorrEnabled: false, expenseShockEnabled: false, ltcEventAge: 0, spouseLtcEventAge: 0 });
+                  const archTaxYears    = archProjection.years;
+                  const archPreRetLog   = archProjection.preRetFundingLog || [];
+                  const sumLog = (t) => archPreRetLog.filter(e=>e.type===t).reduce((s,e)=>s+e.amount,0);
+                  // ── L1 Roth-conversion overage — real value from the simulation, whether
+                  // the conversion landed pre- or post-retirement (row.rothConversionOverage
+                  // covers the latter, preRetFundingLog's 'l1Overage' entries cover the former —
+                  // conversions typically land BEFORE retireAge since they're implementation
+                  // events, not retirement withdrawals, so summing rows alone silently missed
+                  // this in the common case).
                   const l1ConvAmt = inputs.rothConversionAmount || 0;
                   const l1Financed = Math.min(inputs.rothConversionFinanced || 0, l1ConvAmt);
-                  const l1OverageDraw = archTaxYears.reduce((s,y)=>s+(y.rothConversionOverage||0),0);
-                  const l4GrossP = archTaxYears.reduce((s,y)=>s+(y.ltcFundingAmount||0),0);
-                  const l4GrossS = archTaxYears.reduce((s,y)=>s+(y.spouseLtcFundingAmount||0),0);
+                  const l1OverageDraw = archTaxYears.reduce((s,y)=>s+(y.rothConversionOverage||0),0) + sumLog('l1Overage');
+                  const l4GrossP = archTaxYears.reduce((s,y)=>s+(y.ltcFundingAmount||0),0) + sumLog('l2');
+                  const l4GrossS = archTaxYears.reduce((s,y)=>s+(y.spouseLtcFundingAmount||0),0) + sumLog('l2Sp');
                   // ── L3 multi-policy rollup for report display ──
                   // Falls back to the legacy single-policy scalar when l3Policies is empty,
                   // same rule the calc engine uses, so the report always matches the sim.
                   const l3PoliciesList = (inputs.l3Policies && inputs.l3Policies.length > 0) ? inputs.l3Policies : [];
-                  const l3TotalFunding = archTaxYears.reduce((s,y)=>s+(y.etaFundingAmount||0),0);
+                  const l3TotalFunding = archTaxYears.reduce((s,y)=>s+(y.etaFundingAmount||0),0) + sumLog('eta');
                   const l3PolicyCount  = l3PoliciesList.length > 0 ? l3PoliciesList.length : (l3TotalFunding > 0 ? 1 : 0);
                   const l3TotalLoan    = l3PoliciesList.reduce((s,p)=>s+((Number(p.fundingAmount)||0) * Math.min(Math.max((Number(p.ltvPct)||0)/100,0),1)),0);
                   const l4RemainderVal = Math.max(0, (inputs.traditionalBalance || 0) - (inputs.rothConversionAmount || 0) - l3TotalFunding - l4GrossP - l4GrossS - l1OverageDraw);
@@ -5236,15 +5278,18 @@ function App() {
                 // total), which never reflected the ongoing-rate-override toggle even
                 // though the actual simulation did — so the L4 number here didn't move
                 // when that toggle changed. Pulling real per-row amounts fixes that.
-                const oneParagraphYears = projectArc({ ...baseProjectionInputs, architectureEnabled: true, sorrEnabled: false, expenseShockEnabled: false, ltcEventAge: 0, spouseLtcEventAge: 0 }).years;
+                const oneParagraphProjection = projectArc({ ...baseProjectionInputs, architectureEnabled: true, sorrEnabled: false, expenseShockEnabled: false, ltcEventAge: 0, spouseLtcEventAge: 0 });
+                const oneParagraphYears = oneParagraphProjection.years;
+                const oneParagraphPreRetLog = oneParagraphProjection.preRetFundingLog || [];
+                const sumOnePagerLog = (t) => oneParagraphPreRetLog.filter(e=>e.type===t).reduce((s,e)=>s+e.amount,0);
                 const l1ConvAmt = inputs.rothConversionAmount || 0;
                 const l1Financed = Math.min(inputs.rothConversionFinanced || 0, l1ConvAmt);
-                const l1OverageDraw = oneParagraphYears.reduce((s,y)=>s+(y.rothConversionOverage||0),0);
-                const l4GrossP = oneParagraphYears.reduce((s,y)=>s+(y.ltcFundingAmount||0),0);
-                const l4GrossS = oneParagraphYears.reduce((s,y)=>s+(y.spouseLtcFundingAmount||0),0);
+                const l1OverageDraw = oneParagraphYears.reduce((s,y)=>s+(y.rothConversionOverage||0),0) + sumOnePagerLog('l1Overage');
+                const l4GrossP = oneParagraphYears.reduce((s,y)=>s+(y.ltcFundingAmount||0),0) + sumOnePagerLog('l2');
+                const l4GrossS = oneParagraphYears.reduce((s,y)=>s+(y.spouseLtcFundingAmount||0),0) + sumOnePagerLog('l2Sp');
                 // ── L3 multi-policy rollup — same rule as the printable report and the calc engine ──
                 const l3PoliciesList = (inputs.l3Policies && inputs.l3Policies.length > 0) ? inputs.l3Policies : [];
-                const l3TotalFunding = oneParagraphYears.reduce((s,y)=>s+(y.etaFundingAmount||0),0);
+                const l3TotalFunding = oneParagraphYears.reduce((s,y)=>s+(y.etaFundingAmount||0),0) + sumOnePagerLog('eta');
                 const l3PolicyCount  = l3PoliciesList.length > 0 ? l3PoliciesList.length : (l3TotalFunding > 0 ? 1 : 0);
                 const l4RemainderVal = Math.max(0, (inputs.traditionalBalance || 0) - (inputs.rothConversionAmount || 0) - l3TotalFunding - l4GrossP - l4GrossS - l1OverageDraw);
 
