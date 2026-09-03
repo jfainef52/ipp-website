@@ -511,22 +511,32 @@ function runMonteCarlo(startBalance, annualWithdraw, years, trials=1000, mean=0.
     ? fixedStreams
     : (fixedStreams > 0 ? [{ yearOffset: 0, annual: fixedStreams }] : []);
 
+  // Seed is deliberately built ONLY from structural/shape parameters — years,
+  // return/inflation assumptions, event AGES and DURATIONS, whether SORR/shocks
+  // are on — and NEVER from dollar amounts (startBalance, annualWithdraw, ssIncome,
+  // totalExpensesY1, shock amounts, stream dollar values). Two runs of the "same
+  // scenario shape" (same ages, same which-events-are-on, same market assumptions)
+  // always draw the identical sequence of simulated returns, even if a dollar input
+  // changes — e.g. a tax-rate tweak that shifts the starting balance by a few
+  // thousand dollars no longer reshuffles which of the 1,000 random futures gets
+  // drawn. This also means paired comparisons (status quo vs. architecture, using
+  // the same underlying ages/timeline) are tested against the same simulated market
+  // conditions, isolating the actual effect of the change instead of mixing in
+  // unrelated seed noise. A change to the SHAPE of the scenario (different event
+  // ages, a different funding-years count, SORR toggled) still legitimately draws
+  // a different sequence, which is correct — that's a genuinely different scenario.
   const seedVal = Math.round(
-    (startBalance * 0.001)
-    + (annualWithdraw * 0.1)
-    + (years * 1000)
+    (years * 1000)
     + (mean * 99991)
     + (inflation * 77777)
-    + (ssIncome * 0.01)
-    + (totalExpensesY1 * 0.007)
-    + (ltcShockAnnual * 0.0013)
     + (ltcShockYear * 333)
-    + (spouseLtcShockAnnual * 0.0009)
+    + (ltcShockDuration * 97)
     + (spouseLtcShockYear * 211)
-    + (expenseShockAmount * 0.0017)
+    + (spouseLtcShockDuration * 89)
     + (expenseShockFrequency * 53)
-    + streams.reduce((a, s) => a + s.annual * 0.003 + s.yearOffset * 17, 0)
-    + (sorrSchedule ? sorrSchedule.reduce((a, r, i) => a + r * (i+1) * 31337, 0) : 0)
+    + (streams.length * 4001)
+    + streams.reduce((a, s) => a + s.yearOffset * 17 + (s.colaRate > 0 ? 503 : 0), 0)
+    + (sorrSchedule ? (sorrSchedule.length * 6151 + sorrSchedule.reduce((a, r, i) => a + Math.round(r * 1000) * (i + 1) * 31337, 0)) : 0)
   ) ^ 0xDEADBEEF;
   const rand = seededRandom(seedVal);
   const sorrYears = sorrSchedule ? sorrSchedule.length : 0;
@@ -1130,7 +1140,11 @@ function projectArc(inputs) {
   // loop (where L1/L3 draw at retireAge). Then subtract L1 and L3 principal draws
   // that fire at retireAge in year 0 of the retirement loop.
   // This gives the true L4 bridge portfolio the MC should test against.
-  // Note: L1 tax is financed (not from portfolio) so we only subtract the principal.
+  // Note: if rothConversionFinanced fully covers the conversion tax, only the
+  // principal reduces the portfolio; any unfinanced overage is now also
+  // subtracted below (see the L1 branch inside the replay loop) — a conversion
+  // landing BEFORE retireAge already has its overage reflected in `trad` via
+  // the pre-retirement loop above, since _mcBOY_ira is captured after that loop.
   // Split MC starting balance into IRA (taxable draws) and taxable (lower effective tax).
   // Architecture draws all come from trad (IRA), so taxable is unaffected.
   // All draws subtract from IRA component only.
@@ -1153,8 +1167,26 @@ function projectArc(inputs) {
     for (let _a = retireAge; _a <= lastFundingAge; _a++) {
       if (archEtaFundingAmount > 0 && etaFundingAge > 0 && _a === etaFundingAge)
         _mcBOY_ira = Math.max(0, _mcBOY_ira - archEtaFundingAmount);
-      if (archRothConversionAmount > 0 && rothConversionAge > 0 && _a === rothConversionAge)
+      if (archRothConversionAmount > 0 && rothConversionAge > 0 && _a === rothConversionAge) {
         _mcBOY_ira = Math.max(0, _mcBOY_ira - archRothConversionAmount);
+        // Unfinanced portion of the conversion tax — previously this assumed
+        // rothConversionFinanced covered 100% of the tax regardless of what was
+        // actually entered, so the MC starting balance was overstated whenever
+        // financing was partial. Mirrors the pre-retirement loop's overage logic.
+        const _convAGI = (pensionMonthly > 0 && _a >= pensionStartAge ? pensionMonthly * 12 : 0)
+          + (partTimeMonthly > 0 ? partTimeMonthly * 12 : 0)
+          + (_a < ssClaimAge ? (householdIncome || 0) : 0);
+        const _convBrk = filingStatus === 'mfj' ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025;
+        const _convBracket = _convBrk.find(b => (_convAGI + archRothConversionAmount) <= b.limit) || _convBrk[_convBrk.length - 1];
+        const _convRate = _convBracket.rate;
+        const _convTax = archRothConversionAmount * _convRate;
+        const _convFinanced = Math.min(rothConversionFinanced || 0, archRothConversionAmount);
+        const _convOverageTax = Math.max(0, _convTax - _convFinanced);
+        if (_convOverageTax > 0) {
+          const _convOverageGross = _convOverageTax / Math.max(0.01, 1 - _convRate);
+          _mcBOY_ira = Math.max(0, _mcBOY_ira - _convOverageGross);
+        }
+      }
       if (archLtcNetAmount > 0 && ltcFundingAge > 0 && _a >= ltcFundingAge && _a < ltcFundingAge + ltcFundingYearsN) {
         const _p = _a < 59.5 ? 0.10 : 0;
         const _brk = filingStatus === 'mfj' ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025;
