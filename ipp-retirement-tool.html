@@ -67,6 +67,9 @@ window.openScenarioSummary = function(inputs, clientInfo) {
   var sName = (clientInfo&&clientInfo.spouseName)||inputs.spouseName||'';
   var aName = (clientInfo&&clientInfo.advisorName)||inputs.advisorName||'';
   var dateStr = new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+  var l3Policies = Array.isArray(inputs.l3Policies) ? inputs.l3Policies : [];
+  var l3TotalFundingSS = l3Policies.length > 0 ? l3Policies.reduce(function(s,p){return s+(Number(p.fundingAmount)||0);},0) : (inputs.etaFundingAmount||0);
+  var l3TotalIncomeSS  = l3Policies.length > 0 ? l3Policies.reduce(function(s,p){return s+(Number(p.annualIncome)||0);},0) : (inputs.etaAnnualIncome||0);
   var LOGO = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUAAAAFACAYAAADNkKWqAAAtC0lEQVR4nO3de3wcdb3/8ddukl4RSqEtgUAgrCCLFjGAo/hzVfCoPVWgNI5AuYi3c0BHagG5eKxVK9haKCOgcLRyqeCQHgpyURTRRZBViYKXQMu2JW3a0pZbS0tv2d3fH9/vZCfbTZqkoWmT9/PxyCPt7Mx3vjPZ/ex3vlcQEREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREQnF+jsDIiIiIrK7pKCyurp6RH/nQ0Rkd6oAyATehEzgPWK3xfsxPyK7nd7wMhwY29+ZEOkPCoCSB7b3dyZE+oMCoIBagWWQUgAUkUFLAVBEQnFM49igeSKo7O8MyF4tRvFLNNefGZE+ke/vDOxuKgHKrihgAt9bEfxikZ/Bol+vNxN4x2QC78QjjjhiXCQ/A5oCoPRGDCCRSOybCbyTM4H3/tra2mF9fI5C5Gew6K/rDQPdPOAvd1/7ySkAqVSqoh/yslspAEpvxAHmz5xwHPAE8GQw67RDo6/tqkQiMXT8+PEjE4nE0L5Ib29QU1MzfPy48SNTqVR/VU1to1iqHxRUByi7Im9/2tix5BLHlCwKdp8YEE/Z0ka6uL3DcUkY0gy5+TMnXAt8BrjDcf2rElCZNefZ4Zjupl1GV8eF9Zvhtg7H2H+HgSKegni6eD/C/WJALJJ+mHZpvioAFsyZ9EvgncA0J50OItdcLiCV5r2ztLt7XDTPg4YCoOyqOOVLfdGgUYGtK0zvuF/4GgDNphQCsA9wEDASyGU7L5V0O+1eHFfu2GgJKQwY+XT56y0AlEk/Tsf9w/TGYK45xu695vDLatBRAJS+FgPIBN5RQC2wwnH955PJ5JB50089Hjjc7tPiuP5fMSWcsKRVyATee4D9gGq7rSYTeB/CvFdzX/SCv/xjzZpNFINPDqjIBN7xwBGYD/mKMy5p/Pvq1avfZMdgg92Wq4eqmwLv3TZPlUDrlKsffjabzW44qvqoA++Y+/HjgQ2O6//ZnquQHJPcZ96Np74PaHNc//c2zwngXcASx/X/YfMUywTeO4A6ez1bgKWO6z9j8xPmK54JPAcYihmWWADGZwJvpc3TJnv+sBQNkDv6gKPfdvvNH3s3UIMZybPUcf2/23OXu+YYkLP5Pz5y3GKb5/C+DCqDKQDGaGjo3R+4sbHMN+r0OA3Nb823ZjJZYMa3ChDb6xoAkslkRXNzcw74CvBlYHYm8B4FbgIS0X0zgfdP4FLH9X9TX19f1dTUtB34X+A9kd1Osz8A3Oq7xzuu/0x9fX1lU1PT9kzgNQDfAMZH0144t2EZ8APH9W+mY0CIA/lM4J0PXIp55Gw3f+aEtcB04EXgV8C/7T5xIDfvxlPrgN8A6zMmeH4PcO3r19TU1LywYM6kC4EvAMeV3p9M4P0ZmOq4/lMA1dXVwzD1qNH30uX2B6Cttrb2bS0tLVvsPvlM4F0KfBUTxKJpNwHfdFz/YYqlvTDdQibwpmH+JoeXHPc4cBGwsTS/A91gCoCF8oGst2bkaey71MqkD0AqlapMjx3bx3nfLcL6ugnAZXbbo8BKzKPehzGlpocygfd+x/WfxgSRecCT9vV3Av8E/oAtgbmX3/8SELPB7zJglk07A/wRU6o5EfgocFMm8BKO63+NYukmnwm8a4Gv2/+vsMe9hgkoHwN+BPzN5n9LyXWF9XybgfsxgXct8ALw5wVzJh0D3Gj3fRZoAtYDhwAfB94L/DYTeCc4rv/8yJEjc8B3gVGYQDrW3qdmTBB75fDDD29raWmJYYLYncAUm/6vbD6HAR8C6u39PN9x/Tvs8YUyxzUDf7J/o/cAH8Q8qa+3rw+akuBgCIAxoJBInVMz/6IDjqBYwd1tZ9y5pWn1g7e+GU0vE3hHYD4wPU5vJ/LAxs/fsumlfz320zXpdLqt/bwNDfG9KBCGdYPHAv8APuO4/nPhi7b0tBBTGvk28Akg7rj+Tfb1mzEB8HeO608tTTwTeB/ABL8c4NmSXvT104E7gKmZwPu94/oP2O2nUQx+10+5+uFvZbPZDeFxRx555KE//95//hgTuMPriAobQQ6yP9+7YOqC655fteqV8PVM4F0PPOK4/iPRAzOBdwzwEOZR/WvAFw/JHpJzXP+b9vX3YQLg/zquf0/k0ArMe+5iTBB7BTjbcf3flKQffiHckgm8Jx3XX2qP+4o9Lgdc9fWbn70u8r7ClqLnAwdErnFQGPABMJVKVaTT6bb5Fx1wLuZxpccWnjtsvPMg/2T69HjqD3+I2zfPV4AdPph95SdfGrmBL3lLMKWf/3Nc/0kaG3M0NFTQ2NidFs7+FubvTYrBrxIoJElWOK7/TCbwvg38FDippqZmdGtr66u1tbXDDj/88DZMfRjA8BSpSnixEg5vS5MOGyEus+f4UST4hR/cmOP692UC7xvADcA04AH72qWYL5lf2pIhQGUKUwRasmTJisnT7p28YM6kZ4CjKD86Iry2uxzXv9r+u70eM5Juu+kmuD9ng+MNmFJqLE06B1SmUikofh7fliJVSe2LlemWljYgV1NTMzxyzdNs8AvPiT3v7EzgvQs4F/hv4NLkmOQ+9prDezXLHtd+zY7rN2YCb3/gljLXOqANmqIu5tEoj2llzPfip9S2XUxvZ+faFzgeE2SfyATeY5nA+4gtARZg+p7+twuv42kb/CqwXTqaaQ4bPjJ2n/0XzJk0BmDkyJF5+wUTHp9Pk26DljYbLHJ1dXX7Ae/HBLy7q6urR1RXV49IJBJDEonEkJqamqHV1dUjzr7ywfswAbi+trZ2VG1t7ShMvVwcuBmI10MV0JY2eWtLJpNDWltbNwN32vN31gUlhgkYcUzgCr+Uon+XeCKR2Lempmb0nePGHXhUdfWBmNJbDNgvmUxW2WNy9prDYGau2QS/AlBYMGfSuzCNSq+dd8mvH6qurh5RU1MzNLzmcePGjbRB8i57n1MA82489VjgMMz7/waKLb7hNeeAiilXP3w7pjog+rcb8AZ8CTAifHTprNtGf6dXKuzTlccEjw8DH84E3k1TfrZ4WvbXM7YyfXqcGTP21Ddr+GFeSflHqjywleL1decexoDCXddMHAuMttseXTi3obNHthimdZVg1mnjzp1270bgbfa1VUC+qeSAMc3NYWvr0kga5bQBrezYRzCfCbxjMaWuj2Lq/sqp2LZtW3ceNcN9DsXc033umPvxFV3sHwbkY+3/x9nj1pxxSeMqOrYmY18rZLPZrcCSyHkGhcEUAPc2YSkj2uk2Blw8/7NHHXfe5v3PWDxjxsumJLjHBsFQX3+gchS7kjwObOrkPDFsyf/Tl923YUQ+vw1TIhwB7E/xy6v9/m2sr4/R1FTABI5yabaX0ugY/OKY+rbxmEaVfYHFmLq1zZFjDsc0tPT0noR//62YRpLOOj0XMME5bNAIA17l/m1t8dXl0w7TGXTxYNBd8F4sHJe5HfjAHReNeeTsqoaPLH2UNyiOuBiooiWW2BmXNL60cG7DS5jS1TWO65fpD1xWBfA88G7gPOCJFMQhVQlpNtbXx2xXHICz7e9ule7tSJA2TMlvX+A+x/XPpORxMhN4H8QEwJ19abV3X7G/s/bf8SlXP3xBtOFmJ5bb48bNu/Gst9t+iGF1BPbf1NXV7QO8o+TcA96eXo8kO6rCBMH33PWF6vkwI9/r/o17vrCFvbDSfFDzQMF2cH7EvvYDW/dFCirr6+ur6uvrq+zx8XDFO7sth637Ay7IBN5FaWhLk25LQ1tTU9P2+vr6qkzg3QicYNPo1oQA6WJdYcLm8z4gnxyT3Ke2tnZYZOW9sL9iZ6W39n+vTCTaR3XYetRngJHzZ074YbhT5HorAex5wiqF+NfdZ5sxfRljmP6SYQkxLP3mgNxd10y8DDgwvG/dueaBQCXAvVMYBCdmAu9ix/VvamhoqGjsny4yXY0/7U6ptLPjV2M+tKmamprR2dbWV+vr66s2L18+tHnduo2YFv1PAycsmDPpfuDrjus/Yx9fsaMzrgWqP33ZfRObmprWN0CF4/rzMoH3UUyfu5sygTcZ07H5VUy3psnAMZjGigMor1yew2Cyyv57cn19/V1NTU3tnYtt153vUqaxxB67DhM8PwXcls1mtybHjNln04gRbbYj9Dcw3WjOywTeFkzp98UwjUzgnYTpg/jPi2c9+V8A6ab0djjuW8ACYFIm8G49d9q9M15obV0JUFtbOyqYddpFwNWd/B0GNAXAvVfY8vjduo9OaWxsnL+O/nkUjlG+lBSL/HSlwwzEY8aMCR8N7wauBI5ZMGfS34CngfFw8t8d13cd11+aCbwzgV9gGhs+mgm8f2GCyCiKrb2v3jP79DGO67/eaM/juP7ZmcBbihn98GH7E/V9TOONT/FRsTvXDDAHOB2YeNPlJzfByb/FlthtPldihsaFpVRSqVQsnU4D3IZ5PD7djupYCpwMXOe4/mzH9R/OBN4lwPXAF4HPZgLvWeANTJ/EY2yScftFsQkT9P8vE3gzMCNcvnDnnElnY0qTbZi+lgdg+mpuxLSuD5pAOGiKugNQDBMAR931+dH/DRT6Yf62sCV3Mzt+aLbb17aVHhRRsMduDY9Pp9N5TJ+5f2NKY4sx3T/OxDxehuN7KxzX/y1wEmb43GrMh/nDmO5Da4AfnTvt3vGO6y+252ufxMBx/avOvvLB8cD5mFLZtcB/Ae9yXP8Kip+NjQCpjnVyW4HNZ1/5YPSaczbfT2GC2JOYkS5fw3S8/hAwF1Py3AJsHjJkSHjN4bG/sPu+ZK/hTMykEIB53HVc/wbMyI2F9l6cYK/5GMxolG+6l9//AVtKjubrW5ghhX/ABN+TzWUxBLjtgqkLPgIsYud/swFlwFd2plKpynQ63RbpJd9Gz0u+73Rc/9/RjtCZwPs+Zrxmb9LrK2EL37ILF6w+prmxMazA7843eAWQywTeGcBVjuufSPlB9J1KJBJDC4XCWDZDzaolq20jQAwo1NbWjhpZUbFvfsuWTZFREh2koLL1yCOrAUaNGvVSpAGCMC92EoWjgKHnX7pw9aIVK1aV7gNw9NFHv+32b3/sUMzsMZsu/PKjy5vXNYdBIFoy7lYpORN492JKcj91XP8LKVKVadJt9fX1Va+//vpBbIYlq5asZscSYnueMoF3OKZ0te3sKx9cvnTp0vVAvK6urqZq+/a2RStWrC7JS/u9C2addgQQmzzt3hdbW1tfjezTXi941FFHHXjHdz5+MKarz+sXz3ryxZJ7WDZfdrTLOKDtgqkLVoR/n7q6urHDYFiuquq1RYsWvbGzezQQ6BF47xaOBKibN7m63mnkKTtSZLfUBdq+YyvAdCCzCgAtLS2vA693dXwa2liypLM+bXmgorm5eZvjNv8rsj0apMOuMLFFixa94biLmkvSaG84sf8PhzFeBfzdcf1flTtxJvA+gRm3G8OOILEjULABpqt+eGG/xrytn3uxJD+5pUuXLu/k2AJQ0dLS8rqd2aXcNYezvbB48eKXHXfxyzu55h3ytWTJkhWO668oPWbp0qVru7iuAUkBcO+Xw/wd3wc8lVq7NtbdPiF9pH2SgZLtYf3fzibp7Ox4KPZ9i6ZVut8OE5BGzhn9IghLvCcDMwEygfcIZkKB5zGP4gcAHwE+j5lg4PeO6z9EsZGiO3kO8x3uVy4/cTq/L+E1R8/R22vuab66+zcbMAZTAMxjhzv14thyb4ZdSa8vhec/up/O31kQ6O6HaGeP3N1NZ2f75YHYWVc8kL372k/OAT6Lqav7WCf7//KCqQsu7CR/3a0m6Gy/7lxzd0rxvQ1Uu/o3GzAGUwAcgbne3lxzuWNG7kJ6fSk8/9sB0mPHDqo3cA8UAJYtW7bGcf1LDzvssDn3zD79g5hGhFrM5AtvYBpdfue4/h/tcQO9k/mg1t8f3recbVUE02q2gmK9Ube5N683dTYzZhTSxW/P2ynOGdefrelhZ+GVAHamGOlcDIgvX758teP6ARB0sR8o+IkMSBUAmcA7IxN4f7XbBlO3qFgKKs1UW1SEP3ZFtt52J+pOv0fZgwz4EmDR9Hgq9YdefcBtP62OJQHbJaYvctYX9tJZo6EYbHb3HIcF022nY5OR7ZDcG9FH5R51J5L+M4gCIIwdO7bQCDT0RWIzYGxDH6a3q5LJ/nhUi7ZWlmVHOXQ2pyIMjDVow+AXSyQSB2az2XX9nSHpHhXXB69d7gjdQ9GuHzGgMG7cuJH3++4tmKFrV9nVyfa20lMM4LDDDht1z+zT78UMwfuO4/rX0/USlbIHGAwlwLDzawIzVKp0QsidOv+GjY8t+tO8cNopbHrHYlpee5xeHwsDylo7DGt3tFqGK6sdixn7WmDHLhR5zIQCzcCjjuv/zW5vv1fDhg2rwgz3GoYZd/sP9r4v5TiQu2f26UdhhrsBXIgZr6sGlD3cgA+A4ZogmDGY3+1NGrd/dZ/xzp/4J9OnxyJrgnwR8Poyr7voMeCU3bRwUhikDqTzfnRRhUzg/cK9/P6L7AiROFCoqKgoYFZjG4sZO7yzc+5KQHmrjs8BsSlXP/zM/JkTbsaMTZ7egzTpZb7UPacPDPgAGLEV82btzdjdcgHlzV1Iry+F518GsJtHgoRrSrQBF1Ocwqpg83QI8B+YMbVnBbNOO2zK1Q+fks1mo8EubIEtLfmF9Ysxe47ww16Rgli647ao6AiKuJ2oNNw3loKKdOfrvJSOhAgbaMLjS9MLFbLZ7FbH9S8uSa90xEYBoEweonPzdRbUwrwX6JCfVNyulRJOsTXoOjPvisEUAMMpjKJv7J4cWyq+C+n1pfCNv3hnO75FKoDCWV/5xYPL1q5dU+b1H2UC7xzM6m8nz5854QuO699YZr+oMFjkym1L77gtKhpU8umOQci2/BZfLzk2GjzCwBs91w7p7eQ6yqVLesfRQ9FgWC7d8Fqix9n8pKPH7U11p3uEwRQAB6qwlPQU9N9IkLt/+JlRjuu/TCSwpCC2sb4+5rj+zzOBNxEzgelkiguHl9NegswE3qcw6wWPxyyCtBUzNfyDjuv/jOK4WYDCwQcffMC9108OgCFnXNL48YVzG44AvgQ4mGnqX8fMK3hrtMElnEzWzi94CfCY4/rTM4F3ls3v0ZhAvxz49eRp9/7YrhzX3vqLecy/FTMt1WzH9X+ZTCaHNDc3b7Pr+X4GuMNx/Z9kAu+LmElP6+y9WoqZQn9eND17XXEgn0gkhs6fOeFczHrFR2GmsVoB/PbsKx/80V3XTDwEs0rdYsf1P9edv5koAO7twgaYFe7N601n5v4bCZKj+GiWB9PDLtW0TyXFxYs+AxwcBoZcLleuZJ3PBF4dcD+m0SoUBoZjgdMygfeZC7/86OnN65rDBesLFRUVQ4FTABbObbgKuIodS+/vBT6XCbyzHNe/D6hYu3ZtuM/hwAeAtkzgzQfOKTn2HcB/LJgz6awLpi74xPOrVr1Gx2D1fpu/XwBs2rQpfBw/1qa7KhN4kzAzzUQlMbN7nz7l6ocn2yqCsGSfzwTeOzDLXR5fctzbgY/cdc3Ez9nXP0BxMSfphj2mI6/0ShgAf96Svn2LHcWwR9X/bGRjGFzCaoLC8OHDu8zj5Gn3vo4p8T0FTAGOOf/ShTWYQPE/mAlFT5l346lXAPn6+voKgFgsVsBMYLodM8X7MuACzMSkSZvWC5hW59tra2sPAvIbN7bnMazTfB8m+N0NnIop1Z2ImTR1K3DibddPng3kGzoG2I32+NIJRbfb7WHwuxkzqekxmIlJb8X8LSfOnznhcntNVUAhkUiMwax/cjxmotSpwLvOvvLBWsw45u9iJor9pj3HRqTbVALce4UlhI3n3vL6jUAsnf5QvnRkw25UkSJVuY518TG0T2uPraPKYxpD8kBLOGmnbQUuFW9tbX31nKkPOaOqO06S6rj+KuC7mcDbF5gGnJmCb6Wbmkrr1KqAZWdd8cD7ly1bFq2XfC4TeE8Dfwb2C2adNslx/ZtffvnlCkyQCuuJK4AbHdf/Skm6T2cCbxsmCJ+ZSCS+3mg6PYeND2G9cLkGnfAL4DLH9X9Q8vqfMoE3FDgXOC+ZTH6/qakpBxTmz5xwNWZh89XAKXZxpPB+LAeaMoH3FGas+xBUqOkR3ay9V7iy13deeOyOlQ0NDf26PvCUr97zapp0WzPN28wqa+YH09l6KqYuL45ZJ7crBSC2ZNWSFV3MbjzPpnXQykRif3bsfwgwd9myZWtqa2uH2X3jSRjiuP4i4Pf2mPF0FKazfsrVD3/bHlcV+V1xzlUP/QRTwtt3/swJb7f776zvYpinJY7rX4cJhpVhnmz6t9jfh86bfurBQM6udvcpm68fOK7/XPR6gHgymRziuP7DwD32HOp43QMqAe6dtmM+kH9wmvf/AaYSvz9bAGPzb/j054G1FOvEqjDdYE7BPFICLHRcfz7dHCGRCby3Yx4Rj8RMVxWmHdZzDdm2bVvpezj8Um8CYi0tLduxAWgMqTykY5jGjBhmSrOo8B6+YIezxSj2TywAhVgsth7Td/Gg8HjbLacrYbrPUpyZuQ2g2fzOY+5dHjO9/UiABXMmHQRU23ykgXj0egDGNDeHsxE9innE36OqQPZ0CoB7nzD4LZryszc+za/98A3fX2OBw9/f62K/9cCtF896cqdLL9qxw4VM4H0Hs0BQVVf7d5Gn9oWWSnSnn9wWOinV2cf23t7rLV28Vi7d0pmhuzpvWA2wt42k6VcKgHuP8ANQBTx7zo1rPrnkj8E6pk+PM6P/Hn2tAuYRbAMd+/C9Cvz7nKkPPb5kVfvaH132n7MLTp2BWQN3M/Bl4HfnX7pw86ZCIRaPx/P3zD79OMxU9m9V0I92b+nrdLujAHDhl+9eO+/Gs9ZiStInAH9PJBJDstlseyPLykSigmy2DVNSbj9WukcBcM8VlgjCR5ywJDB/ypxXLl7yl2DDHhD82kufZ3vBV5auWdPVojrRxXp2FghOt/v+zHH9W8u8Pqrk/ANNAcAubfkbzNjiy+vq6u7PZrMd7nE2m92aCbx6zOMv9G+n/L2OAmDv5Sn2fXsrSgpxOj4CPQ3MtH3X2AOCXwd3+e7+X3f9V9dBfExYR5VKQTpNunivuivsztPZ+zMccrbHXP9bJI7p5nImkLjrmom/A66+YOqCJzdXVW0CRgWzTvsEZuKFt9lj9AjcAwqAvTecYpeJt8J2oAV4ArjHcf1fAwUb+Ap7SPArUFwYqi1dbJk2eeve5KLh8dHS3EPA2cB5mcBrBu4764oHttx97ScPxUxAcS6dT55QLr1S4YJWpUG5s+3dPUc4LrrcKm47Sze8l+11galUKu64/jI7IuZuTMfw+2+7fvIGzPolYzCtyK9hpvZ3y+RJuqAA2EN2dmgw3RZ+R9+tCRK+cfOYN/eqi2dtWd7UdGvxg97QUMGMGXtSN4cqigtD9fi9ZEeCjLHHDgGzkL3j+ndnAu8DwH8Dc4G5d1/7yeihs4HLgKpCodBe4snn83Fgv0jeOrOPPed+kXxAceGs/XeS5wOjeY7Y324fXpJuh/N1ogLTAozdN1zPJu64/uOHHnroiY0/OOMrmO5ER2Lu22rgt5hlPh1MAAzrBzVbTDcoAPZcAcB2SH1uJ/vusoaGhopGMEPc9pwp78MP1nJMgMqdd0njKyWvdccWzOiKt2HGw7YvYuW4/kWZwLsHM/Y1gfliaAbudlx/USbwKoDciBEj3ggTGzZs2BvA94Gh50x9aGVpfj7Eh/Jp01H8V8AmTLUCRx555PbW1laAjL2eZV3keSsmAO+LXQ/+Q2aiAjBfioeVSfdXmAadcE7EDjPJAFwwdcFrt10/+TogftYVD6wr3W/FihWrHNe/ErjqHQcfPLptxIj4fvvt93rYVzITeP9l9w/rCEvXMpYyBnx9QSqVqrQti5cBs+jd9FXvdFz/3x3r3abHGxqaY419m92iZLLAjBlv5dRGu3tG6J7qKi+DpXQTAwpvr6k55IXW1tV0cj/sRAnPYMYqf9Nx/e+kSFXajujSBZUAe2s6rP3D2liqF4faCVUHglgqlaogDZE56XokBZWkUuUWnspjVmmLpdPpsE6sfX0Ru5obpR/yFKlKUp0sZFUUT6VScZturhvbu5vnik7WQOlOuuZe0qGahbq6urF3XjPxKcx0Z7OmXP1wJpvNbghft53Fr8UEv63YkTaRabKkCyoBdk+ZEuBeb08vAQ52ccwUW+/FTIawr92+DlNd8CZmwoh3hfsCFzqufxtai6TbVALsuXCKohMwY0m72wgS9n/LffEnry74x2/nb2LwPMpJz+WBmOP6mcQhhxw7/7ozPwf8J+Y9997Ifq8BfwTmOK7/OKr76xEFwB6yjzJ54DygdLaQbtn4Zuz3wCaYHoMZCoDSmQIQy65c2eq4/gxgRm1t7UHBrNPGYKb0evOCqQteen7VqrABSiX4HlIA7L1NFPuDdec+hiXALfHKvN6k0l127Q/iaWhraWl5yXH9l0r2ia6dIj2gANh7cYr3rycBUPdceqp0LZLSxZv0hdpL+jDKrogO1SunEPmRvqH72YcUAGVXdNldJCJcPW93l1SivRwUNGQHCoDSGzGgUFdXt99d10x8j91WOl9dHtjw6cvuW7F8+fLX7Lbd3T1DQU+6pAAovREHcnddM/E44LGudrxn9ulrgT8A1zuun2E3BsHq6uoRQ4YMGZLL5bbaZSxFOtCaILIrcpiS3nbgr5j+aE/Y309hOuyOxawH/EQm8D5vjyl938WAihRU2hEeFWX2iYo3dNyn/Xj7/yqgYuHchh8Gs07LLpgz6SqgIkFiKDvO3tNpWja9cosclVPuGro6rqJkn3jkfF2lGy4zOuAHMewOKgHKrooD+XOmLjhzyapVK6Iv2DGq7wauAT4M/G8m8P7muP7f6Bjg8kDOTCjQYQqt6CSqUfnGjvvkiscDxamyhgMHYAJiLku2XMlzZ2l1uM4yx5c5bodrKHfeXOk+6R3T7yrdneVJukEBUPrEz6+fPMxx/XDm6jxQyGazWx3X/3N1dfXEhXMbmjDjVb8KnB/2awOwnXuTmKnfK4G151z10D+WLFmyouQ0MczwsHcDNcBix/UX27rIE4GxjusHdpTOKMyCQgXgyEzgfQy7GNEZlzQ+sXr16jcBMoH3TsyC6Esc139u3LhxI+/33RPsNoBlF854NNPc3LyN8gEnDuRssD8BqLPblp//zUeeXrRo0RuUjPhJpVKV37/ouA8DQ0/zgt+vWbNmUybwDgfqgVcd1/+9zWuuurp6xMK5Dcfb/IRz/y11XL+Z4jog0ksKgNJXoq287UEikUgMzWazbwJ3ATMwC3zH02Yc8kmYhb5Pw86hF/r59/7zDeD2KVc/fGk2m91Ocd3dHGbR88nAZZnAWwb4wMEA9fX1jZhlM5OR5CbbHwAWzm042nH9xfa/UzFTzs/MBF4T8ENMIG43b/qpzXDqVMf1f0PHIBiOpz4PuAo4Onrc7d/+WCt87AeO699AZHGjF198cR847gFg6P2+W48ZVXQRpqT6CGbZzlwm8D6LWYP4iNKbnQm8RcBsx/XnYQKsSoK9oAAob6lDsofksmTjmMk7Y8DImpqaobZR4lrMo/E64GEgi3lPngT8P+DL82dOGOG4/ufoWDe2FRMIJ1FccvNvwJLNmzfHMEGsDjN2NompnwxLVW0XTrv3ZYqBbJtN60xMYN0G/NLm9yDgozaNBzOB9z77+B5268llAu+bmMAOprHncZveSfb8czOBV+e4/lcboKKR9pXl3rBp3IJZ8Og14J/Y59xM4H0GE8ixaT5lr/sg4ETMF0kVxS8G6YXBFADDEkrpVEW7K71wJMhA/aaOlfwAsDKxsoIsbZiAVADWt7a2hrMWfxM4ZfK0e3/Y2tr6ajSxTOD9D/At4LOZwJvtuP7zyWRySHNzc45iA8L7gOeB8x3X/0t4rOM2/9imcRAmeP3Gcf1vRNNPQWW6uEZvBebx/CngbMf1X4zk4zjgfqAWmA58KplMVjQ3N2/LBN5HMMFvO/Alx/V/VnINE4GfA14m8H7nuP4vS+7ZMEzw++mnL7vvf5YvX7468trFmPz90HH9S0pvdibwPui4/pP2vxoC10uD6ZujCnO9Qyiustbdn3Itbj1NL2xpHFHItw3EFrywsSKcI6+ArQc87LDDqjGrlsWAPwG5FFQ6rv+E4/ozSoMfgOP63wFetMecCLBt27bwvoX1aRuBM2zwi7bkDkmlUpUUp5gfkUqlKlO1qWF2e7kO0huAsxzXf7HetiInk8khjus/i1nzuACclEgk9m1ubg4bWS6z228oDX6YmVwexJQqC5hH7dL7BfCk4/qft8Ev2io8yv7+e/Sg+vr6KqDCzvyiwLeLBnwJMJxc8txbXr/jzi+NepxerPd6xp1LlwIwY0Y+XfzA+MC9PUivvQQ49KD8GrNpwMwtCFBVX19ftX79+vh+++2Xf/nllyuG5fOjb//BGSdjSk6HYiaQuB6I2dJXe+PA0Ucf/bbt27cPLxQKsXw+H4vH4+H07nXYNTq2b98e3ufwvv3Rcf3nMQErukhSLp1O57jouPZ1VtLpdFuKFOmWHSajDdN6ynH9FqCyyabV3NwMJqj+2eZ19PyZEw50XH/DOw4++ADMtFQxYGEikdg3/0o+NqzyjRzAtlwuzujRAL/GTP3/nkQiMSabza5ra2uL1iPeBsSSyWSVbWgJW34XYRZBuiYTeKOBx86+8sEXm5qa1kfyrnn/dtGAD4DYD9gLj92x0nmMlTvbubvp2Q9LSx+ktzdr78MGPHrT5SdHg0slpgvKMPv/dcAUx/WXUOzeEssEnodpBBjPju/HaGNDVBjYlgCxFBS6tf5ceWFaq2xa0c4mYTVH+MgeluS57frJYymW0h6fP3NCV1+CcWD4/JkTDnZcf11kG5j1Rwr20T48Zwy4AvNYfixwHcBd10x8HbMOzZNA4Lj+02hOyV0yGAJgKEZDQ+8e+csuRlSI0fDpPkxvr3dImW2bMI9wj5wzdcHNtp9gOHtxIRN4twBfsP//JbCCjiWaMzHdXTr7gNvH7pKw1Xs9CSRhJ/AK4AHMtZZLI4ZdKvNc0/hCLBaL7lNuac6Y4/rZ6urqkxbObTgD01D0buDtmHrP9wHTMoHnOa5/IyoJ9tpgCoCFvg08sQKNg/5NF13K86OYEnH4eJefcvXDG7PZ7LrI/u1dQTKB9w5M8NsMTHRcf4chdZnAOxYTAPuiqiBW8ru3CgAXfvnuVfNuPOslTPeb6xzX/2N3E7CtwDs7R3z16tWbHdf/OaYhhWRNzeh5cya9A/ga5svh+4lEIrD3WCXBXhhMAVDeQudMXfBC6UiQUKTFNSwxgVnbtgC87Lj+Y8lkcsiGDRsqAFpbW7ckEokhFDsj9zZohY0xcaCwkpUV7Hrn4QJA87p1GzH1e58D5o4fN+6D/1izZhNQWV9fH9unqamQhrb6+vqqjS9uHLbolUVv0LOSWodFlQCaW1tfdVz/T4cddthz98w+/TRgxPyZEw6xj9UKgL0wmFqB5a1RAAo/v37ycIqTxHZoPbcjPvKR/cGUFmPA2EzgTWpubt7W2tq6ubW1dXN1dfXw+TMn3IpZD7hcP7cu5xlMkQoD5kp7jlNqampGZ8lura6uHpEcM2afscVjuztnYek+ccyC5BuA99zquw/Yjt00NTVttx29j73p8pPvu/3mjz1aU1MzuuT4zs4ZB8gE3g8zgffjTOC9O5lMVmLvX01NzfB7Zp/+JbvfG+dd0tgaSU96SCVA2RVhn7/wA7rDSJAy8kDccf1/ZQLvDkwDyP9lAu8BTEfo0ZgOxAdiGgh2GAVBsbtIaeMI0GFJyPmYx8XxC+ZMegZ4FlOXlnZcf0p30iq51vbPSyqVijuuv8yuqvcLTD3dnzOBtxh4GdNAEo5GeWnBnEn7O67/WiS9sDtOtHQbB/JHHnnkocCX7bYvzZt+6jI4tRUT5A7HLL4O8K3Fq1e/jOoAe00lQNkVbZjK/w30rJ6uAMQunvXk54HvYho/PonpK3c+puT2/zDDwjZh6gmjNtvtWzpJPwyyz2CGwD2H6YYzEdMy/QrF9/6WTs5Rml6H67QLY8Vt3eVJwE3AcuAo4P2Y4NcCXDflqw+Pt63fMQDbxecNiuvKRM8TGzVq1EvAB4CfYGbUOcLejw9iRoI8DjQ4rn8dWgVulwzEDrnSPbu8LnAymRyyadOm0QAtLS3r6OUH0Q74rwGGnjvtV6++0PrCSoCamprR+8TjQ9dv377eTl4QAwq1tbWjhhcKw9uGDNkUXSS8jPB6qjKBdyRQdd4ljattqQmARCKxb+W2bSO3VVa+uXTp0vXlEklB5Yu1tQd2cp3t96ympmb4gjmTajDjmt90L7+/taWlJQzS0Tq6WF1d3ZhhuVyckSNftf3/ykomk0PmTT/1YMy6wLmzrnjg5WXLlq0pPbeI9EwFQCbwzsgE3l/ttt39RNDVo2df5aVc+n19ne39Azs5f28KGuEQvXK688gu3aA6QNlVpcPTeiIcOldaFxbWJ3a2pkdP1vooTb90bZLuptXVdZau2BZNr7NS8c7uWy6yX2ma3V2LRXZCAVB2VV+0PnbWItpZ2j09Z1etvN1Nqzv7dac1uTfnVQvvW0SNICIyaCkACqiEIYOUAqCEU3qJDDoKgPIm8FJ/Z0JEpD9U1NTUDN/5biIiIiIyoGhEkIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIgMYv8fk+tAHbmPLG0AAAAASUVORK5CYII=";
 
   function row(lbl,val,cls) {
@@ -234,12 +237,17 @@ window.openScenarioSummary = function(inputs, clientInfo) {
           +row('Unfinanced Tax (IRA gross-up)',l1i>0?fmtYr(Math.round(l1i)):'—','red')
           +row('Total IRA Draw / yr',fmtYr(Math.round(l1tot)),'red'))
       ))
-    + ifv(arch, card('teal','Architecture — L3 · ETA (Tax Elimination)',
-        row('ETA Funding Amount',fmtK(inputs.etaFundingAmount),'teal')
+    + ifv(arch, card('teal','Architecture — L3 · ETA (Tax Elimination)'+(l3Policies.length>1?' — '+l3Policies.length+' policies':''),
+        row('ETA Funding Amount (total)',fmtK(l3TotalFundingSS),'teal')
         +row('ETA Funding Age',inputs.etaFundingAge)
-        +row('ETA Annual Income',fmtYr(inputs.etaAnnualIncome),'teal')
+        +row('ETA Annual Income (total)',fmtYr(l3TotalIncomeSS),'teal')
         +row('ETA Income Start Age',inputs.etaStartAge)
         +row('ETA COLA Rate',(inputs.etaColaRate||0)+'%')
+        +ifv(l3Policies.length>1, subHdr('Per-Policy Breakdown') + l3Policies.map(function(p){
+            var ltv = Math.min(Math.max((Number(p.ltvPct)||0)/100,0),1);
+            var loan = (Number(p.fundingAmount)||0)*ltv;
+            return row(p.label||'Policy', fmtK(Number(p.fundingAmount)||0)+' ('+Math.round((Number(p.ltvPct)||0))+'% LTV, '+fmtK(loan)+' loan)');
+          }).join(''))
       ))
     + ifv(arch, card('red','Architecture — L2 · LTC &amp; Legacy',
         row('Primary Net Premium (Annual)',fmtK(inputs.ltcNetAmount),'red')
@@ -840,6 +848,16 @@ function projectArc(inputs) {
     spouseLtcMonthlyBenefit = 0, spouseLtcBenefitDuration = 3, spouseLtcInsured = false,
     ltcNetAmount = 0, ltcFundingAge = 0, ltcFundingYears = 1,
     spouseLtcNetAmount = 0, spouseLtcFundingAge = 0, spouseLtcFundingYears = 1,
+    // Ongoing L2 tax rate override — when enabled, funding years AFTER the first
+    // (i.e. the "ongoing" years of a multi-year L2 premium stream) are grossed up
+    // at this flat rate instead of the bracket-aware/AGI-driven calculation. The
+    // FIRST funding year always uses the real bracket-aware calc (it typically
+    // stacks with other funding-year income — L1 conversion, L3 distribution,
+    // final comp/sale income — so a flat override there would understate it).
+    // Useful for conceptual proposals where post-sale/post-retirement household
+    // income hasn't been fully modeled but the advisor has a reasoned placeholder
+    // rate for "life after the funding year" (e.g. no more W-2/comp income).
+    l2OngoingRateOverrideEnabled = false, l2OngoingRateOverride = 24,
     portfolioReturn = 0.065,
     inflation = 0.028,
     sorrEnabled = false,
@@ -889,10 +907,28 @@ function projectArc(inputs) {
 
   const years = [];
 
+  // ── L3 multi-policy rollup ──
+  // L3/ETA can now be modeled as multiple named policies (e.g. "Primary growth
+  // structure" + "Tax-funding policy for L1") instead of one. All policies share
+  // the same funding age / income start age / COLA rate (etaFundingAge / etaStartAge
+  // / etaColaRate below) — that's still a single implementation event — but each
+  // policy carries its own funding amount, LTV, and income contribution, which are
+  // summed here into the same effective totals the rest of the engine already
+  // consumes. When l3Policies is empty/absent, falls back to the legacy single-
+  // policy scalars (etaFundingAmount/etaAnnualIncome) so existing saved scenarios
+  // behave exactly as before.
+  const l3Policies = Array.isArray(inputs.l3Policies) ? inputs.l3Policies : [];
+  const effEtaFundingAmount = l3Policies.length > 0
+    ? l3Policies.reduce((s, p) => s + (Number(p.fundingAmount) || 0), 0)
+    : etaFundingAmount;
+  const effEtaAnnualIncome = l3Policies.length > 0
+    ? l3Policies.reduce((s, p) => s + (Number(p.annualIncome) || 0), 0)
+    : etaAnnualIncome;
+
   // ── Architecture toggle — when disabled, zero out all IncomeArc™ layers ──
   const archRothAnnuityMonthly   = architectureEnabled ? rothAnnuityMonthly   : 0;
-  const archEtaAnnualIncome      = architectureEnabled ? etaAnnualIncome      : 0;
-  const archEtaFundingAmount     = architectureEnabled ? etaFundingAmount     : 0;
+  const archEtaAnnualIncome      = architectureEnabled ? effEtaAnnualIncome   : 0;
+  const archEtaFundingAmount     = architectureEnabled ? effEtaFundingAmount  : 0;
   const archNonQualAnnuityMonthly= architectureEnabled ? nonQualAnnuityMonthly: 0;
   const archQualAnnuityMonthly   = architectureEnabled ? qualAnnuityMonthly   : 0;
   const archAnnualTradDrawdown   = architectureEnabled ? annualTradDrawdown   : 0;
@@ -965,6 +1001,24 @@ function projectArc(inputs) {
     return { grossDraw: grossSoFar, taxOnDraw: taxSoFar };
   };
 
+  // Flat-rate gross-up — used only when l2OngoingRateOverrideEnabled is on, for L2
+  // funding years AFTER the first. Simpler than grossUpIterative on purpose: this is
+  // an advisor-supplied placeholder rate (e.g. "post-sale, no more comp income, call
+  // it 22%"), not a real bracket walk, so it shouldn't pretend to AGI-stack.
+  const l2OngoingRate = Math.min(Math.max((l2OngoingRateOverride || 0) / 100, 0), 0.99);
+  const flatGrossUp = (netNeeded, rate) => {
+    const r = Math.min(Math.max(rate, 0), 0.99);
+    const grossDraw = r < 1 ? netNeeded / (1 - r) : netNeeded * 5;
+    return { grossDraw, taxOnDraw: grossDraw - netNeeded };
+  };
+  // Resolve which gross-up to use for a given L2 funding-year index (0 = first year).
+  // First year always uses the real bracket-aware calc; later years use the flat
+  // override only if the toggle is on.
+  const l2GrossUpForYear = (yearIndex, netNeeded, brackets, currentAGI) =>
+    (l2OngoingRateOverrideEnabled && yearIndex > 0)
+      ? flatGrossUp(netNeeded, l2OngoingRate)
+      : grossUpIterative(netNeeded, brackets, currentAGI);
+
   // Pre-retirement ordinary tax brackets (2025 table; not inflation-adjusted here since
   // pre-retirement years are typically near-term). Used for LTC/L2 funding draws below.
   const preRetBrackets = filingStatus === 'mfj' ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025;
@@ -998,7 +1052,7 @@ function projectArc(inputs) {
         const preRetAGI = (pensionMonthly > 0 && a >= pensionStartAge ? pensionMonthly * 12 : 0)
           + (partTimeMonthly > 0 ? partTimeMonthly * 12 : 0)
           + (householdIncome || 0);
-        const { grossDraw: ltcGrossPre } = grossUpIterative(archLtcNetAmount, preRetBrackets, preRetAGI);
+        const { grossDraw: ltcGrossPre } = l2GrossUpForYear(a - ltcFundingAge, archLtcNetAmount, preRetBrackets, preRetAGI);
         const ltcFundPre = Math.min(ltcGrossPre, trad);
         trad = Math.max(0, trad - ltcFundPre - (ltcFundPre * preRetPenalty));
       }
@@ -1007,7 +1061,7 @@ function projectArc(inputs) {
         const preRetAGISp = (pensionMonthly > 0 && a >= pensionStartAge ? pensionMonthly * 12 : 0)
           + (partTimeMonthly > 0 ? partTimeMonthly * 12 : 0)
           + (householdIncome || 0);
-        const { grossDraw: ltcGrossPreSp } = grossUpIterative(archSpouseLtcNetAmount, preRetBrackets, preRetAGISp);
+        const { grossDraw: ltcGrossPreSp } = l2GrossUpForYear(a - spouseLtcFundingAge, archSpouseLtcNetAmount, preRetBrackets, preRetAGISp);
         const ltcFundPreSp = Math.min(ltcGrossPreSp, trad);
         trad = Math.max(0, trad - ltcFundPreSp - (ltcFundPreSp * preRetPenaltySp));
       }
@@ -1069,14 +1123,14 @@ function projectArc(inputs) {
         const _p = _a < 59.5 ? 0.10 : 0;
         const _brk = filingStatus === 'mfj' ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025;
         const _preRetActive = _a < ssClaimAge && (!(pensionMonthly > 0) || _a < pensionStartAge);
-        const { grossDraw: _g } = grossUpIterative(archLtcNetAmount, _brk, _preRetActive ? (householdIncome || 0) : 0);
+        const { grossDraw: _g } = l2GrossUpForYear(_a - ltcFundingAge, archLtcNetAmount, _brk, _preRetActive ? (householdIncome || 0) : 0);
         _mcBOY_ira = Math.max(0, _mcBOY_ira - _g - (_g * _p));
       }
       if (archSpouseLtcNetAmount > 0 && spouseLtcFundingAge > 0 && _a >= spouseLtcFundingAge && _a < spouseLtcFundingAge + spouseLtcFundingYearsN) {
         const _ps = _a < 59.5 ? 0.10 : 0;
         const _brkS = filingStatus === 'mfj' ? TAX_BRACKETS_MFJ_2025 : TAX_BRACKETS_SINGLE_2025;
         const _preRetActiveSp = _a < ssClaimAge && (!(pensionMonthly > 0) || _a < pensionStartAge);
-        const { grossDraw: _gs } = grossUpIterative(archSpouseLtcNetAmount, _brkS, _preRetActiveSp ? (householdIncome || 0) : 0);
+        const { grossDraw: _gs } = l2GrossUpForYear(_a - spouseLtcFundingAge, archSpouseLtcNetAmount, _brkS, _preRetActiveSp ? (householdIncome || 0) : 0);
         _mcBOY_ira = Math.max(0, _mcBOY_ira - _gs - (_gs * _ps));
       }
     }
@@ -1113,6 +1167,23 @@ function projectArc(inputs) {
       row.etaFundingAmount = fundAmt;
       // NOT added to sources.rmd — this is a capital reallocation, not spendable income
       row.totalIncome += fundAmt;
+      // Per-policy breakdown for reporting — scaled proportionally if the funding
+      // request exceeded available trad and got capped above.
+      if (l3Policies.length > 0) {
+        const capRatio = archEtaFundingAmount > 0 ? fundAmt / archEtaFundingAmount : 1;
+        row.l3PolicyBreakdown = l3Policies.map(p => {
+          const dist = (Number(p.fundingAmount) || 0) * capRatio;
+          const ltv = Math.min(Math.max((Number(p.ltvPct) || 0) / 100, 0), 1);
+          return {
+            label: p.label || 'L3 Policy',
+            distribution: dist,
+            loan: dist * ltv,
+            ltvPct: Number(p.ltvPct) || 0,
+            annualIncome: Number(p.annualIncome) || 0,
+          };
+        });
+        row.l3TotalLoan = row.l3PolicyBreakdown.reduce((s, p) => s + p.loan, 0);
+      }
     }
 
     // ── Roth Annuity Conversion Event (Layer 1) ──
@@ -1141,7 +1212,7 @@ function projectArc(inputs) {
       const currentAGI = (row.sources.ss||0)*0.85 + (row.sources.pension||0) + (row.sources.rmd||0) + (row.sources.parttime||0) + (row.sources.annuity||0);
       const earlyPenaltyRate = age < 59.5 ? 0.10 : 0;
       // Gross up: net needed / (1 - marginalRate - penaltyRate) approximation, refined iteratively
-      const { grossDraw: ltcGross, taxOnDraw: ltcTax } = grossUpIterative(archLtcNetAmount, ordBracketsLtc, currentAGI);
+      const { grossDraw: ltcGross, taxOnDraw: ltcTax } = l2GrossUpForYear(age - ltcFundingAge, archLtcNetAmount, ordBracketsLtc, currentAGI);
       const ltcFund = Math.min(ltcGross, trad);
       const earlyPenalty = ltcFund * earlyPenaltyRate;
       trad = Math.max(0, trad - ltcFund - earlyPenalty);
@@ -1160,7 +1231,7 @@ function projectArc(inputs) {
         .map(b => ({ limit: b.limit * inflFactor, rate: Math.min(b.rate + stressAdder, 0.99) }));
       const currentAGISp = (row.sources.ss||0)*0.85 + (row.sources.pension||0) + (row.sources.rmd||0) + (row.sources.parttime||0) + (row.sources.annuity||0);
       const earlyPenaltyRateSp = age < 59.5 ? 0.10 : 0;
-      const { grossDraw: spLtcGross, taxOnDraw: spLtcTax } = grossUpIterative(archSpouseLtcNetAmount, ordBracketsSpLtc, currentAGISp);
+      const { grossDraw: spLtcGross, taxOnDraw: spLtcTax } = l2GrossUpForYear(age - spouseLtcFundingAge, archSpouseLtcNetAmount, ordBracketsSpLtc, currentAGISp);
       const spLtcFund = Math.min(spLtcGross, trad);
       const spEarlyPenalty = spLtcFund * earlyPenaltyRateSp;
       trad = Math.max(0, trad - spLtcFund - spEarlyPenalty);
@@ -3031,10 +3102,12 @@ function App() {
     rothAnnuityMonthly: 0, rothAnnuityStartAge: 70,
     etaAnnualIncome: 0, etaStartAge: 70, etaFundingDraw: 0, etaColaRate: 3,
     etaFundingAmount: 0, etaFundingAge: 60,
+    l3Policies: [],
     architectureEnabled: false,
     rothConversionAmount: 0, rothConversionAge: 60, rothConversionFinanced: 0,
     ltcNetAmount: 0, ltcFundingAge: 60, ltcFundingYears: 1,
     spouseLtcNetAmount: 0, spouseLtcFundingAge: 60, spouseLtcFundingYears: 1,
+    l2OngoingRateOverrideEnabled: false, l2OngoingRateOverride: 24,
     // Initial face amount (+ APB rider) from the carrier illustration — the "effective care
     // benefit pool," distinct from net premium (which is money going in, not benefit available).
     // Static initial value only. Most FlexLife LTC-focused policies are DB Option A (level),
@@ -3773,7 +3846,16 @@ function App() {
                     : 0;
                   const l4GrossP = l2TotalNetP > 0 ? l2TotalNetP / Math.max(0.01, 1 - l4MargRate - ((inputs.ltcFundingAge || 0) < 59.5 ? 0.10 : 0)) : 0;
                   const l4GrossS = l2TotalNetS > 0 ? l2TotalNetS / Math.max(0.01, 1 - l4MargRate - ((inputs.spouseLtcFundingAge || 0) < 59.5 ? 0.10 : 0)) : 0;
-                  const l4RemainderVal = Math.max(0, (inputs.traditionalBalance || 0) - (inputs.rothConversionAmount || 0) - (inputs.etaFundingAmount || 0) - l4GrossP - l4GrossS - l1OverageDraw);
+                  // ── L3 multi-policy rollup for report display ──
+                  // Falls back to the legacy single-policy scalar when l3Policies is empty,
+                  // same rule the calc engine uses, so the report always matches the sim.
+                  const l3PoliciesList = (inputs.l3Policies && inputs.l3Policies.length > 0) ? inputs.l3Policies : [];
+                  const l3TotalFunding = l3PoliciesList.length > 0
+                    ? l3PoliciesList.reduce((s,p)=>s+(Number(p.fundingAmount)||0),0)
+                    : (inputs.etaFundingAmount || 0);
+                  const l3PolicyCount  = l3PoliciesList.length > 0 ? l3PoliciesList.length : (l3TotalFunding > 0 ? 1 : 0);
+                  const l3TotalLoan    = l3PoliciesList.reduce((s,p)=>s+((Number(p.fundingAmount)||0) * Math.min(Math.max((Number(p.ltvPct)||0)/100,0),1)),0);
+                  const l4RemainderVal = Math.max(0, (inputs.traditionalBalance || 0) - (inputs.rothConversionAmount || 0) - l3TotalFunding - l4GrossP - l4GrossS - l1OverageDraw);
                   // Risk 1 card and "tax eliminated" comparison both use the fixed status-quo
                   // baseline (totalEstTaxSQ), not the toggle-dependent totalEstTax — otherwise
                   // this figure understates the problem whenever architecture happens to be ON,
@@ -4492,15 +4574,18 @@ function App() {
           </div>
           <div style="flex:1; background:white; border:1pt solid #DDD; border-top:2.5pt solid #4A9B7A; border-radius:0 3pt 3pt 0; padding:5pt 8pt;">
             <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2pt;">
-              <div style="font-size:8pt; font-weight:800; color:#1A2B3C;">ETA Life Policy (Layer 3)</div>
+              <div style="font-size:8pt; font-weight:800; color:#1A2B3C;">ETA Life Polic${l3PolicyCount > 1 ? 'ies' : 'y'} (Layer 3)${l3PolicyCount > 1 ? ' — '+l3PolicyCount+' polic'+(l3PolicyCount>1?'ies':'y') : ''}</div>
               <div style="font-size:7pt; font-weight:700; color:#4A9B7A;">Tax Elimination · RMD Reduction · Income Age ${inputs.etaStartAge || 70}</div>
             </div>
             <div style="font-size:6.5pt; color:#445566; line-height:1.5;">Bank non-recourse loan covers IRA distribution tax — no personal guarantee. Full gross proceeds enter IUL policy tax-free. Permanently reduces QP balance → reduces future RMDs → reduces IRMAA exposure. Tax-free income begins age ${inputs.etaStartAge || 70}${inputs.etaAnnualIncome > 0 ? ' · $'+Math.round(inputs.etaAnnualIncome).toLocaleString()+'/yr initial'+((inputs.etaColaRate||0) > 0 ? ', increasing '+inputs.etaColaRate+'%/yr' : '') : ''}.</div>
+            ${l3PolicyCount > 1 ? `<div style="margin-top:4pt; padding-top:4pt; border-top:0.5pt dashed #CCC; display:flex; flex-direction:column; gap:2pt;">
+              ${l3PoliciesList.map(p => `<div style="display:flex; justify-content:space-between; font-size:6pt; color:#556677;"><span>${p.label||'Policy'}</span><span>${fmtD(Number(p.fundingAmount)||0)}${(Number(p.ltvPct)||0)>0 ? ' · '+Math.round(Number(p.ltvPct))+'% LTV' : ''}</span></div>`).join('')}
+            </div>` : ''}
           </div>
           <div style="width:60pt; flex-shrink:0; text-align:center;">
             <div style="background:rgba(74,155,122,0.08); border:1pt solid rgba(74,155,122,0.3); border-radius:3pt; padding:4pt 5pt;">
-              <div style="font-size:6pt; color:#4A9B7A; text-transform:uppercase; letter-spacing:.5pt;">Funded</div>
-              <div style="font-size:8pt; font-weight:700; color:#1A2B3C;">${inputs.etaFundingAmount > 0 ? fmtD(inputs.etaFundingAmount) : '—'}</div>
+              <div style="font-size:6pt; color:#4A9B7A; text-transform:uppercase; letter-spacing:.5pt;">${l3PolicyCount > 1 ? 'Total Funded' : 'Funded'}</div>
+              <div style="font-size:8pt; font-weight:700; color:#1A2B3C;">${l3TotalFunding > 0 ? fmtD(l3TotalFunding) : '—'}</div>
               <div style="font-size:5.5pt; color:#7A95A8;">at age ${inputs.etaFundingAge || 60}</div>
             </div>
           </div>
@@ -4565,7 +4650,7 @@ function App() {
           const parts = [];
           if (inputs.rothConversionAmount > 0) parts.push(`Layer 1 converts ${fmtD(inputs.rothConversionAmount)} into guaranteed tax-free income of $${Math.round(inputs.rothAnnuityMonthly||0).toLocaleString()}/mo beginning age ${inputs.rothAnnuityStartAge||70}`);
           if (inputs.ltcNetAmount > 0) parts.push(`Layer 2 funds chronic care protection (${fmtD(l2TotalNetP)} net premium${l2YearsP>1?' over '+l2YearsP+' years':''}) for ${clientLabel}${inputs.filingStatus==='mfj'&&inputs.spouseLtcNetAmount>0?' and '+(clientInfo.spouseName||'Spouse'):''} — portfolio untouched during any care event`);
-          if (inputs.etaFundingAmount > 0) parts.push(`Layer 3 repositions ${fmtD(inputs.etaFundingAmount)} via bank non-recourse loan — eliminating the distribution tax and permanently reducing the RMD base`);
+          if (l3TotalFunding > 0) parts.push(`Layer 3 repositions ${fmtD(l3TotalFunding)}${l3PolicyCount > 1 ? ' across '+l3PolicyCount+' policies' : ''} via bank non-recourse loan${l3PolicyCount > 1 ? 's' : ''} — eliminating the distribution tax and permanently reducing the RMD base`);
           parts.push(`Layer 4 preserves the remaining QP balance for liquidity, discretionary access, and continued tax-deferred growth`);
           return parts.join('. ') + '. The layers do not compete — each owns a distinct piece of the problem, so the portfolio is never forced to do the wrong thing at the wrong time.';
         })()
@@ -5157,14 +5242,22 @@ function App() {
                 const l1OverageDraw = l1OverageTax > 0 ? l1OverageTax / Math.max(0.01, 1 - l4MargRate - l1OveragePenaltyRate) : 0;
                 const l4GrossP = l2TotalNetP > 0 ? l2TotalNetP / Math.max(0.01, 1 - l4MargRate - ((inputs.ltcFundingAge||0) < 59.5 ? 0.10 : 0)) : 0;
                 const l4GrossS = l2TotalNetS > 0 ? l2TotalNetS / Math.max(0.01, 1 - l4MargRate - ((inputs.spouseLtcFundingAge||0) < 59.5 ? 0.10 : 0)) : 0;
-                const l4RemainderVal = Math.max(0, (inputs.traditionalBalance || 0) - (inputs.rothConversionAmount || 0) - (inputs.etaFundingAmount || 0) - l4GrossP - l4GrossS - l1OverageDraw);
+                // ── L3 multi-policy rollup — same rule as the printable report and the calc engine ──
+                const l3PoliciesList = (inputs.l3Policies && inputs.l3Policies.length > 0) ? inputs.l3Policies : [];
+                const l3TotalFunding = l3PoliciesList.length > 0
+                  ? l3PoliciesList.reduce((s,p)=>s+(Number(p.fundingAmount)||0),0)
+                  : (inputs.etaFundingAmount || 0);
+                const l3PolicyCount  = l3PoliciesList.length > 0 ? l3PoliciesList.length : (l3TotalFunding > 0 ? 1 : 0);
+                const l4RemainderVal = Math.max(0, (inputs.traditionalBalance || 0) - (inputs.rothConversionAmount || 0) - l3TotalFunding - l4GrossP - l4GrossS - l1OverageDraw);
 
                 // ── Headline summary figures ──
                 const l1AnnualIncome = (inputs.rothAnnuityMonthly || 0) * 12;
                 const isMFJ = inputs.filingStatus === 'mfj';
                 const hasSpouseL2 = isMFJ && ((inputs.spouseLtcDeathBenefit || 0) > 0 || (inputs.spouseLtcNetAmount || 0) > 0);
                 const l2CombinedBenefitPool = (inputs.ltcDeathBenefit || 0) + (hasSpouseL2 ? (inputs.spouseLtcDeathBenefit || 0) : 0);
-                const l3AnnualIncome = inputs.etaAnnualIncome || 0;
+                const l3AnnualIncome = l3PoliciesList.length > 0
+                  ? l3PoliciesList.reduce((s,p)=>s+(Number(p.annualIncome)||0),0)
+                  : (inputs.etaAnnualIncome || 0);
                 const l1LifeLabel = isMFJ ? "for both spouses' life" : 'for life';
                 const l2PoolLabel = hasSpouseL2 ? 'Combined Tax-Free Benefit Pool' : 'Tax-Free Benefit Pool';
 
@@ -5405,15 +5498,18 @@ function App() {
           </div>
           <div style="flex:1; background:white; border:1pt solid #DDD; border-top:2.5pt solid #4A9B7A; border-radius:0 3pt 3pt 0; padding:5pt 8pt;">
             <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2pt;">
-              <div style="font-size:8pt; font-weight:800; color:#1A2B3C;">ETA Life Policy (Layer 3)</div>
+              <div style="font-size:8pt; font-weight:800; color:#1A2B3C;">ETA Life Polic${l3PolicyCount > 1 ? 'ies' : 'y'} (Layer 3)${l3PolicyCount > 1 ? ' — '+l3PolicyCount+' policies' : ''}</div>
               <div style="font-size:7pt; font-weight:700; color:#4A9B7A;">Tax Elimination · RMD Reduction · Income Age ${inputs.etaStartAge || 70}</div>
             </div>
-            <div style="font-size:6.5pt; color:#445566; line-height:1.5;">Bank non-recourse loan covers IRA distribution tax. Full gross proceeds enter IUL policy tax-free. Tax-free income begins age ${inputs.etaStartAge || 70}${inputs.etaAnnualIncome > 0 ? ' · $'+Math.round(inputs.etaAnnualIncome).toLocaleString()+'/yr initial'+((inputs.etaColaRate||0) > 0 ? ', increasing '+inputs.etaColaRate+'%/yr' : '') : ''}.</div>
+            <div style="font-size:6.5pt; color:#445566; line-height:1.5;">Bank non-recourse loan covers IRA distribution tax. Full gross proceeds enter IUL policy tax-free. Tax-free income begins age ${inputs.etaStartAge || 70}${l3AnnualIncome > 0 ? ' · $'+Math.round(l3AnnualIncome).toLocaleString()+'/yr initial'+((inputs.etaColaRate||0) > 0 ? ', increasing '+inputs.etaColaRate+'%/yr' : '') : ''}.</div>
+            ${l3PolicyCount > 1 ? `<div style="margin-top:4pt; padding-top:4pt; border-top:0.5pt dashed #CCC; display:flex; flex-direction:column; gap:2pt;">
+              ${l3PoliciesList.map(p => `<div style="display:flex; justify-content:space-between; font-size:6pt; color:#556677;"><span>${p.label||'Policy'}</span><span>${fmtD(Number(p.fundingAmount)||0)}${(Number(p.ltvPct)||0)>0 ? ' · '+Math.round(Number(p.ltvPct))+'% LTV' : ''}</span></div>`).join('')}
+            </div>` : ''}
           </div>
           <div style="width:60pt; flex-shrink:0; text-align:center;">
             <div style="background:rgba(74,155,122,0.08); border:1pt solid rgba(74,155,122,0.3); border-radius:3pt; padding:4pt 5pt;">
-              <div style="font-size:6pt; color:#4A9B7A; text-transform:uppercase; letter-spacing:.5pt;">Funded</div>
-              <div style="font-size:8pt; font-weight:700; color:#1A2B3C;">${inputs.etaFundingAmount > 0 ? fmtD(inputs.etaFundingAmount) : '—'}</div>
+              <div style="font-size:6pt; color:#4A9B7A; text-transform:uppercase; letter-spacing:.5pt;">${l3PolicyCount > 1 ? 'Total Funded' : 'Funded'}</div>
+              <div style="font-size:8pt; font-weight:700; color:#1A2B3C;">${l3TotalFunding > 0 ? fmtD(l3TotalFunding) : '—'}</div>
               <div style="font-size:5.5pt; color:#7A95A8;">at age ${inputs.etaFundingAge || 60}</div>
             </div>
           </div>
@@ -6429,16 +6525,112 @@ function App() {
                 {/* ── IRA → ETA Lump-Sum Repositioning Event ── */}
                 <div style={{marginTop:12,paddingTop:12,borderTop:'1px solid rgba(168,197,216,.1)'}}>
                   <div style={{fontSize:12,fontWeight:700,color:'#A8C5D8',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:8}}>IRA → ETA Repositioning Event</div>
+
+                  {/* Multiple L3 policies toggle */}
+                  <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:10}}>
+                    <div
+                      onClick={()=>{
+                        const next = !((inputs.l3Policies||[]).length > 0);
+                        if (next && (inputs.l3Policies||[]).length === 0) {
+                          // Seed one row from whatever the legacy single-policy fields already hold
+                          set('l3Policies', [{ label:'Primary ETA Policy', fundingAmount: inputs.etaFundingAmount||0, ltvPct: 50, annualIncome: inputs.etaAnnualIncome||0 }]);
+                        } else if (!next) {
+                          set('l3Policies', []);
+                        }
+                      }}
+                      style={{
+                        width:44, height:24, borderRadius:12, cursor:'pointer',
+                        background: (inputs.l3Policies||[]).length > 0 ? '#A8C5D8' : 'rgba(255,255,255,.1)',
+                        position:'relative', transition:'background .2s', flexShrink:0,
+                        border: (inputs.l3Policies||[]).length > 0 ? '1px solid #A8C5D8' : '1px solid rgba(255,255,255,.15)',
+                      }}>
+                      <div style={{
+                        position:'absolute', top:3, left: (inputs.l3Policies||[]).length > 0 ? 22 : 3,
+                        width:16, height:16, borderRadius:8,
+                        background:'#F5F2EC', transition:'left .2s',
+                        boxShadow:'0 1px 3px rgba(0,0,0,.3)',
+                      }}/>
+                    </div>
+                    <span style={{fontSize:13,color: (inputs.l3Policies||[]).length > 0 ? '#A8C5D8' : '#8DAFC8', fontWeight: (inputs.l3Policies||[]).length > 0 ? 700 : 400}}>
+                      {(inputs.l3Policies||[]).length > 0 ? 'Multiple Policies — editing list below' : 'Single Policy — off'}
+                    </span>
+                  </div>
+
+                  {(inputs.l3Policies||[]).length > 0 && (
+                    <div style={{marginBottom:10}}>
+                      <div style={{fontSize:12,color:'#8DAFC8',lineHeight:1.6,marginBottom:8}}>
+                        All policies share the same Funding Age and Income Start Age below (one repositioning event). Each policy carries its own amount, loan-to-value ratio, and income contribution — useful when, e.g., one policy is the primary growth structure and another exists specifically to generate excess loan credit for L1's conversion tax.
+                      </div>
+                      {inputs.l3Policies.map((p, idx) => {
+                        const updateRow = (field, val) => {
+                          const next = inputs.l3Policies.slice();
+                          next[idx] = { ...next[idx], [field]: val };
+                          set('l3Policies', next);
+                        };
+                        const removeRow = () => {
+                          const next = inputs.l3Policies.slice();
+                          next.splice(idx, 1);
+                          set('l3Policies', next);
+                        };
+                        const loanAmt = (Number(p.fundingAmount)||0) * Math.min(Math.max((Number(p.ltvPct)||0)/100,0),1);
+                        return (
+                          <div key={idx} style={{padding:'10px 12px',background:'rgba(168,197,216,.05)',border:'1px solid rgba(168,197,216,.15)',borderRadius:7,marginBottom:8}}>
+                            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                              <input
+                                value={p.label||''}
+                                onChange={e=>updateRow('label', e.target.value)}
+                                placeholder="Policy label (e.g. Primary, Tax-Funding for L1)"
+                                style={{background:'transparent',border:'none',borderBottom:'1px solid rgba(168,197,216,.3)',color:'#F5F2EC',fontSize:13,fontWeight:600,padding:'2px 0',flex:1}}
+                              />
+                              <button onClick={removeRow} style={{marginLeft:8,background:'none',border:'none',color:'#C47A7A',cursor:'pointer',fontSize:12}}>Remove</button>
+                            </div>
+                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
+                              <Field label="Distribution">
+                                <NumInput value={p.fundingAmount||0} onChange={v=>updateRow('fundingAmount', v)} prefix="$"/>
+                              </Field>
+                              <Field label="Loan LTV">
+                                <NumInput value={p.ltvPct||0} onChange={v=>updateRow('ltvPct', v)} suffix="%"/>
+                              </Field>
+                              <Field label="Annual Income">
+                                <NumInput value={p.annualIncome||0} onChange={v=>updateRow('annualIncome', v)} prefix="$"/>
+                              </Field>
+                            </div>
+                            <div style={{fontSize:11,color:'#8DAFC8',marginTop:6}}>
+                              Loan secured: ${Math.round(loanAmt).toLocaleString()} {(Number(p.ltvPct)||0)>0 ? `(${p.ltvPct}% of $${Math.round(Number(p.fundingAmount)||0).toLocaleString()})` : ''}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <button
+                        onClick={()=>set('l3Policies', [...inputs.l3Policies, { label:`Policy ${inputs.l3Policies.length+1}`, fundingAmount:0, ltvPct:50, annualIncome:0 }])}
+                        style={{background:'rgba(168,197,216,.1)',border:'1px solid rgba(168,197,216,.3)',color:'#A8C5D8',cursor:'pointer',fontSize:12,padding:'6px 12px',borderRadius:6,marginBottom:6}}>
+                        + Add Policy
+                      </button>
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginTop:8,paddingTop:8,borderTop:'1px solid rgba(168,197,216,.15)'}}>
+                        <div style={{textAlign:'center'}}>
+                          <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Total Distribution</div>
+                          <div style={{fontSize:15,fontWeight:600,color:'#A8C5D8',fontFamily:"'Cormorant Garamond',serif"}}>${Math.round(inputs.l3Policies.reduce((s,p)=>s+(Number(p.fundingAmount)||0),0)).toLocaleString()}</div>
+                        </div>
+                        <div style={{textAlign:'center'}}>
+                          <div style={{fontSize:11,color:'#8DAFC8',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:2}}>Total Annual Income</div>
+                          <div style={{fontSize:15,fontWeight:600,color:'#A8C5D8',fontFamily:"'Cormorant Garamond',serif"}}>${Math.round(inputs.l3Policies.reduce((s,p)=>s+(Number(p.annualIncome)||0),0)).toLocaleString()}</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:6}}>
-                    <Field label="Lump-Sum Amount" hint="One-time IRA distribution repositioned into ETA. Tax financed via bank non-recourse loan — no cash-flow impact. IRA balance reduced permanently.">
-                      <NumInput value={inputs.etaFundingAmount} onChange={v=>set('etaFundingAmount',v)} prefix="$"/>
-                    </Field>
+                    {(inputs.l3Policies||[]).length === 0 && (
+                      <Field label="Lump-Sum Amount" hint="One-time IRA distribution repositioned into ETA. Tax financed via bank non-recourse loan — no cash-flow impact. IRA balance reduced permanently.">
+                        <NumInput value={inputs.etaFundingAmount} onChange={v=>set('etaFundingAmount',v)} prefix="$"/>
+                      </Field>
+                    )}
                     <Field label="Funding Age" hint="Age at which repositioning occurs. Seasoning period = Income Start Age minus Funding Age.">
                       <NumInput value={inputs.etaFundingAge} onChange={v=>set('etaFundingAge',v)} suffix="yrs"/>
                     </Field>
                   </div>
-                  {inputs.etaFundingAmount > 0 && inputs.etaFundingAge > 0 && (()=>{
-                    const amt = inputs.etaFundingAmount;
+                  {(inputs.l3Policies.length > 0 ? inputs.l3Policies.reduce((s,p)=>s+(Number(p.fundingAmount)||0),0) : inputs.etaFundingAmount) > 0 && inputs.etaFundingAge > 0 && (()=>{
+                    const amt = inputs.l3Policies.length > 0 ? inputs.l3Policies.reduce((s,p)=>s+(Number(p.fundingAmount)||0),0) : inputs.etaFundingAmount;
                     const seasoning = Math.max(0, (inputs.etaStartAge||0) - inputs.etaFundingAge);
                     const warn = seasoning < 10;
                     return (
@@ -6679,6 +6871,46 @@ function App() {
                     <Field label="Death Benefit" hint="Initial face amount, from the carrier illustration">
                       <NumInput value={inputs.ltcDeathBenefit} onChange={v=>set('ltcDeathBenefit',v)} prefix="$"/>
                     </Field>
+
+                    {/* Ongoing tax rate override — applies to funding years AFTER the first,
+                        for BOTH primary and spouse L2 draws. The first funding year always
+                        uses the real bracket-aware calc, since it typically stacks with other
+                        same-year events (L1 conversion, L3 distribution, final comp/sale income). */}
+                    {Math.max(1,Math.round(inputs.ltcFundingYears||1)) > 1 && (
+                      <div style={{marginTop:10,paddingTop:10,borderTop:'1px solid rgba(255,255,255,.06)'}}>
+                        <div style={{fontSize:12,color:'#8DAFC8',lineHeight:1.6,marginBottom:8}}>
+                          By default every funding year is grossed up using real bracket-aware math off household income. If you know ongoing years will run at a lower rate than the funding year itself — e.g. business sale/comp income ends after year 1 — pin a flat placeholder rate for years 2+ instead of relying on Household Income to carry it.
+                        </div>
+                        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom: inputs.l2OngoingRateOverrideEnabled ? 10 : 0}}>
+                          <div
+                            onClick={()=>set('l2OngoingRateOverrideEnabled', !inputs.l2OngoingRateOverrideEnabled)}
+                            style={{
+                              width:44, height:24, borderRadius:12, cursor:'pointer',
+                              background: inputs.l2OngoingRateOverrideEnabled ? '#9B7EC8' : 'rgba(255,255,255,.1)',
+                              position:'relative', transition:'background .2s', flexShrink:0,
+                              border: inputs.l2OngoingRateOverrideEnabled ? '1px solid #9B7EC8' : '1px solid rgba(255,255,255,.15)',
+                            }}>
+                            <div style={{
+                              position:'absolute', top:3, left: inputs.l2OngoingRateOverrideEnabled ? 22 : 3,
+                              width:16, height:16, borderRadius:8,
+                              background:'#F5F2EC', transition:'left .2s',
+                              boxShadow:'0 1px 3px rgba(0,0,0,.3)',
+                            }}/>
+                          </div>
+                          <span style={{fontSize:13,color: inputs.l2OngoingRateOverrideEnabled ? '#9B7EC8' : '#8DAFC8', fontWeight: inputs.l2OngoingRateOverrideEnabled ? 700 : 400}}>
+                            {inputs.l2OngoingRateOverrideEnabled
+                              ? `Ongoing Rate Override Active — ${inputs.l2OngoingRateOverride}% for funding years 2+`
+                              : 'Off — every funding year uses real bracket-aware calc'}
+                          </span>
+                        </div>
+                        {inputs.l2OngoingRateOverrideEnabled && (
+                          <Field label="Ongoing Rate (yrs 2+)" hint="Flat marginal rate applied to L2 funding draws after the first year, for both primary and spouse">
+                            <NumInput value={inputs.l2OngoingRateOverride} onChange={v=>set('l2OngoingRateOverride',v)} suffix="%"/>
+                          </Field>
+                        )}
+                      </div>
+                    )}
+
                     {inputs.ltcNetAmount > 0 && inputs.ltcFundingAge > 0 && (() => {
                       // Preview gross-up using estimated marginal rate (single-year preview;
                       // exact per-year bracket-aware gross-up, reflecting bracket creep across
