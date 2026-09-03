@@ -3828,31 +3828,29 @@ function App() {
                   const l2TotalNetP = (inputs.ltcNetAmount || 0) * l2YearsP;
                   const l2TotalNetS = (inputs.spouseLtcNetAmount || 0) * l2YearsS;
                   const l4MargRate  = allInMarginalRate || fedMarginalRate || 0.24;
-                  // ── L1 Roth-conversion overage ──
-                  // Same logic as the simulation engine's row._conversionOveragePending
-                  // resolution: full conversion is taxed at the marginal rate (no penalty —
-                  // conversions are penalty-exempt), L3 finances up to rothConversionFinanced
-                  // of that tax, and whatever's left ("overage") has to come out as a separate
-                  // straight IRA distribution — which DOES owe the early-withdrawal penalty,
-                  // since it's a distribution, not a conversion. Previously this card ignored
-                  // the overage entirely, silently assuming L3 financed 100% of L1's tax.
+                  // ── Real simulation run for this exact scenario (architecture ON, no
+                  // health-event/SORR/expense-shock noise) — the single source of truth for
+                  // every dollar figure below. Previously this card re-derived L4's gross
+                  // draws with its own flat-rate approximation (l4MargRate applied uniformly
+                  // to the FULL multi-year L2 total), completely bypassing the engine's real
+                  // bracket-aware/ongoing-rate-override gross-up logic — so changing the
+                  // ongoing L2 rate toggle silently had NO effect on the L4 number shown
+                  // here, even though it correctly changed the actual simulation. Pulling the
+                  // real per-row funding amounts fixes that mismatch.
+                  const archTaxYears    = projectArc({ ...baseProjectionInputs, architectureEnabled: true, sorrEnabled: false, expenseShockEnabled: false, ltcEventAge: 0, spouseLtcEventAge: 0 }).years;
+                  // ── L1 Roth-conversion overage — real value from the simulation's
+                  // row.rothConversionOverage (set once L3 financing is applied), not a
+                  // re-derived approximation.
                   const l1ConvAmt = inputs.rothConversionAmount || 0;
                   const l1Financed = Math.min(inputs.rothConversionFinanced || 0, l1ConvAmt);
-                  const l1ConvTax = l1ConvAmt * l4MargRate;
-                  const l1OverageTax = Math.max(0, l1ConvTax - l1Financed);
-                  const l1OveragePenaltyRate = (inputs.rothConversionAge || 0) < 59.5 ? 0.10 : 0;
-                  const l1OverageDraw = l1OverageTax > 0
-                    ? l1OverageTax / Math.max(0.01, 1 - l4MargRate - l1OveragePenaltyRate)
-                    : 0;
-                  const l4GrossP = l2TotalNetP > 0 ? l2TotalNetP / Math.max(0.01, 1 - l4MargRate - ((inputs.ltcFundingAge || 0) < 59.5 ? 0.10 : 0)) : 0;
-                  const l4GrossS = l2TotalNetS > 0 ? l2TotalNetS / Math.max(0.01, 1 - l4MargRate - ((inputs.spouseLtcFundingAge || 0) < 59.5 ? 0.10 : 0)) : 0;
+                  const l1OverageDraw = archTaxYears.reduce((s,y)=>s+(y.rothConversionOverage||0),0);
+                  const l4GrossP = archTaxYears.reduce((s,y)=>s+(y.ltcFundingAmount||0),0);
+                  const l4GrossS = archTaxYears.reduce((s,y)=>s+(y.spouseLtcFundingAmount||0),0);
                   // ── L3 multi-policy rollup for report display ──
                   // Falls back to the legacy single-policy scalar when l3Policies is empty,
                   // same rule the calc engine uses, so the report always matches the sim.
                   const l3PoliciesList = (inputs.l3Policies && inputs.l3Policies.length > 0) ? inputs.l3Policies : [];
-                  const l3TotalFunding = l3PoliciesList.length > 0
-                    ? l3PoliciesList.reduce((s,p)=>s+(Number(p.fundingAmount)||0),0)
-                    : (inputs.etaFundingAmount || 0);
+                  const l3TotalFunding = archTaxYears.reduce((s,y)=>s+(y.etaFundingAmount||0),0);
                   const l3PolicyCount  = l3PoliciesList.length > 0 ? l3PoliciesList.length : (l3TotalFunding > 0 ? 1 : 0);
                   const l3TotalLoan    = l3PoliciesList.reduce((s,p)=>s+((Number(p.fundingAmount)||0) * Math.min(Math.max((Number(p.ltvPct)||0)/100,0),1)),0);
                   const l4RemainderVal = Math.max(0, (inputs.traditionalBalance || 0) - (inputs.rothConversionAmount || 0) - l3TotalFunding - l4GrossP - l4GrossS - l1OverageDraw);
@@ -3862,7 +3860,6 @@ function App() {
                   // and taxSavedArch can collapse toward $0. See yearsStatusQuo definition above.
                   const lifetimeTaxDisp  = totalEstTaxSQ >= 1000000 ? '$'+(totalEstTaxSQ/1000000).toFixed(1)+'M' : '$'+Math.round(totalEstTaxSQ/1000)+'K';
                   // Compute tax with architecture enabled to show tax eliminated by Layer 3
-                  const archTaxYears    = projectArc({ ...baseProjectionInputs, architectureEnabled: true, sorrEnabled: false, expenseShockEnabled: false, ltcEventAge: 0, spouseLtcEventAge: 0 }).years;
                   const totalEstTaxArch = archTaxYears.reduce((sum, y) => sum + (y.estimatedTax||0), 0);
                   const taxSavedArch    = Math.max(0, totalEstTaxSQ - totalEstTaxArch);
                   const taxSavedDisp    = taxSavedArch >= 1000000 ? '$'+(taxSavedArch/1000000).toFixed(1)+'M in lifetime tax eliminated' : taxSavedArch >= 1000 ? '$'+Math.round(taxSavedArch/1000)+'K in lifetime tax eliminated' : 'Reduces lifetime tax burden';
@@ -5233,20 +5230,21 @@ function App() {
                 const l2YearsS = Math.max(1, Math.round(inputs.spouseLtcFundingYears || 1));
                 const l2TotalNetP = (inputs.ltcNetAmount || 0) * l2YearsP;
                 const l2TotalNetS = (inputs.spouseLtcNetAmount || 0) * l2YearsS;
-                const l4MargRate = allInMarginalRate || fedMarginalRate || 0.24;
+                // ── Real simulation run — single source of truth, same as the printable
+                // report. Previously this card re-derived every gross-up with its own
+                // flat-rate approximation (l4MargRate applied to the FULL multi-year L2
+                // total), which never reflected the ongoing-rate-override toggle even
+                // though the actual simulation did — so the L4 number here didn't move
+                // when that toggle changed. Pulling real per-row amounts fixes that.
+                const oneParagraphYears = projectArc({ ...baseProjectionInputs, architectureEnabled: true, sorrEnabled: false, expenseShockEnabled: false, ltcEventAge: 0, spouseLtcEventAge: 0 }).years;
                 const l1ConvAmt = inputs.rothConversionAmount || 0;
                 const l1Financed = Math.min(inputs.rothConversionFinanced || 0, l1ConvAmt);
-                const l1ConvTax = l1ConvAmt * l4MargRate;
-                const l1OverageTax = Math.max(0, l1ConvTax - l1Financed);
-                const l1OveragePenaltyRate = (inputs.rothConversionAge || 0) < 59.5 ? 0.10 : 0;
-                const l1OverageDraw = l1OverageTax > 0 ? l1OverageTax / Math.max(0.01, 1 - l4MargRate - l1OveragePenaltyRate) : 0;
-                const l4GrossP = l2TotalNetP > 0 ? l2TotalNetP / Math.max(0.01, 1 - l4MargRate - ((inputs.ltcFundingAge||0) < 59.5 ? 0.10 : 0)) : 0;
-                const l4GrossS = l2TotalNetS > 0 ? l2TotalNetS / Math.max(0.01, 1 - l4MargRate - ((inputs.spouseLtcFundingAge||0) < 59.5 ? 0.10 : 0)) : 0;
+                const l1OverageDraw = oneParagraphYears.reduce((s,y)=>s+(y.rothConversionOverage||0),0);
+                const l4GrossP = oneParagraphYears.reduce((s,y)=>s+(y.ltcFundingAmount||0),0);
+                const l4GrossS = oneParagraphYears.reduce((s,y)=>s+(y.spouseLtcFundingAmount||0),0);
                 // ── L3 multi-policy rollup — same rule as the printable report and the calc engine ──
                 const l3PoliciesList = (inputs.l3Policies && inputs.l3Policies.length > 0) ? inputs.l3Policies : [];
-                const l3TotalFunding = l3PoliciesList.length > 0
-                  ? l3PoliciesList.reduce((s,p)=>s+(Number(p.fundingAmount)||0),0)
-                  : (inputs.etaFundingAmount || 0);
+                const l3TotalFunding = oneParagraphYears.reduce((s,y)=>s+(y.etaFundingAmount||0),0);
                 const l3PolicyCount  = l3PoliciesList.length > 0 ? l3PoliciesList.length : (l3TotalFunding > 0 ? 1 : 0);
                 const l4RemainderVal = Math.max(0, (inputs.traditionalBalance || 0) - (inputs.rothConversionAmount || 0) - l3TotalFunding - l4GrossP - l4GrossS - l1OverageDraw);
 
