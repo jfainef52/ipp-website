@@ -173,6 +173,7 @@
       <div class="tab" data-tab="expenses" onclick="switchTab('expenses')">Expenses</div>
       <div class="tab" data-tab="dashboard" onclick="switchTab('dashboard')">Performance</div>
       <div class="tab" data-tab="surveys" onclick="switchTab('surveys')">Surveys</div>
+      <div class="tab" data-tab="survey-responses" onclick="switchTab('survey-responses')">Survey Responses</div>
     </div>
 
     <!-- EVENTS -->
@@ -316,18 +317,28 @@
 
       <div class="card" id="survey-links-card" style="display:none;">
         <h3>Ready to Send</h3>
-        <p class="muted" style="margin-top:-6px;">Copy each message into Messages and send from Stacey's phone. Already-sent households are skipped automatically on the next click.</p>
+        <p class="muted" style="margin-top:-6px;">Copy the message or open it directly in Messages, then click <strong>Mark Sent</strong> once it's actually been texted. Sent households drop to the bottom of the list.</p>
         <div id="survey-links-list"></div>
       </div>
+    </div>
 
-      <div class="section-title">Responses</div>
+    <!-- SURVEY RESPONSES -->
+    <div class="panel" id="panel-survey-responses">
+      <div class="toolbar">
+        <div class="event-picker">
+          <div><label>Event</label><select id="responses-event-select" onchange="loadResponsesTab()"></select></div>
+        </div>
+      </div>
+
+      <div class="stats" id="responses-stats"></div>
+
       <div class="table-wrap">
         <table>
           <thead><tr>
             <th>Household</th><th>Rating</th><th>Most Valuable</th><th>Readiness</th>
             <th>Topics</th><th>Guest</th><th>Feedback</th><th>Sent</th><th>Completed</th>
           </tr></thead>
-          <tbody id="surveys-table"></tbody>
+          <tbody id="responses-table"></tbody>
         </table>
       </div>
     </div>
@@ -423,6 +434,7 @@ function switchTab(name){
   if(name==='expenses') loadExpenses();
   if(name==='dashboard') loadDashboard();
   if(name==='surveys') loadSurveys();
+  if(name==='survey-responses') loadResponsesTab();
 }
 
 // ---------- EVENTS ----------
@@ -452,7 +464,7 @@ function renderEventsTable(){
 }
 function populateEventSelects(){
   const opts = currentEvents.map(e => `<option value="${e.event_id}">${esc(e.name)} — ${fmtDate(e.event_date)}</option>`).join('');
-  ['funnel-event-select','exp-event-select','survey-event-select'].forEach(id=>{
+  ['funnel-event-select','exp-event-select','survey-event-select','responses-event-select'].forEach(id=>{
     const sel = document.getElementById(id);
     const prev = sel.value;
     sel.innerHTML = opts || '<option value="">No events yet</option>';
@@ -758,13 +770,13 @@ const GUEST_LABELS = {
   na: 'N/A — came alone'
 };
 
+// ----- Surveys tab (send workflow) -----
 let currentSurveyHouseholds = [];
 let currentSurveyResponses = [];
 
 async function loadSurveys(){
   const eventId = document.getElementById('survey-event-select').value;
   if(!eventId){
-    document.getElementById('surveys-table').innerHTML = '<tr><td class="empty">Select an event first.</td></tr>';
     document.getElementById('survey-stats').innerHTML = '';
     document.getElementById('survey-links-card').style.display = 'none';
     return;
@@ -783,47 +795,24 @@ async function loadSurveys(){
   currentSurveyResponses = responses || [];
 
   renderSurveyStats();
-  renderSurveysTable();
   renderPendingLinksCard(eventId);
 }
 
 function renderSurveyStats(){
   const attended = currentSurveyHouseholds.length;
-  const sent = currentSurveyHouseholds.filter(h=>h.survey_sent_date).length;
-  const completed = currentSurveyResponses.filter(r=>r.completed_at).length;
-  document.getElementById('survey-stats').innerHTML = `
-    <div class="stat"><div class="num">${attended}</div><div class="lbl">Attended</div></div>
-    <div class="stat"><div class="num">${sent}</div><div class="lbl">Links Sent</div></div>
-    <div class="stat good"><div class="num">${completed}</div><div class="lbl">Completed</div></div>
-  `;
-}
-
-function renderSurveysTable(){
-  const tbody = document.getElementById('surveys-table');
-  if(!currentSurveyResponses.length){
-    tbody.innerHTML = '<tr><td colspan="9" class="empty">No survey links generated yet for this event.</td></tr>';
-    return;
-  }
+  const notCompleted = currentSurveyResponses.filter(r=>!r.completed_at);
   const householdMap = {};
   currentSurveyHouseholds.forEach(h => householdMap[h.id] = h);
-
-  tbody.innerHTML = currentSurveyResponses.map(r => {
+  const awaitingSend = notCompleted.filter(r => {
     const hh = householdMap[r.household_id];
-    const topics = (r.topics_interest||[]).map(t => TOPIC_LABELS[t] || t).join(', ');
-    return `
-      <tr>
-        <td><strong>${esc(hh ? hh.household_name : '—')}</strong></td>
-        <td>${r.rating ?? ''}</td>
-        <td>${esc(r.most_valuable||'')}</td>
-        <td>${esc(READINESS_LABELS[r.readiness] || r.readiness || '')}</td>
-        <td>${esc(topics)}</td>
-        <td>${esc(GUEST_LABELS[r.guest_status] || r.guest_status || '')}</td>
-        <td>${esc(r.open_feedback||'')}</td>
-        <td>${fmtDate(hh ? hh.survey_sent_date : null)}</td>
-        <td>${r.completed_at ? fmtDate(r.completed_at.substring(0,10)) : '<span class="pill pill-pending">Pending</span>'}</td>
-      </tr>
-    `;
-  }).join('');
+    return hh && !hh.survey_sent_date;
+  }).length;
+  const sent = currentSurveyHouseholds.filter(h=>h.survey_sent_date).length;
+  document.getElementById('survey-stats').innerHTML = `
+    <div class="stat"><div class="num">${attended}</div><div class="lbl">Attended</div></div>
+    <div class="stat"><div class="num">${awaitingSend}</div><div class="lbl">Awaiting Send</div></div>
+    <div class="stat good"><div class="num">${sent}</div><div class="lbl">Sent</div></div>
+  `;
 }
 
 function makeToken(){
@@ -861,13 +850,12 @@ async function generateSurveyLinks(){
       event_id: eventId,
       survey_token: makeToken()
     }));
-    const { data: inserted, error } = await sb.from('seminar_survey_responses').insert(rows).select();
+    // NOTE: survey_sent_date is intentionally NOT set here — generating a
+    // link only prepares it. It's only marked sent once someone actually
+    // clicks "Mark Sent" after texting it, so the Sent column reflects
+    // reality rather than the moment this button was clicked.
+    const { error } = await sb.from('seminar_survey_responses').insert(rows);
     if(error){ alert(error.message); return; }
-
-    const today = new Date().toISOString().substring(0,10);
-    for(const h of toSend){
-      await sb.from('seminar_households').update({ survey_sent_date: today }).eq('id', h.id);
-    }
 
     await loadSurveys();
   } finally {
@@ -876,44 +864,76 @@ async function generateSurveyLinks(){
   }
 }
 
+function normalizePhoneForSms(phone){
+  const digits = (phone||'').replace(/\D/g,'');
+  if(!digits) return '';
+  if(digits.length === 10) return '+1' + digits;
+  if(digits.length === 11 && digits.startsWith('1')) return '+' + digits;
+  return digits ? '+' + digits : '';
+}
+
 function renderPendingLinksCard(eventId){
   const event = currentEvents.find(e=>e.event_id===eventId);
   const eventLabel = event && event.venue ? esc(event.venue) : 'our recent dinner';
   const householdMap = {};
   currentSurveyHouseholds.forEach(h => householdMap[h.id] = h);
 
-  const pending = currentSurveyResponses.filter(r => !r.completed_at);
+  const notCompleted = currentSurveyResponses.filter(r => !r.completed_at);
 
   const card = document.getElementById('survey-links-card');
   const list = document.getElementById('survey-links-list');
 
-  if(!pending.length){
+  if(!notCompleted.length){
     card.style.display = 'none';
     list.innerHTML = '';
     return;
   }
-
   card.style.display = 'block';
-  list.innerHTML = pending.map(r => {
+
+  const awaiting = notCompleted.filter(r => {
+    const hh = householdMap[r.household_id];
+    return hh && !hh.survey_sent_date;
+  });
+  const sent = notCompleted.filter(r => {
+    const hh = householdMap[r.household_id];
+    return hh && hh.survey_sent_date;
+  });
+
+  function cardHtml(r, isSent){
     const hh = householdMap[r.household_id];
     if(!hh) return '';
     const link = `${SURVEY_BASE_URL}/${r.survey_token}`;
     const firstName = (hh.household_name||'').split(/[\s&]/)[0];
     const message = `Hi ${firstName}, this is Integrated Planning Partners — Jeff Faine's team. Thanks again for joining us at ${eventLabel}. We'd love your quick feedback (90 seconds): ${link}`;
     const safeMsg = esc(message);
+    const smsPhone = esc(normalizePhoneForSms(hh.phone));
+    const actions = isSent
+      ? `<span class="pill pill-yes">Sent ${fmtDate(hh.survey_sent_date)}</span>`
+      : `<button class="btn-gold btn btn-small" onclick="copySurveyMessage(this)" data-msg="${safeMsg}">Copy Message</button>
+         <button class="btn-ghost btn btn-small" onclick="openInMessages(this)" data-msg="${safeMsg}" data-phone="${smsPhone}">Open in Messages</button>
+         <button class="btn-ghost btn btn-small" onclick="markHouseholdSent('${hh.id}')">Mark Sent</button>`;
     return `
-      <div class="card" style="margin-bottom:10px;">
+      <div class="card" style="margin-bottom:10px; ${isSent ? 'opacity:0.65;' : ''}">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
           <div>
             <strong>${esc(hh.household_name)}</strong>
             <div class="muted">${esc(hh.phone || 'No phone on file')}</div>
           </div>
-          <button class="btn-gold btn btn-small" onclick="copySurveyMessage(this)" data-msg="${safeMsg}">Copy Message</button>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">${actions}</div>
         </div>
         <textarea readonly rows="2" style="margin-top:8px;">${esc(message)}</textarea>
       </div>
     `;
-  }).join('');
+  }
+
+  list.innerHTML = awaiting.map(r=>cardHtml(r,false)).join('') + sent.map(r=>cardHtml(r,true)).join('');
+}
+
+async function markHouseholdSent(householdId){
+  const today = new Date().toISOString().substring(0,10);
+  const { error } = await sb.from('seminar_households').update({ survey_sent_date: today }).eq('id', householdId);
+  if(error){ alert(error.message); return; }
+  await loadSurveys();
 }
 
 function copySurveyMessage(btn){
@@ -923,6 +943,87 @@ function copySurveyMessage(btn){
     btn.textContent = 'Copied!';
     setTimeout(()=>{ btn.textContent = orig; }, 1500);
   });
+}
+
+function openInMessages(btn){
+  const msg = btn.getAttribute('data-msg');
+  const phone = btn.getAttribute('data-phone');
+  if(!phone){ alert('No phone number on file for this household — copy the message and send manually.'); return; }
+  const url = `sms:${phone}?body=${encodeURIComponent(msg)}`;
+  window.open(url, '_blank');
+}
+
+// ----- Survey Responses tab (review only) -----
+let currentResponseHouseholds = [];
+let currentResponseRows = [];
+
+async function loadResponsesTab(){
+  const eventId = document.getElementById('responses-event-select').value;
+  if(!eventId){
+    document.getElementById('responses-table').innerHTML = '<tr><td class="empty">Select an event first.</td></tr>';
+    document.getElementById('responses-stats').innerHTML = '';
+    return;
+  }
+  const { data: households, error: hErr } = await sb.from('seminar_households')
+    .select('id, household_name, phone, attended, survey_sent_date')
+    .eq('event_id', eventId)
+    .eq('attended', true);
+  if(hErr){ console.error(hErr); return; }
+  currentResponseHouseholds = households || [];
+
+  const { data: responses, error: rErr } = await sb.from('seminar_survey_responses')
+    .select('*')
+    .eq('event_id', eventId);
+  if(rErr){ console.error(rErr); return; }
+  currentResponseRows = responses || [];
+
+  renderResponsesStats();
+  renderResponsesTable();
+}
+
+function renderResponsesStats(){
+  const sent = currentResponseHouseholds.filter(h=>h.survey_sent_date).length;
+  const completed = currentResponseRows.filter(r=>r.completed_at).length;
+  const rate = sent ? Math.round((completed/sent)*100) : 0;
+  document.getElementById('responses-stats').innerHTML = `
+    <div class="stat"><div class="num">${sent}</div><div class="lbl">Sent</div></div>
+    <div class="stat good"><div class="num">${completed}</div><div class="lbl">Completed</div></div>
+    <div class="stat"><div class="num">${rate}%</div><div class="lbl">Response Rate</div></div>
+  `;
+}
+
+function renderResponsesTable(){
+  const tbody = document.getElementById('responses-table');
+  if(!currentResponseRows.length){
+    tbody.innerHTML = '<tr><td colspan="9" class="empty">No survey links generated yet for this event.</td></tr>';
+    return;
+  }
+  const householdMap = {};
+  currentResponseHouseholds.forEach(h => householdMap[h.id] = h);
+
+  // Completed responses first, most recent first; pending ones after.
+  const rows = [...currentResponseRows].sort((a,b)=>{
+    if(!!a.completed_at !== !!b.completed_at) return a.completed_at ? -1 : 1;
+    return new Date(b.completed_at || b.created_at) - new Date(a.completed_at || a.created_at);
+  });
+
+  tbody.innerHTML = rows.map(r => {
+    const hh = householdMap[r.household_id];
+    const topics = (r.topics_interest||[]).map(t => TOPIC_LABELS[t] || t).join(', ');
+    return `
+      <tr>
+        <td><strong>${esc(hh ? hh.household_name : '—')}</strong></td>
+        <td>${r.rating ?? ''}</td>
+        <td>${esc(r.most_valuable||'')}</td>
+        <td>${esc(READINESS_LABELS[r.readiness] || r.readiness || '')}</td>
+        <td>${esc(topics)}</td>
+        <td>${esc(GUEST_LABELS[r.guest_status] || r.guest_status || '')}</td>
+        <td>${esc(r.open_feedback||'')}</td>
+        <td>${fmtDate(hh ? hh.survey_sent_date : null)}</td>
+        <td>${r.completed_at ? fmtDate(r.completed_at.substring(0,10)) : '<span class="pill pill-pending">Pending</span>'}</td>
+      </tr>
+    `;
+  }).join('');
 }
 
 // ---------- HELPERS ----------
