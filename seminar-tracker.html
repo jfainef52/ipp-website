@@ -171,6 +171,7 @@
       <div class="tab" data-tab="funnel" onclick="switchTab('funnel')">Funnel</div>
       <div class="tab" data-tab="expenses" onclick="switchTab('expenses')">Expenses</div>
       <div class="tab" data-tab="dashboard" onclick="switchTab('dashboard')">Performance</div>
+      <div class="tab" data-tab="surveys" onclick="switchTab('surveys')">Surveys</div>
     </div>
 
     <!-- EVENTS -->
@@ -299,6 +300,37 @@
       </div>
     </div>
 
+    <!-- SURVEYS -->
+    <div class="panel" id="panel-surveys">
+      <div class="toolbar">
+        <div class="event-picker">
+          <div><label>Event</label><select id="survey-event-select" onchange="loadSurveys()"></select></div>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn-gold btn" onclick="generateSurveyLinks()">Generate Links for Attendees</button>
+        </div>
+      </div>
+
+      <div class="stats" id="survey-stats"></div>
+
+      <div class="card" id="survey-links-card" style="display:none;">
+        <h3>Ready to Send</h3>
+        <p class="muted" style="margin-top:-6px;">Copy each message into Messages and send from Stacey's phone. Already-sent households are skipped automatically on the next click.</p>
+        <div id="survey-links-list"></div>
+      </div>
+
+      <div class="section-title">Responses</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Household</th><th>Rating</th><th>Most Valuable</th><th>Readiness</th>
+            <th>Topics</th><th>Guest</th><th>Feedback</th><th>Sent</th><th>Completed</th>
+          </tr></thead>
+          <tbody id="surveys-table"></tbody>
+        </table>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -389,6 +421,7 @@ function switchTab(name){
   if(name==='funnel') loadFunnel();
   if(name==='expenses') loadExpenses();
   if(name==='dashboard') loadDashboard();
+  if(name==='surveys') loadSurveys();
 }
 
 // ---------- EVENTS ----------
@@ -418,7 +451,7 @@ function renderEventsTable(){
 }
 function populateEventSelects(){
   const opts = currentEvents.map(e => `<option value="${e.event_id}">${esc(e.name)} — ${fmtDate(e.event_date)}</option>`).join('');
-  ['funnel-event-select','exp-event-select'].forEach(id=>{
+  ['funnel-event-select','exp-event-select','survey-event-select'].forEach(id=>{
     const sel = document.getElementById(id);
     const prev = sel.value;
     sel.innerHTML = opts || '<option value="">No events yet</option>';
@@ -690,6 +723,172 @@ function renderZipChart(rows){
         y: { beginAtZero:true, ticks: { callback: v => '$'+v.toLocaleString() } }
       }
     }
+  });
+}
+
+// ---------- SURVEYS ----------
+// NOTE: this now points at the live site — integratedplanningpartners.com/survey/{token} —
+// via the rewrite in ipp-website's vercel.json.
+const SURVEY_BASE_URL = 'https://www.integratedplanningpartners.com/survey';
+
+const TOPIC_LABELS = {
+  L1: 'Guaranteed income floor',
+  L2: 'Long-term care protection',
+  L3: 'Reducing taxes on withdrawals',
+  L4: 'Flexible access / liquidity',
+  NONE: 'None flagged'
+};
+const READINESS_LABELS = {
+  active: 'Actively looking',
+  curious: 'Curious, not in a rush',
+  learning: 'There to learn',
+  na: 'Not applicable'
+};
+const GUEST_LABELS = {
+  attended_would_benefit: 'Attended — would benefit',
+  attended_not_needed: 'Attended — not needed',
+  missed_would_benefit: "Couldn't attend — would benefit",
+  na: 'N/A — came alone'
+};
+
+let currentSurveyHouseholds = [];
+let currentSurveyResponses = [];
+
+async function loadSurveys(){
+  const eventId = document.getElementById('survey-event-select').value;
+  document.getElementById('survey-links-card').style.display = 'none';
+  if(!eventId){
+    document.getElementById('surveys-table').innerHTML = '<tr><td class="empty">Select an event first.</td></tr>';
+    document.getElementById('survey-stats').innerHTML = '';
+    return;
+  }
+  const { data: households, error: hErr } = await sb.from('seminar_households')
+    .select('id, household_name, phone, attended, survey_sent_date')
+    .eq('event_id', eventId)
+    .eq('attended', true);
+  if(hErr){ console.error(hErr); return; }
+  currentSurveyHouseholds = households || [];
+
+  const { data: responses, error: rErr } = await sb.from('seminar_survey_responses')
+    .select('*')
+    .eq('event_id', eventId);
+  if(rErr){ console.error(rErr); return; }
+  currentSurveyResponses = responses || [];
+
+  renderSurveyStats();
+  renderSurveysTable();
+}
+
+function renderSurveyStats(){
+  const attended = currentSurveyHouseholds.length;
+  const sent = currentSurveyHouseholds.filter(h=>h.survey_sent_date).length;
+  const completed = currentSurveyResponses.filter(r=>r.completed_at).length;
+  document.getElementById('survey-stats').innerHTML = `
+    <div class="stat"><div class="num">${attended}</div><div class="lbl">Attended</div></div>
+    <div class="stat"><div class="num">${sent}</div><div class="lbl">Links Sent</div></div>
+    <div class="stat good"><div class="num">${completed}</div><div class="lbl">Completed</div></div>
+  `;
+}
+
+function renderSurveysTable(){
+  const tbody = document.getElementById('surveys-table');
+  if(!currentSurveyResponses.length){
+    tbody.innerHTML = '<tr><td colspan="9" class="empty">No survey links generated yet for this event.</td></tr>';
+    return;
+  }
+  const householdMap = {};
+  currentSurveyHouseholds.forEach(h => householdMap[h.id] = h);
+
+  tbody.innerHTML = currentSurveyResponses.map(r => {
+    const hh = householdMap[r.household_id];
+    const topics = (r.topics_interest||[]).map(t => TOPIC_LABELS[t] || t).join(', ');
+    return `
+      <tr>
+        <td><strong>${esc(hh ? hh.household_name : '—')}</strong></td>
+        <td>${r.rating ?? ''}</td>
+        <td>${esc(r.most_valuable||'')}</td>
+        <td>${esc(READINESS_LABELS[r.readiness] || r.readiness || '')}</td>
+        <td>${esc(topics)}</td>
+        <td>${esc(GUEST_LABELS[r.guest_status] || r.guest_status || '')}</td>
+        <td>${esc(r.open_feedback||'')}</td>
+        <td>${fmtDate(hh ? hh.survey_sent_date : null)}</td>
+        <td>${r.completed_at ? fmtDate(r.completed_at.substring(0,10)) : '<span class="pill pill-pending">Pending</span>'}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function makeToken(){
+  return (crypto.randomUUID ? crypto.randomUUID() : (Date.now().toString(36)+Math.random().toString(36).slice(2))).replace(/-/g,'');
+}
+
+async function generateSurveyLinks(){
+  const eventId = document.getElementById('survey-event-select').value;
+  if(!eventId){ alert('Select an event first.'); return; }
+  const event = currentEvents.find(e=>e.event_id===eventId);
+
+  const alreadyHasResponse = new Set(currentSurveyResponses.map(r=>r.household_id));
+  const toSend = currentSurveyHouseholds.filter(h => !alreadyHasResponse.has(h.id));
+
+  if(!toSend.length){
+    alert('Every attended household for this event already has a survey link.');
+    return;
+  }
+
+  const rows = toSend.map(h => ({
+    household_id: h.id,
+    event_id: eventId,
+    survey_token: makeToken()
+  }));
+  const { data: inserted, error } = await sb.from('seminar_survey_responses').insert(rows).select();
+  if(error){ alert(error.message); return; }
+
+  const today = new Date().toISOString().substring(0,10);
+  for(const h of toSend){
+    await sb.from('seminar_households').update({ survey_sent_date: today }).eq('id', h.id);
+  }
+
+  renderSurveyLinksList(inserted, toSend, event);
+  loadSurveys();
+}
+
+function renderSurveyLinksList(inserted, households, event){
+  const householdMap = {};
+  households.forEach(h => householdMap[h.id] = h);
+  const eventLabel = event ? esc(event.name) : 'our recent dinner';
+
+  const card = document.getElementById('survey-links-card');
+  const list = document.getElementById('survey-links-list');
+  card.style.display = 'block';
+
+  list.innerHTML = inserted.map(r => {
+    const hh = householdMap[r.household_id];
+    if(!hh) return '';
+    const link = `${SURVEY_BASE_URL}/${r.survey_token}`;
+    const firstName = (hh.household_name||'').split(/[\s&]/)[0];
+    const message = `Hi ${firstName}, this is Integrated Planning Partners — Jeff Faine's team. Thanks again for joining us at ${eventLabel}. We'd love your quick feedback (90 seconds): ${link}`;
+    const safeMsg = esc(message);
+    return `
+      <div class="card" style="margin-bottom:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+          <div>
+            <strong>${esc(hh.household_name)}</strong>
+            <div class="muted">${esc(hh.phone || 'No phone on file')}</div>
+          </div>
+          <button class="btn-gold btn btn-small" onclick="copySurveyMessage(this)" data-msg="${safeMsg}">Copy Message</button>
+        </div>
+        <textarea readonly rows="2" style="margin-top:8px;">${esc(message)}</textarea>
+      </div>
+    `;
+  }).join('');
+}
+
+function copySurveyMessage(btn){
+  const msg = btn.getAttribute('data-msg');
+  navigator.clipboard.writeText(msg).then(()=>{
+    const orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(()=>{ btn.textContent = orig; }, 1500);
   });
 }
 
