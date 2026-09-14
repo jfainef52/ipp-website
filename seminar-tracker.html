@@ -782,7 +782,7 @@ async function loadSurveys(){
     return;
   }
   const { data: households, error: hErr } = await sb.from('seminar_households')
-    .select('id, household_name, phone, attended, survey_sent_date')
+    .select('id, household_name, phone, attended, survey_sent_date, survey_skip_reason')
     .eq('event_id', eventId)
     .eq('attended', true);
   if(hErr){ console.error(hErr); return; }
@@ -805,13 +805,15 @@ function renderSurveyStats(){
   currentSurveyHouseholds.forEach(h => householdMap[h.id] = h);
   const awaitingSend = notCompleted.filter(r => {
     const hh = householdMap[r.household_id];
-    return hh && !hh.survey_sent_date;
+    return hh && !hh.survey_sent_date && !hh.survey_skip_reason;
   }).length;
   const sent = currentSurveyHouseholds.filter(h=>h.survey_sent_date).length;
+  const noPhone = currentSurveyHouseholds.filter(h=>h.survey_skip_reason==='no_phone').length;
   document.getElementById('survey-stats').innerHTML = `
     <div class="stat"><div class="num">${attended}</div><div class="lbl">Attended</div></div>
     <div class="stat"><div class="num">${awaitingSend}</div><div class="lbl">Awaiting Send</div></div>
     <div class="stat good"><div class="num">${sent}</div><div class="lbl">Sent</div></div>
+    <div class="stat"><div class="num">${noPhone}</div><div class="lbl">No Phone</div></div>
   `;
 }
 
@@ -890,16 +892,20 @@ function renderPendingLinksCard(eventId){
   }
   card.style.display = 'block';
 
-  const awaiting = notCompleted.filter(r => {
+  // Three tiers: still need to send (top), then sent and skipped (bottom,
+  // out of the way but still visible for reference).
+  const awaiting = [];
+  const sent = [];
+  const skipped = [];
+  notCompleted.forEach(r => {
     const hh = householdMap[r.household_id];
-    return hh && !hh.survey_sent_date;
-  });
-  const sent = notCompleted.filter(r => {
-    const hh = householdMap[r.household_id];
-    return hh && hh.survey_sent_date;
+    if(!hh) return;
+    if(hh.survey_skip_reason) skipped.push(r);
+    else if(hh.survey_sent_date) sent.push(r);
+    else awaiting.push(r);
   });
 
-  function cardHtml(r, isSent){
+  function cardHtml(r, status){
     const hh = householdMap[r.household_id];
     if(!hh) return '';
     const link = `${SURVEY_BASE_URL}/${r.survey_token}`;
@@ -907,13 +913,23 @@ function renderPendingLinksCard(eventId){
     const message = `Hi ${firstName}, this is Integrated Planning Partners — Jeff Faine's team. Thanks again for joining us at ${eventLabel}. We'd love your quick feedback (90 seconds): ${link}`;
     const safeMsg = esc(message);
     const smsPhone = esc(normalizePhoneForSms(hh.phone));
-    const actions = isSent
-      ? `<span class="pill pill-yes">Sent ${fmtDate(hh.survey_sent_date)}</span>`
-      : `<button class="btn-gold btn btn-small" onclick="copySurveyMessage(this)" data-msg="${safeMsg}">Copy Message</button>
-         <button class="btn-ghost btn btn-small" onclick="openInMessages(this)" data-msg="${safeMsg}" data-phone="${smsPhone}">Open in Messages</button>
-         <button class="btn-ghost btn btn-small" onclick="markHouseholdSent('${hh.id}')">Mark Sent</button>`;
+    const hasPhone = !!smsPhone;
+
+    let actions;
+    if(status === 'sent'){
+      actions = `<span class="pill pill-yes">Sent ${fmtDate(hh.survey_sent_date)}</span>`;
+    } else if(status === 'skipped'){
+      actions = `<span class="pill pill-no">No Phone on File</span>`;
+    } else {
+      actions = `<button class="btn-gold btn btn-small" onclick="copySurveyMessage(this)" data-msg="${safeMsg}">Copy Message</button>`
+        + (hasPhone ? `<button class="btn-ghost btn btn-small" onclick="openInMessages(this)" data-msg="${safeMsg}" data-phone="${smsPhone}">Open in Messages</button>` : '')
+        + `<button class="btn-ghost btn btn-small" onclick="markHouseholdSent('${hh.id}')">Mark Sent</button>`
+        + (!hasPhone ? `<button class="btn-ghost btn btn-small" onclick="markHouseholdSkipped('${hh.id}')">No Phone — Move to Bottom</button>` : '');
+    }
+
+    const dimmed = status !== 'awaiting';
     return `
-      <div class="card" style="margin-bottom:10px; ${isSent ? 'opacity:0.65;' : ''}">
+      <div class="card" style="margin-bottom:10px; ${dimmed ? 'opacity:0.65;' : ''}">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
           <div>
             <strong>${esc(hh.household_name)}</strong>
@@ -926,12 +942,20 @@ function renderPendingLinksCard(eventId){
     `;
   }
 
-  list.innerHTML = awaiting.map(r=>cardHtml(r,false)).join('') + sent.map(r=>cardHtml(r,true)).join('');
+  list.innerHTML = awaiting.map(r=>cardHtml(r,'awaiting')).join('')
+    + sent.map(r=>cardHtml(r,'sent')).join('')
+    + skipped.map(r=>cardHtml(r,'skipped')).join('');
 }
 
 async function markHouseholdSent(householdId){
   const today = new Date().toISOString().substring(0,10);
   const { error } = await sb.from('seminar_households').update({ survey_sent_date: today }).eq('id', householdId);
+  if(error){ alert(error.message); return; }
+  await loadSurveys();
+}
+
+async function markHouseholdSkipped(householdId){
+  const { error } = await sb.from('seminar_households').update({ survey_skip_reason: 'no_phone' }).eq('id', householdId);
   if(error){ alert(error.message); return; }
   await loadSurveys();
 }
