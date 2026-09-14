@@ -307,7 +307,7 @@
           <div><label>Event</label><select id="survey-event-select" onchange="loadSurveys()"></select></div>
         </div>
         <div style="display:flex; gap:8px;">
-          <button class="btn-gold btn" onclick="generateSurveyLinks()">Generate Links for Attendees</button>
+          <button class="btn-gold btn" id="gen-links-btn" onclick="generateSurveyLinks()">Generate Links for Attendees</button>
         </div>
       </div>
 
@@ -822,34 +822,53 @@ function makeToken(){
   return (crypto.randomUUID ? crypto.randomUUID() : (Date.now().toString(36)+Math.random().toString(36).slice(2))).replace(/-/g,'');
 }
 
+let generatingSurveyLinks = false;
+
 async function generateSurveyLinks(){
+  if(generatingSurveyLinks) return; // guard against double-click / double-fire
   const eventId = document.getElementById('survey-event-select').value;
   if(!eventId){ alert('Select an event first.'); return; }
-  const event = currentEvents.find(e=>e.event_id===eventId);
 
-  const alreadyHasResponse = new Set(currentSurveyResponses.map(r=>r.household_id));
-  const toSend = currentSurveyHouseholds.filter(h => !alreadyHasResponse.has(h.id));
+  const genBtn = document.getElementById('gen-links-btn');
+  generatingSurveyLinks = true;
+  if(genBtn){ genBtn.disabled = true; genBtn.textContent = 'Generating…'; }
 
-  if(!toSend.length){
-    alert('Every attended household for this event already has a survey link.');
-    return;
+  try{
+    const event = currentEvents.find(e=>e.event_id===eventId);
+
+    // Re-check against the database directly rather than trusting in-memory
+    // state, so a stale page or a fast double-click can't create duplicates.
+    const { data: existing, error: exErr } = await sb.from('seminar_survey_responses')
+      .select('household_id')
+      .eq('event_id', eventId);
+    if(exErr){ alert(exErr.message); return; }
+    const alreadyHasResponse = new Set((existing||[]).map(r=>r.household_id));
+    const toSend = currentSurveyHouseholds.filter(h => !alreadyHasResponse.has(h.id));
+
+    if(!toSend.length){
+      alert('Every attended household for this event already has a survey link.');
+      return;
+    }
+
+    const rows = toSend.map(h => ({
+      household_id: h.id,
+      event_id: eventId,
+      survey_token: makeToken()
+    }));
+    const { data: inserted, error } = await sb.from('seminar_survey_responses').insert(rows).select();
+    if(error){ alert(error.message); return; }
+
+    const today = new Date().toISOString().substring(0,10);
+    for(const h of toSend){
+      await sb.from('seminar_households').update({ survey_sent_date: today }).eq('id', h.id);
+    }
+
+    await loadSurveys();
+    renderSurveyLinksList(inserted, toSend, event);
+  } finally {
+    generatingSurveyLinks = false;
+    if(genBtn){ genBtn.disabled = false; genBtn.textContent = 'Generate Links for Attendees'; }
   }
-
-  const rows = toSend.map(h => ({
-    household_id: h.id,
-    event_id: eventId,
-    survey_token: makeToken()
-  }));
-  const { data: inserted, error } = await sb.from('seminar_survey_responses').insert(rows).select();
-  if(error){ alert(error.message); return; }
-
-  const today = new Date().toISOString().substring(0,10);
-  for(const h of toSend){
-    await sb.from('seminar_households').update({ survey_sent_date: today }).eq('id', h.id);
-  }
-
-  renderSurveyLinksList(inserted, toSend, event);
-  loadSurveys();
 }
 
 function renderSurveyLinksList(inserted, households, event){
