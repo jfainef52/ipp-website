@@ -910,7 +910,10 @@ function renderPendingLinksCard(eventId){
     if(!hh) return '';
     const link = `${SURVEY_BASE_URL}/${r.survey_token}`;
     const firstName = (hh.household_name||'').split(/[\s&]/)[0];
-    const message = `Hi ${firstName}, this is Integrated Planning Partners — Jeff Faine's team. Thanks again for joining us at ${eventLabel}. We'd love your quick feedback (90 seconds): ${link}`;
+    // NOTE: this batch is going out later than the usual 7–10 day window,
+    // so the wording acknowledges the gap. Revert to "Thanks again for
+    // joining us at {venue}." once back on the normal cadence.
+    const message = `Hi ${firstName}, this is Integrated Planning Partners — Jeff Faine's team. It's been a few weeks since our dinner at ${eventLabel} — we'd still love your quick feedback (90 seconds): ${link}`;
     const safeMsg = esc(message);
     const smsPhone = esc(normalizePhoneForSms(hh.phone));
     const hasPhone = !!smsPhone;
