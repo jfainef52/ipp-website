@@ -128,6 +128,7 @@
     padding:8px 8px; font-size:13.5px; min-width:90px; min-height:38px;
   }
   .rev-input{width:100px;}
+  .venue-input{width:140px;}
   @media (hover:none){ .btn, button, select, input, td{ font-size:15px; } }
 
   .toolbar{display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;}
@@ -440,7 +441,7 @@ function renderEventsTable(){
       <td><strong>${esc(e.name)}</strong></td>
       <td>${fmtDate(e.event_date)}</td>
       <td>${esc(e.market||'')}</td>
-      <td>${esc(e.venue_zip||'')}</td>
+      <td><input class="venue-input" value="${esc(e.venue||'')}" onchange="updateEventVenue('${e.event_id}', this.value)"></td>
       <td>${e.total_invited}</td>
       <td>${e.rsvps}</td>
       <td>${e.attendees}</td>
@@ -477,6 +478,12 @@ async function addEvent(){
 async function deleteEvent(id){
   if(!confirm('Delete this event and all its household/expense data?')) return;
   await sb.from('seminar_events').delete().eq('id', id);
+  loadEvents();
+}
+async function updateEventVenue(id, value){
+  const venue = value.trim();
+  const { error } = await sb.from('seminar_events').update({ venue }).eq('id', id);
+  if(error){ alert(error.message); return; }
   loadEvents();
 }
 
@@ -756,10 +763,10 @@ let currentSurveyResponses = [];
 
 async function loadSurveys(){
   const eventId = document.getElementById('survey-event-select').value;
-  document.getElementById('survey-links-card').style.display = 'none';
   if(!eventId){
     document.getElementById('surveys-table').innerHTML = '<tr><td class="empty">Select an event first.</td></tr>';
     document.getElementById('survey-stats').innerHTML = '';
+    document.getElementById('survey-links-card').style.display = 'none';
     return;
   }
   const { data: households, error: hErr } = await sb.from('seminar_households')
@@ -777,6 +784,7 @@ async function loadSurveys(){
 
   renderSurveyStats();
   renderSurveysTable();
+  renderPendingLinksCard(eventId);
 }
 
 function renderSurveyStats(){
@@ -834,8 +842,6 @@ async function generateSurveyLinks(){
   if(genBtn){ genBtn.disabled = true; genBtn.textContent = 'Generating…'; }
 
   try{
-    const event = currentEvents.find(e=>e.event_id===eventId);
-
     // Re-check against the database directly rather than trusting in-memory
     // state, so a stale page or a fast double-click can't create duplicates.
     const { data: existing, error: exErr } = await sb.from('seminar_survey_responses')
@@ -864,23 +870,31 @@ async function generateSurveyLinks(){
     }
 
     await loadSurveys();
-    renderSurveyLinksList(inserted, toSend, event);
   } finally {
     generatingSurveyLinks = false;
     if(genBtn){ genBtn.disabled = false; genBtn.textContent = 'Generate Links for Attendees'; }
   }
 }
 
-function renderSurveyLinksList(inserted, households, event){
+function renderPendingLinksCard(eventId){
+  const event = currentEvents.find(e=>e.event_id===eventId);
+  const eventLabel = event && event.venue ? esc(event.venue) : 'our recent dinner';
   const householdMap = {};
-  households.forEach(h => householdMap[h.id] = h);
-  const eventLabel = event ? esc(event.name) : 'our recent dinner';
+  currentSurveyHouseholds.forEach(h => householdMap[h.id] = h);
+
+  const pending = currentSurveyResponses.filter(r => !r.completed_at);
 
   const card = document.getElementById('survey-links-card');
   const list = document.getElementById('survey-links-list');
-  card.style.display = 'block';
 
-  list.innerHTML = inserted.map(r => {
+  if(!pending.length){
+    card.style.display = 'none';
+    list.innerHTML = '';
+    return;
+  }
+
+  card.style.display = 'block';
+  list.innerHTML = pending.map(r => {
     const hh = householdMap[r.household_id];
     if(!hh) return '';
     const link = `${SURVEY_BASE_URL}/${r.survey_token}`;
