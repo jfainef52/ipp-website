@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Integrated Planning Partners — Your Feedback</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0B1F3A;
+    --navy-deep:#081527;
+    --gold:#C9A24B;
+    --gold-soft:#E4C877;
+    --cream:#F5F3EE;
+    --muted:#9FA8BC;
+    --line:rgba(245,243,238,0.12);
+    --error:#E08585;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--navy);
+    color:var(--cream);
+    font-family:'Inter', -apple-system, sans-serif;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px 16px;
+    line-height:1.5;
+  }
+  .card{
+    width:100%;
+    max-width:460px;
+    background:var(--navy-deep);
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:40px 28px 32px;
+    position:relative;
+  }
+  .brand{
+    text-align:center;
+    font-size:11px;
+    letter-spacing:0.14em;
+    color:var(--gold);
+    font-weight:600;
+    margin-bottom:28px;
+  }
+  .progress{
+    display:flex;
+    gap:6px;
+    justify-content:center;
+    margin-bottom:32px;
+  }
+  .dot{
+    width:6px;
+    height:6px;
+    border-radius:50%;
+    background:var(--line);
+    transition:background 0.3s ease, transform 0.3s ease;
+  }
+  .dot.active{background:var(--gold);transform:scale(1.3);}
+  .dot.done{background:var(--muted);}
+  .screen{display:none;}
+  .screen.visible{display:block;animation:fade 0.35s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+  h1{
+    font-family:'Fraunces', serif;
+    font-weight:500;
+    font-size:23px;
+    line-height:1.3;
+    margin:0 0 8px;
+    color:var(--cream);
+  }
+  .sub{
+    color:var(--muted);
+    font-size:14px;
+    margin:0 0 24px;
+  }
+  .options{display:flex;flex-direction:column;gap:10px;margin-bottom:28px;}
+  .opt{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:14px 16px;
+    border:1px solid var(--line);
+    border-radius:3px;
+    cursor:pointer;
+    font-size:15px;
+    color:var(--cream);
+    background:transparent;
+    transition:border-color 0.2s ease, background 0.2s ease;
+    text-align:left;
+  }
+  .opt:hover{border-color:var(--gold);}
+  .opt.selected{border-color:var(--gold);background:rgba(201,162,75,0.09);}
+  .opt .mark{
+    width:16px;height:16px;flex:none;
+    border:1px solid var(--muted);
+    border-radius:50%;
+    position:relative;
+  }
+  .opt.multi .mark{border-radius:3px;}
+  .opt.selected .mark{border-color:var(--gold);}
+  .opt.selected .mark::after{
+    content:'';
+    position:absolute;top:50%;left:50%;
+    width:8px;height:8px;
+    background:var(--gold);
+    border-radius:50%;
+    transform:translate(-50%,-50%);
+  }
+  .opt.multi.selected .mark::after{border-radius:1px;}
+  .stars{display:flex;gap:10px;justify-content:center;margin-bottom:8px;}
+  .scale-labels{display:flex;justify-content:space-between;max-width:270px;margin:0 auto 28px;font-size:12px;color:var(--muted);}
+  .star{
+    width:44px;height:44px;
+    border:1px solid var(--line);
+    border-radius:50%;
+    background:transparent;
+    color:var(--muted);
+    font-family:'Fraunces',serif;
+    font-size:16px;
+    cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    transition:all 0.2s ease;
+  }
+  .star.selected{border-color:var(--gold);background:var(--gold);color:var(--navy-deep);font-weight:600;}
+  textarea{
+    width:100%;
+    min-height:110px;
+    background:transparent;
+    border:1px solid var(--line);
+    border-radius:3px;
+    color:var(--cream);
+    font-family:'Inter',sans-serif;
+    font-size:15px;
+    padding:12px 14px;
+    resize:vertical;
+    margin-bottom:20px;
+  }
+  textarea:focus, .opt:focus-visible, .star:focus-visible, button:focus-visible{
+    outline:2px solid var(--gold-soft);
+    outline-offset:2px;
+  }
+  .nav{display:flex;justify-content:space-between;align-items:center;gap:12px;}
+  .btn{
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+    font-weight:600;
+    letter-spacing:0.01em;
+    padding:12px 22px;
+    border-radius:3px;
+    border:none;
+    cursor:pointer;
+    transition:opacity 0.2s ease;
+  }
+  .btn:disabled{opacity:0.35;cursor:not-allowed;}
+  .btn-primary{background:var(--gold);color:var(--navy-deep);}
+  .btn-primary:not(:disabled):hover{background:var(--gold-soft);}
+  .btn-primary.loading{opacity:0.85;cursor:wait;display:inline-flex;align-items:center;gap:8px;}
+  .spinner{
+    width:14px;height:14px;
+    border:2px solid rgba(8,21,39,0.3);
+    border-top-color:var(--navy-deep);
+    border-radius:50%;
+    animation:spin 0.7s linear infinite;
+    display:inline-block;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .btn-text{background:transparent;color:var(--muted);padding:12px 4px;}
+  .btn-text:hover{color:var(--cream);}
+  .skip{
+    text-align:center;
+    font-size:13px;
+    color:var(--muted);
+    margin-top:14px;
+    cursor:pointer;
+    text-decoration:underline;
+  }
+  .center-msg{text-align:center;padding:20px 0;}
+  .center-msg h1{margin-bottom:14px;}
+  .center-msg p{color:var(--muted);font-size:15px;line-height:1.6;}
+  .cal-link{
+    display:inline-block;
+    margin-top:20px;
+    background:var(--gold);
+    color:var(--navy-deep);
+    padding:13px 26px;
+    border-radius:3px;
+    text-decoration:none;
+    font-weight:600;
+    font-size:14px;
+  }
+  .loading{text-align:center;color:var(--muted);font-size:14px;padding:40px 0;}
+  .footer-note{
+    text-align:center;
+    font-size:11px;
+    color:var(--muted);
+    margin-top:24px;
+    opacity:0.7;
+  }
+</style>
+</head>
+<body>
+
+<div class="card" id="card">
+  <div class="loading" id="loading">Loading your survey…</div>
+</div>
+
+<script>
+const SUPABASE_URL = "https://tkfhzmakjxdkarptkhyv.supabase.co";
+const SUPABASE_KEY = "sb_publishable_UuWA6uyG4KSxraTZwrffbQ_jBeLe4q4";
+
+// token comes from /survey/{token}
+const pathParts = window.location.pathname.split('/').filter(Boolean);
+const token = pathParts[pathParts.length - 1] || '';
+
+const state = {
+  rating: null,
+  most_valuable: null,
+  readiness: null,
+  topics: [],
+  guest_status: null,
+  open_feedback: '',
+  householdName: '',
+  eventName: '',
+  venue: ''
+};
+
+const TOPIC_OPTIONS = [
+  { value: 'L1', label: "A guaranteed income floor that doesn't depend on the market" },
+  { value: 'L2', label: "Protecting against the cost of long-term care" },
+  { value: 'L3', label: "Reducing the taxes owed on retirement account withdrawals" },
+  { value: 'L4', label: "Having flexible access to money without being forced into bad decisions" },
+  { value: 'NONE', label: "None of these apply to me right now" }
+];
+
+const READINESS_OPTIONS = [
+  { value: 'active', label: "I'm actively looking to make changes to my retirement plan" },
+  { value: 'curious', label: "I'm curious but not in a rush" },
+  { value: 'learning', label: "I was mainly there to learn" },
+  { value: 'na', label: "Not applicable to me right now" }
+];
+
+const MOST_VALUABLE_OPTIONS = [
+  { value: 'strategy', label: "The retirement income strategy discussion" },
+  { value: 'dinner', label: "The dinner & conversation" },
+  { value: 'qa', label: "The Q&A" },
+  { value: 'other', label: "Something else" }
+];
+
+const GUEST_OPTIONS = [
+  { value: 'attended_would_benefit', label: "Yes — they were there and would benefit too" },
+  { value: 'attended_not_needed', label: "Yes, they were there — but this isn't something they need" },
+  { value: 'missed_would_benefit', label: "They couldn't make it, but would benefit" },
+  { value: 'na', label: "N/A — I came on my own" }
+];
+
+const TOTAL_STEPS = 6;
+let currentStep = 0;
+
+async function init() {
+  if (!token) {
+    renderError("This link doesn't look right — please text us and we'll send a new one.");
+    return;
+  }
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_survey_context`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`
+      },
+      body: JSON.stringify({ p_token: token })
+    });
+    const data = await res.json();
+    if (!res.ok || !data || !data.length) {
+      renderError("This link doesn't look right — please text us and we'll send a new one.");
+      return;
+    }
+    const ctx = data[0];
+    state.householdName = (ctx.household_name || '').split(' ')[0] || '';
+    state.eventName = ctx.event_name || 'our recent dinner';
+    state.venue = ctx.venue || '';
+    if (ctx.already_completed) {
+      renderAlreadyDone();
+      return;
+    }
+    renderSurvey();
+  } catch (e) {
+    renderError("Something went wrong loading your survey. Please try again in a moment.");
+  }
+}
+
+function renderError(msg) {
+  document.getElementById('card').innerHTML = `
+    <div class="brand">INTEGRATED PLANNING PARTNERS</div>
+    <div class="center-msg">
+      <h1>We hit a snag</h1>
+      <p>${msg}</p>
+    </div>`;
+}
+
+function renderAlreadyDone() {
+  document.getElementById('card').innerHTML = `
+    <div class="brand">INTEGRATED PLANNING PARTNERS</div>
+    <div class="center-msg">
+      <h1>Thanks — we've already got your response</h1>
+      <p>Appreciate you taking the time. If anything's changed since, feel free to text us directly.</p>
+    </div>`;
+}
+
+function renderSurvey() {
+  const greeting = state.householdName ? `Hi ${state.householdName}, ` : '';
+  document.getElementById('card').innerHTML = `
+    <div class="brand">INTEGRATED PLANNING PARTNERS</div>
+    <div class="progress" id="progress"></div>
+    <div id="screens"></div>
+  `;
+  buildProgress();
+  buildScreens(greeting);
+  showStep(0);
+}
+
+function buildProgress() {
+  const p = document.getElementById('progress');
+  p.innerHTML = '';
+  for (let i = 0; i < TOTAL_STEPS; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot';
+    d.id = `dot-${i}`;
+    p.appendChild(d);
+  }
+}
+
+function updateProgress(step) {
+  for (let i = 0; i < TOTAL_STEPS; i++) {
+    const d = document.getElementById(`dot-${i}`);
+    d.className = 'dot' + (i === step ? ' active' : i < step ? ' done' : '');
+  }
+}
+
+function buildScreens(greeting) {
+  const c = document.getElementById('screens');
+  c.innerHTML = `
+    ${screenWrap(0, `
+      <h1>${greeting}thanks again for joining us${state.venue ? ' at ' + state.venue : ''}.</h1>
+      <p class="sub">Got 90 seconds? A few quick questions — no sales pitch, just your honest take.</p>
+      <div class="nav" style="justify-content:flex-end;">
+        <button class="btn btn-primary" onclick="nextStep()">Let's go</button>
+      </div>
+    `)}
+
+    ${screenWrap(1, `
+      <h1>Overall, how would you rate your experience at the dinner?</h1>
+      <div class="stars" id="stars"></div>
+      <div class="scale-labels"><span>1 · Poor</span><span>5 · Excellent</span></div>
+      <div class="nav">
+        <span></span>
+        <button class="btn btn-primary" id="next-1" onclick="nextStep()" disabled>Next</button>
+      </div>
+    `)}
+
+    ${screenWrap(2, `
+      <h1>What was the most valuable part of the evening?</h1>
+      <div class="options" id="opts-valuable"></div>
+      <div class="nav">
+        <span></span>
+        <button class="btn btn-primary" id="next-2" onclick="nextStep()" disabled>Next</button>
+      </div>
+    `)}
+
+    ${screenWrap(3, `
+      <h1>Which of these feels most true for you right now?</h1>
+      <div class="options" id="opts-readiness"></div>
+      <div class="nav">
+        <span></span>
+        <button class="btn btn-primary" id="next-3" onclick="nextStep()" disabled>Next</button>
+      </div>
+    `)}
+
+    ${screenWrap(4, `
+      <h1>Anything you'd like more clarity on?</h1>
+      <p class="sub">Select all that apply.</p>
+      <div class="options" id="opts-topics"></div>
+      <div class="nav">
+        <span></span>
+        <button class="btn btn-primary" onclick="nextStep()">Next</button>
+      </div>
+    `)}
+
+    ${screenWrap(5, `
+      <h1>Would a spouse or guest also benefit from a conversation like this?</h1>
+      <div class="options" id="opts-guest"></div>
+      <textarea id="feedback" placeholder="Anything else you'd like us to know? (optional)"></textarea>
+      <div class="nav">
+        <span></span>
+        <button class="btn btn-primary" id="submit-btn" onclick="submitSurvey()" disabled>Submit</button>
+      </div>
+    `)}
+  `;
+
+  buildStars();
+  buildOptionGroup('opts-valuable', MOST_VALUABLE_OPTIONS, 'most_valuable', false, 2);
+  buildOptionGroup('opts-readiness', READINESS_OPTIONS, 'readiness', false, 3);
+  buildOptionGroup('opts-topics', TOPIC_OPTIONS, 'topics', true);
+  buildOptionGroup('opts-guest', GUEST_OPTIONS, 'guest_status', false, null, true);
+}
+
+function screenWrap(i, inner) {
+  return `<div class="screen" id="screen-${i}">${inner}</div>`;
+}
+
+function buildStars() {
+  const el = document.getElementById('stars');
+  for (let i = 1; i <= 5; i++) {
+    const b = document.createElement('button');
+    b.className = 'star';
+    b.textContent = i;
+    b.setAttribute('aria-label', `${i} star${i > 1 ? 's' : ''}`);
+    b.onclick = () => {
+      state.rating = i;
+      document.querySelectorAll('.star').forEach((s, idx) => {
+        s.classList.toggle('selected', idx < i);
+      });
+      document.getElementById('next-1').disabled = false;
+    };
+    el.appendChild(b);
+  }
+}
+
+function buildOptionGroup(containerId, options, field, multi, nextBtnStepIndex, isLastNoValidation) {
+  const el = document.getElementById(containerId);
+  options.forEach(opt => {
+    const b = document.createElement('button');
+    b.className = 'opt' + (multi ? ' multi' : '');
+    b.innerHTML = `<span class="mark"></span><span>${opt.label}</span>`;
+    b.onclick = () => {
+      if (multi) {
+        const idx = state.topics.indexOf(opt.value);
+        if (idx > -1) {
+          state.topics.splice(idx, 1);
+          b.classList.remove('selected');
+        } else {
+          state.topics.push(opt.value);
+          b.classList.add('selected');
+        }
+      } else {
+        state[field] = opt.value;
+        el.querySelectorAll('.opt').forEach(o => o.classList.remove('selected'));
+        b.classList.add('selected');
+        if (nextBtnStepIndex !== null && nextBtnStepIndex !== undefined) {
+          document.getElementById(`next-${nextBtnStepIndex}`).disabled = false;
+        }
+        if (isLastNoValidation) {
+          document.getElementById('submit-btn').disabled = false;
+        }
+      }
+    };
+    el.appendChild(b);
+  });
+}
+
+function showStep(i) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('visible'));
+  document.getElementById(`screen-${i}`).classList.add('visible');
+  updateProgress(i);
+  currentStep = i;
+}
+
+function nextStep() {
+  if (currentStep < TOTAL_STEPS - 1) {
+    showStep(currentStep + 1);
+  }
+}
+
+async function submitSurvey() {
+  state.open_feedback = document.getElementById('feedback').value.trim();
+  const btn = document.getElementById('submit-btn');
+  if (btn.classList.contains('loading')) return; // guard against double-tap
+  btn.disabled = true;
+  btn.classList.add('loading');
+  btn.innerHTML = '<span class="spinner"></span><span>Submitting…</span>';
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/submit_survey_response`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`
+      },
+      body: JSON.stringify({
+        p_token: token,
+        p_rating: state.rating,
+        p_most_valuable: state.most_valuable,
+        p_readiness: state.readiness,
+        p_topics: state.topics,
+        p_guest_status: state.guest_status,
+        p_open_feedback: state.open_feedback || null
+      })
+    });
+    const ok = await res.json();
+    if (!res.ok || ok !== true) {
+      throw new Error('submit failed');
+    }
+    renderThankYou();
+  } catch (e) {
+    btn.disabled = false;
+    btn.classList.remove('loading');
+    btn.textContent = 'Submit';
+    alert("Something went wrong submitting — please try again.");
+  }
+}
+
+function renderThankYou() {
+  let inner;
+  if (state.readiness === 'active') {
+    inner = `
+      <h1>Thank you — that's helpful to know.</h1>
+      <p>Sounds like now might be a good time to talk. Let's set aside 30 minutes to go over it — pick whatever time works best for you.</p>
+      <a class="cal-link" href="https://calendly.com/integratedplanningpartners-support/30min" target="_blank" rel="noopener">Find a time</a>
+    `;
+  } else if (state.readiness === 'curious') {
+    inner = `
+      <h1>Thank you for the feedback.</h1>
+      <p>No rush at all — we'll send along a short resource on the topics you flagged in case they're useful. Reach out anytime.</p>
+    `;
+  } else {
+    inner = `
+      <h1>Thank you for the feedback.</h1>
+      <p>We really appreciate you taking the time — it helps us make these evenings better.</p>
+    `;
+  }
+  document.getElementById('card').innerHTML = `
+    <div class="brand">INTEGRATED PLANNING PARTNERS</div>
+    <div class="center-msg">${inner}</div>
+    <div class="footer-note">773-318-9608 · integratedplanningpartners.com</div>
+  `;
+}
+
+init();
+</script>
+</body>
+</html>
