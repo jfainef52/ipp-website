@@ -11,6 +11,10 @@
     {
       "source": "/iul-mechanics",
       "destination": "/iul-mechanics.html"
+    },
+    {
+      "source": "/survey/(.*)",
+      "destination": "/survey.html"
     }
   ]
 }
