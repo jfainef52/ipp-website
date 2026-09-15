@@ -7,6 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script>window.addEventListener("load",()=>{ if(typeof emailjs!=="undefined") emailjs.init("XyWTKKWFoeYOhfFbV"); });</script>
 <style>
   :root{
     --navy:#0B1F3A;
@@ -284,6 +286,7 @@ async function init() {
     }
     const ctx = data[0];
     state.householdName = (ctx.household_name || '').split(' ')[0] || '';
+    state.fullHouseholdName = ctx.household_name || '';
     state.eventName = ctx.event_name || 'our recent dinner';
     state.venue = ctx.venue || '';
     if (ctx.already_completed) {
@@ -508,12 +511,42 @@ async function submitSurvey() {
     if (!res.ok || ok !== true) {
       throw new Error('submit failed');
     }
+    sendCompletionNotification();
     renderThankYou();
   } catch (e) {
     btn.disabled = false;
     btn.classList.remove('loading');
     btn.textContent = 'Submit';
     alert("Something went wrong submitting — please try again.");
+  }
+}
+
+function labelFor(options, value) {
+  const match = options.find(o => o.value === value);
+  return match ? match.label : (value || 'Not answered');
+}
+
+function sendCompletionNotification() {
+  // Fire-and-forget: a notification failure should never block the
+  // guest's thank-you screen or the saved response, which is already safe.
+  try {
+    if (typeof emailjs === 'undefined') return;
+    emailjs.send('IPP Support', 'template_survey_done', {
+      to_email: 'support@integratedplanningpartners.com',
+      household_name: state.fullHouseholdName || 'Unknown household',
+      event_venue: state.venue || 'Unknown event',
+      rating: state.rating ? `${state.rating} / 5` : 'Not answered',
+      most_valuable: labelFor(MOST_VALUABLE_OPTIONS, state.most_valuable),
+      readiness: labelFor(READINESS_OPTIONS, state.readiness),
+      topics: (state.topics && state.topics.length)
+        ? state.topics.map(t => labelFor(TOPIC_OPTIONS, t)).join(', ')
+        : 'None selected',
+      guest_status: labelFor(GUEST_OPTIONS, state.guest_status),
+      feedback: state.open_feedback || 'None provided',
+      tracker_link: 'https://www.integratedplanningpartners.com/seminar-tracker.html'
+    }).catch(e => console.warn('Completion notification failed:', e));
+  } catch (e) {
+    console.warn('Completion notification failed:', e);
   }
 }
 
