@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Intake Answers | Integrated Planning Partners</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--navy:#0B1929;--navy-card:#162740;--gold:#C8A96E;--gold-light:#d9bc8a;--gold-line:rgba(200,169,110,.3);--text:#e8ddd0;--text-muted:#8a9ab0;--text-dim:#5a6a7e;--green:#4caf7d;--red:#e05757;--amber:#e0a94a;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--navy);color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;line-height:1.6;min-height:100vh}
+nav{background:var(--navy);border-bottom:1px solid var(--gold-line);padding:0 2rem;display:flex;align-items:center;height:56px;position:sticky;top:0;z-index:10}
+nav .brand{font-family:'Cormorant Garamond',serif;font-size:19px;color:var(--gold);letter-spacing:.02em}
+nav a{margin-left:auto;color:var(--text-muted);text-decoration:none;font-size:13px}
+nav a:hover{color:var(--gold)}
+.wrap{max-width:900px;margin:0 auto;padding:2rem 1.25rem 5rem}
+.state{text-align:center;padding:5rem 1rem}
+.state h2{font-family:'Cormorant Garamond',serif;font-size:1.8rem;color:var(--gold);margin-bottom:.6rem}
+.state p{color:var(--text-muted);max-width:420px;margin:0 auto 1rem}
+.state a.btn{display:inline-block}
+.head{background:var(--navy-card);border:1px solid var(--gold-line);border-radius:10px;padding:1.5rem 1.75rem;margin-bottom:1.5rem}
+.head h1{font-family:'Cormorant Garamond',serif;font-size:2rem;font-weight:600;color:var(--gold);line-height:1.2}
+.meta{display:flex;flex-wrap:wrap;gap:1.25rem;margin-top:.9rem}
+.meta div{display:flex;flex-direction:column;font-size:13px}
+.meta span.l{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim)}
+.actions{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:1.1rem;align-items:center}
+.btn,button.btn{background:transparent;border:1px solid var(--gold);color:var(--gold);padding:8px 14px;border-radius:6px;font:500 13px 'DM Sans',sans-serif;cursor:pointer;text-decoration:none}
+.btn:hover{background:var(--gold);color:var(--navy)}
+select.st{background:var(--navy);color:var(--text);border:1px solid var(--gold-line);border-radius:6px;padding:8px 10px;font:13px 'DM Sans',sans-serif}
+.saved{font-size:12px;color:var(--green);min-width:50px}
+.sec{background:var(--navy-card);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:1rem 1.25rem;margin-bottom:1rem}
+.sec h2{font-family:'Cormorant Garamond',serif;font-size:1.25rem;color:var(--text);font-weight:600}
+.sec .tag{font-size:11px;color:var(--gold);margin-bottom:.4rem;letter-spacing:.02em}
+.row{display:grid;grid-template-columns:minmax(150px,1fr) 1.6fr;gap:14px;padding:7px 0;border-top:1px solid rgba(255,255,255,.05);font-size:14px}
+.row .k{color:var(--text-muted);font-size:13px}
+.row .v{white-space:pre-wrap;word-break:break-word;color:var(--text)}
+.skip{border-left:3px solid var(--amber)}
+.skip .row .v{color:var(--text-muted)}
+.note{font-size:12px;color:var(--text-dim);margin-top:2rem}
+@media(max-width:600px){.row{grid-template-columns:1fr;gap:2px}}
+@media print{
+  nav,.no-print{display:none!important}
+  body,.head,.sec{background:#fff!important;color:#111!important;border-color:#bbb!important}
+  *{color:#111!important}
+  .sec{break-inside:avoid}
+}
+</style>
+</head>
+<body>
+<nav><span class="brand">Integrated Planning Partners</span><a href="advisor-portal.html">← Advisor Portal</a></nav>
+<div class="wrap" id="app"><div class="state"><p>Loading…</p></div></div>
+
+<script>
+(function () {
+  var U = 'https://piixgvxrasddphklgazh.supabase.co';
+  var K = 'sb_publishable_acvdk0hBniaB6qOD8_k8XQ_9R6FNbP_';
+  var API = U + '/functions/v1/intake-advisor';
+  var app = document.getElementById('app');
+  var id = new URLSearchParams(location.search).get('s') || '';
+  var current = null;
+
+  function session() { try { return JSON.parse(localStorage.getItem('ipp_sb_session') || 'null'); } catch (e) { return null; } }
+  function el(tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+  function call(body) {
+    var s = session();
+    if (!s || !s.access_token || (s.expires_at && Date.now() / 1000 > s.expires_at - 30)) return Promise.resolve({ ok: false, error: 'signed_out' });
+    return fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: K, Authorization: 'Bearer ' + s.access_token }, body: JSON.stringify(body) })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return r.ok && d.ok ? d : { ok: false, error: d.error || (r.status === 401 ? 'signed_out' : 'failed') }; }); })
+      .catch(function () { return { ok: false, error: 'offline' }; });
+  }
+  function state(title, msg, link) {
+    app.textContent = '';
+    var box = el('div', 'state'); box.appendChild(el('h2', '', title)); box.appendChild(el('p', '', msg));
+    if (link) { var a = el('a', 'btn', link.text); a.href = link.href; box.appendChild(a); }
+    app.appendChild(box);
+  }
+  var MSG = {
+    signed_out: ['Please sign in first', 'Your portal session is missing or has expired. Sign in to the advisor portal, then open this page again.', { text: 'Go to the advisor portal', href: 'advisor-portal.html' }],
+    not_found: ['Not found', 'This record does not exist, or it belongs to another advisor’s client.', { text: 'Back to the portal', href: 'advisor-portal.html' }],
+    not_configured: ['Setup is not finished', 'The encryption key (INTAKE_ENCRYPTION_KEY) has not been added to Supabase, so answers cannot be opened yet.', null],
+    decrypt_failed: ['Could not open this record', 'The answers could not be decrypted. If the encryption key was changed, restore the original key.', null],
+    offline: ['Could not reach the server', 'Check your connection and reload this page.', null],
+    failed: ['Something went wrong', 'Please reload and try again.', null]
+  };
+  function fail(code) { var m = MSG[code] || MSG.failed; state(m[0], m[1], m[2]); }
+
+  var FORM = { life: 'Application Intake', annuity: 'Annuity Supplement' };
+  function when(d) { return d ? new Date(d).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : ''; }
+
+  function textVersion(r) {
+    var s = r.submission, sm = (r.data && r.data.summary) || { sections: [], skipped: [] }, out = [];
+    out.push((FORM[s.form] || 'Intake').toUpperCase() + ': ' + (r.client.first_name + ' ' + r.client.last_name).trim());
+    out.push('Submitted ' + when(s.submitted_at), '');
+    sm.sections.forEach(function (sec) { out.push(sec.title.toUpperCase() + (sec.section ? ' (' + sec.section + ')' : '')); sec.items.forEach(function (i) { out.push('  ' + i.label + ': ' + i.value); }); out.push(''); });
+    if (sm.skipped.length) { out.push('NOT ANSWERED, TO FOLLOW UP'); sm.skipped.forEach(function (g) { out.push('  ' + g.title + (g.section ? ' (' + g.section + ')' : '')); g.labels.forEach(function (l) { out.push('    - ' + l); }); }); }
+    return out.join('\n');
+  }
+
+  function download(name, text, type) {
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: type })); a.download = name;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(function () { URL.revokeObjectURL(a.href); }, 500);
+  }
+
+  function show(r) {
+    current = r; var s = r.submission, d = r.data || {}, sm = d.summary || { sections: [], skipped: [] };
+    var name = (r.client.first_name + ' ' + r.client.last_name).trim();
+    app.textContent = '';
+    var head = el('div', 'head');
+    head.appendChild(el('h1', '', name));
+    var meta = el('div', 'meta');
+    [['Form', FORM[s.form] || s.form], ['Submitted', when(s.submitted_at)], ['Email', s.email || ''], ['Answered', s.question_count != null ? (s.question_count - (s.skipped_count || 0)) + ' of ' + s.question_count : ''], ['Not answered', s.skipped_count != null ? String(s.skipped_count) : '']].forEach(function (p) {
+      if (!p[1]) return; var m = el('div'); m.appendChild(el('span', 'l', p[0])); m.appendChild(el('span', '', p[1])); meta.appendChild(m);
+    });
+    head.appendChild(meta);
+    var act = el('div', 'actions no-print');
+    var sel = el('select', 'st'); [['new', 'New'], ['reviewing', 'Reviewing'], ['applied', 'Application prepared'], ['archived', 'Archived']].forEach(function (o) { var op = el('option', '', o[1]); op.value = o[0]; if (o[0] === s.status) op.selected = true; sel.appendChild(op); });
+    var saved = el('span', 'saved', '');
+    sel.addEventListener('change', function () { saved.textContent = 'Saving…'; call({ action: 'set_status', submission_id: s.id, status: sel.value }).then(function (x) { saved.textContent = x.ok ? 'Saved' : 'Not saved'; setTimeout(function () { saved.textContent = ''; }, 2000); }); });
+    act.appendChild(sel); act.appendChild(saved);
+    var b1 = el('button', 'btn', 'Print / Save as PDF'); b1.addEventListener('click', function () { window.print(); });
+    var b2 = el('button', 'btn', 'Copy as text'); b2.addEventListener('click', function () { var t = textVersion(r); (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { b2.textContent = 'Copied ✓'; setTimeout(function () { b2.textContent = 'Copy as text'; }, 1800); }, function () { b2.textContent = 'Copy blocked'; }); });
+    var b3 = el('button', 'btn', 'Download data (JSON)'); b3.addEventListener('click', function () { download((name || 'client').replace(/\s+/g, '_') + '_' + (s.form || 'intake') + '.json', JSON.stringify({ submission: s, answers: d.answers, meta: d.meta }, null, 2), 'application/json'); });
+    act.appendChild(b1); act.appendChild(b2); act.appendChild(b3);
+    head.appendChild(act); app.appendChild(head);
+
+    sm.sections.forEach(function (sec) {
+      var box = el('div', 'sec'); if (sec.section) box.appendChild(el('div', 'tag', sec.section)); box.appendChild(el('h2', '', sec.title));
+      sec.items.forEach(function (i) { var row = el('div', 'row'); row.appendChild(el('div', 'k', i.label)); row.appendChild(el('div', 'v', i.value)); box.appendChild(row); });
+      app.appendChild(box);
+    });
+    if (sm.skipped.length) {
+      var sk = el('div', 'sec skip'); sk.appendChild(el('h2', '', 'Not answered, to follow up'));
+      sm.skipped.forEach(function (g) { var row = el('div', 'row'); row.appendChild(el('div', 'k', g.title + (g.section ? ' (' + g.section + ')' : ''))); row.appendChild(el('div', 'v', g.labels.join('\n'))); sk.appendChild(row); });
+      app.appendChild(sk);
+    }
+    app.appendChild(el('p', 'note no-print', 'Opening this page is recorded. The answers are stored encrypted and are only decrypted for signed-in advisors.'));
+  }
+
+  if (!id) { state('No record selected', 'Open this page from a client’s Application Intake panel in the advisor portal.', { text: 'Go to the advisor portal', href: 'advisor-portal.html' }); return; }
+  call({ action: 'view', submission_id: id }).then(function (r) { if (!r.ok) fail(r.error); else show(r); });
+})();
+</script>
+</body>
+</html>
