@@ -32,7 +32,7 @@
       headers: { 'Content-Type': 'application/json', 'apikey': K, 'Authorization': 'Bearer ' + s.access_token },
       body: JSON.stringify(body)
     }).then(function (r) {
-      return r.json().catch(function () { return {}; }).then(function (d) { return r.ok && d.ok ? d : { ok: false, error: d.error || (r.status === 401 ? 'signed_out' : 'failed') }; });
+      return r.json().catch(function () { return {}; }).then(function (d) { return r.ok && d.ok ? d : { ok: false, error: d.error || (r.status === 401 ? 'signed_out' : 'failed'), detail: d.detail }; });
     }).catch(function () { return { ok: false, error: 'offline' }; });
   }
   var ERR = {
@@ -43,6 +43,17 @@
     inactive: 'That link is no longer active.',
     failed: 'Something went wrong. Please try again.'
   };
+
+  function msg(r) {
+    if (r.error === 'not_configured') {
+      var d = String(r.detail || '');
+      if (d === 'missing') return 'The server cannot find a secret named INTAKE_ENCRYPTION_KEY. Check the name is spelled exactly like that and was saved in the ipp-advisor-portal project, then try again.';
+      if (d === 'not_base64') return 'The encryption key was found but has characters it cannot use, often quotation marks or a copied label. Create a new one with  openssl rand -base64 32  and paste only that result.';
+      var m = d.match(/^length_(\d+)$/);
+      if (m) return 'The encryption key decodes to ' + m[1] + ' bytes, but it must be exactly 32. Create a new one with  openssl rand -base64 32  (not -hex) and paste only that result.';
+    }
+    return ERR[r.error] || ERR.failed;
+  }
 
   function copy(text, done) {
     function fallback() {
@@ -108,7 +119,7 @@
 
     function load(note, then) {
       call({ action: 'list', client_id: clientId }).then(function (r) {
-        if (!r.ok) { body.innerHTML = '<div class="ip-msg" style="color:var(--error,#e05757)">' + esc(ERR[r.error] || ERR.failed) + '</div>'; return; }
+        if (!r.ok) { body.innerHTML = '<div class="ip-msg" style="color:var(--error,#e05757)">' + esc(msg(r)) + '</div>'; return; }
         draw(r, note);
         if (then) then();
       });
@@ -120,18 +131,18 @@
         var kind = FORMS[document.getElementById('ip-form').value];
         b.disabled = true; b.textContent = 'Creating…';
         call(Object.assign({ action: 'create_invite', client_id: clientId }, kind.body)).then(function (r) {
-          if (!r.ok) { load(ERR[r.error] || ERR.failed); return; }
+          if (!r.ok) { load(msg(r)); return; }
           load('', function () { showNew(r.link, kind); });
         });
       } else if (b.hasAttribute('data-copy')) {
         b.disabled = true;
         call({ action: 'get_link', invite_id: b.getAttribute('data-copy') }).then(function (r) {
-          if (!r.ok) { b.disabled = false; alert(ERR[r.error] || ERR.failed); return; }
+          if (!r.ok) { b.disabled = false; alert(msg(r)); return; }
           copy(r.link, function (ok) { b.disabled = false; b.textContent = ok ? 'Copied ✓' : 'Copy failed'; setTimeout(function () { b.textContent = 'Copy link'; }, 1800); });
         });
       } else if (b.hasAttribute('data-revoke')) {
         if (!confirm('Turn this link off? The client will no longer be able to open it.')) return;
-        call({ action: 'revoke', invite_id: b.getAttribute('data-revoke') }).then(function (r) { load(r.ok ? '' : (ERR[r.error] || ERR.failed)); });
+        call({ action: 'revoke', invite_id: b.getAttribute('data-revoke') }).then(function (r) { load(r.ok ? '' : (msg(r))); });
       } else if (b.hasAttribute('data-copylink')) {
         copy(b.getAttribute('data-copylink'), function (ok) { b.textContent = ok ? 'Copied ✓' : 'Copy failed'; setTimeout(function () { b.textContent = 'Copy link'; }, 1800); });
       } else if (b.hasAttribute('data-copymsg')) {
