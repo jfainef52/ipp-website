@@ -1,0 +1,1428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Application Intake — Integrated Planning Partners</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400&family=Barlow:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  @media print {
+    .no-print { display: none !important; }
+    #root, #root * { background: #fff !important; color: #111 !important; border-color: #bbb !important; }
+    body { background: #fff !important; color: #111 !important; }
+  }
+</style>
+</head>
+<body style="margin:0;background:#0E1824;">
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.27.6/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+
+<script type="text/babel" data-cfasync="false">
+const { useState, useEffect, useRef } = React;
+
+// ─────────────────────────────────────────────────────────────
+// Connection to the IPP server. The link token is the client's credential.
+// ─────────────────────────────────────────────────────────────
+const INTAKE_FORM = "life"; // which form this file is: "life" or "annuity"
+const INTAKE_API = "https://piixgvxrasddphklgazh.supabase.co/functions/v1/intake-public";
+const SB_PUBLISHABLE = "sb_publishable_acvdk0hBniaB6qOD8_k8XQ_9R6FNbP_";
+const SITE = "https://www.integratedplanningpartners.com";
+const EMAILJS_SERVICE_ID = "IPP Support";
+const EMAILJS_TEMPLATE = "template_qxximsu";
+const EMAILJS_PUBLIC_KEY = "XyWTKKWFoeYOhfFbV";
+const NOTIFY_EMAIL = "support@integratedplanningpartners.com";
+const URL_PARAMS = (() => { try { return new URLSearchParams(window.location.search); } catch (e) { return new URLSearchParams(""); } })();
+const LINK_TOKEN = URL_PARAMS.get("t") || "";
+const PREVIEW = URL_PARAMS.get("preview") === "1"; // ?preview=1 runs the form without saving or sending anything
+
+async function callIntake(payload) {
+  let res;
+  try {
+    res = await fetch(INTAKE_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "apikey": SB_PUBLISHABLE },
+      body: JSON.stringify({ token: LINK_TOKEN, ...payload }),
+    });
+  } catch (e) { return { ok: false, error: "offline" }; }
+  let data = {};
+  try { data = await res.json(); } catch (e) {}
+  return res.ok && data.ok ? data : { ok: false, error: data.error || "failed" };
+}
+
+// A readable copy of the answers, grouped the way the client saw them. Stored encrypted with the raw answers.
+function buildAdvisorSummary(screens, answers) {
+  const sections = [], skipped = [];
+  screens.forEach(s => {
+    const section = SECTION_LABELS[s.questions[0].phase] || "";
+    const items = s.questions.filter(q => hasAnswer(q, answers[q.id])).map(q => ({ label: labelFor(q), value: fmtAnswer(q, answers[q.id], answers) }));
+    const missing = s.questions.filter(q => !hasAnswer(q, answers[q.id])).map(q => labelFor(q));
+    if (items.length) sections.push({ title: s.title, section, items });
+    if (missing.length) skipped.push({ title: s.title, section, labels: missing });
+  });
+  return { sections, skipped };
+}
+
+// Tells the office a submission arrived. Contains no health, SSN, or financial details, only a name and a link.
+function notifyTeam(answers, submissionId) {
+  try {
+    if (typeof emailjs === "undefined") return;
+    emailjs.init(EMAILJS_PUBLIC_KEY);
+    const name = ((answers.first_name || "") + " " + (answers.last_name || "")).trim() || "A client";
+    const kind = INTAKE_FORM === "annuity" ? "Annuity Supplement" : "Application Intake";
+    const link = SITE + "/intake-view.html?s=" + encodeURIComponent(submissionId || "");
+    const html = '<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;background:#0E1824;color:#F5F2EC;border-radius:8px;">'
+      + '<p style="margin:0 0 6px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#C8A96E;">New submission</p>'
+      + '<h2 style="margin:0 0 10px;font-weight:400;font-size:22px;">' + kind + ' received</h2>'
+      + '<p style="margin:0 0 18px;font-size:14px;line-height:1.6;color:#C8BFA8;"><strong style="color:#F5F2EC;">' + name.replace(/[<>&]/g, "") + '</strong> has submitted the ' + kind + '. The answers are stored securely and are not included in this email.</p>'
+      + '<a href="' + link + '" style="display:inline-block;background:#C8A96E;color:#0E1824;padding:11px 22px;border-radius:6px;font-size:13px;font-weight:700;text-decoration:none;">Open in the advisor portal &rarr;</a>'
+      + '<p style="margin:18px 0 0;font-size:11px;color:#6E8299;">Sign in to the advisor portal first if prompted.</p></div>';
+    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE, {
+      to_email: NOTIFY_EMAIL, cc_email: "", name, email: answers.email || "", reply_to: answers.email || NOTIFY_EMAIL, html_content: html,
+    }).catch(() => {});
+  } catch (e) {}
+}
+
+
+const GS = `
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400&family=Barlow:wght@300;400;500;600;700&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  button { cursor: pointer; border: none; background: none; font-family: inherit; }
+  input, select, textarea { font-family: inherit; }
+  @keyframes fadeUp { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
+`;
+
+const NAVY = "#0E1824", NAVY2 = "#162032", GOLD = "#C8A96E", GOLD2 = "#E0C080",
+      OFFWHITE = "#F5F2EC", WARM = "#C8BFA8", GRAY = "#6E8299", BORDER = "rgba(255,255,255,.1)";
+
+
+const SELECT_ARROW = "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' fill='none' stroke='%23C8A96E' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/></svg>\")";
+const SELECT_STYLE = {
+  width: "100%", padding: "14px 40px 14px 14px", backgroundColor: "#162032", backgroundImage: SELECT_ARROW,
+  backgroundRepeat: "no-repeat", backgroundPosition: "right 14px center", border: `1px solid ${BORDER}`,
+  borderRadius: 10, color: OFFWHITE, fontSize: 15, outline: "none", colorScheme: "dark", appearance: "none", WebkitAppearance: "none",
+};
+
+const LOGO_SVG = `<svg viewBox="875 1789 3260 1462" xmlns="http://www.w3.org/2000/svg" style="height:28px;width:auto;display:block;">
+  <g fill="${GOLD}">
+    <rect x="914.76" y="2074.65" width="228.09" height="228.09"/>
+    <rect x="1226.07" y="2697.25" width="228.09" height="228.09"/>
+    <path d="M1564.58,2074.65h-338.52v228.09h566.61c0-125.97-102.12-228.09-228.09-228.09Z"/>
+    <path d="M1226.07,2614.05h338.52c125.97,0,228.09-102.12,228.09-228.09h-566.61v228.09Z"/>
+    <rect x="914.76" y="2385.95" width="228.09" height="539.39"/>
+  </g>
+</svg>`;
+
+// ─────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────
+function sub(str, tokens) {
+  if (!str) return str;
+  return str.replace(/\{(\w+)\}/g, (m, k) => (tokens[k] !== undefined ? tokens[k] : m));
+}
+function fmtCurrency(v) {
+  const n = Number(v);
+  if (v === undefined || v === null || v === "" || isNaN(n)) return null;
+  return "$" + Math.round(n).toLocaleString("en-US");
+}
+function fmtDate(v) {
+  if (!v) return "";
+  const d = new Date(v + "T00:00:00");
+  if (isNaN(d)) return v;
+  return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+}
+const YN = [{ id: "yes", label: "Yes" }, { id: "no", label: "No" }];
+
+const OTHER = { id: "other", label: "Something else", other: true };
+const mk = arr => arr.map(l => ({ id: l.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, ""), label: l }));
+const US_STATES = "Alabama|AL,Alaska|AK,Arizona|AZ,Arkansas|AR,California|CA,Colorado|CO,Connecticut|CT,Delaware|DE,District of Columbia|DC,Florida|FL,Georgia|GA,Hawaii|HI,Idaho|ID,Illinois|IL,Indiana|IN,Iowa|IA,Kansas|KS,Kentucky|KY,Louisiana|LA,Maine|ME,Maryland|MD,Massachusetts|MA,Michigan|MI,Minnesota|MN,Mississippi|MS,Missouri|MO,Montana|MT,Nebraska|NE,Nevada|NV,New Hampshire|NH,New Jersey|NJ,New Mexico|NM,New York|NY,North Carolina|NC,North Dakota|ND,Ohio|OH,Oklahoma|OK,Oregon|OR,Pennsylvania|PA,Rhode Island|RI,South Carolina|SC,South Dakota|SD,Tennessee|TN,Texas|TX,Utah|UT,Vermont|VT,Virginia|VA,Washington|WA,West Virginia|WV,Wisconsin|WI,Wyoming|WY".split(",").map(s => { const [label, id] = s.split("|"); return { id, label }; });
+const REL_OPTIONS = [...mk(["Spouse / partner", "Child", "Parent", "Sibling", "Grandchild", "Trust", "Charity / organization", "Business or business partner"]), OTHER];
+const CARRIER_OPTIONS = [...mk(["Pacific Life", "National Life Group", "Northwestern Mutual", "New York Life", "MassMutual", "Prudential", "Lincoln Financial", "Transamerica", "John Hancock", "Nationwide", "State Farm", "Allianz", "Equitable", "Principal", "Protective", "Guardian", "MetLife", "Penn Mutual", "Globe Life", "Corebridge / AIG"]), OTHER];
+const COUNTRIES = [...mk(["Canada", "Mexico", "United Kingdom", "India", "China", "Philippines", "Germany", "Brazil", "South Korea", "Israel"]), OTHER];
+const ADDRESS_STATES = [...US_STATES, { id: "intl", label: "Outside the U.S." }];
+const VISAS = [...mk(["H-1B", "L-1", "E-2", "F-1 (student)", "O-1", "B-1 / B-2 (visitor)", "TN", "Green card application pending"]), OTHER];
+const INDUSTRIES = [...mk(["Healthcare / medical", "Finance, insurance, or real estate", "Technology", "Construction or skilled trades", "Education", "Legal or professional services", "Manufacturing", "Retail, restaurant, or hospitality", "Transportation or logistics", "Government or military", "Energy or utilities", "Agriculture"]), OTHER];
+const MED_CATS = [...mk(["Blood pressure", "Cholesterol", "Diabetes or blood sugar", "Thyroid", "Acid reflux / stomach", "Depression or anxiety", "Pain or arthritis", "Allergy or asthma", "Blood thinner", "Sleep aid", "Hormone or birth control"]), OTHER];
+const TOBACCO = [{ id: "cigarettes", label: "Cigarettes" }, { id: "ecig", label: "E-cigarettes / vape" }, { id: "cigars", label: "Cigars" }, { id: "pipe", label: "Pipe" }, { id: "chew", label: "Chewing tobacco / snuff" }, { id: "patch", label: "Nicotine patch" }, { id: "gum", label: "Nicotine gum" }, OTHER];
+const TOBACCO_LAST_USED = [{ id: "within_1yr", label: "Within the past year" }, { id: "1_2yr", label: "1–2 years ago" }, { id: "2_3yr", label: "2–3 years ago" }, { id: "3_5yr", label: "3–5 years ago" }];
+const DEVICES = [...mk(["Wheelchair", "Walker", "Multi-prong cane", "Hospital bed", "Dialysis machine", "Oxygen or respirator", "Motorized cart", "Stair lift"]), OTHER];
+const VISIT_REASONS = [...mk(["Annual physical / checkup", "Follow-up on an existing condition", "New illness or injury", "Lab work or screening", "Medication management or refill", "Referral to a specialist"]), OTHER];
+const VISIT_OUTCOMES = [{ id: "normal", label: "Normal — no concerns" }, { id: "resolved", label: "Treated and resolved" }, { id: "ongoing", label: "Ongoing treatment or monitoring" }, { id: "referred", label: "Referred for more testing or a specialist" }, OTHER];
+const CAUSES = [...mk(["Heart disease / heart attack", "Cancer", "Stroke", "Lung disease", "Diabetes or kidney disease", "Accident", "Natural causes / old age", "Unknown"]), OTHER];
+const BEST_TIMES = [{ id: "weekday_am", label: "Weekday mornings" }, { id: "weekday_pm", label: "Weekday afternoons" }, { id: "weekday_eve", label: "Weekday evenings" }, { id: "weekend", label: "Weekends" }, { id: "anytime", label: "Anytime" }, OTHER];
+
+
+// ─────────────────────────────────────────────────────────────
+// SECTION LABELS (shown in header)
+// ─────────────────────────────────────────────────────────────
+const SECTION_LABELS = {
+  identity:    "Personal Information",
+  citizenship: "Citizenship",
+  employment:  "Employment & Income",
+  health:      "Health History",
+  lifestyle:   "Lifestyle & Activities",
+  background:  "Background Questions",
+  household:   "Household",
+  owner:       "Policy Ownership",
+  beneficiary: "Beneficiaries",
+  purpose:     "Purpose of Coverage",
+  coverage:    "Existing Coverage & Replacement",
+  suitability: "Financial Profile",
+  billing:     "Billing & Delivery Preferences",
+  wrapup:      "Final Details",
+};
+
+// ─────────────────────────────────────────────────────────────
+// PERSON QUESTION TEMPLATES — reused for the Proposed Insured
+// and, when applicable, the spouse. `id(x)` prefixes the key so
+// conditions can reference this same person's other answers.
+// ─────────────────────────────────────────────────────────────
+function personTemplates(id) {
+  return [
+    { key: "first_name", phase: "identity", type: "text", q: "What is {POSS} first name?", placeholder: "First name" , why: "We need {poss} legal first name exactly as it appears on {poss} government ID, since it has to match on the application and the policy."},
+    { key: "middle_name", phase: "identity", type: "text", q: "What is {POSS} middle name or initial? (Leave blank if none)", placeholder: "Middle name or initial", why: "Carriers ask for a middle name or initial so the application matches {poss} records exactly." },
+    { key: "last_name", phase: "identity", type: "text", q: "And {poss} last name?", placeholder: "Last name" , why: "Carriers require {poss} full legal name to match {poss} identification, or the application can be kicked back for correction."},
+    { key: "dob", phase: "identity", type: "date", q: "What is {POSS} date of birth?" , why: "Age is one of the biggest underwriting factors — it drives the mortality tables, premium rates, and eligibility for certain products and riders."},
+    { key: "sex", phase: "identity", type: "single", q: "What sex {was} {p} assigned at birth, as recorded on {poss} government ID?",
+      why: "Carriers use this for underwriting — it affects mortality tables and premium calculations. This is separate from gender identity.",
+      options: [{ id: "male", label: "Male" }, { id: "female", label: "Female" }] },
+    { key: "pob_location", phase: "identity", type: "single", q: "{Was} {p} born in the U.S. or outside the U.S.?", options: [{ id: "us", label: "In the U.S." }, { id: "abroad", label: "Outside the U.S." }], why: "Place of birth helps the carrier verify identity, and for someone born outside the U.S. it can trigger additional underwriting requirements." },
+    { key: "pob_city", phase: "identity", type: "text", q: "In what city {was} {p} born?", placeholder: "City", why: "Place of birth helps the carrier verify identity, and for someone born outside the U.S. it can trigger additional underwriting requirements." },
+    { key: "pob_state", phase: "identity", type: "select", options: US_STATES, q: "In what state?", cond: a => a[id("pob_location")] === "us", why: "Place of birth helps the carrier verify identity, and for someone born outside the U.S. it can trigger additional underwriting requirements." },
+    { key: "pob_country", phase: "identity", type: "select", options: COUNTRIES, q: "In what country?", cond: a => a[id("pob_location")] === "abroad", why: "Place of birth helps the carrier verify identity, and for someone born outside the U.S. it can trigger additional underwriting requirements." },
+
+    { key: "citizenship", phase: "citizenship", type: "single", q: "{Is} {p} a U.S. citizen, U.S. permanent resident, or foreign national?",
+      options: [{ id: "citizen", label: "U.S. Citizen" }, { id: "permanent_resident", label: "U.S. Permanent Resident" }, { id: "foreign_national", label: "Foreign National" }] , why: "Citizenship and residency status affect insurable interest and which products a carrier can legally issue."},
+    { key: "citizenship_country", phase: "citizenship", type: "select", options: COUNTRIES, q: "What country {is} {p} a citizen of?", cond: a => a[id("citizenship")] === "foreign_national" , why: "Underwriters review country-of-citizenship risk as part of standard foreign-national guidelines."},
+    { key: "visa_type", phase: "citizenship", type: "select", options: VISAS, q: "What type of visa {does} {p} hold?", cond: a => a[id("citizenship")] === "foreign_national" , why: "Visa type and time in the U.S. affect whether — and how — a carrier is able to insure a foreign national."},
+    { key: "years_in_country", phase: "citizenship", type: "number", q: "How long {has} {p} lived in the U.S.? (years)", cond: a => a[id("citizenship")] === "foreign_national" , why: "Time in the U.S. is part of the standard underwriting guidelines for foreign nationals."},
+
+    { key: "ssn", phase: "identity", type: "text", q: "What is {POSS} Social Security Number?", placeholder: "XXX-XX-XXXX",
+      why: "Required by the carrier and the IRS to issue a policy and for tax reporting." },
+    { key: "has_drivers_license", phase: "identity", type: "single", q: "{Does} {p} have a valid driver's license?", options: YN,
+      why: "A government-issued ID number helps the carrier verify identity and satisfies anti-fraud and 'know your customer' requirements. If {p} {does}n't have one, another form of ID can be used instead." },
+    { key: "dl_number", phase: "identity", type: "text", q: "What is {POSS} driver's license number?", placeholder: "License number" , why: "A government-issued ID number helps the carrier verify identity and satisfies anti-fraud and 'know your customer' requirements.", cond: a => a[id("has_drivers_license")] === "yes"},
+    { key: "dl_state", phase: "identity", type: "select", options: US_STATES, q: "Which state issued {poss} driver's license?", placeholder: "State" , why: "Tells the carrier which state's driving and identity records to check.", cond: a => a[id("has_drivers_license")] === "yes"},
+    { key: "mobile_phone", phase: "identity", type: "text", q: "What is the best mobile number for {obj}?", placeholder: "(555) 555-5555" , why: "The carrier may need to reach {obj} directly to schedule a phone health interview or a medical exam."},
+    { key: "email", phase: "identity", type: "email", q: "What is {POSS} email address?", placeholder: "name@email.com" , why: "Used to send required disclosures and illustrations, and — if {p} consent(s) to e-delivery — policy documents."},
+    { key: "address_street", phase: "identity", type: "text", q: "What is {POSS} street address? (no PO boxes)", placeholder: "Street address", why: "Underwriters use address history to run consumer reports and to confirm which state’s rates and forms legally apply." },
+    { key: "address_city", phase: "identity", type: "text", q: "City", placeholder: "City", why: "Underwriters use address history to run consumer reports and to confirm which state’s rates and forms legally apply." },
+    { key: "address_state", phase: "identity", type: "select", options: ADDRESS_STATES, q: "State", why: "Underwriters use address history to run consumer reports and to confirm which state’s rates and forms legally apply." },
+    { key: "address_zip", phase: "identity", type: "text", q: "ZIP code", placeholder: "ZIP or postal code", why: "Underwriters use address history to run consumer reports and to confirm which state’s rates and forms legally apply." },
+    { key: "years_at_address", phase: "identity", type: "number", q: "How long {has} {p} lived at this address? (years)", placeholder: "e.g. 4" , why: "Time at an address helps the carrier confirm identity through public records during underwriting."},
+    { key: "name_change", phase: "identity", type: "single", q: "{Has} {p} legally changed {poss} name in the last 5 years — for example, through marriage or a court order?", options: YN , why: "If a background check turns up a different name, the carrier needs the connection explained so it doesn't stall the application."},
+    { key: "name_change_details", phase: "identity", type: "text", q: "What was {poss} former name, and what was the reason for the change?", cond: a => a[id("name_change")] === "yes" , why: "This ties {poss} past and current records together so a name mismatch doesn't get flagged during underwriting."},
+
+    { key: "employment_status", phase: "employment", type: "single", q: "What best describes {poss} current work situation?",
+      options: [{ id: "employed", label: "Employed (W-2)" }, { id: "self_employed", label: "Self-employed / business owner" }, { id: "retired", label: "Retired" }, { id: "not_working", label: "Not currently working" }, { id: "student", label: "Full-time student" }] , why: "Occupation and work status are core underwriting factors — they affect mortality risk and how much coverage a carrier will approve relative to income."},
+    { key: "occupation", phase: "employment", type: "text", q: "What is {POSS} occupation or job title?", cond: a => ["employed", "self_employed"].includes(a[id("employment_status")]) , why: "Certain occupations carry additional risk that underwriters have to price in or restrict."},
+    { key: "employer_name", phase: "employment", type: "text", q: "What is the name of {poss} employer (or business, if self-employed)?", cond: a => ["employed", "self_employed"].includes(a[id("employment_status")]) , why: "Used to verify employment and income as part of the financial underwriting review."},
+    { key: "years_employed", phase: "employment", type: "number", q: "How long {has} {p} worked there? (years)", cond: a => ["employed", "self_employed"].includes(a[id("employment_status")]) , why: "Job stability is one factor carriers weigh when assessing overall risk and income consistency."},
+    { key: "industry", phase: "employment", type: "select", options: INDUSTRIES, q: "What industry or type of business is this?", cond: a => ["employed", "self_employed"].includes(a[id("employment_status")]) , why: "Some industries carry elevated occupational hazards that underwriters have to account for."},
+    { key: "annual_earned_income", phase: "employment", type: "currency", q: "What is {POSS} approximate annual earned income from occupation?", cond: a => ["employed", "self_employed"].includes(a[id("employment_status")]) , why: "Carriers cap how much coverage they'll issue relative to income, to confirm the amount applied for is financially reasonable."},
+    { key: "annual_unearned_income", phase: "employment", type: "currency", q: "{Does} {p} have annual unearned income — investments, rental, pension, etc.? Roughly how much? (Enter 0 if none)" , why: "Total income — not just salary — factors into how much coverage is considered financially justified."},
+    { key: "net_worth", phase: "employment", type: "currency", q: "What is {POSS} approximate individual net worth?" , why: "Net worth helps the carrier confirm the coverage amount requested is proportionate and insurable."},
+
+    { key: "health_status", phase: "health", type: "single", q: "How would {p} describe {poss} overall health?",
+      options: [{ id: "excellent", label: "Excellent — no significant issues" }, { id: "good", label: "Good — minor issues, well managed" }, { id: "fair", label: "Fair — some ongoing concerns" }, { id: "poor", label: "Poor — significant issues" }] , why: "Self-reported health gives the underwriter an early read before medical records or exam results come back."},
+    { key: "height_weight", phase: "health", type: "heightweight", q: "What is {POSS} height and weight?" , why: "Height and weight are checked against a build chart — falling outside the standard range can affect rate class on its own, regardless of other health factors."},
+    { key: "weight_change", phase: "health", type: "single", q: "{Has} {p} gained or lost significant weight in the last 12 months?", options: YN , why: "A significant recent weight change is a common underwriting flag and may prompt the carrier to ask for more detail."},
+    { key: "tobacco_use", phase: "health", type: "single", q: "{Has} {p} used any tobacco or nicotine product — cigarettes, vape, cigars, chew, patch, gum — in the last 5 years?",
+      why: "Tobacco use is one of the most significant underwriting factors and affects carrier classification and premium.",
+      options: [{ id: "never", label: "Never / quit more than 5 years ago" }, { id: "former", label: "Former user — quit within 5 years" }, { id: "current", label: "Current user" }] },
+    { key: "tobacco_details", phase: "health", type: "multi", options: TOBACCO, q: "Which tobacco or nicotine product(s) {has} {p} used?", cond: a => ["former", "current"].includes(a[id("tobacco_use")]) , why: "The type of product matters — cigarettes, cigars, and nicotine replacement can be rated differently."},
+    { key: "tobacco_last_used", phase: "health", type: "single", q: "About when was {poss} last use?", options: TOBACCO_LAST_USED, cond: a => a[id("tobacco_use")] === "former", why: "Carriers look at how long it has been since {poss} last use — the longer it has been, the more favorable the rate class can be." },
+    { key: "tobacco_amount", phase: "health", type: "text", q: "Roughly how much, and how often? (For example, a pack a day, or a cigar a week)", placeholder: "e.g. half a pack a day", cond: a => ["former", "current"].includes(a[id("tobacco_use")]), why: "Underwriters price heavy and occasional use differently, so amount and frequency can change the rate class." },
+    { key: "alcohol_use", phase: "health", type: "single", q: "About how many alcoholic drinks {does} {p} have in a typical week?", options: [{ id: "none", label: "None" }, { id: "1_3", label: "1–3 drinks" }, { id: "4_7", label: "4–7 drinks" }, { id: "8_14", label: "8–14 drinks" }, { id: "15_plus", label: "More than 14 drinks" }], why: "Regular heavy drinking affects mortality risk, and underwriters ask about it in their interview even when the application does not." },
+    { key: "current_medications", phase: "health", type: "single", q: "{Is} {p} currently taking any prescription medication?", options: YN , why: "Medications often point to an underlying condition the underwriter needs on file, even one that hasn't been formally diagnosed as serious."},
+    { key: "medications_list", phase: "health", type: "multi", options: MED_CATS, q: "What are the medications for? Select all that apply.", cond: a => a[id("current_medications")] === "yes" , why: "What a medication treats is often more informative to an underwriter than a diagnosis alone."},
+    { key: "medications_names", phase: "health", type: "textarea", q: "If you have them handy, list the medication names and doses.", cond: a => Array.isArray(a[id("medications_list")]) && a[id("medications_list")].length > 0, why: "Exact names and doses let the underwriter confirm what each medication is treating." },
+    { key: "reduced_work_disability", phase: "health", type: "single", q: "In the last 5 years, {has} {p} worked less than full-time, or received / applied for disability or workers' compensation?", options: YN , why: "A disability claim or reduced work capacity is a direct signal to underwriters about current health and future risk."},
+    { key: "has_physician", phase: "health", type: "single", q: "{Does} {p} have a primary care physician or regular health care provider?", options: YN, why: "The carrier typically requests records from the primary doctor as part of underwriting, so it needs to know who that is. If there is none, the underwriter knows to rely on other sources." },
+    { key: "physician_name", phase: "health", type: "text", q: "What is the name of {poss} primary physician or medical practice?", placeholder: "Dr. Name / practice name", cond: a => a[id("has_physician")] === "yes", why: "This is the doctor the carrier will request medical records from, so the name needs to be exact." },
+    { key: "physician_address", phase: "health", type: "textarea", q: "What is that physician's office address (and phone number, if known)?", cond: a => a[id("has_physician")] === "yes", why: "The carrier requests records directly from the office, so it needs a way to locate and contact them." },
+    { key: "physician_last_seen", phase: "health", type: "date", q: "When did {p} last see this physician?", cond: a => a[id("has_physician")] === "yes", why: "Recency tells the underwriter whether a condition is current, ongoing, or resolved, and how recent the records will be." },
+    { key: "physician_reason", phase: "health", type: "select", options: VISIT_REASONS, q: "What was the reason for that last visit?", cond: a => a[id("has_physician")] === "yes", why: "The reason and outcome of the most recent visit give the underwriter an early read on current health before records arrive." },
+    { key: "physician_outcome", phase: "health", type: "single", q: "What was the outcome?", options: VISIT_OUTCOMES, cond: a => a[id("has_physician")] === "yes", why: "The outcome tells the underwriter whether anything was found, resolved, or is still being managed." },
+    { key: "other_physicians", phase: "health", type: "single", q: "In the past 5 years, {has} {p} seen any other physicians or specialists?", options: YN, why: "Specialists often treat conditions that don't show up in a primary doctor's file, so carriers ask for every provider seen, not just the main one." },
+    { key: "specialist1_name", phase: "health", type: "text", q: "What is the name and specialty of {poss} first additional physician or specialist?", placeholder: "Dr. Name, specialty", cond: a => a[id("other_physicians")] === "yes", why: "Each treating physician is a potential source of medical records, so the underwriter needs every name to get a complete picture." },
+    { key: "specialist1_address", phase: "health", type: "textarea", q: "What is that physician's office address (and phone number, if known)?", cond: a => a[id("other_physicians")] === "yes", why: "The carrier requests records directly from the office, so it needs a way to locate and contact them." },
+    { key: "specialist1_last_seen", phase: "health", type: "date", q: "When did {p} last see this physician?", cond: a => a[id("other_physicians")] === "yes", why: "Recency tells the underwriter whether a condition is current, ongoing, or resolved." },
+    { key: "specialist1_reason", phase: "health", type: "select", options: VISIT_REASONS, q: "What was the main reason for those visits?", cond: a => a[id("other_physicians")] === "yes", why: "A specialist visit often points to a condition not captured elsewhere on the application, and the outcome tells the underwriter how it was resolved." },
+    { key: "specialist1_outcome", phase: "health", type: "single", q: "What was the outcome?", options: VISIT_OUTCOMES, cond: a => a[id("other_physicians")] === "yes", why: "The outcome tells the underwriter whether anything was found, resolved, or is still being managed." },
+    { key: "has_second_specialist", phase: "health", type: "single", q: "Is there another physician or specialist {p} {has} seen in the past 5 years?", options: YN, cond: a => a[id("other_physicians")] === "yes", why: "Carriers want a complete list of treating providers so no relevant records are missed." },
+    { key: "specialist2_name", phase: "health", type: "text", q: "What is the name and specialty of {poss} second additional physician or specialist?", placeholder: "Dr. Name, specialty", cond: a => a[id("has_second_specialist")] === "yes", why: "Each treating physician is a potential source of medical records, so the underwriter needs every name to get a complete picture." },
+    { key: "specialist2_address", phase: "health", type: "textarea", q: "What is that physician's office address (and phone number, if known)?", cond: a => a[id("has_second_specialist")] === "yes", why: "The carrier requests records directly from the office, so it needs a way to locate and contact them." },
+    { key: "specialist2_last_seen", phase: "health", type: "date", q: "When did {p} last see this physician?", cond: a => a[id("has_second_specialist")] === "yes", why: "Recency tells the underwriter whether a condition is current, ongoing, or resolved." },
+    { key: "specialist2_reason", phase: "health", type: "select", options: VISIT_REASONS, q: "What was the main reason for those visits?", cond: a => a[id("has_second_specialist")] === "yes", why: "A specialist visit often points to a condition not captured elsewhere on the application, and the outcome tells the underwriter how it was resolved." },
+    { key: "specialist2_outcome", phase: "health", type: "single", q: "What was the outcome?", options: VISIT_OUTCOMES, cond: a => a[id("has_second_specialist")] === "yes", why: "The outcome tells the underwriter whether anything was found, resolved, or is still being managed." },
+    { key: "specialist_additional", phase: "health", type: "textarea", q: "Please list any further physicians or specialists: name, specialty, address, date last seen, and reason. (Leave blank if none.)", cond: a => a[id("has_second_specialist")] === "yes", why: "Carriers want a complete list of treating providers so no relevant records are missed." },
+    { key: "health_conditions", phase: "health", type: "multi",
+      q: "In the past 10 years, {has} {p} been diagnosed, treated, or tested positive for any of the following? Select all that apply.",
+      options: [
+        { id: "heart", label: "Heart disease, high blood pressure, or high cholesterol" },
+        { id: "stroke", label: "Stroke or circulatory / vascular disorder" },
+        { id: "respiratory", label: "Lung or respiratory disorder (asthma, COPD, sleep apnea)" },
+        { id: "digestive", label: "Digestive or liver disorder" },
+        { id: "neuro", label: "Neurological disorder (seizures, memory loss, paralysis)" },
+        { id: "endocrine", label: "Endocrine or thyroid disorder" },
+        { id: "diabetes", label: "Diabetes or blood sugar disorder" },
+        { id: "cancer", label: "Cancer, tumor, or lymphoma" },
+        { id: "kidney", label: "Kidney, urinary, or genital-system disorder" },
+        { id: "autoimmune", label: "Autoimmune disorder, lupus, or blindness" },
+        { id: "mental_health", label: "Mental health condition (depression, anxiety, bipolar, PTSD)" },
+        { id: "neuromuscular", label: "Neuromuscular disease (Parkinson's, ALS, MS)" },
+        { id: "blood", label: "Blood disorder (anemia, hemophilia)" },
+        { id: "skin", label: "Skin disorder (melanoma, non-healing wounds)" },
+        { id: "hiv", label: "HIV/AIDS or related condition" },
+        { id: "none", label: "None of the above" },
+      ] , why: "This is the core of the medical underwriting decision — it's how the carrier sets rate class, exclusions, or whether coverage can be offered at all."},
+    { key: "conditions_details", phase: "health", type: "textarea",
+      q: "For each item selected, please note the condition, approximate date, and treating physician if known.",
+      cond: a => Array.isArray(a[id("health_conditions")]) && a[id("health_conditions")].some(x => x !== "none") , why: "Specifics — dates, severity, treatment — let the underwriter make an accurate call instead of assuming the worst case for a vague answer."},
+    { key: "substance_use_history", phase: "health", type: "single",
+      q: "In the past 10 years, {has} {p} used marijuana, cocaine, heroin, or any other illicit drug or controlled substance, been advised to reduce alcohol or drug use, or attended a treatment program or support group?", options: YN , why: "This is a standard underwriting question that can affect rate class independent of other health factors."},
+    { key: "substance_details", phase: "health", type: "textarea", q: "Which substance, how often, and when did {p} last use it? (For example, marijuana, a few times a year, last used in 2024)", cond: a => a[id("substance_use_history")] === "yes", why: "Frequency and how recent matter a great deal, and marijuana is rated differently from other drugs." },
+    { key: "recent_medical_visits", phase: "health", type: "single", q: "In the past 5 years, {has} {p} been hospitalized, visited an ER, or had x-rays, EKGs, ultrasounds, biopsies, or other significant tests or procedures?", options: YN , why: "A recent hospitalization or procedure often reveals something not yet captured elsewhere on the application."},
+    { key: "pending_appointments", phase: "health", type: "single", q: "{Does} {p} have any pending medical appointments right now?", options: YN , why: "An upcoming appointment may return results the carrier wants to see first — flagging it early avoids delays later."},
+    { key: "adl_assistance", phase: "health", type: "single", q: "{Does} {p} currently need help or supervision with daily activities — bathing, dressing, walking, medication, housework?", options: YN , why: "Needing help with daily activities is one of the clearest underwriting signals for current health, and for some products, for insurability at all."},
+    { key: "medical_devices", phase: "health", type: "single", q: "{Does} {p} currently use or require a wheelchair, walker, multi-prong cane, hospital bed, dialysis machine, oxygen or respirator, motorized cart, or stair lift?", options: YN, why: "Needing a medical device is one of the clearest signals of current health and mobility, and it directly affects insurability." },
+    { key: "medical_devices_details", phase: "health", type: "multi", options: DEVICES, q: "Which device(s) {does} {p} use?", cond: a => a[id("medical_devices")] === "yes", why: "The specific device helps the underwriter understand the underlying condition." },
+    { key: "family_history", phase: "health", type: "multi", q: "To {poss} knowledge, has a biological parent or sibling been diagnosed with any of the following?",
+      options: [{ id: "cancer", label: "Cancer" }, { id: "heart", label: "Heart disease" }, { id: "huntingtons", label: "Huntington's disease" }, { id: "als", label: "ALS (Lou Gehrig's disease)" }, { id: "kidney", label: "Polycystic kidney disease" }, { id: "none", label: "None known" }] , why: "A family history of certain hereditary conditions can affect rate class even when {poss} own health is excellent."},
+    { key: "mother_status", phase: "health", type: "single", q: "Is {poss} biological mother living or deceased?",
+      options: [{ id: "living", label: "Living" }, { id: "deceased", label: "Deceased" }, { id: "unknown", label: "Unknown" }] , why: "Family longevity is a classic underwriting factor, especially for conditions with a genetic link."},
+    { key: "mother_age_death", phase: "health", type: "number", q: "About how old was {poss} mother when she passed away?", placeholder: "Age at death",
+      cond: a => a[id("mother_status")] === "deceased" , why: "Age at death matters more than the fact of death alone — dying young from a hereditary condition carries more underwriting weight than a death from natural causes at an older age."},
+    { key: "mother_cause_death", phase: "health", type: "select", options: CAUSES, q: "What was the cause of death, if known?",
+      cond: a => a[id("mother_status")] === "deceased" , why: "The specific cause tells the underwriter whether there's a hereditary risk pattern to account for."},
+    { key: "father_status", phase: "health", type: "single", q: "Is {poss} biological father living or deceased?",
+      options: [{ id: "living", label: "Living" }, { id: "deceased", label: "Deceased" }, { id: "unknown", label: "Unknown" }] , why: "Family longevity is a classic underwriting factor, especially for conditions with a genetic link."},
+    { key: "father_age_death", phase: "health", type: "number", q: "About how old was {poss} father when he passed away?", placeholder: "Age at death",
+      cond: a => a[id("father_status")] === "deceased" , why: "Age at death matters more than the fact of death alone — dying young from a hereditary condition carries more underwriting weight than a death from natural causes at an older age."},
+    { key: "father_cause_death", phase: "health", type: "select", options: CAUSES, q: "What was the cause of death, if known?",
+      cond: a => a[id("father_status")] === "deceased" , why: "The specific cause tells the underwriter whether there's a hereditary risk pattern to account for."},
+
+    { key: "aviation_activity", phase: "lifestyle", type: "single", q: "{Does} {p} fly as a pilot, student pilot, or crew member — other than as a paying passenger?", options: YN , why: "Flying outside of commercial air travel is rated or excluded by most carriers, so it has to be disclosed up front."},
+    { key: "aviation_details", phase: "lifestyle", type: "textarea", q: "Briefly describe: certificate type, aircraft, and approximate hours flown per year.", cond: a => a[id("aviation_activity")] === "yes" , why: "Certificate type, aircraft, and flight hours determine how the carrier prices or restricts aviation risk."},
+    { key: "hazardous_avocations", phase: "lifestyle", type: "multi", q: "{Does} {p} regularly participate in any of the following?",
+      options: [
+        { id: "diving", label: "Scuba or skin diving" },
+        { id: "racing", label: "Auto, motorcycle, or boat racing" },
+        { id: "skydiving", label: "Skydiving, parachuting, or BASE jumping" },
+        { id: "hanggliding", label: "Hang gliding" },
+        { id: "climbing", label: "Mountain or rock climbing" },
+        { id: "hunting", label: "Big game hunting" },
+        { id: "caving", label: "Cave exploring" },
+        { id: "other", label: "Something else", other: true },
+        { id: "none", label: "None of the above" },
+      ] , why: "High-risk hobbies are individually underwritten — some carry a flat extra premium, others an exclusion rider."},
+    { key: "foreign_travel_plans", phase: "lifestyle", type: "single", q: "In the next 2 years, {does} {p} plan to travel to or reside in a high-risk foreign country or region?", options: YN , why: "Travel to certain regions can result in a rating, an exclusion, or in rare cases a decline, depending on the carrier's country list."},
+    { key: "foreign_travel_details", phase: "lifestyle", type: "text", q: "Which countries, and for what purpose / how long?", cond: a => a[id("foreign_travel_plans")] === "yes" , why: "The destination and purpose determine which country-risk guidelines apply."},
+
+    { key: "driving_record", phase: "background", type: "single", q: "In the last 5 years, {has} {p} had a suspended license, a DUI, or 3 or more moving violations?", options: YN , why: "Driving record is a proxy for overall risk-taking behavior that most carriers factor into underwriting."},
+    { key: "criminal_history", phase: "background", type: "single", q: "In the last 10 years, {has} {p} pleaded guilty to or been convicted of a felony or misdemeanor, or is a charge currently pending?", options: YN , why: "A criminal record can affect insurability and is a required background disclosure for nearly every carrier."},
+    { key: "bankruptcy", phase: "background", type: "single", q: "{Has} {p} been involved in any bankruptcy proceeding that has not been discharged?", options: YN , why: "Financial background factors into insurable interest and how a carrier views the justification for the coverage amount."},
+    { key: "insurance_declined_history", phase: "background", type: "single", q: "{Has} {p} ever had a life, health, or disability insurance application declined, postponed, rated, or modified?", options: YN , why: "A prior decline or rating is one of the first things an underwriter checks against MIB and reinsurance records — disclosing it up front avoids surprises later."},
+    { key: "pending_other_apps", phase: "background", type: "single", q: "In the past 12 months, {has} {p} applied for — or {does} {p} currently have pending — any other life or disability insurance application?", options: YN , why: "Carriers watch for total coverage being applied for across multiple companies at once, to avoid approving more than is financially justified."},
+  ];
+}
+
+function buildPerson(prefix, tokens, extraCond) {
+  const idf = f => prefix + f;
+  return personTemplates(idf).map(t => ({
+    id: idf(t.key),
+    phase: t.phase,
+    type: t.type,
+    q: sub(t.q, tokens),
+    why: t.why ? sub(t.why, tokens) : null,
+    placeholder: t.placeholder,
+    options: t.options,
+    condition: a => (extraCond ? extraCond(a) : true) && (t.cond ? t.cond(a) : true),
+  }));
+}
+
+const APPLICANT_TOKENS = { P: "You", p: "you", POSS: "Your", poss: "your", obj: "you",
+  Is: "Are", is: "are", Was: "Were", was: "were", Does: "Do", does: "do", Has: "Have", has: "have" };
+const SPOUSE_TOKENS = { P: "Your spouse", p: "your spouse", POSS: "Your spouse's", poss: "your spouse's", obj: "your spouse",
+  Is: "Is", is: "is", Was: "Was", was: "was", Does: "Does", does: "does", Has: "Has", has: "has" };
+
+const applicantQs = buildPerson("", APPLICANT_TOKENS, null);
+
+const spouseQs = buildPerson("sp_", SPOUSE_TOKENS, a => a.marital_status === "married" && a.add_spouse === "yes");
+spouseQs.forEach(q => {
+  if (/^sp_address_/.test(q.id) || q.id === "sp_years_at_address") {
+    const orig = q.condition;
+    q.condition = a => orig(a) && a.spouse_same_address !== "yes";
+  }
+  if (q.id === "sp_net_worth") {
+    const orig = q.condition;
+    q.condition = a => orig(a) && a.combine_net_worth !== "yes";
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// HOUSEHOLD / MARITAL
+// ─────────────────────────────────────────────────────────────
+const householdQs = [
+  { id: "marital_status", phase: "household", type: "single", q: "What is your marital or partnership status?",
+    options: [{ id: "married", label: "Married or domestic partnership" }, { id: "single", label: "Single" }, { id: "divorced", label: "Divorced" }, { id: "widowed", label: "Widowed" }] , why: "Marital status affects beneficiary defaults, survivor income needs, and whether spousal underwriting or joint ownership applies."},
+  { id: "spouse_existing_insurance", phase: "household", type: "currency",
+    q: "If known, roughly how much life insurance is currently in force on your spouse or partner? (Enter 0 if none or unknown)",
+    condition: a => a.marital_status === "married" , why: "Existing coverage on a spouse factors into the household's total insurable-need calculation."},
+  { id: "add_spouse", phase: "household", type: "single",
+    q: "Would you like to include your spouse's information now, so we can prepare coverage or an application for them as well?",
+    why: "If you're both being underwritten, or your spouse is a joint owner, beneficiary, or second insured, we'll need this either way.",
+    options: YN, condition: a => a.marital_status === "married" },
+  { id: "spouse_same_address", phase: "household", type: "single", q: "Does your spouse live at the same home address as you?",
+    options: YN, condition: a => a.marital_status === "married" && a.add_spouse === "yes" , why: "Saves you from re-entering the same address twice."},
+  { id: "combine_net_worth", phase: "household", type: "single",
+    q: "Should we treat net worth as one shared household figure, instead of tracking it separately for each of you?",
+    options: YN, condition: a => a.marital_status === "married" && a.add_spouse === "yes" , why: "Some households report net worth jointly; this just avoids asking the same financial question twice."},
+];
+
+// ─────────────────────────────────────────────────────────────
+// OWNERSHIP (if other than the Proposed Insured)
+// ─────────────────────────────────────────────────────────────
+const ownerQs = [
+];
+
+// ─────────────────────────────────────────────────────────────
+// BENEFICIARIES
+// ─────────────────────────────────────────────────────────────
+function beneficiaryBlock(kind, n) {
+  // kind: "primary" | "contingent"
+  const label = n === 1 ? "first" : n === 2 ? "second" : "third";
+  const gate = kind === "primary"
+    ? a => ["2", "3plus"].includes(a.num_primary_beneficiaries) || n === 1
+    : a => a.has_contingent === "yes" && (n === 1 || a.num_contingent_beneficiaries === "2");
+  const prefix = `${kind}_ben${n}_`;
+  return [
+    { id: prefix + "name", phase: "beneficiary", type: "text", q: `What is the full name of your ${label} ${kind} beneficiary?`, condition: gate,
+      why: "The exact legal name is what the carrier uses to pay a claim — it needs to match this person's ID." },
+    { id: prefix + "relationship", phase: "beneficiary", type: "select", options: REL_OPTIONS, q: `What is their relationship to you?`, condition: gate,
+      why: "Relationship helps establish insurable interest and is a required field on the beneficiary designation." },
+    { id: prefix + "dob", phase: "beneficiary", type: "date", q: `What is their date of birth?`, condition: gate,
+      why: "Confirms identity, and for a minor beneficiary can trigger guardianship or trust requirements the carrier needs to flag." },
+    { id: prefix + "ssn_tin", phase: "beneficiary", type: "text", q: `What is their Social Security Number or Tax ID?`, condition: gate,
+      why: "Required for the carrier's records and for any tax reporting on the death benefit." },
+    { id: prefix + "address_street", phase: "beneficiary", type: "text", q: `What is their street address?`, placeholder: "Street address", condition: gate, why: "Where the carrier sends claim paperwork if this beneficiary ever needs to file." },
+    { id: prefix + "address_city", phase: "beneficiary", type: "text", q: `City`, placeholder: "City", condition: gate, why: "Where the carrier sends claim paperwork if this beneficiary ever needs to file." },
+    { id: prefix + "address_state", phase: "beneficiary", type: "select", options: ADDRESS_STATES, q: `State`, condition: gate, why: "Where the carrier sends claim paperwork if this beneficiary ever needs to file." },
+    { id: prefix + "address_zip", phase: "beneficiary", type: "text", q: `ZIP code`, placeholder: "ZIP or postal code", condition: gate, why: "Where the carrier sends claim paperwork if this beneficiary ever needs to file." },
+    { id: prefix + "phone", phase: "beneficiary", type: "text", q: `What is a phone number for them, if known?`, condition: gate,
+      why: "Makes it easier for the carrier to reach this beneficiary quickly if a claim is ever filed." },
+    { id: prefix + "share", phase: "beneficiary", type: "number", q: `What percentage of proceeds should they receive? (Leave blank to split equally)`, placeholder: "e.g. 50", condition: gate,
+      why: "If this isn't specified, multiple beneficiaries in the same class split the proceeds equally by default." },
+  ];
+}
+
+const beneficiaryQs = [
+  { id: "num_primary_beneficiaries", phase: "beneficiary", type: "single", q: "How many primary beneficiaries would you like to name?",
+    options: [{ id: "1", label: "1" }, { id: "2", label: "2" }, { id: "3plus", label: "3 or more" }] , why: "A carrier won't issue a policy without at least one named primary beneficiary on file."},
+  { id: "primary_ben3plus_note", phase: "beneficiary", type: "textarea",
+    q: "Please list the names, relationships, and intended share for each additional primary beneficiary — your advisor will collect full details for each.",
+    condition: a => a.num_primary_beneficiaries === "3plus" , why: "We can only collect two beneficiaries per person in this format — this note makes sure nothing gets lost for the rest."},
+  ...beneficiaryBlock("primary", 1),
+  ...beneficiaryBlock("primary", 2),
+];
+
+// ─────────────────────────────────────────────────────────────
+// PURPOSE OF COVERAGE
+// ─────────────────────────────────────────────────────────────
+const purposeQs = [
+];
+
+// ─────────────────────────────────────────────────────────────
+// EXISTING COVERAGE & REPLACEMENT
+// ─────────────────────────────────────────────────────────────
+const coverageQs = [
+  { id: "has_existing_coverage", phase: "coverage", type: "single", q: "Do you currently have any life insurance or annuity contracts in force on your own life?", options: YN , why: "Carriers review all in-force coverage to confirm the total amount you're insured for across every company is reasonable relative to income and net worth."},
+  { id: "existing1_company", phase: "coverage", type: "select", options: CARRIER_OPTIONS, q: "What company is that policy with?", condition: a => a.has_existing_coverage === "yes" , why: "Confirms details of coverage the carrier will factor into an overall insurable-need review."},
+  { id: "existing1_policy_number", phase: "coverage", type: "text", q: "What is the policy or contract number, if you have it handy?", placeholder: "Optional", condition: a => a.has_existing_coverage === "yes" , why: "Helps your advisor and the carrier reference the correct policy if it's part of a replacement or exchange."},
+  { id: "existing1_type", phase: "coverage", type: "single", q: "What type of contract is it?", condition: a => a.has_existing_coverage === "yes",
+    options: [{ id: "life", label: "Life insurance" }, { id: "annuity", label: "Annuity" }, { id: "ltc", label: "Long-term care" }] , why: "Type, amount, and age of an existing policy all factor into how underwriters view total in-force coverage."},
+  { id: "existing1_face_amount", phase: "coverage", type: "currency", q: "What is the face amount or current value?", condition: a => a.has_existing_coverage === "yes" , why: "Type, amount, and age of an existing policy all factor into how underwriters view total in-force coverage."},
+  { id: "existing1_issue_year", phase: "coverage", type: "number", q: "What year was it issued?", placeholder: "e.g. 2015", condition: a => a.has_existing_coverage === "yes" , why: "Type, amount, and age of an existing policy all factor into how underwriters view total in-force coverage."},
+  { id: "has_second_existing_coverage", phase: "coverage", type: "single", q: "Do you have a second existing policy or contract to tell us about?", options: YN, condition: a => a.has_existing_coverage === "yes" , why: "Carriers review all in-force coverage to confirm the total amount you're insured for across every company is reasonable relative to income and net worth."},
+  { id: "existing2_company", phase: "coverage", type: "select", options: CARRIER_OPTIONS, q: "What company is the second policy with?", condition: a => a.has_second_existing_coverage === "yes" , why: "Confirms details of coverage the carrier will factor into an overall insurable-need review."},
+  { id: "existing2_policy_number", phase: "coverage", type: "text", q: "What is the policy or contract number, if you have it handy?", placeholder: "Optional", condition: a => a.has_second_existing_coverage === "yes" , why: "Helps your advisor and the carrier reference the correct policy if it's part of a replacement or exchange."},
+  { id: "existing2_type", phase: "coverage", type: "single", q: "What type of contract is it?", condition: a => a.has_second_existing_coverage === "yes",
+    options: [{ id: "life", label: "Life insurance" }, { id: "annuity", label: "Annuity" }, { id: "ltc", label: "Long-term care" }] , why: "Type, amount, and age of an existing policy all factor into how underwriters view total in-force coverage."},
+  { id: "existing2_face_amount", phase: "coverage", type: "currency", q: "What is the face amount or current value?", condition: a => a.has_second_existing_coverage === "yes" , why: "Type, amount, and age of an existing policy all factor into how underwriters view total in-force coverage."},
+  { id: "existing2_issue_year", phase: "coverage", type: "number", q: "What year was it issued?", placeholder: "e.g. 2018", condition: a => a.has_second_existing_coverage === "yes" , why: "Type, amount, and age of an existing policy all factor into how underwriters view total in-force coverage."},
+
+  { id: "replacing_coverage", phase: "coverage", type: "single", condition: a => a.has_existing_coverage !== "no",
+    q: "Will this new policy replace, reduce, or involve a withdrawal or loan from any existing life insurance or annuity?", options: YN , why: "Replacing a policy triggers state-required replacement disclosures, since it can affect contestability periods and cost."},
+  { id: "replacement_details", phase: "coverage", type: "textarea", q: "Which company and policy number is being replaced or affected?", condition: a => a.replacing_coverage === "yes" , why: "Identifies exactly which policy is affected so the required replacement paperwork can be prepared correctly."},
+
+
+
+];
+
+// ─────────────────────────────────────────────────────────────
+// FINANCIAL PROFILE / SUITABILITY (household level)
+// ─────────────────────────────────────────────────────────────
+const rangeOptions = ranges => ranges.map(r => ({ id: r.replace(/[^a-z0-9]/gi, "_"), label: r }));
+
+const suitabilityQs = [
+];
+
+// ─────────────────────────────────────────────────────────────
+// BILLING & NOTIFICATIONS
+// ─────────────────────────────────────────────────────────────
+const billingQs = [
+];
+
+// ─────────────────────────────────────────────────────────────
+// WRAP-UP
+// ─────────────────────────────────────────────────────────────
+const wrapupQs = [
+  { id: "contact_preference", phase: "wrapup", type: "single", q: "How do you prefer we reach out with any follow-up questions?",
+    options: [{ id: "email", label: "Email" }, { id: "call", label: "Phone call" }, { id: "text", label: "Text message" }, { id: "any", label: "Any — whatever is fastest" }] , why: "Helps your advisor reach you efficiently for anything that needs a quick follow-up."},
+  { id: "best_time_to_reach", phase: "wrapup", type: "single", options: BEST_TIMES, q: "Is there a best day or time of day to reach you?" , why: "Helps your advisor reach you efficiently for anything that needs a quick follow-up."},
+  { id: "additional_notes", phase: "wrapup", type: "textarea", q: "Anything else you'd like your advisor to know before preparing your application?" , why: "Gives you a chance to flag anything unusual before your advisor prepares the paperwork, so there are no surprises later."},
+];
+
+const QUESTIONS = [
+  ...applicantQs,
+  ...householdQs,
+  ...spouseQs,
+  ...ownerQs,
+  ...beneficiaryQs,
+  ...purposeQs,
+  ...coverageQs,
+  ...suitabilityQs,
+  ...billingQs,
+  ...wrapupQs,
+];
+const qMap = Object.fromEntries(QUESTIONS.map(q => [q.id, q]));
+
+function buildSequence(answers) {
+  return QUESTIONS.filter(q => (q.condition ? q.condition(answers) : true));
+}
+
+
+// ─────────────────────────────────────────────────────────────
+// SCREENS: related questions shown together on one screen.
+// Questions inside a screen appear only when their own condition is met,
+// so follow-ups are revealed in place as the client answers.
+// ─────────────────────────────────────────────────────────────
+const PERSON_SCREENS = [
+  { id: "name", title: "{POSS} name", keys: ["first_name", "middle_name", "last_name", "name_change", "name_change_details"] },
+  { id: "birth", title: "{POSS} birth and citizenship", keys: ["dob", "sex", "pob_location", ["pob_city", "pob_state", "pob_country"], "citizenship", "citizenship_country", "visa_type", "years_in_country"] },
+  { id: "ids", title: "{POSS} identification", keys: ["ssn", "has_drivers_license", "dl_number", "dl_state"] },
+  { id: "contact", title: "{POSS} contact details", keys: ["mobile_phone", "email"] },
+  { id: "home", title: "{POSS} home address", keys: ["address_street", ["address_city", "address_state", "address_zip"], "years_at_address"] },
+  { id: "work", title: "{POSS} work", keys: ["employment_status", "occupation", "employer_name", "years_employed", "industry"] },
+  { id: "income", title: "{POSS} income and net worth", keys: ["annual_earned_income", "annual_unearned_income", "net_worth"] },
+  { id: "body", title: "{POSS} height, weight, and general health", keys: ["health_status", "height_weight", "weight_change"] },
+  { id: "tobacco", title: "{POSS} tobacco and alcohol use", keys: ["tobacco_use", "tobacco_details", "tobacco_last_used", "tobacco_amount", "alcohol_use"] },
+  { id: "meds", title: "{POSS} medications", keys: ["current_medications", "medications_list", "medications_names"] },
+  { id: "doctor", title: "{POSS} primary physician", keys: ["has_physician", "physician_name", "physician_address"] },
+  { id: "visit", title: "{POSS} last visit to that physician", keys: ["physician_last_seen", "physician_reason", "physician_outcome"] },
+  { id: "others", title: "{POSS} other physicians and specialists", keys: ["other_physicians", "specialist1_name", "specialist1_address"] },
+  { id: "spec1", title: "{POSS} visits to that specialist", keys: ["specialist1_last_seen", "specialist1_reason", "specialist1_outcome", "has_second_specialist"] },
+  { id: "spec2", title: "{POSS} second specialist", keys: ["specialist2_name", "specialist2_address", "specialist2_last_seen"] },
+  { id: "spec2b", title: "{POSS} second specialist: visits", keys: ["specialist2_reason", "specialist2_outcome", "specialist_additional"] },
+  { id: "conds", title: "{POSS} medical conditions", keys: ["health_conditions", "conditions_details"] },
+  { id: "quick", title: "{POSS} quick health questions", keys: ["reduced_work_disability", "substance_use_history", "substance_details", "recent_medical_visits", "pending_appointments", "adl_assistance", "medical_devices", "medical_devices_details"] },
+  { id: "famhx", title: "{POSS} family history", keys: ["family_history"] },
+  { id: "parents", title: "{POSS} parents", keys: ["mother_status", "mother_age_death", "mother_cause_death", "father_status", "father_age_death", "father_cause_death"] },
+  { id: "activities", title: "{POSS} activities and travel", keys: ["hazardous_avocations", "aviation_activity", "aviation_details", "foreign_travel_plans", "foreign_travel_details"] },
+  { id: "background", title: "{POSS} background", keys: ["driving_record", "criminal_history", "bankruptcy", "insurance_declined_history", "pending_other_apps"] },
+];
+const benKeys = (n, fields) => fields.map(f => "primary_ben" + n + "_" + f);
+const existKeys = (n) => ["company", "policy_number", "type", "face_amount", "issue_year"].map(f => "existing" + n + "_" + f);
+const benDetail = n => ["primary_ben" + n + "_dob", "primary_ben" + n + "_ssn_tin", "primary_ben" + n + "_address_street",
+  ["primary_ben" + n + "_address_city", "primary_ben" + n + "_address_state", "primary_ben" + n + "_address_zip"], "primary_ben" + n + "_phone"];
+const SCREEN_DEFS = [
+  ...PERSON_SCREENS.map(s => ({ ...s, prefix: "", tokens: APPLICANT_TOKENS })),
+  { id: "cov1", title: "Your existing coverage", keys: ["has_existing_coverage", ...existKeys(1)] },
+  { id: "cov2", title: "A second policy or contract", keys: ["has_second_existing_coverage", ...existKeys(2)] },
+  { id: "repl", title: "Replacing your coverage", keys: ["replacing_coverage", "replacement_details"] },
+  { id: "household", title: "Household", keys: ["marital_status", "spouse_existing_insurance", "add_spouse", "spouse_same_address", "combine_net_worth"] },
+  ...PERSON_SCREENS.map(s => ({ ...s, id: "sp_" + s.id, prefix: "sp_", tokens: SPOUSE_TOKENS })),
+  { id: "ben1", title: "Primary beneficiary", keys: ["num_primary_beneficiaries", "primary_ben3plus_note", ...benKeys(1, ["name", "relationship", "share"])] },
+  { id: "ben1b", title: "Primary beneficiary: details", keys: benDetail(1) },
+  { id: "ben2", title: "Second primary beneficiary", keys: benKeys(2, ["name", "relationship", "share"]) },
+  { id: "ben2b", title: "Second primary beneficiary: details", keys: benDetail(2) },
+  { id: "wrap", title: "Final details", keys: ["contact_preference", "best_time_to_reach", "additional_notes"] },
+];
+
+const LABELS = {
+  first_name: "First name", middle_name: "Middle name or initial", last_name: "Last name",
+  name_change: "Legal name change in the last 5 years?", name_change_details: "Former name and reason",
+  dob: "Date of birth", sex: "Sex assigned at birth", pob_location: "Born in the U.S. or outside it?", pob_city: "City of birth", pob_state: "State of birth", pob_country: "Country of birth", citizenship: "Citizenship status",
+  citizenship_country: "Country of citizenship", visa_type: "Visa type", years_in_country: "Years in the U.S.",
+  ssn: "Social Security number", has_drivers_license: "Valid driver’s license?", dl_number: "License number", dl_state: "Issuing state",
+  mobile_phone: "Mobile phone", email: "Email address", address_street: "Street address (no PO boxes)", address_city: "City", address_state: "State", address_zip: "ZIP code", years_at_address: "Years at this address",
+  employment_status: "Work situation", occupation: "Occupation or job title", employer_name: "Employer or business",
+  years_employed: "Years there", industry: "Industry",
+  annual_earned_income: "Annual earned income", annual_unearned_income: "Annual unearned income (investments, rental, pension)", net_worth: "Net worth",
+  health_status: "Overall health", height_weight: "Height and weight", weight_change: "Significant weight change in the last 12 months?",
+  tobacco_use: "Tobacco or nicotine in the last 5 years", tobacco_details: "Which products", tobacco_last_used: "Last used",
+  tobacco_amount: "How much and how often", alcohol_use: "Alcoholic drinks in a typical week",
+  current_medications: "Taking prescription medication?", medications_list: "What they are for", medications_names: "Names and doses, if handy",
+  has_physician: "Primary care physician?", physician_name: "Physician or practice name", physician_address: "Office address and phone",
+  physician_last_seen: "Date last seen", physician_reason: "Reason for the last visit", physician_outcome: "Outcome",
+  other_physicians: "Seen other physicians or specialists in the last 5 years?", has_second_specialist: "Another physician or specialist?",
+  specialist_additional: "Any further providers: name, specialty, address, last seen, reason",
+  health_conditions: "Diagnosed, treated, or tested positive for any of these in the last 10 years?", conditions_details: "Condition, date, and treating physician for each",
+  reduced_work_disability: "Reduced work, disability, or workers’ comp in the last 5 years?",
+  substance_use_history: "Marijuana or other drug use, treatment, or advice to cut back in the last 10 years?",
+  substance_details: "Which substance, how often, and when last used",
+  recent_medical_visits: "Hospital stay, ER visit, or major tests in the last 5 years?", pending_appointments: "Pending medical appointments?",
+  adl_assistance: "Help needed with daily activities?", medical_devices: "Wheelchair, walker, oxygen, or similar device?", medical_devices_details: "Which devices",
+  family_history: "Parent or sibling with any of these", mother_status: "Mother", mother_age_death: "Her age at death", mother_cause_death: "Cause of death",
+  father_status: "Father", father_age_death: "His age at death", father_cause_death: "Cause of death",
+  aviation_activity: "Fly as a pilot or crew member?", aviation_details: "Certificate, aircraft, and hours per year",
+  hazardous_avocations: "Hazardous activities", foreign_travel_plans: "High-risk foreign travel in the next 2 years?", foreign_travel_details: "Where, why, and how long",
+  driving_record: "Suspended license, DUI, or 3+ moving violations in the last 5 years?",
+  criminal_history: "Felony or misdemeanor conviction or pending charge in the last 10 years?", bankruptcy: "Bankruptcy not yet discharged?",
+  insurance_declined_history: "Insurance ever declined, rated, or modified?", pending_other_apps: "Other life or disability application in the last 12 months?",
+  marital_status: "Marital status", spouse_existing_insurance: "Life insurance now in force on your spouse",
+  add_spouse: "Include your spouse’s information now?", spouse_same_address: "Spouse lives at the same address?", combine_net_worth: "Treat net worth as one household figure?",
+  num_primary_beneficiaries: "How many primary beneficiaries?", primary_ben3plus_note: "Additional beneficiaries: names, relationships, shares",
+  has_existing_coverage: "Life insurance or annuity in force on your life?", has_second_existing_coverage: "Another policy or contract?",
+  replacing_coverage: "Replacing, reducing, or borrowing from existing coverage?", replacement_details: "Which company and policy number",
+  contact_preference: "Best way to reach you", best_time_to_reach: "Best time to reach you", additional_notes: "Anything else for your advisor",
+};
+const BEN_LABELS = { name: "Full legal name", relationship: "Relationship to you", share: "Percent share", dob: "Date of birth", ssn_tin: "Social Security number or tax ID", address_street: "Street address", address_city: "City", address_state: "State", address_zip: "ZIP code", phone: "Phone number" };
+const EXIST_LABELS = { company: "Company", policy_number: "Policy or contract number", type: "Type", face_amount: "Face amount or current value", issue_year: "Year issued" };
+const SPEC_LABELS = { name: "Name and specialty", address: "Office address and phone", last_seen: "Date last seen", reason: "Main reason for the visits", outcome: "Outcome" };
+function labelFor(q) {
+  const id = q.id.replace(/^sp_/, "");
+  if (LABELS[id]) return LABELS[id];
+  let m = id.match(/^primary_ben\d_(.+)$/); if (m && BEN_LABELS[m[1]]) return BEN_LABELS[m[1]];
+  m = id.match(/^existing\d_(.+)$/); if (m && EXIST_LABELS[m[1]]) return EXIST_LABELS[m[1]];
+  m = id.match(/^specialist\d_(.+)$/); if (m && SPEC_LABELS[m[1]]) return SPEC_LABELS[m[1]];
+  return q.q;
+}
+
+function buildScreens(answers) {
+  const out = [];
+  SCREEN_DEFS.forEach(def => {
+    const pf = def.prefix || "";
+    const vis = k => { const q = qMap[pf + k]; return q && (q.condition ? q.condition(answers) : true) ? q : null; };
+    const rows = [];
+    def.keys.forEach(k => {
+      if (Array.isArray(k)) { const cl = k.map(vis).filter(Boolean); if (cl.length) rows.push(cl); }
+      else { const q = vis(k); if (q) rows.push([q]); }
+    });
+    if (rows.length) out.push({ id: def.id, title: def.tokens ? sub(def.title, def.tokens) : def.title, rows, questions: rows.flat() });
+  });
+  return out;
+}
+
+function formatPhone(s) {
+  const d = String(s).replace(/\D/g, "");
+  const n = d.length === 11 && d[0] === "1" ? d.slice(1) : d;
+  return n.length === 10 ? "(" + n.slice(0, 3) + ") " + n.slice(3, 6) + "-" + n.slice(6) : String(s);
+}
+function formatSsn(s) {
+  const d = String(s).replace(/\D/g, "");
+  return d.length === 9 ? d.slice(0, 3) + "-" + d.slice(3, 5) + "-" + d.slice(5) : String(s);
+}
+
+function fmtAnswer(q, v, answers) {
+  if (v === undefined || v === null || v === "") return "—";
+  if (q.type === "currency") return fmtCurrency(v) || "—";
+  if (q.type === "date") return fmtDate(v);
+  if (q.type === "heightweight") {
+    if (typeof v !== "object") return "—";
+    const parts = [];
+    if (v.feet !== undefined && v.feet !== "" && v.inches !== undefined && v.inches !== "") parts.push(`${v.feet}'${v.inches}"`);
+    if (v.weight !== undefined && v.weight !== "") parts.push(`${v.weight} lbs`);
+    return parts.length ? parts.join(", ") : "—";
+  }
+  if (q.type === "multi") {
+    if (!Array.isArray(v) || v.length === 0) return "—";
+    return v.map(id => {
+      const o = q.options.find(x => x.id === id);
+      if (o && o.other) { const tx = answers && answers[q.id + "__other"]; return tx ? "Something else: " + tx : o.label; }
+      return o ? o.label : id;
+    }).join(", ");
+  }
+  if (q.type === "single" || q.type === "select") {
+    const opt = (q.options || []).find(o => o.id === v);
+    if (opt && opt.other) { const tx = answers && answers[q.id + "__other"]; return tx ? "Something else: " + tx : opt.label; }
+    return opt ? opt.label : v;
+  }
+  if (/(^|_)ssn(_tin)?$/.test(q.id)) return formatSsn(v);
+  if (/phone$/.test(q.id)) return formatPhone(v);
+  return String(v);
+}
+
+// ─────────────────────────────────────────────────────────────
+// UI COMPONENTS
+// ─────────────────────────────────────────────────────────────
+function ChoiceBtn({ label, selected, onClick }) {
+  return (
+    <button onClick={onClick} style={{
+      display: "block", width: "100%", textAlign: "left", padding: "15px 18px", marginBottom: 10,
+      borderRadius: 11, fontSize: 15, fontWeight: 500, lineHeight: 1.4,
+      background: selected ? "rgba(200,169,110,.14)" : "rgba(255,255,255,.04)",
+      border: `1px solid ${selected ? GOLD : BORDER}`,
+      color: selected ? GOLD2 : OFFWHITE, transition: "all .15s ease",
+    }}>{label}</button>
+  );
+}
+
+function WhyCard({ text, onClose }) {
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", zIndex: 300, display: "flex", alignItems: "flex-end" }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: NAVY2, borderTop: `1px solid ${BORDER}`, borderRadius: "16px 16px 0 0", padding: "22px 22px 28px", width: "100%", animation: "fadeUp .25s ease" }}>
+        <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".16em", textTransform: "uppercase", color: GOLD, marginBottom: 10 }}>Why we're asking</div>
+        <p style={{ fontSize: 13.5, lineHeight: 1.65, color: WARM, marginBottom: 18 }}>{text}</p>
+        <button onClick={onClose} style={{ width: "100%", padding: 13, borderRadius: 10, background: "rgba(255,255,255,.06)", color: OFFWHITE, fontSize: 13, fontWeight: 600 }}>Got it</button>
+      </div>
+    </div>
+  );
+}
+
+function CurrencyField({ value, onChange, placeholder, onEnter, inputRef, baseInputStyle }) {
+  const format = raw => (raw === "" ? "" : Number(raw).toLocaleString("en-US"));
+  const [display, setDisplay] = useState(format(value === undefined ? "" : value));
+
+  useEffect(() => {
+    setDisplay(format(value === undefined ? "" : value));
+  }, [value]);
+
+  const handleChange = e => {
+    const input = e.target;
+    const prevLen = input.value.length;
+    const caret = input.selectionStart;
+    const raw = input.value.replace(/[^0-9]/g, "");
+    const nextDisplay = format(raw);
+    setDisplay(nextDisplay);
+    onChange(raw);
+    // Keep the caret in roughly the same spot relative to the digits, accounting
+    // for commas added/removed by the reformat.
+    requestAnimationFrame(() => {
+      if (!input) return;
+      const delta = nextDisplay.length - prevLen;
+      const pos = Math.max(0, (caret || 0) + delta);
+      try { input.setSelectionRange(pos, pos); } catch (e) {}
+    });
+  };
+
+  return (
+    <div style={{ position: "relative" }}>
+      <span style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: GRAY, fontSize: 15 }}>$</span>
+      <input ref={inputRef} type="text" inputMode="numeric" value={display} placeholder={placeholder || "0"}
+        onChange={handleChange} onKeyDown={e => e.key === "Enter" && onEnter()} style={{ ...baseInputStyle, paddingLeft: 30 }} />
+    </div>
+  );
+}
+
+function HeightWeightField({ value, onChange }) {
+  const val = value && typeof value === "object" ? value : {};
+  const feetOptions = [3, 4, 5, 6, 7];
+  const inchOptions = Array.from({ length: 13 }, (_, i) => i); // 0–12
+  const update = patch => onChange({ ...val, ...patch });
+  const selectStyle = SELECT_STYLE;
+  const labelStyle = { fontSize: 11, color: GRAY, marginBottom: 6, display: "block", fontWeight: 600, letterSpacing: ".02em" };
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+        <div style={{ flex: 1 }}>
+          <label style={labelStyle}>FEET</label>
+          <select value={val.feet === undefined ? "" : val.feet} onChange={e => update({ feet: e.target.value })} style={selectStyle}>
+            <option value="" disabled>Select</option>
+            {feetOptions.map(f => <option key={f} value={f}>{f} ft</option>)}
+          </select>
+        </div>
+        <div style={{ flex: 1 }}>
+          <label style={labelStyle}>INCHES</label>
+          <select value={val.inches === undefined ? "" : val.inches} onChange={e => update({ inches: e.target.value })} style={selectStyle}>
+            <option value="" disabled>Select</option>
+            {inchOptions.map(i => <option key={i} value={i}>{i} in</option>)}
+          </select>
+        </div>
+      </div>
+      <div>
+        <label style={labelStyle}>WEIGHT</label>
+        <div style={{ position: "relative" }}>
+          <input type="number" inputMode="numeric" value={val.weight === undefined ? "" : val.weight} placeholder="e.g. 180"
+            onChange={e => update({ weight: e.target.value })}
+            style={{ width: "100%", padding: "15px 50px 15px 16px", background: "rgba(255,255,255,.05)", border: `1px solid ${BORDER}`, borderRadius: 10, color: OFFWHITE, fontSize: 15, outline: "none" }} />
+          <span style={{ position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)", color: GRAY, fontSize: 14 }}>lbs</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Field({ question, answer, onAnswer, onEnter, otherValue, onOther }) {
+  const inputRef = useRef(null);
+  useEffect(() => {
+    if (["text", "email", "number", "currency"].includes(question.type) && inputRef.current) {
+      setTimeout(() => inputRef.current && inputRef.current.focus(), 60);
+    }
+  }, [question.id]);
+
+  const baseInputStyle = {
+    width: "100%", padding: "15px 16px", background: "rgba(255,255,255,.05)",
+    border: `1px solid ${BORDER}`, borderRadius: 10, color: OFFWHITE, fontSize: 15, outline: "none",
+  };
+
+  const otherInput = (
+    <input type="text" autoFocus value={otherValue || ""} placeholder="Please tell us more"
+      onChange={e => onOther && onOther(e.target.value)} style={{ ...baseInputStyle, marginTop: 4 }} />
+  );
+  if (question.type === "single") {
+    const sel = question.options.find(o => o.id === answer);
+    return (
+      <>
+        {question.options.map(o => (
+          <ChoiceBtn key={o.id} label={o.label} selected={answer === o.id} onClick={() => onAnswer(o.id)} />
+        ))}
+        {sel && sel.other && otherInput}
+      </>
+    );
+  }
+  if (question.type === "select") {
+    const sel = question.options.find(o => o.id === answer);
+    return (
+      <>
+        <select value={answer || ""} onChange={e => onAnswer(e.target.value)} style={SELECT_STYLE}>
+          <option value="" disabled>Select…</option>
+          {question.options.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+        </select>
+        {sel && sel.other && <div style={{ marginTop: 10 }}>{otherInput}</div>}
+      </>
+    );
+  }
+  if (question.type === "multi") {
+    const sel = Array.isArray(answer) ? answer : [];
+    const toggle = id => {
+      let next;
+      if (id === "none") next = sel.includes("none") ? [] : ["none"];
+      else next = sel.includes(id) ? sel.filter(x => x !== id) : [...sel.filter(x => x !== "none"), id];
+      onAnswer(next);
+    };
+    return (
+      <>
+        <p style={{ fontSize: 11, color: GRAY, marginBottom: 10, fontWeight: 600, letterSpacing: ".03em" }}>SELECT ALL THAT APPLY</p>
+        {question.options.map(o => <ChoiceBtn key={o.id} label={o.label} selected={sel.includes(o.id)} onClick={() => toggle(o.id)} />)}
+        {question.options.some(o => o.other && sel.includes(o.id)) && otherInput}
+      </>
+    );
+  }
+  if (question.type === "text" || question.type === "email") {
+    return (
+      <input ref={inputRef} type={question.type === "email" ? "email" : "text"} value={answer || ""} placeholder={question.placeholder || ""}
+        onChange={e => onAnswer(e.target.value)} onKeyDown={e => e.key === "Enter" && onEnter()} style={baseInputStyle} />
+    );
+  }
+  if (question.type === "textarea") {
+    return (
+      <textarea value={answer || ""} placeholder={question.placeholder || ""} rows={4}
+        onChange={e => onAnswer(e.target.value)} style={{ ...baseInputStyle, resize: "vertical", lineHeight: 1.5 }} />
+    );
+  }
+  if (question.type === "number") {
+    return (
+      <input ref={inputRef} type="number" inputMode="numeric" value={answer === undefined ? "" : answer} placeholder={question.placeholder || ""}
+        onChange={e => onAnswer(e.target.value)} onKeyDown={e => e.key === "Enter" && onEnter()} style={baseInputStyle} />
+    );
+  }
+  if (question.type === "currency") {
+    return (
+      <CurrencyField value={answer} onChange={onAnswer} placeholder={question.placeholder} onEnter={onEnter}
+        inputRef={inputRef} baseInputStyle={baseInputStyle} />
+    );
+  }
+  if (question.type === "date") {
+    return <input type="date" value={answer || ""} onChange={e => onAnswer(e.target.value)} style={{ ...baseInputStyle, colorScheme: "dark" }} />;
+  }
+  if (question.type === "heightweight") {
+    return <HeightWeightField value={answer} onChange={onAnswer} />;
+  }
+  return null;
+}
+
+function hasAnswer(question, answer) {
+  if (answer === undefined || answer === null) return false;
+  if (Array.isArray(answer)) return answer.length > 0;
+  if (typeof answer === "object") return Object.values(answer).some(x => x !== undefined && x !== null && String(x).trim() !== "");
+  return String(answer).trim() !== "";
+}
+
+// Everything can be skipped. The only thing blocked is a half-typed, invalid email.
+function canContinue(question, answer) {
+  if (!question) return false;
+  if (question.type === "email" && hasAnswer(question, answer)) return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(answer).trim());
+  return true;
+}
+
+function QuestionScreen({ question, answer, onAnswer, onNext, onBack, stepNum, totalSteps, otherValue, onOther }) {
+  const [showWhy, setShowWhy] = useState(false);
+  useEffect(() => setShowWhy(false), [question.id]);
+  const pct = totalSteps > 0 ? Math.round((stepNum / totalSteps) * 100) : 0;
+  const ok = canContinue(question, answer);
+  const answered = hasAnswer(question, answer);
+  const isLast = stepNum === totalSteps;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", minHeight: "100dvh", background: NAVY, position: "relative" }}>
+      <div style={{ position: "absolute", top: -100, right: -100, width: 380, height: 380, borderRadius: "50%", background: "radial-gradient(circle,rgba(200,169,110,.06) 0%,transparent 70%)", pointerEvents: "none" }} />
+
+      <div style={{ padding: "18px 20px 0", flexShrink: 0, maxWidth: 640, margin: "0 auto", width: "100%" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            <div dangerouslySetInnerHTML={{ __html: LOGO_SVG }} />
+            <div style={{ fontSize: 9, color: GOLD, letterSpacing: ".1em", textTransform: "uppercase" }}>{SECTION_LABELS[question.phase] || "Application Intake"}</div>
+          </div>
+          <span style={{ fontSize: 10, color: GRAY }}>{pct}%</span>
+        </div>
+        <div style={{ height: 3, background: "rgba(255,255,255,.07)", borderRadius: 2, marginBottom: 6 }}>
+          <div style={{ height: "100%", width: pct + "%", background: `linear-gradient(90deg,${GOLD},${GOLD2})`, borderRadius: 2, transition: "width .35s ease" }} />
+        </div>
+      </div>
+
+      <div style={{ flex: 1, padding: "22px 20px 0", maxWidth: 640, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
+        <div style={{ animation: "fadeUp .3s ease both" }}>
+          <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 24, fontWeight: 400, lineHeight: 1.36, color: OFFWHITE, marginBottom: 20 }}>{question.q}</h2>
+        </div>
+        <Field question={question} answer={answer} onAnswer={onAnswer} onEnter={() => ok && answered && onNext()} otherValue={otherValue} onOther={onOther} />
+        {!ok && <p style={{ fontSize: 12, color: GRAY, marginTop: 10 }}>Please enter a valid email address, or clear the field to skip.</p>}
+      </div>
+
+      <div style={{ padding: "18px 20px 30px", flexShrink: 0, maxWidth: 640, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
+        {question.why && (
+          <button onClick={() => setShowWhy(true)} style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 12, color: GRAY, fontSize: 12, fontWeight: 500 }}>
+            <span style={{ width: 17, height: 17, borderRadius: "50%", border: "1px solid #4A6070", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9 }}>?</span>
+            Why are we asking this?
+          </button>
+        )}
+        <div style={{ display: "flex", gap: 10 }}>
+          {stepNum > 1 && (
+            <button onClick={onBack} style={{ padding: "15px 20px", borderRadius: 11, fontSize: 14, fontWeight: 600, background: "rgba(255,255,255,.05)", border: `1px solid ${BORDER}`, color: GRAY, flexShrink: 0 }}>← Back</button>
+          )}
+          <button onClick={onNext} disabled={!ok} style={{
+            flex: 1, padding: 15, borderRadius: 11, fontSize: 14, fontWeight: 700, letterSpacing: ".03em",
+            background: !ok ? "rgba(255,255,255,.06)" : (answered || isLast) ? GOLD : "rgba(255,255,255,.05)",
+            color: !ok ? "#3A5268" : (answered || isLast) ? NAVY : GOLD2,
+            border: ok && !answered && !isLast ? "1px solid rgba(200,169,110,.35)" : "none",
+          }}>{isLast ? "Finish →" : answered ? "Continue →" : "Skip for now →"}</button>
+        </div>
+      </div>
+      {showWhy && <WhyCard text={question.why} onClose={() => setShowWhy(false)} />}
+    </div>
+  );
+}
+
+function WelcomeScreen({ onStart, hasSaved, onResume, onClear }) {
+  return (
+    <div style={{ minHeight: "100dvh", background: NAVY, display: "flex", flexDirection: "column", justifyContent: "center", padding: "40px 24px", position: "relative" }}>
+      <div style={{ position: "absolute", top: -120, right: -120, width: 420, height: 420, borderRadius: "50%", background: "radial-gradient(circle,rgba(200,169,110,.07) 0%,transparent 70%)" }} />
+      <div style={{ maxWidth: 480, margin: "0 auto", width: "100%", position: "relative" }}>
+        <div dangerouslySetInnerHTML={{ __html: LOGO_SVG }} style={{ marginBottom: 22 }} />
+        <div style={{ fontSize: 10, color: GOLD, letterSpacing: ".18em", textTransform: "uppercase", marginBottom: 14 }}>Integrated Planning Partners</div>
+        <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 36, fontWeight: 300, lineHeight: 1.2, color: OFFWHITE, marginBottom: 16 }}>Application Intake</h1>
+        <p style={{ fontSize: 14.5, lineHeight: 1.7, color: WARM, fontWeight: 300, marginBottom: 10 }}>
+          This interview gathers the personal, financial, health, and beneficiary information your advisor needs to prepare your application. Plan on about 15–20 minutes with your information in front of you.
+        </p>
+        <p style={{ fontSize: 13, lineHeight: 1.65, color: GRAY, fontWeight: 300, marginBottom: 26 }}>
+          Product design, coverage amounts, and account allocations are handled by your advisor — you won't be asked to make those decisions here. If you're married, you'll have the option to add your spouse's information as well.
+        </p>
+
+        <div style={{ background: "rgba(200,169,110,.06)", border: "1px solid rgba(200,169,110,.18)", borderRadius: 12, padding: "18px 20px", marginBottom: 26 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: GOLD, marginBottom: 4 }}>Gather these first — it saves time</div>
+          <p style={{ fontSize: 12, lineHeight: 1.55, color: GRAY, marginBottom: 14 }}>Having these in front of you before you begin is the difference between a quick session and a lot of stopping to look things up.</p>
+          {[
+            { h: "Identification", items: [
+              "Driver's license (number and issuing state)",
+              "Social Security number" ] },
+            { h: "Your doctors", items: [
+              "Primary physician's name, office address, and phone number",
+              "Any specialists you've seen in the last 5 years — name, specialty, address, and phone",
+              "The approximate date you last saw each, and why",
+              "A list of current prescription medications and what each is for" ] },
+            { h: "Existing insurance", items: [
+              "Company, policy or contract number, face amount, and year issued for every life insurance policy or annuity you own" ] },
+            { h: "The people involved", items: [
+              "Beneficiaries — full legal name, date of birth, Social Security number, and address" ] },
+            { h: "Work and finances", items: [
+              "Employer name and how long you've been there",
+              "Rough figures for your annual income and net worth" ] },
+            { h: "Family health history", items: [
+              "Whether each biological parent is living, and if not, their age and cause of death",
+              "Any parent or sibling diagnosed with cancer, heart disease, Huntington's, ALS, or polycystic kidney disease" ] },
+          ].map((g, gi, arr) => (
+            <div key={gi} style={{ marginBottom: gi === arr.length - 1 ? 0 : 14 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".04em", color: GOLD2, marginBottom: 6 }}>{g.h}</div>
+              {g.items.map((item, i) => (
+                <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 5 }}>
+                  <span style={{ color: GOLD, fontSize: 13, lineHeight: "20px", flexShrink: 0 }}>✓</span>
+                  <span style={{ fontSize: 13, lineHeight: 1.5, color: WARM }}>{item}</span>
+                </div>
+              ))}
+            </div>
+          ))}
+          <p style={{ fontSize: 11.5, lineHeight: 1.55, color: GRAY, marginTop: 14, fontStyle: "italic" }}>
+            Don't know an answer? Skip it — we'll follow up on anything you leave blank. Your answers are saved on this device as you go, so if you're interrupted you can pick up where you left off.
+          </p>
+        </div>
+
+        <p style={{ fontSize: 13, lineHeight: 1.65, color: WARM, marginBottom: 20 }}>
+          Prefer to do this by phone or in a meeting? Call our office at <strong style={{ color: OFFWHITE }}>773-318-9608</strong> or send us an email at <strong style={{ color: OFFWHITE }}>support@integratedplanningpartners.com</strong> and we'll go through it with you.
+        </p>
+
+        {hasSaved && (
+          <button onClick={onResume} style={{ display: "block", width: "100%", marginBottom: 12, padding: 15, borderRadius: 11, background: "rgba(255,255,255,.05)", border: `1px solid ${BORDER}`, color: OFFWHITE, fontSize: 14, fontWeight: 600 }}>Resume where you left off</button>
+        )}
+        <button onClick={onStart} style={{ display: "block", width: "100%", padding: 16, borderRadius: 11, background: GOLD, color: NAVY, fontSize: 15, fontWeight: 700, letterSpacing: ".03em" }}>{hasSaved ? "Start over" : "Begin →"}</button>
+        {hasSaved && (
+          <button onClick={onClear} style={{ display: "block", margin: "16px auto 0", color: GRAY, fontSize: 12, textDecoration: "underline" }}>Not your own device? Clear saved answers</button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function maskSensitive(q, text) {
+  if (!text || text === "—") return text;
+  const isSsn = /ssn/.test(q.id), isDl = /dl_number$/.test(q.id);
+  if (!isSsn && !isDl) return text;
+  const last4 = String(text).replace(/[^0-9A-Za-z]/g, "").slice(-4);
+  return (isSsn ? "•••-••-" : "••••") + last4;
+}
+
+function SummaryScreen({ answers, screens, onStartOver }) {
+  useEffect(() => { try { window.scrollTo(0, 0); } catch (e) {} }, []);
+  const [copied, setCopied] = useState(false);
+  const shown = q => maskSensitive(q, fmtAnswer(q, answers[q.id], answers));
+  const answeredScreens = screens.map(s => ({ title: s.title, qs: s.questions.filter(q => hasAnswer(q, answers[q.id])) })).filter(s => s.qs.length);
+  const skippedGroups = screens.map(s => ({ title: s.title, section: SECTION_LABELS[s.questions[0].phase] || "", qs: s.questions.filter(q => !hasAnswer(q, answers[q.id])) })).filter(g => g.qs.length);
+  const skipped = skippedGroups.flatMap(g => g.qs);
+
+  const buildText = () => {
+    let out = `APPLICATION INTAKE SUMMARY\nIntegrated Planning Partners\nSubmitted ${new Date().toLocaleString()}\nSocial Security and license numbers show only their last four characters.\n`;
+    answeredScreens.forEach(s => {
+      out += `\n\n${s.title.toUpperCase()}\n${"-".repeat(s.title.length)}\n`;
+      s.qs.forEach(q => { out += `${labelFor(q)}: ${shown(q)}\n`; });
+    });
+    if (skipped.length) {
+      out += "\n\nNOT ANSWERED — TO FOLLOW UP\n---------------------------\n";
+      skippedGroups.forEach(g => {
+        out += `\n${g.title} (Section: ${g.section})\n`;
+        g.qs.forEach(q => { out += `  - ${labelFor(q)}\n`; });
+      });
+    }
+    return out;
+  };
+  const copySummary = () => {
+    navigator.clipboard.writeText(buildText()).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2200); });
+  };
+  const downloadSummary = () => {
+    const blob = new Blob([buildText()], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const name = (answers.first_name || "client") + "_" + (answers.last_name || "intake");
+    a.href = url; a.download = name.replace(/\s+/g, "_") + "_application_intake.txt";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  };
+  const btn = { padding: "12px 18px", borderRadius: 10, background: "rgba(255,255,255,.06)", border: `1px solid ${BORDER}`, color: OFFWHITE, fontSize: 13, fontWeight: 600 };
+
+  return (
+    <div style={{ minHeight: "100dvh", background: NAVY, padding: "28px 20px 60px" }}>
+      <div style={{ maxWidth: 720, margin: "0 auto" }}>
+        <div dangerouslySetInnerHTML={{ __html: LOGO_SVG }} style={{ marginBottom: 18 }} />
+        <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 30, fontWeight: 300, color: OFFWHITE, marginBottom: 6 }}>Thank you — your information has been submitted.</h1>
+        {PREVIEW && <p style={{ fontSize: 13, color: GOLD2, marginBottom: 10 }}>Preview mode: nothing was saved or sent.</p>}
+        <p style={{ fontSize: 13.5, color: WARM, lineHeight: 1.65, marginBottom: 14 }}>A copy of your answers is below for your records. Your advisor will follow up to confirm details and go over next steps.</p>
+        {skipped.length > 0 && (
+          <p style={{ fontSize: 13, color: GOLD2, lineHeight: 1.6, marginBottom: 14 }}>{skipped.length} question{skipped.length === 1 ? " was" : "s were"} left unanswered. No problem. We’ll follow up to gather what’s missing.</p>
+        )}
+
+        <div className="no-print" style={{ display: "flex", gap: 10, margin: "18px 0 28px", flexWrap: "wrap" }}>
+          <button onClick={() => window.print()} style={{ ...btn, background: GOLD, color: NAVY, border: "none", fontWeight: 700 }}>Print / Save as PDF</button>
+          <button onClick={downloadSummary} style={btn}>Download as text file</button>
+          <button onClick={copySummary} style={btn}>{copied ? "Copied ✓" : "Copy"}</button>
+        </div>
+        <p className="no-print" style={{ fontSize: 11.5, color: GRAY, margin: "-14px 0 24px", lineHeight: 1.5 }}>For your protection, Social Security and license numbers appear here with only the last four characters.</p>
+
+        {answeredScreens.map(s => (
+          <div key={s.title} style={{ marginBottom: 20 }}>
+            <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 18, fontWeight: 600, color: OFFWHITE, marginBottom: 8, borderBottom: `1px solid ${BORDER}`, paddingBottom: 6 }}>{s.title}</h2>
+            {s.qs.map(q => (
+              <div key={q.id} style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 12, padding: "6px 0", borderBottom: "1px solid rgba(255,255,255,.05)" }}>
+                <span style={{ fontSize: 12, color: GRAY, lineHeight: 1.5 }}>{labelFor(q)}</span>
+                <span style={{ fontSize: 12.5, color: OFFWHITE, fontWeight: 500, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{shown(q)}</span>
+              </div>
+            ))}
+          </div>
+        ))}
+        {skipped.length > 0 && (
+          <div style={{ marginBottom: 22 }}>
+            <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 18, fontWeight: 600, color: OFFWHITE, marginBottom: 10, borderBottom: `1px solid ${BORDER}`, paddingBottom: 6 }}>Not answered, to follow up ({skipped.length})</h2>
+            {skippedGroups.map(g => (
+              <div key={g.title} style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: OFFWHITE, lineHeight: 1.4 }}>{g.title}</div>
+                <div style={{ fontSize: 11.5, color: GOLD, marginBottom: 4 }}>Section: {g.section}</div>
+                {g.qs.map(q => (
+                  <div key={q.id} style={{ fontSize: 12.5, color: GRAY, lineHeight: 1.5, padding: "3px 0 3px 12px", borderLeft: "2px solid rgba(255,255,255,.1)" }}>{labelFor(q)}</div>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+        <p style={{ fontSize: 10, color: "#33506A", marginTop: 20, lineHeight: 1.6 }}>This summary is a planning aid to help prepare your formal application. It is not itself an insurance or annuity application, and no coverage takes effect until a completed carrier application is signed and accepted.</p>
+        {PREVIEW && <button className="no-print" onClick={onStartOver} style={{ display: "block", margin: "26px auto 0", color: GRAY, fontSize: 12, textDecoration: "underline" }}>Start a new response</button>}
+      </div>
+    </div>
+  );
+}
+
+// Interim device save: answers are kept on this device only, expire after 12 hours,
+// and are erased when the interview is finished. (The live version will save to the
+// server instead, so nothing sensitive has to sit on a client's computer.)
+const SAVE_KEY = "ipp_application_intake_v3_" + (LINK_TOKEN ? LINK_TOKEN.slice(0, 10) : "preview");
+const SAVE_TTL_MS = 12 * 60 * 60 * 1000;
+
+function readSaved() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return null;
+    const saved = JSON.parse(raw);
+    if (!saved || !saved.savedAt || Date.now() - saved.savedAt > SAVE_TTL_MS) { localStorage.removeItem(SAVE_KEY); return null; }
+    return saved;
+  } catch (e) { return null; }
+}
+function clearSaved() { try { localStorage.removeItem(SAVE_KEY); } catch (e) {} }
+
+function Pill({ label, selected, onClick }) {
+  return (
+    <button type="button" onClick={onClick} style={{
+      padding: "9px 16px", borderRadius: 999, fontSize: 14, fontWeight: 500, lineHeight: 1.3, textAlign: "left",
+      border: `1px solid ${selected ? GOLD : BORDER}`, background: selected ? "rgba(200,169,110,.16)" : "rgba(255,255,255,.04)",
+      color: selected ? GOLD2 : OFFWHITE,
+    }}>{label}</button>
+  );
+}
+
+function CheckItem({ label, selected, onClick }) {
+  return (
+    <button type="button" onClick={onClick} style={{
+      display: "flex", alignItems: "flex-start", gap: 10, width: "100%", textAlign: "left", padding: "10px 12px", marginBottom: 6,
+      borderRadius: 10, fontSize: 14, lineHeight: 1.35,
+      border: `1px solid ${selected ? GOLD : BORDER}`, background: selected ? "rgba(200,169,110,.14)" : "rgba(255,255,255,.03)",
+      color: selected ? GOLD2 : OFFWHITE,
+    }}>
+      <span style={{ width: 16, height: 16, flexShrink: 0, marginTop: 2, borderRadius: 4, border: `1.5px solid ${selected ? GOLD : "#5B7084"}`, background: selected ? GOLD : "transparent", color: NAVY, fontSize: 11, lineHeight: "13px", textAlign: "center", fontWeight: 700 }}>{selected ? "✓" : ""}</span>
+      <span>{label}</span>
+    </button>
+  );
+}
+
+function FieldRow({ q, value, other, onChange, onOther }) {
+  const [open, setOpen] = useState(false);
+  const label = labelFor(q);
+  const isYN = q.type === "single" && q.options.length === 2 && q.options[0].id === "yes" && q.options[1].id === "no";
+  const inputStyle = { width: "100%", padding: "12px 14px", background: "rgba(255,255,255,.05)", border: `1px solid ${BORDER}`, borderRadius: 10, color: OFFWHITE, fontSize: 15, outline: "none" };
+  const infoBtn = (
+    <button type="button" onClick={() => setOpen(o => !o)} aria-label="Why we ask" style={{ marginLeft: 8, width: 18, height: 18, borderRadius: "50%", border: "1px solid #4A6070", color: GRAY, fontSize: 10, verticalAlign: "middle", lineHeight: "16px", padding: 0 }}>?</button>
+  );
+  const infoPanel = open && (
+    <div style={{ margin: "6px 0 10px", padding: "10px 12px", borderRadius: 9, background: "rgba(255,255,255,.04)", fontSize: 12.5, lineHeight: 1.55, color: GRAY }}>
+      {q.q !== label && <div style={{ marginBottom: q.why ? 6 : 0 }}><span style={{ color: WARM }}>Full question: </span>{q.q}</div>}
+      {q.why && <div><span style={{ color: WARM }}>Why we ask: </span>{q.why}</div>}
+    </div>
+  );
+
+  if (isYN) {
+    return (
+      <div style={{ borderBottom: "1px solid rgba(255,255,255,.07)", padding: "10px 0" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ flex: 1, fontSize: 14.5, lineHeight: 1.4, color: OFFWHITE }}>{label}{infoBtn}</div>
+          <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+            {q.options.map(o => <Pill key={o.id} label={o.label} selected={value === o.id} onClick={() => onChange(o.id)} />)}
+          </div>
+        </div>
+        {infoPanel}
+      </div>
+    );
+  }
+
+  let control = null, showOther = false;
+  const sel = (q.options || []).find(o => o.id === value);
+  if (q.type === "single") {
+    control = <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{q.options.map(o => <Pill key={o.id} label={o.label} selected={value === o.id} onClick={() => onChange(o.id)} />)}</div>;
+    showOther = !!(sel && sel.other);
+  } else if (q.type === "select") {
+    control = (
+      <select value={value || ""} onChange={e => onChange(e.target.value)} style={SELECT_STYLE}>
+        <option value="" disabled>Select…</option>
+        {q.options.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+      </select>
+    );
+    showOther = !!(sel && sel.other);
+  } else if (q.type === "multi") {
+    const cur = Array.isArray(value) ? value : [];
+    const toggle = id => {
+      let next;
+      if (id === "none") next = cur.includes("none") ? [] : ["none"];
+      else next = cur.includes(id) ? cur.filter(x => x !== id) : [...cur.filter(x => x !== "none"), id];
+      onChange(next);
+    };
+    control = <div>{q.options.map(o => <CheckItem key={o.id} label={o.label} selected={cur.includes(o.id)} onClick={() => toggle(o.id)} />)}</div>;
+    showOther = q.options.some(o => o.other && cur.includes(o.id));
+  } else if (q.type === "text" || q.type === "email") {
+    control = <input type={q.type === "email" ? "email" : "text"} value={value || ""} placeholder={q.placeholder || ""} onChange={e => onChange(e.target.value)} style={inputStyle} />;
+  } else if (q.type === "number") {
+    control = <input type="number" inputMode="numeric" value={value === undefined ? "" : value} placeholder={q.placeholder || ""} onChange={e => onChange(e.target.value)} style={inputStyle} />;
+  } else if (q.type === "currency") {
+    control = <CurrencyField value={value} onChange={onChange} placeholder={q.placeholder} onEnter={() => {}} inputRef={null} baseInputStyle={inputStyle} />;
+  } else if (q.type === "date") {
+    control = <input type="date" value={value || ""} onChange={e => onChange(e.target.value)} style={{ ...inputStyle, colorScheme: "dark" }} />;
+  } else if (q.type === "textarea") {
+    control = <textarea value={value || ""} placeholder={q.placeholder || ""} rows={3} onChange={e => onChange(e.target.value)} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }} />;
+  } else if (q.type === "heightweight") {
+    control = <HeightWeightField value={value} onChange={onChange} />;
+  }
+
+  return (
+    <div style={{ marginBottom: 20, paddingTop: 4 }}>
+      <div style={{ fontSize: 13.5, fontWeight: 600, color: WARM, marginBottom: 8, lineHeight: 1.4 }}>{label}{infoBtn}</div>
+      {infoPanel}
+      {control}
+      {showOther && (
+        <input type="text" value={other || ""} placeholder="Please tell us more" onChange={e => onOther(e.target.value)} style={{ ...inputStyle, marginTop: 8 }} />
+      )}
+    </div>
+  );
+}
+
+function ScreenView({ screen, answers, onAnswer, onOther, onNext, onBack, stepNum, totalSteps, editing }) {
+  useEffect(() => { try { window.scrollTo(0, 0); } catch (e) {} }, [screen.id]);
+  const qs = screen.questions;
+  const pct = totalSteps > 0 ? Math.round((stepNum / totalSteps) * 100) : 0;
+  const ok = qs.every(q => canContinue(q, answers[q.id]));
+  const answered = qs.some(q => hasAnswer(q, answers[q.id]));
+  const isLast = stepNum === totalSteps;
+  const renderRow = q => (
+    <FieldRow key={q.id} q={q} value={answers[q.id]} other={answers[q.id + "__other"]}
+      onChange={val => onAnswer(q.id, val)} onOther={text => onOther(q.id, text)} />
+  );
+  return (
+    <div style={{ display: "flex", flexDirection: "column", minHeight: "100dvh", background: NAVY, position: "relative" }}>
+      <div style={{ position: "absolute", top: -100, right: -100, width: 380, height: 380, borderRadius: "50%", background: "radial-gradient(circle,rgba(200,169,110,.06) 0%,transparent 70%)", pointerEvents: "none" }} />
+      <div style={{ padding: "18px 20px 0", flexShrink: 0, maxWidth: 640, margin: "0 auto", width: "100%" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            <div dangerouslySetInnerHTML={{ __html: LOGO_SVG }} />
+            <div style={{ fontSize: 9, color: GOLD, letterSpacing: ".1em", textTransform: "uppercase" }}>{editing ? "Editing your answer" : (SECTION_LABELS[qs[0].phase] || "Application Intake")}</div>
+          </div>
+          {!editing && <span style={{ fontSize: 10, color: GRAY }}>{pct}%</span>}
+        </div>
+        {!editing && (
+          <div style={{ height: 3, background: "rgba(255,255,255,.07)", borderRadius: 2, marginBottom: 6 }}>
+            <div style={{ height: "100%", width: pct + "%", background: `linear-gradient(90deg,${GOLD},${GOLD2})`, borderRadius: 2, transition: "width .35s ease" }} />
+          </div>
+        )}
+      </div>
+
+      <div style={{ flex: 1, padding: "22px 20px 0", maxWidth: 640, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
+        <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 26, fontWeight: 400, lineHeight: 1.3, color: OFFWHITE, marginBottom: 18 }}>{screen.title}</h2>
+        {screen.rows.map(row => row.length > 1 ? (
+          <div key={row.map(q => q.id).join("|")} style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {row.map(q => <div key={q.id} style={{ flex: "1 1 96px", minWidth: 0 }}>{renderRow(q)}</div>)}
+          </div>
+        ) : renderRow(row[0]))}
+        {!ok && <p style={{ fontSize: 12, color: GRAY, marginTop: 4 }}>Please enter a valid email address, or clear the field to skip.</p>}
+      </div>
+
+      <div style={{ padding: "18px 20px 30px", flexShrink: 0, maxWidth: 640, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
+        <div style={{ display: "flex", gap: 10 }}>
+          {stepNum > 1 && !editing && (
+            <button onClick={onBack} style={{ padding: "15px 20px", borderRadius: 11, fontSize: 14, fontWeight: 600, background: "rgba(255,255,255,.05)", border: `1px solid ${BORDER}`, color: GRAY, flexShrink: 0 }}>← Back</button>
+          )}
+          <button onClick={onNext} disabled={!ok} style={{
+            flex: 1, padding: 15, borderRadius: 11, fontSize: 14, fontWeight: 700, letterSpacing: ".03em",
+            background: !ok ? "rgba(255,255,255,.06)" : (editing || answered || isLast) ? GOLD : "rgba(255,255,255,.05)",
+            color: !ok ? "#3A5268" : (editing || answered || isLast) ? NAVY : GOLD2,
+            border: ok && !editing && !answered && !isLast ? "1px solid rgba(200,169,110,.35)" : "none",
+          }}>{editing ? "Back to review →" : isLast ? "Review your answers →" : answered ? "Continue →" : "Skip for now →"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReviewScreen({ screens, answers, onEdit, onSubmit, busy, error }) {
+  useEffect(() => { try { window.scrollTo(0, 0); } catch (e) {} }, []);
+  const all = screens.flatMap(s => s.questions);
+  const missing = all.filter(q => !hasAnswer(q, answers[q.id])).length;
+  return (
+    <div style={{ minHeight: "100dvh", background: NAVY, display: "flex", flexDirection: "column" }}>
+      <div style={{ flex: 1, padding: "26px 20px 24px", maxWidth: 720, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
+        <div dangerouslySetInnerHTML={{ __html: LOGO_SVG }} style={{ marginBottom: 18 }} />
+        <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 32, fontWeight: 300, color: OFFWHITE, marginBottom: 8 }}>Review your answers</h1>
+        <p style={{ fontSize: 14, color: WARM, lineHeight: 1.65, marginBottom: 8 }}>Look everything over. Tap <strong style={{ color: OFFWHITE }}>Edit</strong> next to anything you’d like to change. When it all looks right, submit it at the bottom of the page.</p>
+        {missing > 0 && (
+          <p style={{ fontSize: 13, color: GOLD2, lineHeight: 1.6, marginBottom: 6 }}>{missing} question{missing === 1 ? " is" : "s are"} not answered yet. You can answer {missing === 1 ? "it" : "them"} now, or leave {missing === 1 ? "it" : "them"} and we’ll follow up.</p>
+        )}
+        <div style={{ marginTop: 22 }}>
+          {screens.map(screen => (
+            <div key={screen.id} style={{ marginBottom: 24 }}>
+              <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 20, fontWeight: 600, color: OFFWHITE, marginBottom: 6, borderBottom: `1px solid ${BORDER}`, paddingBottom: 6 }}>{screen.title}</h2>
+              {screen.questions.map(q => {
+                const has = hasAnswer(q, answers[q.id]);
+                return (
+                  <div key={q.id} style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "9px 0", borderBottom: "1px solid rgba(255,255,255,.06)" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, color: GRAY, lineHeight: 1.4 }}>{labelFor(q)}</div>
+                      <div style={{ fontSize: 14, color: has ? OFFWHITE : GRAY, fontStyle: has ? "normal" : "italic", lineHeight: 1.45, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{has ? fmtAnswer(q, answers[q.id], answers) : "Not answered"}</div>
+                    </div>
+                    <button onClick={() => onEdit(q.id)} aria-label={(has ? "Edit " : "Answer ") + labelFor(q)} style={{ flexShrink: 0, padding: "7px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, background: has ? "rgba(255,255,255,.05)" : "rgba(200,169,110,.14)", border: `1px solid ${has ? BORDER : GOLD}`, color: has ? OFFWHITE : GOLD2 }}>{has ? "Edit" : "Answer"}</button>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={{ position: "sticky", bottom: 0, background: NAVY, borderTop: `1px solid ${BORDER}`, padding: "14px 20px calc(14px + env(safe-area-inset-bottom, 0px))" }}>
+        <div style={{ maxWidth: 720, margin: "0 auto" }}>
+          {error && <p role="alert" style={{ fontSize: 13, color: "#E8A0A0", lineHeight: 1.5, marginBottom: 10 }}>{error}</p>}
+          <button onClick={onSubmit} disabled={busy} style={{ display: "block", width: "100%", padding: 16, borderRadius: 11, background: busy ? "rgba(200,169,110,.5)" : GOLD, color: NAVY, fontSize: 15, fontWeight: 700, letterSpacing: ".03em" }}>{busy ? "Submitting…" : error ? "Try again →" : "Submit →"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatusScreen({ title, children, action }) {
+  return (
+    <div style={{ minHeight: "100dvh", background: NAVY, display: "flex", flexDirection: "column", justifyContent: "center", padding: "40px 24px" }}>
+      <div style={{ maxWidth: 460, margin: "0 auto", width: "100%" }}>
+        <div dangerouslySetInnerHTML={{ __html: LOGO_SVG }} style={{ marginBottom: 22 }} />
+        <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 32, fontWeight: 300, lineHeight: 1.2, color: OFFWHITE, marginBottom: 14 }}>{title}</h1>
+        <div style={{ fontSize: 14.5, lineHeight: 1.7, color: WARM, fontWeight: 300 }}>{children}</div>
+        {action}
+      </div>
+    </div>
+  );
+}
+const ContactLine = () => (
+  <p style={{ marginTop: 16, fontSize: 13.5, color: WARM }}>Call our office at <strong style={{ color: OFFWHITE }}>773-318-9608</strong> or send us an email at <strong style={{ color: OFFWHITE }}>support@integratedplanningpartners.com</strong>.</p>
+);
+
+function App() {
+  const [view, setView] = useState("welcome"); // welcome, flow, review, thanks
+  const [answers, setAnswers] = useState({});
+  const [step, setStep] = useState(0);
+  const [editing, setEditing] = useState(false);
+  const [hasSaved, setHasSaved] = useState(false);
+  const [invite, setInvite] = useState({ state: PREVIEW ? "ok" : LINK_TOKEN ? "loading" : "error", error: LINK_TOKEN ? "" : "no_link", info: {} });
+  const [busy, setBusy] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+
+  const loadInvite = async () => {
+    setInvite({ state: "loading", error: "", info: {} });
+    const res = await callIntake({ action: "get_invite" });
+    if (res.ok) setInvite({ state: "ok", error: "", info: res });
+    else setInvite({ state: "error", error: res.error, info: {} });
+  };
+
+  useEffect(() => {
+    const s = document.createElement("style"); s.textContent = GS; document.head.appendChild(s);
+    try { localStorage.removeItem("ipp_application_intake_v1"); localStorage.removeItem("ipp_application_intake_v2"); } catch (e) {}
+    setHasSaved(!!readSaved());
+    if (!PREVIEW && LINK_TOKEN) loadInvite();
+    return () => document.head.removeChild(s);
+  }, []);
+
+  useEffect(() => {
+    if (view === "flow" || view === "review") {
+      try { localStorage.setItem(SAVE_KEY, JSON.stringify({ answers, step, savedAt: Date.now() })); } catch (e) {}
+    }
+  }, [answers, step, view]);
+
+  const screens = buildScreens(answers);
+  const idx = Math.min(step, Math.max(screens.length - 1, 0));
+  const current = screens[idx];
+
+  const start = () => { clearSaved(); setAnswers({}); setStep(0); setEditing(false); setView("flow"); };
+  const resume = () => {
+    const saved = readSaved();
+    if (!saved) { start(); return; }
+    setAnswers(saved.answers || {});
+    setStep(saved.step || 0);
+    setEditing(false);
+    setView("flow");
+  };
+  const discardSaved = () => { clearSaved(); setHasSaved(false); };
+
+  const setAnswer = (qid, val) => setAnswers(prev => ({ ...prev, [qid]: val }));
+  const setOther = (qid, text) => setAnswers(prev => ({ ...prev, [qid + "__other"]: text }));
+  const next = () => {
+    if (editing) { setEditing(false); setView("review"); return; }
+    if (idx >= screens.length - 1) { setView("review"); return; }
+    setStep(idx + 1);
+  };
+  const back = () => {
+    if (editing) { setEditing(false); setView("review"); return; }
+    if (idx > 0) setStep(idx - 1);
+  };
+  const editQuestion = qid => {
+    const i = screens.findIndex(s => s.questions.some(q => q.id === qid));
+    if (i >= 0) { setStep(i); setEditing(true); setView("flow"); }
+  };
+  const submit = async () => {
+    if (busy) return;
+    setBusy(true); setSubmitError("");
+    if (!PREVIEW) {
+      const all = screens.flatMap(s => s.questions);
+      const res = await callIntake({
+        action: "submit", answers,
+        summary: buildAdvisorSummary(screens, answers),
+        meta: { form: INTAKE_FORM, version: 3, question_count: all.length, skipped_count: all.filter(q => !hasAnswer(q, answers[q.id])).length },
+      });
+      if (!res.ok && res.error !== "already_submitted") {
+        setBusy(false);
+        setSubmitError(res.error === "offline"
+          ? "We couldn’t reach our server. Check your connection and tap Try again. Your answers are saved on this device."
+          : res.error === "expired" || res.error === "invalid_link"
+            ? "This link is no longer active. Please contact our office and we’ll send a new one."
+            : "Something went wrong sending your answers. Please tap Try again, or contact our office if it keeps happening.");
+        return;
+      }
+      if (res.ok) notifyTeam(answers, res.submission_id);
+    }
+    clearSaved();
+    setBusy(false);
+    setView("thanks");
+  };
+
+  if (invite.state === "loading") return <StatusScreen title="One moment…"><p>Opening your secure form.</p></StatusScreen>;
+  if (invite.state === "error") {
+    const e = invite.error;
+    if (e === "already_submitted") return <StatusScreen title="This form was already submitted."><p>Thank you. We have your answers. If you need to change something, please reach out.</p><ContactLine /></StatusScreen>;
+    if (e === "expired") return <StatusScreen title="This link has expired."><p>For your security, links stop working after a while. We’ll gladly send you a new one.</p><ContactLine /></StatusScreen>;
+    if (e === "offline" || e === "failed") return <StatusScreen title="We couldn’t reach our server." action={<button onClick={loadInvite} style={{ marginTop: 18, padding: "13px 22px", borderRadius: 10, background: GOLD, color: NAVY, fontSize: 14, fontWeight: 700 }}>Try again</button>}><p>Check your internet connection and try again.</p><ContactLine /></StatusScreen>;
+    return <StatusScreen title="This link isn’t working."><p>This page needs the personal link your advisor sent you. The link may be incomplete, replaced, or turned off.</p><ContactLine /></StatusScreen>;
+  }
+
+  if (view === "welcome") return <WelcomeScreen onStart={start} hasSaved={hasSaved} onResume={resume} onClear={discardSaved} />;
+  if (view === "review") return <ReviewScreen screens={screens} answers={answers} onEdit={editQuestion} onSubmit={submit} busy={busy} error={submitError} />;
+  if (view === "thanks") return <SummaryScreen answers={answers} screens={screens} onStartOver={start} />;
+  if (view === "flow" && current) {
+    return <ScreenView screen={current} answers={answers} onAnswer={setAnswer} onOther={setOther} onNext={next} onBack={back} stepNum={idx + 1} totalSteps={screens.length || 1} editing={editing} />;
+  }
+  return null;
+}
+
+ReactDOM.render(<App />, document.getElementById("root"));
+
+</script>
+</body>
+</html>
