@@ -68,7 +68,7 @@ select.st{background:var(--navy);color:var(--text);border:1px solid var(--gold-l
     var s = session();
     if (!s || !s.access_token || (s.expires_at && Date.now() / 1000 > s.expires_at - 30)) return Promise.resolve({ ok: false, error: 'signed_out' });
     return fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: K, Authorization: 'Bearer ' + s.access_token }, body: JSON.stringify(body) })
-      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return r.ok && d.ok ? d : { ok: false, error: d.error || (r.status === 401 ? 'signed_out' : 'failed') }; }); })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return r.ok && d.ok ? d : { ok: false, error: d.error || (r.status === 401 ? 'signed_out' : 'failed'), detail: d.detail }; }); })
       .catch(function () { return { ok: false, error: 'offline' }; });
   }
   function state(title, msg, link) {
@@ -85,7 +85,14 @@ select.st{background:var(--navy);color:var(--text);border:1px solid var(--gold-l
     offline: ['Could not reach the server', 'Check your connection and reload this page.', null],
     failed: ['Something went wrong', 'Please reload and try again.', null]
   };
-  function fail(code) { var m = MSG[code] || MSG.failed; state(m[0], m[1], m[2]); }
+  function fail(r) {
+    var m = MSG[r.error] || MSG.failed, extra = '';
+    if (r.error === 'not_configured') {
+      var d = String(r.detail || ''), len = d.match(/^length_(\d+)$/);
+      extra = d === 'missing' ? ' The secret named INTAKE_ENCRYPTION_KEY was not found.' : d === 'not_base64' ? ' The key has characters it cannot use, such as quotation marks.' : len ? ' The key decodes to ' + len[1] + ' bytes but must be 32.' : '';
+    }
+    state(m[0], m[1] + extra, m[2]);
+  }
 
   var FORM = { life: 'Application Intake', annuity: 'Annuity Supplement' };
   function when(d) { return d ? new Date(d).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : ''; }
@@ -140,7 +147,7 @@ select.st{background:var(--navy);color:var(--text);border:1px solid var(--gold-l
   }
 
   if (!id) { state('No record selected', 'Open this page from a client’s Application Intake panel in the advisor portal.', { text: 'Go to the advisor portal', href: 'advisor-portal.html' }); return; }
-  call({ action: 'view', submission_id: id }).then(function (r) { if (!r.ok) fail(r.error); else show(r); });
+  call({ action: 'view', submission_id: id }).then(function (r) { if (!r.ok) fail(r); else show(r); });
 })();
 </script>
 </body>
