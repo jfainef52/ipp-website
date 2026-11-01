@@ -153,7 +153,7 @@
     function showNew(link, kind) {
       var box = document.getElementById('ip-new'); if (!box) return;
       var hi = firstName ? 'Hi ' + firstName + ', ' : 'Hi, ';
-      var msg = hi + 'here is your secure link for the ' + kind.intro + ': ' + link + ' Questions? Call our office at 773-318-9608.';
+      var msg = hi + 'here is your secure link for the ' + kind.intro + ': ' + link + ' Questions? Call our office at 773-318-9608 or send us an email at support@integratedplanningpartners.com.';
       box.innerHTML = '<div class="ip-item" style="border-color:var(--gold,#C8A96E)"><div class="ip-main"><div class="ip-sub" style="margin-bottom:6px">New link ready. Paste it into an email or text message.</div>' +
         '<div class="ip-row" style="margin:0"><input class="ip-link" readonly value="' + esc(link) + '" onclick="this.select()">' +
         '<button class="ip-btn" data-copylink="' + esc(link) + '">Copy link</button>' +
