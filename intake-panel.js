@@ -110,7 +110,7 @@
         var sub = subs[i.id], live = st === 'sent' || st === 'opened';
         html += '<div class="ip-item"><div class="ip-main"><strong>' + (i.form === 'annuity' ? 'Annuity Supplement' : 'Application Intake') + '</strong>' +
           '<span class="ip-chip" style="color:' + COLORS[st] + '">' + STATUS[st] + '</span>' +
-          '<div class="ip-sub">Created ' + fmt(i.created_at) + (i.submitted_at ? ' · Submitted ' + fmt(i.submitted_at) : i.opened_at ? ' · Opened ' + fmt(i.opened_at) : '') + (live ? ' · Expires ' + fmt(i.expires_at) : '') + '</div></div>' +
+          '<div class="ip-sub">Created ' + fmt(i.created_at) + (i.submitted_at ? ' · Submitted ' + fmt(i.submitted_at) : i.opened_at ? ' · Opened ' + fmt(i.opened_at) : '') + (live ? ' · Expires ' + fmt(i.expires_at) : '') + '</div>' + (sub ? '<div class="ip-sub">' + (sub.last_viewed_at ? 'Last viewed ' + fmt(sub.last_viewed_at) + ' by ' + esc(sub.last_viewed_by || 'Unknown') : 'Not viewed yet') + '</div>' : '') + '</div>' +
           (live ? '<button class="ip-btn ghost" data-copy="' + i.id + '">Copy link</button><button class="ip-btn ghost" data-revoke="' + i.id + '">Revoke</button>' : '') +
           (sub ? '<a class="ip-btn" target="_blank" rel="noopener" href="' + VIEW + '?s=' + encodeURIComponent(sub.id) + '">View answers</a>' : '') + '</div>';
       });
