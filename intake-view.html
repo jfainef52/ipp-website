@@ -106,6 +106,16 @@ select.st{background:var(--navy);color:var(--text);border:1px solid var(--gold-l
     return out.join('\n');
   }
 
+  var ACT = { view: 'viewed the answers', print: 'printed or saved as PDF', copy: 'copied the answers as text', download: 'downloaded the data' };
+  function drawHistory(box, list) {
+    box.textContent = '';
+    box.appendChild(el('h2', '', 'Access history'));
+    if (!list.length) { box.appendChild(el('div', 'row')).appendChild(el('div', 'k', 'No activity recorded.')); return; }
+    list.slice(0, 25).forEach(function (h) {
+      var row = el('div', 'row'); row.appendChild(el('div', 'k', when(h.at))); row.appendChild(el('div', 'v', h.by + ' ' + (ACT[h.action] || h.action))); box.appendChild(row);
+    });
+  }
+
   function download(name, text, type) {
     var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: type })); a.download = name;
     document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(function () { URL.revokeObjectURL(a.href); }, 500);
@@ -127,9 +137,11 @@ select.st{background:var(--navy);color:var(--text);border:1px solid var(--gold-l
     var saved = el('span', 'saved', '');
     sel.addEventListener('change', function () { saved.textContent = 'Saving…'; call({ action: 'set_status', submission_id: s.id, status: sel.value }).then(function (x) { saved.textContent = x.ok ? 'Saved' : 'Not saved'; setTimeout(function () { saved.textContent = ''; }, 2000); }); });
     act.appendChild(sel); act.appendChild(saved);
-    var b1 = el('button', 'btn', 'Print / Save as PDF'); b1.addEventListener('click', function () { window.print(); });
-    var b2 = el('button', 'btn', 'Copy as text'); b2.addEventListener('click', function () { var t = textVersion(r); (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { b2.textContent = 'Copied ✓'; setTimeout(function () { b2.textContent = 'Copy as text'; }, 1800); }, function () { b2.textContent = 'Copy blocked'; }); });
-    var b3 = el('button', 'btn', 'Download data (JSON)'); b3.addEventListener('click', function () { download((name || 'client').replace(/\s+/g, '_') + '_' + (s.form || 'intake') + '.json', JSON.stringify({ submission: s, answers: d.answers, meta: d.meta }, null, 2), 'application/json'); });
+    var history = (r.history || []).slice(), histBox = el('div', 'sec no-print');
+    function logEvent(ev) { call({ action: 'log_event', submission_id: s.id, event: ev }).then(function (x) { if (x.ok) { history.unshift({ action: ev, at: new Date().toISOString(), by: 'You' }); drawHistory(histBox, history); } }); }
+    var b1 = el('button', 'btn', 'Print / Save as PDF'); b1.addEventListener('click', function () { logEvent('print'); window.print(); });
+    var b2 = el('button', 'btn', 'Copy as text'); b2.addEventListener('click', function () { var t = textVersion(r); (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { logEvent('copy'); b2.textContent = 'Copied ✓'; setTimeout(function () { b2.textContent = 'Copy as text'; }, 1800); }, function () { b2.textContent = 'Copy blocked'; }); });
+    var b3 = el('button', 'btn', 'Download data (JSON)'); b3.addEventListener('click', function () { logEvent('download'); download((name || 'client').replace(/\s+/g, '_') + '_' + (s.form || 'intake') + '.json', JSON.stringify({ submission: s, answers: d.answers, meta: d.meta }, null, 2), 'application/json'); });
     act.appendChild(b1); act.appendChild(b2); act.appendChild(b3);
     head.appendChild(act); app.appendChild(head);
 
@@ -143,6 +155,7 @@ select.st{background:var(--navy);color:var(--text);border:1px solid var(--gold-l
       sm.skipped.forEach(function (g) { var row = el('div', 'row'); row.appendChild(el('div', 'k', g.title + (g.section ? ' (' + g.section + ')' : ''))); row.appendChild(el('div', 'v', g.labels.join('\n'))); sk.appendChild(row); });
       app.appendChild(sk);
     }
+    drawHistory(histBox, history); app.appendChild(histBox);
     app.appendChild(el('p', 'note no-print', 'Opening this page is recorded. The answers are stored encrypted and are only decrypted for signed-in advisors.'));
   }
 
