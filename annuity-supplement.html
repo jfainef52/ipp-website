@@ -920,12 +920,12 @@ function ReviewScreen({ screens, answers, onEdit, onSubmit, busy, error }) {
 }
 
 // Tells the office the client opened their link (sent only the first time). No details, just a first name.
-function notifyOpened(firstName) {
+function notifyOpened(firstName, role) {
   try {
     if (typeof emailjs === "undefined") return;
     emailjs.init(EMAILJS_PUBLIC_KEY);
     const who = (firstName || "A client").replace(/[<>&]/g, "");
-    const kind = INTAKE_FORM === "annuity" ? "Annuity Supplement" : "Application Intake";
+    const kind = (INTAKE_FORM === "annuity" ? "Annuity Supplement" : "Application Intake") + (role === "spouse" ? " (spouse)" : "");
     let when = "";
     try { when = new Date().toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "America/New_York" }) + " Eastern"; } catch (e) { when = new Date().toISOString(); }
     const html = '<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;background:#0E1824;color:#F5F2EC;border-radius:8px;">'
@@ -969,7 +969,7 @@ function App() {
   const loadInvite = async () => {
     setInvite({ state: "loading", error: "", info: {} });
     const res = await callIntake({ action: "get_invite" });
-    if (res.ok) { setInvite({ state: "ok", error: "", info: res }); if (res.first_open) notifyOpened(res.first_name); }
+    if (res.ok) { setInvite({ state: "ok", error: "", info: res }); if (res.first_open) notifyOpened(res.first_name, res.role); }
     else setInvite({ state: "error", error: res.error, info: {} });
   };
 
