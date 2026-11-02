@@ -73,7 +73,7 @@ function notifyTeam(answers, submissionId) {
     if (typeof emailjs === "undefined") return;
     emailjs.init(EMAILJS_PUBLIC_KEY);
     const name = ((answers.first_name || "") + " " + (answers.last_name || "")).trim() || "A client";
-    const kind = INTAKE_FORM === "annuity" ? "Annuity Supplement" : "Application Intake";
+    const kind = (INTAKE_FORM === "annuity" ? "Annuity Supplement" : "Application Intake") + (answers.__spouse ? " (spouse)" : "");
     const link = SITE + "/intake-view.html?s=" + encodeURIComponent(submissionId || "");
     const html = '<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;background:#0E1824;color:#F5F2EC;border-radius:8px;">'
       + '<p style="margin:0 0 6px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#C8A96E;">New submission</p>'
@@ -209,11 +209,11 @@ function personTemplates(id) {
     { key: "dl_state", phase: "identity", type: "select", options: US_STATES, q: "Which state issued {poss} driver's license?", placeholder: "State" , why: "Tells the carrier which state's driving and identity records to check.", cond: a => a[id("has_drivers_license")] === "yes"},
     { key: "mobile_phone", phase: "identity", type: "text", q: "What is the best mobile number for {obj}?", placeholder: "(555) 555-5555" , why: "The carrier may need to reach {obj} directly to schedule a phone health interview or a medical exam."},
     { key: "email", phase: "identity", type: "email", q: "What is {POSS} email address?", placeholder: "name@email.com" , why: "Used to send required disclosures and illustrations, and — if {p} consent(s) to e-delivery — policy documents."},
-    { key: "address_street", phase: "identity", type: "text", q: "What is {POSS} street address? (no PO boxes)", placeholder: "Street address", why: "Underwriters use address history to run consumer reports and to confirm which state’s rates and forms legally apply." },
-    { key: "address_city", phase: "identity", type: "text", q: "City", placeholder: "City", why: "Underwriters use address history to run consumer reports and to confirm which state’s rates and forms legally apply." },
-    { key: "address_state", phase: "identity", type: "select", options: ADDRESS_STATES, q: "State", why: "Underwriters use address history to run consumer reports and to confirm which state’s rates and forms legally apply." },
-    { key: "address_zip", phase: "identity", type: "text", q: "ZIP code", placeholder: "ZIP or postal code", why: "Underwriters use address history to run consumer reports and to confirm which state’s rates and forms legally apply." },
-    { key: "years_at_address", phase: "identity", type: "number", q: "How long {has} {p} lived at this address? (years)", placeholder: "e.g. 4" , why: "Time at an address helps the carrier confirm identity through public records during underwriting."},
+    { key: "address_street", phase: "identity", cond: a => a.same_address_as_spouse !== "yes", type: "text", q: "What is {POSS} street address? (no PO boxes)", placeholder: "Street address", why: "Underwriters use address history to run consumer reports and to confirm which state’s rates and forms legally apply." },
+    { key: "address_city", phase: "identity", cond: a => a.same_address_as_spouse !== "yes", type: "text", q: "City", placeholder: "City", why: "Underwriters use address history to run consumer reports and to confirm which state’s rates and forms legally apply." },
+    { key: "address_state", phase: "identity", cond: a => a.same_address_as_spouse !== "yes", type: "select", options: ADDRESS_STATES, q: "State", why: "Underwriters use address history to run consumer reports and to confirm which state’s rates and forms legally apply." },
+    { key: "address_zip", phase: "identity", cond: a => a.same_address_as_spouse !== "yes", type: "text", q: "ZIP code", placeholder: "ZIP or postal code", why: "Underwriters use address history to run consumer reports and to confirm which state’s rates and forms legally apply." },
+    { key: "years_at_address", phase: "identity", cond: a => a.same_address_as_spouse !== "yes", type: "number", q: "How long {has} {p} lived at this address? (years)", placeholder: "e.g. 4" , why: "Time at an address helps the carrier confirm identity through public records during underwriting."},
     { key: "name_change", phase: "identity", type: "single", q: "{Has} {p} legally changed {poss} name in the last 5 years — for example, through marriage or a court order?", options: YN , why: "If a background check turns up a different name, the carrier needs the connection explained so it doesn't stall the application."},
     { key: "name_change_details", phase: "identity", type: "text", q: "What was {poss} former name, and what was the reason for the change?", cond: a => a[id("name_change")] === "yes" , why: "This ties {poss} past and current records together so a name mismatch doesn't get flagged during underwriting."},
 
@@ -369,8 +369,10 @@ spouseQs.forEach(q => {
 // HOUSEHOLD / MARITAL
 // ─────────────────────────────────────────────────────────────
 const householdQs = [
-  { id: "marital_status", phase: "household", type: "single", q: "What is your marital or partnership status?",
+  { id: "marital_status", phase: "household", type: "single", condition: a => !a.__spouse, q: "What is your marital or partnership status?",
     options: [{ id: "married", label: "Married or domestic partnership" }, { id: "single", label: "Single" }, { id: "divorced", label: "Divorced" }, { id: "widowed", label: "Widowed" }] , why: "Marital status affects beneficiary defaults, survivor income needs, and whether spousal underwriting or joint ownership applies."},
+  { id: "same_address_as_spouse", phase: "identity", type: "single", q: "Do you live at the same home address as your spouse?", options: YN, condition: a => !!a.__spouse,
+    why: "Saves you from entering the same address twice. We already have your spouse's address." },
   { id: "spouse_existing_insurance", phase: "household", type: "currency",
     q: "If known, roughly how much life insurance is currently in force on your spouse or partner? (Enter 0 if none or unknown)",
     condition: a => a.marital_status === "married" , why: "Existing coverage on a spouse factors into the household's total insurable-need calculation."},
@@ -517,7 +519,7 @@ const PERSON_SCREENS = [
   { id: "birth", title: "{POSS} birth and citizenship", keys: ["dob", "sex", "pob_location", ["pob_city", "pob_state", "pob_country"], "citizenship", "citizenship_country", "visa_type", "years_in_country"] },
   { id: "ids", title: "{POSS} identification", keys: ["ssn", "has_drivers_license", "dl_number", "dl_state"] },
   { id: "contact", title: "{POSS} contact details", keys: ["mobile_phone", "email"] },
-  { id: "home", title: "{POSS} home address", keys: ["address_street", ["address_city", "address_state", "address_zip"], "years_at_address"] },
+  { id: "home", title: "{POSS} home address", keys: ["same_address_as_spouse", "address_street", ["address_city", "address_state", "address_zip"], "years_at_address"] },
   { id: "work", title: "{POSS} work", keys: ["employment_status", "occupation", "employer_name", "years_employed", "industry"] },
   { id: "income", title: "{POSS} income and net worth", keys: ["annual_earned_income", "annual_unearned_income", "net_worth"] },
   { id: "body", title: "{POSS} height, weight, and general health", keys: ["health_status", "height_weight", "weight_change"] },
@@ -560,7 +562,7 @@ const LABELS = {
   dob: "Date of birth", sex: "Sex assigned at birth", pob_location: "Born in the U.S. or outside it?", pob_city: "City of birth", pob_state: "State of birth", pob_country: "Country of birth", citizenship: "Citizenship status",
   citizenship_country: "Country of citizenship", visa_type: "Visa type", years_in_country: "Years in the U.S.",
   ssn: "Social Security number", has_drivers_license: "Valid driver’s license?", dl_number: "License number", dl_state: "Issuing state",
-  mobile_phone: "Mobile phone", email: "Email address", address_street: "Street address (no PO boxes)", address_city: "City", address_state: "State", address_zip: "ZIP code", years_at_address: "Years at this address",
+  mobile_phone: "Mobile phone", email: "Email address", same_address_as_spouse: "Same home address as your spouse?", address_street: "Street address (no PO boxes)", address_city: "City", address_state: "State", address_zip: "ZIP code", years_at_address: "Years at this address",
   employment_status: "Work situation", occupation: "Occupation or job title", employer_name: "Employer or business",
   years_employed: "Years there", industry: "Industry",
   annual_earned_income: "Annual earned income", annual_unearned_income: "Annual unearned income (investments, rental, pension)", net_worth: "Net worth",
@@ -919,7 +921,7 @@ function QuestionScreen({ question, answer, onAnswer, onNext, onBack, stepNum, t
   );
 }
 
-function WelcomeScreen({ onStart, hasSaved, onResume, onClear }) {
+function WelcomeScreen({ onStart, hasSaved, onResume, onClear, spouseMode }) {
   return (
     <div style={{ minHeight: "100dvh", background: NAVY, display: "flex", flexDirection: "column", justifyContent: "center", padding: "40px 24px", position: "relative" }}>
       <div style={{ position: "absolute", top: -120, right: -120, width: 420, height: 420, borderRadius: "50%", background: "radial-gradient(circle,rgba(200,169,110,.07) 0%,transparent 70%)" }} />
@@ -934,6 +936,9 @@ function WelcomeScreen({ onStart, hasSaved, onResume, onClear }) {
           Product design, coverage amounts, and account allocations are handled by your advisor — you won't be asked to make those decisions here. If you're married, you'll have the option to add your spouse's information as well.
         </p>
 
+        {spouseMode && (
+          <p style={{ fontSize: 13.5, lineHeight: 1.65, color: GOLD2, marginBottom: 20 }}>This is your own, separate intake. Your answers are private and are not shown to your spouse.</p>
+        )}
         <div style={{ background: "rgba(200,169,110,.06)", border: "1px solid rgba(200,169,110,.18)", borderRadius: 12, padding: "18px 20px", marginBottom: 26 }}>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: GOLD, marginBottom: 4 }}>Gather these first — it saves time</div>
           <p style={{ fontSize: 12, lineHeight: 1.55, color: GRAY, marginBottom: 14 }}>Having these in front of you before you begin is the difference between a quick session and a lot of stopping to look things up.</p>
@@ -1301,12 +1306,12 @@ function ReviewScreen({ screens, answers, onEdit, onSubmit, busy, error }) {
 }
 
 // Tells the office the client opened their link (sent only the first time). No details, just a first name.
-function notifyOpened(firstName) {
+function notifyOpened(firstName, role) {
   try {
     if (typeof emailjs === "undefined") return;
     emailjs.init(EMAILJS_PUBLIC_KEY);
     const who = (firstName || "A client").replace(/[<>&]/g, "");
-    const kind = INTAKE_FORM === "annuity" ? "Annuity Supplement" : "Application Intake";
+    const kind = (INTAKE_FORM === "annuity" ? "Annuity Supplement" : "Application Intake") + (role === "spouse" ? " (spouse)" : "");
     let when = "";
     try { when = new Date().toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "America/New_York" }) + " Eastern"; } catch (e) { when = new Date().toISOString(); }
     const html = '<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;background:#0E1824;color:#F5F2EC;border-radius:8px;">'
@@ -1350,7 +1355,7 @@ function App() {
   const loadInvite = async () => {
     setInvite({ state: "loading", error: "", info: {} });
     const res = await callIntake({ action: "get_invite" });
-    if (res.ok) { setInvite({ state: "ok", error: "", info: res }); if (res.first_open) notifyOpened(res.first_name); }
+    if (res.ok) { setInvite({ state: "ok", error: "", info: res }); if (res.first_open) notifyOpened(res.first_name, res.role); }
     else setInvite({ state: "error", error: res.error, info: {} });
   };
 
@@ -1372,11 +1377,13 @@ function App() {
   const idx = Math.min(step, Math.max(screens.length - 1, 0));
   const current = screens[idx];
 
-  const start = () => { clearSaved(); setAnswers({}); setStep(0); setEditing(false); setView("flow"); };
+  const spouseMode = PREVIEW ? URL_PARAMS.get("role") === "spouse" : invite.info.role === "spouse";
+  const preset = spouseMode ? { __spouse: true } : {};
+  const start = () => { clearSaved(); setAnswers({ ...preset }); setStep(0); setEditing(false); setView("flow"); };
   const resume = () => {
     const saved = readSaved();
     if (!saved) { start(); return; }
-    setAnswers(saved.answers || {});
+    setAnswers({ ...(saved.answers || {}), ...preset });
     setStep(saved.step || 0);
     setEditing(false);
     setView("flow");
@@ -1406,7 +1413,7 @@ function App() {
       const res = await callIntake({
         action: "submit", answers,
         summary: buildAdvisorSummary(screens, answers),
-        meta: { form: INTAKE_FORM, version: 3, question_count: all.length, skipped_count: all.filter(q => !hasAnswer(q, answers[q.id])).length },
+        meta: { form: INTAKE_FORM, role: spouseMode ? "spouse" : "primary", version: 3, question_count: all.length, skipped_count: all.filter(q => !hasAnswer(q, answers[q.id])).length },
       });
       if (!res.ok && res.error !== "already_submitted") {
         setBusy(false);
@@ -1433,7 +1440,7 @@ function App() {
     return <StatusScreen title="This link isn’t working."><p>This page needs the personal link your advisor sent you. The link may be incomplete, replaced, or turned off.</p><ContactLine /></StatusScreen>;
   }
 
-  if (view === "welcome") return <WelcomeScreen onStart={start} hasSaved={hasSaved} onResume={resume} onClear={discardSaved} />;
+  if (view === "welcome") return <WelcomeScreen onStart={start} hasSaved={hasSaved} onResume={resume} onClear={discardSaved} spouseMode={spouseMode} />;
   if (view === "review") return <ReviewScreen screens={screens} answers={answers} onEdit={editQuestion} onSubmit={submit} busy={busy} error={submitError} />;
   if (view === "thanks") return <SummaryScreen answers={answers} screens={screens} onStartOver={start} />;
   if (view === "flow" && current) {
