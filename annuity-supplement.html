@@ -82,7 +82,7 @@ function notifyTeam(answers, submissionId) {
       + '<a href="' + link + '" style="display:inline-block;background:#C8A96E;color:#0E1824;padding:11px 22px;border-radius:6px;font-size:13px;font-weight:700;text-decoration:none;">Open in the advisor portal &rarr;</a>'
       + '<p style="margin:18px 0 0;font-size:11px;color:#6E8299;">Sign in to the advisor portal first if prompted.</p></div>';
     emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE, {
-      to_email: NOTIFY_EMAIL, cc_email: "", name, email: answers.email || "", reply_to: answers.email || NOTIFY_EMAIL, html_content: html,
+      to_email: NOTIFY_EMAIL, cc_email: "", name, email: answers.email || "", reply_to: answers.email || NOTIFY_EMAIL, subject: kind + " received: " + name, html_content: html,
     }).catch(() => {});
   } catch (e) {}
 }
@@ -919,6 +919,27 @@ function ReviewScreen({ screens, answers, onEdit, onSubmit, busy, error }) {
   );
 }
 
+// Tells the office the client opened their link (sent only the first time). No details, just a first name.
+function notifyOpened(firstName) {
+  try {
+    if (typeof emailjs === "undefined") return;
+    emailjs.init(EMAILJS_PUBLIC_KEY);
+    const who = (firstName || "A client").replace(/[<>&]/g, "");
+    const kind = INTAKE_FORM === "annuity" ? "Annuity Supplement" : "Application Intake";
+    let when = "";
+    try { when = new Date().toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "America/New_York" }) + " Eastern"; } catch (e) { when = new Date().toISOString(); }
+    const html = '<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;background:#0E1824;color:#F5F2EC;border-radius:8px;">'
+      + '<p style="margin:0 0 6px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#C8A96E;">Link opened</p>'
+      + '<h2 style="margin:0 0 10px;font-weight:400;font-size:22px;">' + who + ' opened the ' + kind + ' link</h2>'
+      + '<p style="margin:0;font-size:14px;line-height:1.6;color:#C8BFA8;">Opened ' + when + '. They may not have started yet. You will get another email when they submit.</p>'
+      + '<p style="margin:16px 0 0;font-size:11px;color:#6E8299;">Some email security tools open links automatically, so an alert can occasionally come from a scanner rather than the client.</p></div>';
+    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE, {
+      to_email: NOTIFY_EMAIL, cc_email: "", name: who + " opened their link", email: "", reply_to: NOTIFY_EMAIL,
+      subject: kind + " link opened: " + who, html_content: html,
+    }).catch(() => {});
+  } catch (e) {}
+}
+
 function StatusScreen({ title, children, action }) {
   return (
     <div style={{ minHeight: "100dvh", background: NAVY, display: "flex", flexDirection: "column", justifyContent: "center", padding: "40px 24px" }}>
@@ -948,7 +969,7 @@ function App() {
   const loadInvite = async () => {
     setInvite({ state: "loading", error: "", info: {} });
     const res = await callIntake({ action: "get_invite" });
-    if (res.ok) setInvite({ state: "ok", error: "", info: res });
+    if (res.ok) { setInvite({ state: "ok", error: "", info: res }); if (res.first_open) notifyOpened(res.first_name); }
     else setInvite({ state: "error", error: res.error, info: {} });
   };
 
