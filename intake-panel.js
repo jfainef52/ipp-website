@@ -14,6 +14,7 @@
 
   var FORMS = {
     life:        { label: 'Application Intake (life insurance)', body: { form: 'life' }, intro: 'application intake' },
+    life_spouse: { label: '', body: { form: 'life', role: 'spouse' }, intro: 'application intake', spouse: true },
     annuity_new: { label: 'Annuity Supplement (client has not done the Application Intake)', body: { form: 'annuity', annuity_mode: 'none' }, intro: 'annuity supplement' },
     annuity_done:{ label: 'Annuity Supplement (client already did the Application Intake)', body: { form: 'annuity', annuity_mode: 'done' }, intro: 'annuity supplement' }
   };
@@ -41,6 +42,7 @@
     not_configured: 'The encryption key has not been added to Supabase yet. Add INTAKE_ENCRYPTION_KEY and try again.',
     not_found: 'That client could not be found, or you do not have access to it.',
     inactive: 'That link is no longer active.',
+    no_spouse: 'This client record has no spouse name. Add the spouse to the client record first.',
     failed: 'Something went wrong. Please try again.'
   };
 
@@ -98,17 +100,21 @@
     var panel = shell(clientId); place(panel);
     var body = panel.querySelector('.ip-body');
 
+    var spouseName = '';
     function draw(data, note) {
+      spouseName = data.spouse_first_name || '';
       var subs = {}; (data.submissions || []).forEach(function (s) { subs[s.invite_id] = s; });
       var html = '<div class="ip-row"><select id="ip-form">' +
-        Object.keys(FORMS).map(function (k) { return '<option value="' + k + '">' + esc(FORMS[k].label) + '</option>'; }).join('') +
+        Object.keys(FORMS).filter(function (k) { return !FORMS[k].spouse; }).map(function (k) { return '<option value="' + k + '">' + esc(FORMS[k].label) + '</option>'; }).join('') +
+        (spouseName ? '<option value="life_spouse">' + esc('Application Intake for ' + spouseName + ' (spouse)') + '</option>' : '') +
         '</select><button class="ip-btn" id="ip-create">Create link</button></div>' +
+        (spouseName ? '<div class="ip-sub" style="margin:-2px 0 10px">' + esc(spouseName) + ' is on this record as the spouse. Choose "Application Intake for ' + esc(spouseName) + '" to give them their own private link.</div>' : '') +
         '<div id="ip-new"></div>' + (note ? '<div class="ip-msg" style="color:var(--error,#e05757)">' + esc(note) + '</div>' : '');
       if (!(data.invites || []).length) html += '<div class="ip-sub" style="font-style:italic">No links created yet.</div>';
       (data.invites || []).forEach(function (i) {
         var st = i.status === 'submitted' ? 'submitted' : i.status === 'revoked' ? 'revoked' : i.expired ? 'expired' : i.status;
         var sub = subs[i.id], live = st === 'sent' || st === 'opened';
-        html += '<div class="ip-item"><div class="ip-main"><strong>' + (i.form === 'annuity' ? 'Annuity Supplement' : 'Application Intake') + '</strong>' +
+        html += '<div class="ip-item"><div class="ip-main"><strong>' + (i.form === 'annuity' ? 'Annuity Supplement' : 'Application Intake') + (i.role === 'spouse' ? ' (spouse)' : '') + '</strong>' +
           '<span class="ip-chip" style="color:' + COLORS[st] + '">' + STATUS[st] + '</span>' +
           '<div class="ip-sub">Created ' + fmt(i.created_at) + (i.submitted_at ? ' · Submitted ' + fmt(i.submitted_at) : i.opened_at ? ' · Opened ' + fmt(i.opened_at) : '') + (live ? ' · Expires ' + fmt(i.expires_at) : '') + '</div>' + (sub ? '<div class="ip-sub">' + (sub.last_viewed_at ? 'Last viewed ' + fmt(sub.last_viewed_at) + ' by ' + esc(sub.last_viewed_by || 'Unknown') : 'Not viewed yet') + '</div>' : '') + '</div>' +
           (live ? '<button class="ip-btn ghost" data-copy="' + i.id + '">Copy link</button><button class="ip-btn ghost" data-revoke="' + i.id + '">Revoke</button>' : '') +
@@ -128,12 +134,7 @@
     panel.addEventListener('click', function (e) {
       var b = e.target.closest('button'); if (!b) return;
       if (b.id === 'ip-create') {
-        var kind = FORMS[document.getElementById('ip-form').value];
-        b.disabled = true; b.textContent = 'Creating…';
-        call(Object.assign({ action: 'create_invite', client_id: clientId }, kind.body)).then(function (r) {
-          if (!r.ok) { load(msg(r)); return; }
-          load('', function () { showNew(r.link, kind); });
-        });
+        create(FORMS[document.getElementById('ip-form').value], b);
       } else if (b.hasAttribute('data-copy')) {
         b.disabled = true;
         call({ action: 'get_link', invite_id: b.getAttribute('data-copy') }).then(function (r) {
@@ -143,6 +144,8 @@
       } else if (b.hasAttribute('data-revoke')) {
         if (!confirm('Turn this link off? The client will no longer be able to open it.')) return;
         call({ action: 'revoke', invite_id: b.getAttribute('data-revoke') }).then(function (r) { load(r.ok ? '' : (msg(r))); });
+      } else if (b.hasAttribute('data-spouse')) {
+        create(FORMS.life_spouse, b);
       } else if (b.hasAttribute('data-copylink')) {
         copy(b.getAttribute('data-copylink'), function (ok) { b.textContent = ok ? 'Copied ✓' : 'Copy failed'; setTimeout(function () { b.textContent = 'Copy link'; }, 1800); });
       } else if (b.hasAttribute('data-copymsg')) {
@@ -150,14 +153,25 @@
       }
     });
 
+    function create(kind, btn) {
+      btn.disabled = true; btn.textContent = 'Creating…';
+      call(Object.assign({ action: 'create_invite', client_id: clientId }, kind.body)).then(function (r) {
+        if (!r.ok) { load(msg(r)); return; }
+        load('', function () { showNew(r.link, kind); });
+      });
+    }
+
     function showNew(link, kind) {
       var box = document.getElementById('ip-new'); if (!box) return;
-      var hi = firstName ? 'Hi ' + firstName + ', ' : 'Hi, ';
+      var who = kind.spouse ? spouseName : firstName;
+      var hi = who ? 'Hi ' + who + ', ' : 'Hi, ';
       var msg = hi + 'here is your secure link for the ' + kind.intro + ': ' + link + ' Questions? Call our office at 773-318-9608 or send us an email at support@integratedplanningpartners.com.';
       box.innerHTML = '<div class="ip-item" style="border-color:var(--gold,#C8A96E)"><div class="ip-main"><div class="ip-sub" style="margin-bottom:6px">New link ready. Paste it into an email or text message.</div>' +
         '<div class="ip-row" style="margin:0"><input class="ip-link" readonly value="' + esc(link) + '" onclick="this.select()">' +
         '<button class="ip-btn" data-copylink="' + esc(link) + '">Copy link</button>' +
-        '<button class="ip-btn ghost" data-copymsg="' + esc(msg) + '">Copy with a short message</button></div></div></div>';
+        '<button class="ip-btn ghost" data-copymsg="' + esc(msg) + '">Copy with a short message</button></div>' +
+        (spouseName && !kind.spouse && kind.body.form === 'life' ? '<div class="ip-sub" style="margin-top:8px">Send ' + esc(spouseName) + ' their own private link too? <button class="ip-btn ghost" style="margin-left:6px" data-spouse="1">Create ' + esc(spouseName) + '\'s link</button></div>' : '') +
+        '</div></div>';
     }
 
     load();
