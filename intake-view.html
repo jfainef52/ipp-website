@@ -95,11 +95,12 @@ select.st{background:var(--navy);color:var(--text);border:1px solid var(--gold-l
   }
 
   var FORM = { life: 'Application Intake', annuity: 'Annuity Supplement' };
+  function formName(s) { return (FORM[s.form] || s.form || 'Intake') + (s.role === 'spouse' ? ' (spouse)' : ''); }
   function when(d) { return d ? new Date(d).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : ''; }
 
   function textVersion(r) {
     var s = r.submission, sm = (r.data && r.data.summary) || { sections: [], skipped: [] }, out = [];
-    out.push((FORM[s.form] || 'Intake').toUpperCase() + ': ' + (r.client.first_name + ' ' + r.client.last_name).trim());
+    out.push(formName(s).toUpperCase() + ': ' + (r.client.first_name + ' ' + r.client.last_name).trim());
     out.push('Submitted ' + when(s.submitted_at), '');
     sm.sections.forEach(function (sec) { out.push(sec.title.toUpperCase() + (sec.section ? ' (' + sec.section + ')' : '')); sec.items.forEach(function (i) { out.push('  ' + i.label + ': ' + i.value); }); out.push(''); });
     if (sm.skipped.length) { out.push('NOT ANSWERED, TO FOLLOW UP'); sm.skipped.forEach(function (g) { out.push('  ' + g.title + (g.section ? ' (' + g.section + ')' : '')); g.labels.forEach(function (l) { out.push('    - ' + l); }); }); }
@@ -128,7 +129,7 @@ select.st{background:var(--navy);color:var(--text);border:1px solid var(--gold-l
     var head = el('div', 'head');
     head.appendChild(el('h1', '', name));
     var meta = el('div', 'meta');
-    [['Form', FORM[s.form] || s.form], ['Submitted', when(s.submitted_at)], ['Email', s.email || ''], ['Answered', s.question_count != null ? (s.question_count - (s.skipped_count || 0)) + ' of ' + s.question_count : ''], ['Not answered', s.skipped_count != null ? String(s.skipped_count) : '']].forEach(function (p) {
+    [['Form', formName(s)], ['Submitted', when(s.submitted_at)], ['Email', s.email || ''], ['Answered', s.question_count != null ? (s.question_count - (s.skipped_count || 0)) + ' of ' + s.question_count : ''], ['Not answered', s.skipped_count != null ? String(s.skipped_count) : '']].forEach(function (p) {
       if (!p[1]) return; var m = el('div'); m.appendChild(el('span', 'l', p[0])); m.appendChild(el('span', '', p[1])); meta.appendChild(m);
     });
     head.appendChild(meta);
