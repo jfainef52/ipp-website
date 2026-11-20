@@ -33,7 +33,7 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}th{font:700 11.5px va
 .hide{display:none}
 </style></head><body>
 <div id="auth-gate"><div class="spin"></div></div>
-<header><div><h1>LTC Protection Modeler</h1><div class="s">Long-term-care-focused indexed life vs. a taxable investment account · Monte Carlo income, illustrated protection</div></div><a href="advisor-dashboard.html">← Advisor dashboard</a></header>
+<header><div><h1>LTC Protection Modeler</h1><div class="s">Protection asset vs. a taxable investment account · hypothetical market-sequence income, illustrated protection</div></div><a href="advisor-dashboard.html">← Advisor dashboard</a></header>
 <main id="app" class="hide">
 <section class="card"><h2>1 · Case details</h2><div class="grid">
 <div><label>Client name</label><input id="clientName" placeholder="Client or household"></div>
@@ -41,7 +41,7 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}th{font:700 11.5px va
 <div><label>Date</label><input id="dateStr"></div>
 <div><label>Version label (optional)</label><input id="version" placeholder="e.g. Draft 1"></div></div></section>
 
-<section class="card"><h2>2 · Policy illustration</h2>
+<section class="card"><h2>2 · Carrier illustration</h2>
 <div class="drop" id="drop">Drop the illustration output here (.csv or .xlsx), or click to choose<input type="file" id="file" accept=".csv,.xlsx,.xls" class="hide"></div>
 <div id="fileMsg"></div>
 <div class="grid" style="margin-top:12px">
@@ -59,15 +59,15 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}th{font:700 11.5px va
 <div><label>Average years of care</label><input id="careDur" type="number" step="0.1" value="3.3"></div></div></section>
 
 <section class="card"><h2>3 · Funding</h2><div class="grid">
-<div><label>Source of funds</label><select id="fundSrc"><option value="nq">Non-qualified savings</option><option value="x1035">1035 exchange from other life policies</option><option value="mix">Mix: 1035 exchange and non-qualified</option><option value="qp">Qualified source (taxes handled separately)</option></select></div>
+<div><label>Source of funds</label><select id="fundSrc"><option value="nq">Non-qualified savings</option><option value="x1035">1035 exchange of existing values</option><option value="mix">Mix: 1035 exchange and non-qualified</option><option value="qp">Qualified source (taxes handled separately)</option></select></div>
 <div id="exWrap" class="hide"><label>Amount arriving by 1035 exchange ($)</label><input id="exAmt" type="number" step="1000" value="0"></div></div>
-<div class="hint" style="margin-top:6px">Contributions are read from the illustration (up to 20 years). The taxable account receives the same dollars in the same years. No financing is used.</div></section>
+<div class="hint" style="margin-top:6px">Contributions are read year by year from the illustration (up to 20 years), so a one-time 1035 exchange plus ongoing annual premium works when the illustration is run that way: for example a $100,000 exchange plus $15,000 a year shows $115,000 in year 1 and $15,000 after. The taxable account receives the same dollars in the same years. No financing is used.</div></section>
 
 <section class="card"><h2>4 · Income assumptions</h2><div class="grid">
 <div><label>Income starts at age</label><input id="is" type="number" value="65"></div>
 <div><label>Income ends at age</label><input id="ie" type="number" value="95"></div>
 <div><label>Annual increase (%)</label><input id="cola" type="number" step="0.25" value="2"></div>
-<div><label>Policy loan rate (%)</label><input id="loanRate" type="number" step="0.25" value="5"></div>
+<div><label>Loan rate (%)</label><input id="loanRate" type="number" step="0.25" value="5"></div>
 <div><label>Keep cash value after loans above ($)</label><input id="csvFloor" type="number" step="5000" value="50000"></div></div></section>
 
 <section class="card"><h2>5 · Taxable account assumptions</h2><div class="grid">
@@ -449,90 +449,54 @@ async function runMonteCarlo(ill, p, onProgress){
   }
   const avgCredited = sumCredited/cntCredited;
 
-  // ---- policy bands (average of the middle 10% of paths ranked by AV at income start) ----
+  // ---- policy income solved on EVERY path; paths ranked by that income ----
+  // The 25th / 50th / 75th paths are actual simulated market sequences. The taxable account is then run on the
+  // very same sequence, so both sides of each comparison see identical returns.
   prog(0.42,'Solving policy income…'); await tick();
-  const order = Array.from({length:N},(_,i)=>i).sort((a,b)=>avAll[a*nYrs+incIdx]-avAll[b*nYrs+incIdx]);
-  const bw = Math.max(10, Math.floor(N*0.10));
+  const pathInc = new Float64Array(N);
+  for (let k=0;k<N;k++){
+    if (k%1000===0){ prog(0.42+0.2*k/N,'Solving policy income…'); await tick(); }
+    pathInc[k] = solveLoanIncome(avAll.subarray(k*nYrs,(k+1)*nYrs), surrArr, o);
+  }
+  const order = Array.from({length:N},(_,i)=>i).sort((a,b)=>pathInc[a]-pathInc[b]);
   const PCTS = [25,50,75];
-  const bands = {};
+  const io = { nInc, startIdx:incIdx, cf, fee, tax };
+  const ages = Array.from({length:nYrs},(_,i)=>issueAge+i);
+  const cfSum = cf.reduce((s,v)=>s+v,0);
+  prog(0.7,'Running the taxable account on the same paths…'); await tick();
+  const strands = {};
   PCTS.forEach(pc=>{
-    const c = Math.floor(pc/100*N), lo = Math.max(0, c-Math.floor(bw/2)), hi = Math.min(N, lo+bw);
-    const av = new Float64Array(nYrs); const m = hi-lo;
-    for (let q=lo;q<hi;q++){ const k=order[q]; for (let i=0;i<nYrs;i++) av[i]+=avAll[k*nYrs+i]/m; }
-    const inc = solveLoanIncome(av, surrArr, o);
+    const k = order[Math.floor(pc/100*(N-1))];
+    const av = avAll.subarray(k*nYrs,(k+1)*nYrs);
+    const inc = pathInc[k];
     const out = { inc:new Float64Array(nYrs), cum:new Float64Array(nYrs), csvNet:new Float64Array(nYrs) };
     loanWalk(av, surrArr, o, inc, out);
-    bands[pc] = { av, income:inc, walk:out };
-  });
-  const survFor = inc => {
-    let ok=0; const av = new Float64Array(nYrs);
-    for (let k=0;k<N;k++){ for (let i=0;i<nYrs;i++) av[i]=avAll[k*nYrs+i]; if (loanWalk(av,surrArr,o,inc,null)) ok++; }
-    return ok/N;
-  };
-  const surv = {}; PCTS.forEach(pc=>{ surv[pc]=survFor(bands[pc].income); });
-
-  // ---- taxable account: per-path solve to last through income end ----
-  prog(0.55,'Solving taxable account income…'); await tick();
-  const io = { nInc, startIdx:incIdx, cf, fee, tax };
-  const gross = new Float64Array(N*nInc), net = new Float64Array(N*nInc), bal = new Float64Array(N*nInc);
-  const totNet = new Float64Array(N), firstNet = new Float64Array(N);
-  const det = { gross:new Float64Array(nInc), net:new Float64Array(nInc), bal:new Float64Array(nInc) };
-  for (let k=0;k<N;k++){
-    if (k%2000===0){ prog(0.55+0.2*k/N,'Solving taxable account income…'); await tick(); }
     const id = draws.subarray(k*nYrs,(k+1)*nYrs);
     let lo=0, hi=b0[k]*3;
     for (let it=0; it<50; it++){ const m=(lo+hi)/2; if (invRunPath(id,blend,b0[k],ba0[k],m,io,null)) lo=m; else hi=m; }
+    const det = { gross:new Float64Array(nInc), net:new Float64Array(nInc), bal:new Float64Array(nInc) };
     invRunPath(id,blend,b0[k],ba0[k],lo,io,det);
-    let t=0;
-    for (let j=0;j<nInc;j++){ gross[k*nInc+j]=det.gross[j]; net[k*nInc+j]=det.net[j]; bal[k*nInc+j]=det.bal[j]; t+=det.net[j]; }
-    totNet[k]=t; firstNet[k]=det.net[0];
-  }
-  const medOf = a => pctileSorted(sortedCopy(a),50);
-  const invSurvFor = W => { let ok=0; for (let k=0;k<N;k++) if (invRunPath(draws.subarray(k*nYrs,(k+1)*nYrs),blend,b0[k],ba0[k],W,io,null)) ok++; return ok/N; };
-
-  // ---- per-age taxable percentiles ----
-  prog(0.78,'Building ledger…'); await tick();
-  const ages = Array.from({length:nYrs},(_,i)=>issueAge+i);
+    let tN=0; for (let j=0;j<nInc;j++) tN+=det.net[j];
+    strands[pc] = { k, av, inc, walk:out, det, txFirst:det.net[0], txTotal:tN, polTotal:inc*cfSum };
+  });
+  const bands = {}, invBands = {};
+  PCTS.forEach(pc=>{ const st=strands[pc]; bands[pc]={ income:st.inc, total:st.polTotal, surv:null }; invBands[pc]={ first:st.txFirst, total:st.txTotal }; });
+  const m = strands[50];
+  const policy = ages.map((age,i)=>({ age, av:m.av[i], income:m.walk.inc[i], loan:m.walk.cum[i], csvNet:m.walk.csvNet[i] }));
   const taxable = ages.map((age,i)=>{
-    const col = [];
-    if (i<incIdx){ for (let k=0;k<N;k++) col.push(invPre[k*incIdx+i]); return { age, bal:pctileSorted(sortedCopy(col),50), gross:0, net:0 }; }
-    if (age<=p.ie){ const j=age-p.is; const g=[],n=[],b=[]; for(let k=0;k<N;k++){ g.push(gross[k*nInc+j]); n.push(net[k*nInc+j]); b.push(bal[k*nInc+j]); }
-      return { age, bal:pctileSorted(sortedCopy(b),50), gross:pctileSorted(sortedCopy(g),50), net:pctileSorted(sortedCopy(n),50) }; }
+    if (i<incIdx) return { age, bal:invPre[m.k*incIdx+i], gross:0, net:0 };
+    if (age<=p.ie){ const j=age-p.is; return { age, bal:m.det.bal[j], gross:m.det.gross[j], net:m.det.net[j] }; }
     return { age, bal:0, gross:0, net:0 };
   });
-  const totSorted = sortedCopy(totNet), firstSorted = sortedCopy(firstNet);
-  const invBands = {}; PCTS.forEach(pc=>{ invBands[pc] = { first:pctileSorted(firstSorted,pc), total:pctileSorted(totSorted,pc) }; });
-
-  // ---- equal-confidence check ----
-  prog(0.85,'Equal-confidence check…'); await tick();
-  const bisect = (f,t,hi)=>{ let lo=0; for(let it=0;it<26;it++){ const m=(lo+hi)/2; if (f(m)>=t) lo=m; else hi=m; } return lo; };
-  const cfSum = cf.reduce((s,v)=>s+v,0);
-  const maxB0 = b0.reduce((m,v)=>v>m?v:m,0);
-  let maxAV=1; for (let i=0;i<avAll.length;i++) if (avAll[i]>maxAV) maxAV=avAll[i];
-  const dHi = maxAV*0.5+1;
-  const eq3 = [0.90,0.75,0.50].map(t=>{
-    const dInc = bisect(survFor,t,dHi);
-    const W = bisect(invSurvFor,t,maxB0);
-    const n1=[], nT=[];
-    for (let k=0;k<N;k++){
-      const dd = { gross:new Float64Array(nInc), net:new Float64Array(nInc), bal:new Float64Array(nInc) };
-      if (invRunPath(draws.subarray(k*nYrs,(k+1)*nYrs),blend,b0[k],ba0[k],W,io,dd)){ n1.push(dd.net[0]); let s=0; for(let j=0;j<nInc;j++) s+=dd.net[j]; nT.push(s); }
-    }
-    return { t, polInc:dInc, polTot:dInc*cfSum, taxNet1:medOf(n1), taxNetT:medOf(nT) };
-  });
-
-  // ---- assemble ----
-  const m = bands[50];
-  const policy = ages.map((age,i)=>({ age, av:m.av[i], income:m.walk.inc[i], loan:m.walk.cum[i], csvNet:m.walk.csvNet[i] }));
+  const eq3 = [];
   const illus = ill.rows.slice(0,nYrs).map(r=>({ age:r.age, year:r.year, prem:r.prem, av:r.av, csv:r.csv, db:r.db }));
-  const polTot = {}; PCTS.forEach(pc=>{ let s=0; for(let j=0;j<nInc;j++) s+=bands[pc].income*cf[j]; polTot[pc]=s; });
   // calibration diagnostic: engine at constant illustrated return vs the file
   const diag = (()=>{ const r = new Float64Array(nYrs).fill(cal.iRate), a = new Float64Array(nYrs); simAV(cal,r,a);
     let mx=0; for(let i=0;i<nYrs;i++) mx=Math.max(mx,Math.abs(a[i]-ill.rows[i].av)); return { maxAvDiff:mx }; })();
   prog(1,'Done');
   return { params:p, issueAge, nYrs, N, ages, years:{from:years[0],to:years[years.length-1],n:years.length},
     prem:Array.from(P), totalPrem:Array.from(P).reduce((s,v)=>s+v,0), nInc, cfSum,
-    policy, taxable, illus, bands:Object.fromEntries(PCTS.map(pc=>[pc,{income:bands[pc].income, total:polTot[pc], surv:surv[pc]}])),
+    policy, taxable, illus, bands,
     invBands, eq3, avgCredited, diag, kRange:cal.mode?[Math.min(...cal.bcr),Math.max(...cal.bcr)]:[Math.min(...cal.k), Math.max(...cal.k)], overlay:!!cal.mode };
 }
 
@@ -567,6 +531,12 @@ function derive(R, I, M){
   D.advisor = I.advisorName || '';
   D.dateStr = I.dateStr;
   D.issueAge = R.issueAge;
+  D.exch = (I.fundSrc==='x1035'||I.fundSrc==='mix') ? (I.exAmt||0) : 0;
+  D.onging = (R.prem[1]||0);
+  if (D.exch>0 && R.prem[0]>=D.exch-1){ D.ongoing = R.prem[1]||0; D.ongoingYrs = R.prem.filter(v=>v>0).length;
+    D.fundPhrase = $m(D.exch)+' moved in by 1035 exchange in year 1'+(D.ongoing>0?', plus '+$m(D.ongoing)+' a year for '+D.ongoingYrs+' year'+(D.ongoingYrs===1?'':'s'):'');
+    D.fundShort = $m(D.exch)+' exchange + '+$m(D.ongoing)+' a year'; }
+  else { D.fundPhrase = (R.prem.slice(0,M.payYears).every(v=>Math.abs(v-M.annualPrem)<1) ? $m(M.annualPrem)+' a year for '+M.payYears+' years' : 'the contribution schedule shown in the illustration over '+M.payYears+' years'); D.fundShort = D.fundPhrase; }
   D.payYears = M.payYears; D.annual = M.annualPrem; D.totalPrem = R.totalPrem;
   D.payEndAge = R.issueAge + M.payYears - 1;
   D.is = I.is; D.ie = I.ie; D.incYears = I.ie - I.is + 1;
@@ -618,7 +588,7 @@ function lineChart(opts){
 }
 const legend = items => '<div class="legend">'+items.map(i=>'<span><i style="background:'+i.color+'"></i>'+esc(i.name)+'</span>').join('')+'</div>';
 
-const DISCLOSURE = 'This material is hypothetical and for discussion only. It is not tax, legal or investment advice, and it is not a guarantee of future results. Policy values, death benefits and long-term care benefits shown are illustrations that depend on the policy as issued, on its charges and on assumptions that are not guaranteed. Monte Carlo results come from simulations that re-sample historical market returns; actual results will differ. Policy loans and long-term care benefit payments reduce cash value and death benefit and can cause a policy to lapse if not managed. Qualification for benefits depends on the policy terms and on a licensed health professional certifying chronic illness. Taxes are assumed at the rates shown; speak with a tax professional about your situation.';
+const DISCLOSURE = 'This material is hypothetical and for discussion only. It is not tax, legal or investment advice, and it is not a guarantee of future results. The hypothetical models shown assume certain crediting methods and index account charges that are purely hypothetical and do not represent any particular investment or product. Hypothetical crediting methods, charges, values and returns are not guaranteed. Hypothetical returns used here are bootstrapped historical S&P 500 returns, used purely as a hypothetical example of index volatility over a period of time; actual results will differ significantly. Values labeled as illustrated come from a carrier illustration at the stated rate, which is a static assumption and will not occur as shown. Loans and long-term care benefit payments reduce cash value and death benefit and can cause the asset to lapse if not managed. Qualification for benefits depends on the terms of the asset and on a licensed health professional certifying chronic illness. Taxes are assumed at the rates shown; speak with a tax professional about your situation.';
 
 // ════════════════════════════════════════════════════════════════════
 // 1. LEDGER — 11x17 landscape
@@ -645,9 +615,9 @@ function buildLedgerDoc(R, I, M){
   const bandRows = [25,50,75].map(b=>{
     const lab = b===25?'Cautious markets (25th percentile)':b===50?'Median markets (50th percentile)':'Favorable markets (75th percentile)';
     const pb=R.bands[b], tb=R.invBands[b];
-    return '<tr><td class="lbl">'+lab+'</td><td>'+$m(tb.first)+'</td><td>'+$m(tb.total)+'</td><td>'+$m(pb.income)+'</td><td>'+$m(pb.total)+'</td><td>'+Math.round(pb.surv*100)+'%</td><td class="'+(pb.total-tb.total<0?'neg':'pos')+'">'+$m(pb.total-tb.total)+'</td></tr>';
+    return '<tr><td class="lbl">'+lab+'</td><td>'+$m(tb.first)+'</td><td>'+$m(tb.total)+'</td><td>'+$m(pb.income)+'</td><td>'+$m(pb.total)+'</td><td class="'+(pb.total-tb.total<0?'neg':'pos')+'">'+$m(pb.total-tb.total)+'</td></tr>';
   }).join('');
-  const eqRows = D.eq.map(e=>'<tr><td class="lbl">'+Math.round(e.t*100)+'% of simulations</td><td>'+$m(e.polInc)+'</td><td>'+$m(e.taxNet1)+'</td><td>'+$m(e.polTot)+'</td><td>'+$m(e.taxNetT)+'</td><td><b>'+(e.polTot>=e.taxNetT?'Policy':'Taxable')+'</b></td></tr>').join('');
+  const eqRows = D.eq.map(e=>'<tr><td class="lbl">'+Math.round(e.t*100)+'% of simulations</td><td>'+$m(e.polInc)+'</td><td>'+$m(e.taxNet1)+'</td><td>'+$m(e.polTot)+'</td><td>'+$m(e.taxNetT)+'</td><td><b>'+(e.polTot>=e.taxNetT?'Asset':'Taxable')+'</b></td></tr>').join('');
 
   const css = PB_VARS + FONTS_LINK_PLACEHOLDER + '';
   const style = '@page{size:17in 11in;margin:.3in}'
@@ -657,7 +627,7 @@ function buildLedgerDoc(R, I, M){
    + '.hdr h1{margin:0;font:800 30px/1 var(--head);letter-spacing:.02em;text-transform:uppercase}.hdr .sub{font:500 13px var(--body);color:#c9d6e8;margin-top:4px}'
    + '.hdr .meta{margin-left:auto;text-align:right;font:500 12px/1.5 var(--body);color:#c9d6e8}.hdr .meta b{color:#fff}'
    + '.chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 8px}.chip{background:#f1f4f9;border:1px solid var(--line);border-radius:999px;padding:3px 10px;font:600 10.5px var(--body);color:var(--navy2)}.chip b{color:var(--navy)}'
-   + '.top{display:grid;grid-template-columns:1.55fr 1fr;gap:14px;margin-bottom:8px}'
+   + '.top1{margin-bottom:8px}'
    + 'h3{margin:0 0 4px;font:700 13px var(--head);letter-spacing:.08em;text-transform:uppercase;color:var(--navy)}'
    + 'table{border-collapse:collapse;width:100%}.sm th{background:var(--navy2);color:#fff;font:600 10px var(--body);padding:4px 6px;text-align:right}.sm th:first-child,.sm td.lbl{text-align:left}'
    + '.sm td{padding:3px 6px;text-align:right;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}.sm td.lbl{font-weight:600;color:var(--navy)}'
@@ -675,16 +645,16 @@ function buildLedgerDoc(R, I, M){
   const nSim = R.N.toLocaleString('en-US');
   const html = '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Income and Protection Ledger - '+esc(D.client)+'</title>'+FONTS+'<style>'+PB_VARS+style+'</style></head><body>'
    + TOOLBAR('Ledger')
-   + '<div class="sheet"><div class="hdr"><div><h1>Income &amp; Protection Ledger</h1><div class="sub">'+esc(D.client)+' · Issue age '+D.issueAge+' · '+$m(D.annual)+' per year for '+D.payYears+' years ('+$m(D.totalPrem)+' total) into each strategy</div></div>'
+   + '<div class="sheet"><div class="hdr"><div><h1>Income &amp; Protection Ledger</h1><div class="sub">'+esc(D.client)+' · Issue age '+D.issueAge+' · '+D.fundPhrase+' ('+$m(D.totalPrem)+' total) into each strategy</div></div>'
    + '<div class="meta">'+(D.advisor?'Prepared by <b>'+esc(D.advisor)+'</b><br>':'')+esc(D.dateStr)+(I.version?'<br>'+esc(I.version):'')+'</div></div>'
-   + '<div class="chips"><span class="chip">Illustrated rate <b>'+pc(p.iRate)+'</b></span><span class="chip">Index cap <b>'+pc(p.cap)+'</b> · floor <b>'+pc(p.floor)+'</b></span><span class="chip">Income ages <b>'+I.is+'–'+I.ie+'</b></span><span class="chip">Cost-of-living increase <b>'+pc(p.cola)+'</b></span><span class="chip">Policy loan rate <b>'+pc(p.loanRate)+'</b></span><span class="chip">Cash value kept above <b>'+$m(p.csvFloor)+'</b></span>'
+   + '<div class="chips"><span class="chip">Illustrated rate <b>'+pc(p.iRate)+'</b></span><span class="chip">Index cap <b>'+pc(p.cap)+'</b> · floor <b>'+pc(p.floor)+'</b></span><span class="chip">Income ages <b>'+I.is+'–'+I.ie+'</b></span><span class="chip">Cost-of-living increase <b>'+pc(p.cola)+'</b></span><span class="chip">Asset loan rate <b>'+pc(p.loanRate)+'</b></span><span class="chip">Cash value kept above <b>'+$m(p.csvFloor)+'</b></span>'
    + '<span class="chip"><b>'+nSim+'</b> simulations · returns '+R.years.from+'–'+R.years.to+'</span><span class="chip">Taxable account: <b>'+p.invEq+'%</b> stocks / <b>'+(100-p.invEq)+'%</b> bonds · fee <b>'+pc(p.invFee)+'</b> · tax drag <b>'+pc(p.invDrag)+'</b> · gains taxed <b>'+pc(p.invTax,1)+'</b></span></div>'
-   + '<div class="top"><div><h3>Outcome range — income from the same contributions</h3><table class="sm"><thead><tr><th>Market experience</th><th>Taxable: year-1 net</th><th>Taxable: total net</th><th>Policy: year-1 tax-free</th><th>Policy: total tax-free</th><th>Policy odds income lasts</th><th>Policy minus taxable</th></tr></thead><tbody>'+bandRows+'</tbody></table></div>'
-   + '<div class="eq"><h3 style="margin-top:0">Equal-confidence check · advisor review</h3><table class="sm"><thead><tr><th>Income lasts to age '+I.ie+' in</th><th>Policy yr-1</th><th>Taxable net yr-1</th><th>Policy total</th><th>Taxable net total</th><th>Leads</th></tr></thead><tbody>'+eqRows+'</tbody></table></div></div>'
-   + '<table class="led"><thead><tr><th class="grp h0" colspan="3">Contributions</th><th class="grp h1" colspan="3">Taxable investment account · median</th><th class="grp h2" colspan="4">Life insurance policy · simulated median</th><th class="grp h3" colspan="2">Income difference</th><th class="grp h4" colspan="2">Policy at illustrated rate ('+pc(p.iRate)+')</th></tr>'
-   + '<tr><th class="h0">Age</th><th class="h0">Yr</th><th class="h0">Each strategy</th><th class="h1">Balance</th><th class="h1">Withdrawal</th><th class="h1">Net after tax</th><th class="h2">Account value</th><th class="h2">Tax-free income</th><th class="h2">Loan balance</th><th class="h2">Cash value after loans</th><th class="h3">Policy − taxable (yr)</th><th class="h3">Cumulative</th><th class="h4">Cash surrender value</th><th class="h4">Death benefit</th></tr></thead><tbody>'+rows+tot+'</tbody></table>'
-   + '<div class="notes"><div><b>Funding.</b> '+esc(I.fundNote||'Non-qualified savings')+'; no financing. <b>How to read this page.</b> The first two sections come from '+nSim+' simulated market paths built by re-sampling '+R.years.n+' calendar years of historical returns. Each age shows the median across paths. Policy income is the level (cost-of-living adjusted) amount taken as policy loans that keeps cash value after loans above '+$m(p.csvFloor)+' through age '+I.ie+' and keeps the policy in force to age 100. The taxable account withdrawal is solved on each path so the account lasts to age '+I.ie+' (this uses hindsight, so it favors the taxable account), with gains taxed at '+pc(p.invTax,1)+' as withdrawn.</div>'
-   + '<div><b>Third section.</b> Cash surrender value and death benefit are shown exactly as illustrated at '+pc(p.iRate)+', before any policy loans. Death benefit is also the pool available for long-term care while the insured is living, so loans taken for income reduce it. '+(R.overlay?'The simulated sections apply the policy enhancement rider (a credit multiplier of '+R.kRange[0].toFixed(2).replace(/\.?0+$/,'')+'x to '+R.kRange[1].toFixed(2).replace(/\.?0+$/,'')+'x on the capped index return, with its matching charge), so simulated values can exceed the base illustration shown here. Average credited rate across all simulated years was '+pc(R.avgCredited*100)+'.':'The simulated policy engine reproduces the illustration to within '+$m(R.diag.maxAvDiff)+' when the index earns the illustrated rate; average credited rate across all simulated years was '+pc(R.avgCredited*100)+' against '+pc(Math.min(Math.max(p.iRate,p.floor),p.cap))+' illustrated (after cap and floor).')+'</div></div>'
+   + '<div class="top1"><div><h3>Outcome range — income from the same contributions</h3><table class="sm"><thead><tr><th>Market experience</th><th>Taxable: year-1 net</th><th>Taxable: total net</th><th>Asset: year-1 tax-free</th><th>Asset: total tax-free</th><th>Asset minus taxable</th></tr></thead><tbody>'+bandRows+'</tbody></table></div>'
+   + '</div>'
+   + '<table class="led"><thead><tr><th class="grp h0" colspan="3">Contributions</th><th class="grp h1" colspan="3">Taxable investment account · median</th><th class="grp h2" colspan="4">Protection asset · simulated median</th><th class="grp h3" colspan="2">Income difference</th><th class="grp h4" colspan="2">Asset at illustrated rate ('+pc(p.iRate)+')</th></tr>'
+   + '<tr><th class="h0">Age</th><th class="h0">Yr</th><th class="h0">Each strategy</th><th class="h1">Balance</th><th class="h1">Withdrawal</th><th class="h1">Net after tax</th><th class="h2">Account value</th><th class="h2">Tax-free income</th><th class="h2">Loan balance</th><th class="h2">Cash value after loans</th><th class="h3">Asset − taxable (yr)</th><th class="h3">Cumulative</th><th class="h4">Cash surrender value</th><th class="h4">Death benefit</th></tr></thead><tbody>'+rows+tot+'</tbody></table>'
+   + '<div class="notes"><div><b>Funding.</b> '+esc(I.fundNote||'Non-qualified savings')+'; no financing. <b>How to read this page.</b> The first two sections use '+nSim+' hypothetical market sequences built by re-sampling '+R.years.n+' calendar years of historical returns. The cautious, median and favorable cases are three actual sequences from that set, ranked by the income the asset can support. The taxable account is run on the same sequence in each case, with its withdrawal sized so the account lasts through age '+I.ie+', and gains taxed at '+pc(p.invTax,1)+' as withdrawn. Asset income is the level, cost-of-living adjusted amount taken as loans that keeps cash value after loans above '+$m(p.csvFloor)+' through age '+I.ie+' and keeps the asset in force to age 100. The ledger rows follow the median sequence.</div>'
+   + '<div><b>Third section.</b> Cash surrender value and death benefit are shown exactly as illustrated at '+pc(p.iRate)+', before any asset loans. Death benefit is also the pool available for long-term care while the insured is living, so loans taken for income reduce it. '+(R.overlay?'The simulated sections apply the asset enhancement rider (a credit multiplier of '+R.kRange[0].toFixed(2).replace(/\.?0+$/,'')+'x to '+R.kRange[1].toFixed(2).replace(/\.?0+$/,'')+'x on the capped index return, with its matching charge), so simulated values can exceed the base illustration shown here. Average credited rate across all simulated years was '+pc(R.avgCredited*100)+'.':'The simulated asset engine reproduces the illustration to within '+$m(R.diag.maxAvDiff)+' when the index earns the illustrated rate; average credited rate across all simulated years was '+pc(R.avgCredited*100)+' against '+pc(Math.min(Math.max(p.iRate,p.floor),p.cap))+' illustrated (after cap and floor).')+'</div></div>'
    + '<div class="foot">'+esc(DISCLOSURE)+'</div></div></body></html>';
   return html;
 }
@@ -696,8 +666,8 @@ const FONTS_LINK_PLACEHOLDER = '';
 function buildOnePagerDoc(R, I, M){
   const D = derive(R,I,M), p=R.params;
   const leadTxt = D.polLeads
-    ? 'In the median case the policy produces about '+$m(D.polTotal-D.txTotal)+' more tax-free income than the taxable account nets after tax.'
-    : 'In the median case the taxable account nets about '+$m(D.txTotal-D.polTotal)+' more income than the policy, before counting the care benefit and death benefit only the policy provides.';
+    ? 'In the median case the asset produces about '+$m(D.polTotal-D.txTotal)+' more tax-free income than the taxable account nets after tax.'
+    : 'In the median case the taxable account nets about '+$m(D.txTotal-D.polTotal)+' more income than the asset, before counting the care benefit and death benefit only the asset provides.';
   const takeaway = 'Unlike homeowners insurance, a year with no claim is not a year of premium lost. The value stays yours.';
   const style = '@page{size:letter;margin:0}'
    + '.page{width:8.5in;min-height:11in;margin:14px auto;background:#fff;box-shadow:0 2px 14px rgba(0,0,0,.14);display:flex;flex-direction:column}'
@@ -716,30 +686,30 @@ function buildOnePagerDoc(R, I, M){
    + 'table{border-collapse:collapse;width:100%;font-size:11.5px}th{font:700 10.5px var(--body);text-align:right;color:var(--muted);padding:3px 6px;border-bottom:2px solid var(--line)}th:first-child,td:first-child{text-align:left}'
    + 'td{padding:3px 6px;text-align:right;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}td b{color:var(--navy)}'
    + '.band{background:var(--amber);color:var(--navy);padding:9px 16px;border-radius:10px;font:700 14.5px/1.25 var(--body)}'
-   + '.sm{font:500 10.8px/1.4 var(--body);color:var(--muted)}.fine{font:500 8.4px/1.35 var(--body);color:#6c7a90;padding:6px .5in .22in;border-top:1px solid var(--line)}'
+   + '.sm{font:500 10.8px/1.4 var(--body);color:var(--muted)}.fine{font:500 7.6px/1.3 var(--body);color:#6c7a90;padding:4px .5in .16in;border-top:1px solid var(--line)}'
    + '.cols{display:grid;grid-template-columns:1.12fr 1fr;gap:10px}.legend{display:flex;gap:14px;font:600 11px var(--body);color:var(--muted);margin-top:2px}.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}';
   const ages = [65,80,95].filter(a=>a>=R.issueAge && a<=R.ages[R.ages.length-1]);
   if (ages.indexOf(D.ltcAge)<0 && false) ages.push(D.ltcAge);
   const protRows = ages.map(a=>{ const r=D.at(a); return '<tr><td><b>Age '+a+'</b></td><td>'+$m(r.csv)+'</td><td>'+$m(r.db)+'</td></tr>'; }).join('');
   const chart = lineChart({ w:330, h:150, ages:R.ages, label:'Cumulative income', series:[
-      {name:'Policy (tax-free)',color:'#2e9e6b',vals:D.cumPol.map((v,i)=>R.ages[i]>=I.is?v:null)},
+      {name:'Asset (tax-free)',color:'#2e9e6b',vals:D.cumPol.map((v,i)=>R.ages[i]>=I.is?v:null)},
       {name:'Taxable account (after tax)',color:'#2f6fb5',vals:D.cumTax.map((v,i)=>R.ages[i]>=I.is?v:null)} ] });
   const html = '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>One-Page Summary - '+esc(D.client)+'</title>'+FONTS+'<style>'+PB_VARS+style+'</style></head><body>'
    + TOOLBAR('One-Page Summary')
-   + '<div class="page"><div class="top"><div class="eyebrow">Prepared for '+esc(D.client)+' · age '+D.issueAge+'</div><h1>Paying for care without paying the tax first</h1><p>'+$m(D.annual)+' a year for '+D.payYears+' years ('+$m(D.totalPrem)+') — placed in a policy, or placed in a taxable account. Here is what each could do.</p></div>'
+   + '<div class="page"><div class="top"><div class="eyebrow">Prepared for '+esc(D.client)+' · age '+D.issueAge+'</div><h1>Paying for care without paying the tax first</h1><p>'+D.fundPhrase+' ('+$m(D.totalPrem)+') — placed in the protection asset, or placed in a taxable account. Here is what each could do.</p></div>'
    + '<div class="body">'
    + '<div><h2>If care is needed</h2><div class="pair"><div class="big green"><div class="n">'+$m(D.mo)+'<span style="font-size:15px;font-weight:700"> / month</span></div><div class="l">Illustrated tax-free long-term care benefit</div><div class="s">'+$m(D.ltcAnnual)+' a year · '+$m(D.ltcTotal)+' over '+D.ltcYrs+' years</div></div>'
    + '<div class="big orange"><div class="n">'+$m(D.qpGrossTotal)+'</div><div class="l">Withdrawn from a qualified account to net the same '+$m(D.ltcTotal)+'</div><div class="s">at a '+pc(I.qpTax,1)+' tax rate · '+$m(D.qpTaxTotal)+' goes to taxes</div></div></div></div>'
    + '<div class="cols"><div class="card g"><h2>The benefit pool</h2><div class="sm" style="color:var(--ink);font-size:12px;line-height:1.45">While the insured is living, the death benefit is the pool the care benefit draws from. At age '+D.ltcAge+' that pool is illustrated at <b>'+$m(D.pool)+'</b> — about <b>'+(D.poolCovers>=10?Math.round(D.poolCovers):D.poolCovers.toFixed(1))+'×</b> the '+D.ltcYrs+'-year benefit above.</div></div>'
-   + '<div class="card accent"><h2>Per month, same net care dollars</h2><table><tr><td>Tax-free from policy</td><td><b>'+$m(D.mo)+'</b></td></tr><tr><td>From a qualified account</td><td><b>'+$m(D.qpGrossMonthly)+'</b></td></tr></table></div></div>'
-   + '<div><h2>If care is never needed — the income picture</h2><div class="cols"><div class="card b"><table><thead><tr><th></th><th>Taxable account</th><th>Policy</th></tr></thead><tbody>'
+   + '<div class="card accent"><h2>Per month, same net care dollars</h2><table><tr><td>Tax-free from the asset</td><td><b>'+$m(D.mo)+'</b></td></tr><tr><td>From a qualified account</td><td><b>'+$m(D.qpGrossMonthly)+'</b></td></tr></table></div></div>'
+   + '<div><h2>If care is never needed — the income picture</h2><div class="cols"><div class="card b"><table><thead><tr><th></th><th>Taxable account</th><th>Asset</th></tr></thead><tbody>'
    + '<tr><td>Income starts at age</td><td>'+D.is+'</td><td>'+D.is+'</td></tr>'
    + '<tr><td>Year-1 income</td><td><b>'+$m(D.txFirst)+'</b> after tax</td><td><b>'+$m(D.polFirst)+'</b> tax-free</td></tr>'
    + '<tr><td>Total to age '+D.ie+'</td><td><b>'+$m(D.txTotal)+'</b></td><td><b>'+$m(D.polTotal)+'</b></td></tr>'
    + '<tr><td>Median market case</td><td colspan="2" style="text-align:right;color:var(--muted)">'+R.N.toLocaleString('en-US')+' simulations</td></tr></tbody></table></div>'
-   + '<div class="card"><div style="font:700 11px var(--body);color:var(--muted);margin-bottom:2px">Cumulative income by age</div>'+chart+legend([{name:'Policy',color:'#2e9e6b'},{name:'Taxable account',color:'#2f6fb5'}])+'</div></div>'
+   + '<div class="card"><div style="font:700 11px var(--body);color:var(--muted);margin-bottom:2px">Cumulative income by age</div>'+chart+legend([{name:'Asset',color:'#2e9e6b'},{name:'Taxable account',color:'#2f6fb5'}])+'</div></div>'
    + '<div class="sm" style="margin-top:5px">'+esc(leadTxt)+' Income is cost-of-living adjusted at '+pc(p_(R).cola)+' a year.</div></div>'
-   + '<div class="card accent"><h2>Not use it or lose it</h2><div class="sm" style="color:var(--ink);font-size:12px;line-height:1.45">Traditional long-term care coverage works like homeowners insurance: if there is no claim, the premium is gone. Here, care is only one of three ways the same dollars can be used. <b>Needed for care:</b> a tax-free benefit. <b>Not needed:</b> tax-free policy loan income. <b>Either way:</b> a death benefit for your family. About '+Math.round(D.careProb)+'% of people over 65 need some care, averaging '+D.careDur+' years, with a typical cost near '+$m(D.careMo)+' a month and rising about '+pc(D.careInfl*100,1)+' a year.</div></div>'
+   + '<div class="card accent"><h2>Not use it or lose it</h2><div class="sm" style="color:var(--ink);font-size:12px;line-height:1.45">Traditional long-term care coverage works like homeowners insurance: if there is no claim, the premium is gone. Here, care is only one of three ways the same dollars can be used. <b>Needed for care:</b> a tax-free benefit. <b>Not needed:</b> tax-free asset loan income. <b>Either way:</b> a death benefit for your family. About '+Math.round(D.careProb)+'% of people over 65 need some care, averaging '+D.careDur+' years, with a typical cost near '+$m(D.careMo)+' a month and rising about '+pc(D.careInfl*100,1)+' a year.</div></div>'
    + '<div><h2>What stays behind (illustrated at '+pc(R.params.iRate)+', before loans)</h2><div class="card"><table><thead><tr><th></th><th>Cash surrender value</th><th>Death benefit</th></tr></thead><tbody>'+protRows+'</tbody></table></div></div>'
    + '<div class="band">'+esc(takeaway)+'</div></div>'
    + '<div class="fine">'+esc(DISCLOSURE)+' Illustrated rate '+pc(R.params.iRate)+'; income ages '+D.is+'–'+D.ie+'. '+(D.advisor?'Prepared by '+esc(D.advisor)+' · ':'')+esc(D.dateStr)+'.</div></div></body></html>';
@@ -788,39 +758,39 @@ function buildDiscussionDoc(R, I, M){
     + '<div class="band">Every $1 of care paid from a qualified account takes about $'+(1/(1-D.qpRate)).toFixed(2)+' out of it.</div></div>');
 
   // 3 two destinations
-  const p3 = page('<div class="in"><div class="eyebrow">One contribution, two places</div><h1>The same '+$m(D.annual)+' a year, put to work two ways</h1>'
-    + '<div class="pair"><div class="big blue"><div class="n">'+$m(D.totalPrem)+'</div><div class="l">Into a taxable investment account</div><div class="s">'+$m(D.annual)+' a year for '+D.payYears+' years, ages '+D.issueAge+'–'+D.payEndAge+'</div></div><div class="big green"><div class="n">'+$m(D.totalPrem)+'</div><div class="l">Into a life insurance policy</div><div class="s">the same '+$m(D.annual)+' a year for '+D.payYears+' years</div></div></div>'
+  const p3 = page('<div class="in"><div class="eyebrow">One contribution, two places</div><h1>The same dollars, put to work two ways</h1>'
+    + '<div class="pair"><div class="big blue"><div class="n">'+$m(D.totalPrem)+'</div><div class="l">Into a taxable investment account</div><div class="s">'+D.fundPhrase+', ages '+D.issueAge+'–'+D.payEndAge+'</div></div><div class="big green"><div class="n">'+$m(D.totalPrem)+'</div><div class="l">Into the protection asset</div><div class="s">the same contributions</div></div></div>'
     + '<div class="two"><div class="card b"><h3>Taxable account</h3><ul class="k"><li>Grows with the markets, up and down</li><li>Fees and taxes along the way</li><li>Gains taxed when you take income</li><li>Nothing extra if care is needed</li></ul></div>'
-    + '<div class="card g"><h3>Policy</h3><ul class="k"><li>Cash value that grows with an index, with a floor</li><li>A long-term care benefit, paid tax-free</li><li>A death benefit for the people you leave</li><li>Income through policy loans, which are not taxed as income when the policy is properly structured</li></ul></div></div>'
+    + '<div class="card g"><h3>Asset</h3><ul class="k"><li>Cash value that grows with an index, with a floor</li><li>A long-term care benefit, paid tax-free</li><li>A death benefit for the people you leave</li><li>Income through asset loans, which are not taxed as income when the asset is properly structured</li></ul></div></div>'
     + '<div class="band">Same dollars in. Different things you can do when you need them.</div></div>');
 
   // 3b use it or lose it
   const p3b = page('<div class="in"><div class="eyebrow">A modern way to plan for care</div><h1>Not use it or lose it</h1>'
     + '<p>Think of homeowners insurance. You pay every year, and in a year with no claim, that premium is gone. Traditional long-term care insurance works much the same way, and it is the reason many people put off planning for care.</p>'
     + '<div class="two"><div class="card o"><h3>The old way</h3><ul class="k"><li>Premium paid every year</li><li>No care needed? The premium is gone</li><li>Premiums can rise over time</li><li>Nothing for your family if the benefit is never used</li></ul></div>'
-    + '<div class="card g"><h3>This way</h3><ul class="k"><li>Funded for '+D.payYears+' years, then paid up</li><li>Care needed? A tax-free benefit of '+$m(D.mo)+' a month</li><li>Care not needed? Tax-free income through policy loans</li><li>Either way, a death benefit for your family</li></ul></div></div>'
+    + '<div class="card g"><h3>This way</h3><ul class="k"><li>Funded for '+D.payYears+' years, then paid up</li><li>Care needed? A tax-free benefit of '+$m(D.mo)+' a month</li><li>Care not needed? Tax-free income through asset loans</li><li>Either way, a death benefit for your family</li></ul></div></div>'
     + '<div class="pair"><div class="big navyb"><div class="n">'+Math.round(D.careProb)+'%</div><div class="l">of people over 65 are expected to need some long-term care</div><div class="s">averaging about '+D.careDur+' years</div></div><div class="big orange"><div class="n">'+$m(D.careMo)+'</div><div class="l">typical monthly cost of care today</div><div class="s">rising about '+pc(D.careInfl*100,1)+' a year</div></div></div>'
     + '<div class="band">Every dollar has a job whether or not care is ever needed.</div></div>');
 
   // 4 care
   const p4 = page('<div class="in"><div class="eyebrow">If care is needed</div><h1>A tax-free benefit, month after month</h1>'
     + '<div class="pair"><div class="big green"><div class="n">'+$m(D.mo)+'</div><div class="l">Illustrated monthly long-term care benefit</div><div class="s">'+$m(D.ltcAnnual)+' a year</div></div><div class="big navyb"><div class="n">'+$m(D.ltcTotal)+'</div><div class="l">Over '+D.ltcYrs+' years, tax-free</div><div class="s">no withdrawal needed from your qualified account</div></div></div>'
-    + '<div class="card g"><h3>Where the benefit comes from</h3><p>While the insured is living, the policy\'s death benefit is the pool the care benefit draws from. At age '+D.ltcAge+' that pool is illustrated at <b>'+$m(D.pool)+'</b> — about '+(D.poolCovers>=10?Math.round(D.poolCovers):D.poolCovers.toFixed(1))+' times the '+D.ltcYrs+'-year benefit. Whatever is not used for care passes to your family.</p></div>'
+    + '<div class="card g"><h3>Where the benefit comes from</h3><p>While the insured is living, the asset\'s death benefit is the pool the care benefit draws from. At age '+D.ltcAge+' that pool is illustrated at <b>'+$m(D.pool)+'</b> — about '+(D.poolCovers>=10?Math.round(D.poolCovers):D.poolCovers.toFixed(1))+' times the '+D.ltcYrs+'-year benefit. Whatever is not used for care passes to your family.</p></div>'
     + '<div class="card o"><h3>To net the same from a qualified account</h3><table><thead><tr><th></th><th>Per month</th><th>Per year</th><th>'+D.ltcYrs+' years</th></tr></thead><tbody><tr><td>Tax-free benefit</td><td><b>'+$m(D.mo)+'</b></td><td><b>'+$m(D.ltcAnnual)+'</b></td><td><b>'+$m(D.ltcTotal)+'</b></td></tr><tr><td>Qualified-account withdrawal</td><td><b>'+$m(D.qpGrossMonthly)+'</b></td><td><b>'+$m(D.qpGrossAnnual)+'</b></td><td><b>'+$m(D.qpGrossTotal)+'</b></td></tr><tr><td>Paid in tax</td><td>'+$m(D.qpGrossMonthly-D.mo)+'</td><td>'+$m(D.qpGrossAnnual-D.ltcAnnual)+'</td><td>'+$m(D.qpTaxTotal)+'</td></tr></tbody></table></div>'
     + '<div class="band">'+$m(D.qpTaxTotal)+' that could stay in your qualified account, still working for you.</div></div>');
 
   // 5 income
   const chart = lineChart({ w:640, h:170, ages:R.ages, label:'Cumulative income', series:[
-      {name:'Policy',color:'#2e9e6b',vals:D.cumPol.map((v,i)=>R.ages[i]>=I.is?v:null)},
+      {name:'Asset',color:'#2e9e6b',vals:D.cumPol.map((v,i)=>R.ages[i]>=I.is?v:null)},
       {name:'Taxable account',color:'#2f6fb5',vals:D.cumTax.map((v,i)=>R.ages[i]>=I.is?v:null)} ] });
   const bandRows = [25,50,75].map(b=>{ const lab=b===25?'Cautious markets':b===50?'Median markets':'Favorable markets'; return '<tr><td>'+lab+'</td><td>'+$m(R.invBands[b].total)+'</td><td>'+$m(R.bands[b].total)+'</td></tr>'; }).join('');
-  const p5head = D.polLeads ? 'The policy can also pay you income' : 'The policy can also pay you income — and here is how it compares';
-  const p5band = D.polLeads ? 'In the median case, tax-free income from the policy outpaces what the account nets after tax.' : 'On income alone the account nets more in the median case. The policy adds the care benefit and death benefit the account cannot.';
+  const p5head = D.polLeads ? 'The asset can also pay you income' : 'The asset can also pay you income — and here is how it compares';
+  const p5band = D.polLeads ? 'In the median case, tax-free income from the asset outpaces what the account nets after tax.' : 'On income alone the account nets more in the median case. The asset adds the care benefit and death benefit the account cannot.';
   const p5 = page('<div class="in"><div class="eyebrow">If care is never needed</div><h1>'+esc(p5head)+'</h1>'
     + '<p>We ran '+R.N.toLocaleString('en-US')+' possible market histories. Both strategies start income at age '+D.is+' and run to age '+D.ie+', rising '+pc(p.cola)+' a year.</p>'
-    + '<div class="pair"><div class="big blue"><div class="n">'+$m(D.txFirst)+'</div><div class="l">Taxable account, first year</div><div class="s">after tax · '+$m(D.txTotal)+' in total</div></div><div class="big green"><div class="n">'+$m(D.polFirst)+'</div><div class="l">Policy, first year</div><div class="s">tax-free · '+$m(D.polTotal)+' in total</div></div></div>'
-    + '<div class="card"><div style="font:700 13px var(--body);color:var(--muted);margin-bottom:2px">Total income by age — median markets</div>'+chart+legend([{name:'Policy (tax-free)',color:'#2e9e6b'},{name:'Taxable account (after tax)',color:'#2f6fb5'}])+'</div>'
-    + '<div class="card"><table><thead><tr><th>Total income to age '+D.ie+'</th><th>Taxable account</th><th>Policy</th></tr></thead><tbody>'+bandRows+'</tbody></table></div>'
+    + '<div class="pair"><div class="big blue"><div class="n">'+$m(D.txFirst)+'</div><div class="l">Taxable account, first year</div><div class="s">after tax · '+$m(D.txTotal)+' in total</div></div><div class="big green"><div class="n">'+$m(D.polFirst)+'</div><div class="l">Asset, first year</div><div class="s">tax-free · '+$m(D.polTotal)+' in total</div></div></div>'
+    + '<div class="card"><div style="font:700 13px var(--body);color:var(--muted);margin-bottom:2px">Total income by age — median markets</div>'+chart+legend([{name:'Asset (tax-free)',color:'#2e9e6b'},{name:'Taxable account (after tax)',color:'#2f6fb5'}])+'</div>'
+    + '<div class="card"><table><thead><tr><th>Total income to age '+D.ie+'</th><th>Taxable account</th><th>Asset</th></tr></thead><tbody>'+bandRows+'</tbody></table></div>'
     + '<div class="band">'+esc(p5band)+'</div></div>');
 
   // 6 stays behind
@@ -830,19 +800,19 @@ function buildDiscussionDoc(R, I, M){
       {name:'Death benefit',color:'#e8772e',vals:R.illus.map(r=>r.db)},
       {name:'Cash surrender value',color:'#2e9e6b',vals:R.illus.map(r=>r.csv)} ] });
   const p6 = page('<div class="in"><div class="eyebrow">What stays behind</div><h1>Protection that grows with you</h1>'
-    + '<p>The death benefit is the pool for care while you are living, and what your family receives afterward. Cash value is what you can reach through policy loans.</p>'
-    + '<div class="card"><div style="font:700 13px var(--body);color:var(--muted);margin-bottom:2px">As illustrated at '+pc(p.iRate)+', before any policy loans</div>'+chart2+legend([{name:'Death benefit',color:'#e8772e'},{name:'Cash surrender value',color:'#2e9e6b'}])+'</div>'
+    + '<p>The death benefit is the pool for care while you are living, and what your family receives afterward. Cash value is what you can reach through asset loans.</p>'
+    + '<div class="card"><div style="font:700 13px var(--body);color:var(--muted);margin-bottom:2px">As illustrated at '+pc(p.iRate)+', before any asset loans</div>'+chart2+legend([{name:'Death benefit',color:'#e8772e'},{name:'Cash surrender value',color:'#2e9e6b'}])+'</div>'
     + '<div class="card"><table><thead><tr><th></th><th>Cash surrender value</th><th>Death benefit</th></tr></thead><tbody>'+protRows+'</tbody></table></div>'
-    + '<div class="band">Income taken as policy loans reduces the death benefit and the care pool, so we decide how much to take, and when, together.</div></div>');
+    + '<div class="band">Income taken as asset loans reduces the death benefit and the care pool, so we decide how much to take, and when, together.</div></div>');
 
   // 7 how built
   const p7 = page('<div class="in"><div class="eyebrow">How we built these numbers</div><h2 style="font-size:34px">Plain-English assumptions</h2>'
     + '<table class="assume"><tbody>'
-    + '<tr><td>Contributions</td><td>'+$m(D.annual)+' a year for '+D.payYears+' years into each strategy ('+$m(D.totalPrem)+' total). Source: '+esc(I.fundNote||'Non-qualified savings')+'. No financing is used.</td></tr>'
-    + '<tr><td>Policy growth</td><td>The policy is illustrated at '+pc(p.iRate)+'. For income we replaced that with '+R.N.toLocaleString('en-US')+' simulated market histories, re-sampling '+R.years.n+' calendar years ('+R.years.from+'–'+R.years.to+'), with the policy\'s cap of '+pc(p.cap)+' and floor of '+pc(p.floor)+(R.overlay?', and the policy\'s enhancement rider credit multiplier applied':'')+'</td></tr>'
-    + '<tr><td>Death benefit and cash value</td><td>Shown exactly as illustrated at '+pc(p.iRate)+', before policy loans'+(R.overlay?' (the illustration is the base policy, so simulated values can run higher)':'')+'</td></tr>'
+    + '<tr><td>Contributions</td><td>'+D.fundPhrase+' into each strategy ('+$m(D.totalPrem)+' total). Source: '+esc(I.fundNote||'Non-qualified savings')+'. No financing is used.</td></tr>'
+    + '<tr><td>Asset growth</td><td>The asset is illustrated at '+pc(p.iRate)+'. For income we replaced that with '+R.N.toLocaleString('en-US')+' simulated market histories, re-sampling '+R.years.n+' calendar years ('+R.years.from+'–'+R.years.to+'), with the asset\'s cap of '+pc(p.cap)+' and floor of '+pc(p.floor)+(R.overlay?', and the asset\'s enhancement rider credit multiplier applied':'')+'</td></tr>'
+    + '<tr><td>Death benefit and cash value</td><td>Shown exactly as illustrated at '+pc(p.iRate)+', before asset loans'+(R.overlay?' (the illustration is the base asset, so simulated values can run higher)':'')+'</td></tr>'
     + '<tr><td>Taxable account</td><td>A diversified blend of stocks and bonds, less a '+pc(p.invFee)+' fee and '+pc(p.invDrag)+' a year for taxes along the way; gains taxed at '+pc(p.invTax,1)+' when withdrawn</td></tr>'
-    + '<tr><td>Income</td><td>Ages '+D.is+'–'+D.ie+', rising '+pc(p.cola)+' a year. Policy income is taken as loans at '+pc(p.loanRate)+' interest and sized to keep cash value above '+$m(p.csvFloor)+'</td></tr>'
+    + '<tr><td>Income</td><td>Ages '+D.is+'–'+D.ie+', rising '+pc(p.cola)+' a year. Asset income is taken as loans at '+pc(p.loanRate)+' interest and sized to keep cash value above '+$m(p.csvFloor)+'</td></tr>'
     + '<tr><td>Care benefit</td><td>'+$m(D.mo)+' a month as illustrated; withdrawal comparison uses a '+pc(I.qpTax,1)+' tax rate over '+D.ltcYrs+' years</td></tr>'
     + '</tbody></table><p class="fine" style="margin-top:14px">'+esc(DISCLOSURE)+'</p></div>');
 
@@ -915,7 +885,7 @@ async function handleFile(f){
 const nv=id=>parseFloat($(id).value);
 function inputs(){
   const fs=$('fundSrc').value, ex=nv('exAmt')||0;
-  const fundNote = fs==='nq' ? 'Non-qualified savings' : fs==='x1035' ? '1035 exchange from other life insurance policies' : fs==='mix' ? '1035 exchange ('+$m(ex)+') combined with non-qualified savings' : 'Qualified source, with the tax on distributions handled separately';
+  const fundNote = fs==='nq' ? 'Non-qualified savings' : fs==='x1035' ? '1035 exchange of existing values' : fs==='mix' ? '1035 exchange ('+$m(ex)+') combined with non-qualified savings' : 'Qualified source, with the tax on distributions handled separately';
   return { clientName:$('clientName').value.trim(), advisorName:$('advisorName').value.trim(), dateStr:$('dateStr').value, version:$('version').value.trim(),
     iRate:nv('iRate'), cap:nv('cap'), floor:nv('floor'), ltcMonthly:nv('ltcMonthly'), ltcYears:nv('ltcYears'), qpTax:nv('qpTax'), ltcAge:nv('ltcAge'), careCost:nv('careCost'), careInfl:nv('careInfl'), careProb:nv('careProb'), careDur:nv('careDur'),
     is:nv('is'), ie:nv('ie'), cola:nv('cola'), loanRate:nv('loanRate'), csvFloor:nv('csvFloor'),
@@ -927,6 +897,8 @@ $('run').onclick=async()=>{
   ['iRate','cap','floor','ltcMonthly','ltcYears','qpTax','is','ie','cola','loanRate','csvFloor','invEq','invFee','invDrag','invTax'].forEach(k=>{ if(isNaN(I[k])) bad.push(k); });
   if(bad.length||!(I.ltcMonthly>0)){ $('runMsg').innerHTML='<div class="err">Please fill in every input, including the illustrated rate and the monthly LTC benefit.</div>'; return; }
   if(I.qpTax<0||I.qpTax>=100){ $('runMsg').innerHTML='<div class="err">Tax rate must be between 0 and 99.</div>'; return; }
+  const ex1=(I.fundSrc==='x1035'||I.fundSrc==='mix')?(I.exAmt||0):0;
+  if(ex1>0 && ILL.rows[0].prem < ex1-1){ $('runMsg').innerHTML='<div class="err">The illustration\'s year-1 premium ('+$m(ILL.rows[0].prem)+') is less than the exchange amount entered ('+$m(ex1)+'). Run the illustration with the exchange included in year 1, or correct the amount.</div>'; return; }
   $('runMsg').innerHTML=''; $('run').disabled=true; $('results').classList.add('hide');
   try{
     const R=await runMonteCarlo(ILL,I,(f,t)=>{ $('pbar').style.width=Math.round(f*100)+'%'; $('status').textContent=t||''; });
@@ -941,9 +913,9 @@ function show(R,I){
    '<div class="kpi k1"><div class="n">'+$m(D.ltcTotal)+'</div><div class="l">Tax-free care benefit over '+D.ltcYrs+' years</div></div>'+
    '<div class="kpi k3"><div class="n">'+$m(D.qpGrossTotal)+'</div><div class="l">Qualified-account withdrawal needed for the same net</div></div>'+
    '<div class="kpi k2"><div class="n">'+$m(D.txTotal)+'</div><div class="l">Taxable account, total net income (median)</div></div>'+
-   '<div class="kpi k4"><div class="n">'+$m(D.polTotal)+'</div><div class="l">Policy, total tax-free income (median)</div></div>';
-  $('bandTbl').innerHTML='<thead><tr><th>Market experience</th><th>Taxable total net</th><th>Policy total</th><th>Policy odds income lasts</th></tr></thead><tbody>'+
-   [25,50,75].map(b=>'<tr><td>'+(b===25?'Cautious (25th)':b===50?'Median (50th)':'Favorable (75th)')+'</td><td>'+$m(R.invBands[b].total)+'</td><td>'+$m(R.bands[b].total)+'</td><td>'+Math.round(R.bands[b].surv*100)+'%</td></tr>').join('')+'</tbody>';
+   '<div class="kpi k4"><div class="n">'+$m(D.polTotal)+'</div><div class="l">Protection asset, total tax-free income (median)</div></div>';
+  $('bandTbl').innerHTML='<thead><tr><th>Market experience</th><th>Taxable total net</th><th>Asset total</th></tr></thead><tbody>'+
+   [25,50,75].map(b=>'<tr><td>'+(b===25?'Cautious (25th)':b===50?'Median (50th)':'Favorable (75th)')+'</td><td>'+$m(R.invBands[b].total)+'</td><td>'+$m(R.bands[b].total)+'</td></tr>').join('')+'</tbody>';
   $('results').classList.remove('hide'); $('status').textContent='Done · '+R.N.toLocaleString('en-US')+' simulations';
   $('results').scrollIntoView({behavior:'smooth'});
 }
