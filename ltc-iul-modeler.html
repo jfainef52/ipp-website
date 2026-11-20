@@ -49,10 +49,12 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}th{font:700 11.5px va
 <div><label>Index cap (%)</label><input id="cap" type="number" step="0.05"><div class="hint">Used in the Monte Carlo credit</div></div>
 <div><label>Index floor (%)</label><input id="floor" type="number" step="0.05" value="0"></div>
 <div><label>Illustrated monthly LTC benefit ($)</label><input id="ltcMonthly" type="number" step="1"></div>
-<div><label>Benefit period (years)</label><input id="ltcYears" type="number" min="1" max="10" value="3"></div>
+<div id="ltcYrsBox"><label>Benefit period (years)</label><input id="ltcYears" type="number" min="1" max="10" value="3"></div>
 <div><label>Qualified-source tax rate (%)</label><input id="qpTax" type="number" step="0.5" value="30"></div>
 <div><label>Enhancement rider factors</label><select id="overlay"><option value="1">Apply (illustration run without the rider)</option><option value="0">Do not apply (illustration already includes it)</option></select><div class="hint">Credit multiplier and matching charge, by policy year</div></div>
-<div><label>Age shown for the benefit pool</label><input id="ltcAge" type="number" value="75"></div>
+<div><label>Care coverage structure</label><select id="careMode"><option value="pool">Total benefit is the care pool</option><option value="fixed">Separate care amount (set at issue)</option></select></div>
+<div id="careAmtBox" style="display:none"><label>Total care available at issue ($)</label><input id="careAmt" type="number" step="1000"><div class="hint">From the illustration; shown as a separate amount, not the total benefit</div></div>
+<div id="ltcAgeBox"><label>Age shown for the benefit pool</label><input id="ltcAge" type="number" value="75"></div>
 <div><label>Typical monthly cost of care ($)</label><input id="careCost" type="number" value="10646"><div class="hint">Editable; default from the LTC cost calculator data</div></div>
 <div><label>Care cost inflation (%)</label><input id="careInfl" type="number" step="0.25" value="4"></div>
 <div><label>Chance of needing care after 65 (%)</label><input id="careProb" type="number" value="70"></div>
@@ -547,6 +549,7 @@ function derive(R, I, M){
   D.incDiff = D.polTotal - D.txTotal;
   // LTC
   D.mo = I.ltcMonthly; D.ltcYrs = I.ltcYears; D.ltcAnnual = D.mo*12; D.ltcTotal = D.ltcAnnual*D.ltcYrs;
+  if (I.careMode==='fixed' && I.careAmt>0) D.ltcTotal = I.careAmt;
   D.qpRate = I.qpTax/100; D.qpGrossTotal = D.ltcTotal/(1-D.qpRate); D.qpGrossAnnual = D.ltcAnnual/(1-D.qpRate); D.qpTaxTotal = D.qpGrossTotal - D.ltcTotal;
   D.qpGrossMonthly = D.mo/(1-D.qpRate);
   // illustrated rows
@@ -555,6 +558,8 @@ function derive(R, I, M){
   D.ltcAge = Math.min(Math.max(I.ltcAge, R.issueAge), R.ages[R.ages.length-1]);
   D.pool = at(D.ltcAge).db;
   D.poolCovers = D.pool / Math.max(1,D.ltcTotal);
+  D.fixed = I.careMode==='fixed'; D.careAmt = I.careAmt||0; D.careCovers = D.careAmt/Math.max(1,D.ltcTotal);
+  D.fx = x=>(x>=10?Math.round(x):x.toFixed(1));
   D.initialDB = M.initialDB;
   // ledger cumulative
   let cp=0, ct=0; D.cumPol=[]; D.cumTax=[];
@@ -654,7 +659,7 @@ function buildLedgerDoc(R, I, M){
    + '<table class="led"><thead><tr><th class="grp h0" colspan="3">Contributions</th><th class="grp h1" colspan="3">Taxable investment account · median</th><th class="grp h2" colspan="4">Protection asset · simulated median</th><th class="grp h3" colspan="2">Income difference</th><th class="grp h4" colspan="2">Asset at illustrated rate ('+pc(p.iRate)+')</th></tr>'
    + '<tr><th class="h0">Age</th><th class="h0">Yr</th><th class="h0">Each strategy</th><th class="h1">Balance</th><th class="h1">Withdrawal</th><th class="h1">Net after tax</th><th class="h2">Account value</th><th class="h2">Tax-free income</th><th class="h2">Loan balance</th><th class="h2">Accessible value after loans</th><th class="h3">Asset − taxable (yr)</th><th class="h3">Cumulative</th><th class="h4">Accessible value</th><th class="h4">Total benefit</th></tr></thead><tbody>'+rows+tot+'</tbody></table>'
    + '<div class="notes"><div><b>Funding.</b> '+esc(I.fundNote||'Non-qualified savings')+'; no financing. <b>How to read this page.</b> The first two sections use '+nSim+' hypothetical market sequences built by re-sampling '+R.years.n+' calendar years of historical returns. The cautious, median and favorable cases are three actual sequences from that set, ranked by the income the asset can support. The taxable account is run on the same sequence in each case, with its withdrawal sized so the account lasts through age '+I.ie+', and gains taxed at '+pc(p.invTax,1)+' as withdrawn. Asset income is the level, cost-of-living adjusted amount taken as loans that keeps accessible value after loans above '+$m(p.csvFloor)+' through age '+I.ie+' and keeps the asset in force to age 100. The ledger rows follow the median sequence.</div>'
-   + '<div><b>Third section.</b> Accessible value and total benefit are shown exactly as illustrated at '+pc(p.iRate)+', before any asset loans. Total benefit is also the pool available for long-term care while the insured is living, so loans taken for income reduce it. '+(R.overlay?'The simulated sections apply the asset enhancement rider (a credit multiplier of '+R.kRange[0].toFixed(2).replace(/\.?0+$/,'')+'x to '+R.kRange[1].toFixed(2).replace(/\.?0+$/,'')+'x on the capped index return, with its matching charge), so simulated values can exceed the base illustration shown here. Average credited rate across all simulated years was '+pc(R.avgCredited*100)+'.':'The simulated asset engine reproduces the illustration to within '+$m(R.diag.maxAvDiff)+' when the index earns the illustrated rate; average credited rate across all simulated years was '+pc(R.avgCredited*100)+' against '+pc(Math.min(Math.max(p.iRate,p.floor),p.cap))+' illustrated (after cap and floor).')+'</div></div>'
+   + '<div><b>Third section.</b> Accessible value and total benefit are shown exactly as illustrated at '+pc(p.iRate)+', before any asset loans. '+(D.fixed?'Loans taken for income reduce the total benefit. ':'Total benefit is also the pool available for long-term care while the insured is living, so loans taken for income reduce it. ')+(R.overlay?'The simulated sections apply the asset enhancement rider (a credit multiplier of '+R.kRange[0].toFixed(2).replace(/\.?0+$/,'')+'x to '+R.kRange[1].toFixed(2).replace(/\.?0+$/,'')+'x on the capped index return, with its matching charge), so simulated values can exceed the base illustration shown here. Average credited rate across all simulated years was '+pc(R.avgCredited*100)+'.':'The simulated asset engine reproduces the illustration to within '+$m(R.diag.maxAvDiff)+' when the index earns the illustrated rate; average credited rate across all simulated years was '+pc(R.avgCredited*100)+' against '+pc(Math.min(Math.max(p.iRate,p.floor),p.cap))+' illustrated (after cap and floor).')+'</div></div>'
    + '<div class="foot">'+esc(DISCLOSURE)+'</div></div></body></html>';
   return html;
 }
@@ -691,21 +696,23 @@ function buildOnePagerDoc(R, I, M){
   const ages = [65,80,95].filter(a=>a>=R.issueAge && a<=R.ages[R.ages.length-1]);
   if (ages.indexOf(D.ltcAge)<0 && false) ages.push(D.ltcAge);
   const protRows = ages.map(a=>{ const r=D.at(a); return '<tr><td><b>Age '+a+'</b></td><td>'+$m(r.csv)+'</td><td>'+$m(r.db)+'</td></tr>'; }).join('');
-  const chart = lineChart({ w:330, h:150, ages:R.ages, label:'Cumulative income', series:[
-      {name:'Asset (tax-free)',color:'#2e9e6b',vals:D.cumPol.map((v,i)=>R.ages[i]>=I.is?v:null)},
-      {name:'Taxable account (after tax)',color:'#2f6fb5',vals:D.cumTax.map((v,i)=>R.ages[i]>=I.is?v:null)} ] });
+  const _ix=R.ages.map((a,i)=>i).filter(i=>R.ages[i]>=I.is&&R.ages[i]<=I.ie);
+  const chart = lineChart({ w:330, h:150, ages:_ix.map(i=>R.ages[i]), label:'Cumulative income', series:[
+      {name:'Asset (tax-free)',color:'#2e9e6b',vals:_ix.map(i=>D.cumPol[i])},
+      {name:'Taxable account (after tax)',color:'#2f6fb5',vals:_ix.map(i=>D.cumTax[i])} ] });
   const html = '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>One-Page Summary - '+esc(D.client)+'</title>'+FONTS+'<style>'+PB_VARS+style+'</style></head><body>'
    + TOOLBAR('One-Page Summary')
-   + '<div class="page"><div class="top"><div class="eyebrow">Prepared for '+esc(D.client)+' · age '+D.issueAge+'</div><h1>Paying for care without paying the tax first</h1><p>'+D.fundPhrase+' ('+$m(D.totalPrem)+') — placed in the protection asset, or placed in a taxable account. Here is what each could do.</p></div>'
+   + '<div class="page"><div class="top"><div class="eyebrow">Prepared for '+esc(D.client)+' · age '+D.issueAge+'</div><h1>Paying for care without paying the tax first</h1><p>'+D.fundPhrase+' ('+$m(D.totalPrem)+') — placed in the protection asset, or placed in a taxable account. Here is what <span style="white-space:nowrap">each could do.</span></p></div>'
    + '<div class="body">'
-   + '<div><h2>If care is needed</h2><div class="pair"><div class="big green"><div class="n">'+$m(D.mo)+'<span style="font-size:15px;font-weight:700"> / month</span></div><div class="l">Illustrated tax-free long-term care benefit</div><div class="s">'+$m(D.ltcAnnual)+' a year · '+$m(D.ltcTotal)+' over '+D.ltcYrs+' years</div></div>'
+   + '<div><h2>If care is needed</h2><div class="pair"><div class="big green"><div class="n">'+$m(D.mo)+'<span style="font-size:15px;font-weight:700"> / month</span></div><div class="l">Illustrated tax-free long-term care benefit</div><div class="s">'+$m(D.ltcAnnual)+' a year · '+(D.fixed?$m(D.ltcTotal)+' total care available':$m(D.ltcTotal)+' over '+D.ltcYrs+' years')+'</div></div>'
    + '<div class="big orange"><div class="n">'+$m(D.qpGrossTotal)+'</div><div class="l">Withdrawn from a qualified account to net the same '+$m(D.ltcTotal)+'</div><div class="s">at a '+pc(I.qpTax,1)+' tax rate · '+$m(D.qpTaxTotal)+' goes to taxes</div></div></div></div>'
-   + '<div class="cols"><div class="card g"><h2>The benefit pool</h2><div class="sm" style="color:var(--ink);font-size:12px;line-height:1.45">While the insured is living, the total benefit is the pool the care benefit draws from. At age '+D.ltcAge+' that pool is illustrated at <b>'+$m(D.pool)+'</b> — about <b>'+(D.poolCovers>=10?Math.round(D.poolCovers):D.poolCovers.toFixed(1))+'×</b> the '+D.ltcYrs+'-year benefit above.</div></div>'
+   + '<div class="cols"'+(D.fixed?' style="grid-template-columns:1fr"':'')+'>'+(D.fixed?'':'<div class="card g"><h2>The benefit pool</h2><div class="sm" style="color:var(--ink);font-size:12px;line-height:1.45">While the insured is living, the total benefit is the pool the care benefit draws from. At age '+D.ltcAge+' that pool is illustrated at <b>'+$m(D.pool)+'</b> — about <b>'+D.fx(D.poolCovers)+'×</b> the '+D.ltcYrs+'-year benefit above.</div></div>')
    + '<div class="card accent"><h2>Per month, same net care dollars</h2><table><tr><td>Tax-free from the asset</td><td><b>'+$m(D.mo)+'</b></td></tr><tr><td>From a qualified account</td><td><b>'+$m(D.qpGrossMonthly)+'</b></td></tr></table></div></div>'
    + '<div><h2>If care is never needed — the income picture</h2><div class="cols"><div class="card b"><table><thead><tr><th></th><th>Taxable account</th><th>Asset</th></tr></thead><tbody>'
    + '<tr><td>Income starts at age</td><td>'+D.is+'</td><td>'+D.is+'</td></tr>'
    + '<tr><td>Year-1 income</td><td><b>'+$m(D.txFirst)+'</b> after tax</td><td><b>'+$m(D.polFirst)+'</b> tax-free</td></tr>'
    + '<tr><td>Total to age '+D.ie+'</td><td><b>'+$m(D.txTotal)+'</b></td><td><b>'+$m(D.polTotal)+'</b></td></tr>'
+   + '<tr class="gain"><td><b>Income difference</b></td><td></td><td class="'+(D.incDiff<0?'neg':'pos')+'"><b>'+(D.incDiff>=0?'+':'−')+$m(Math.abs(D.incDiff))+'</b></td></tr>'
    + '<tr><td>Median market case</td><td colspan="2" style="text-align:right;color:var(--muted)">'+R.N.toLocaleString('en-US')+' simulations</td></tr></tbody></table></div>'
    + '<div class="card"><div style="font:700 11px var(--body);color:var(--muted);margin-bottom:2px">Cumulative income by age</div>'+chart+legend([{name:'Asset',color:'#2e9e6b'},{name:'Taxable account',color:'#2f6fb5'}])+'</div></div>'
    + '<div class="sm" style="margin-top:5px">'+esc(leadTxt)+' Income is cost-of-living adjusted at '+pc(p_(R).cola)+' a year.</div></div>'
@@ -747,13 +754,13 @@ function buildDiscussionDoc(R, I, M){
   const page = (inner, cls) => { pg++; return '<section class="page '+(cls||'')+'">'+inner+(cls==='cover'?'':'<div class="pf"><span>Prepared for '+esc(D.client)+(D.advisor?' · '+esc(D.advisor):'')+' · '+esc(D.dateStr)+'</span><span>Page '+pg+' of '+TOTAL+'</span></div>')+'</section>'; };
 
   // 1 cover
-  const cover = page('<div class="in"><div><div class="eyebrow">A conversation about the cost of care</div><div class="bar"></div><h1>What if the money for care came out tax-free?</h1><p>'+D.ltcYrs+' years of care can cost '+$m(D.ltcTotal)+' after tax. Where that money comes from decides what it really costs.</p></div>'
+  const cover = page('<div class="in"><div><div class="eyebrow">A conversation about the cost of care</div><div class="bar"></div><h1>What if the money for care came out tax-free?</h1><p>'+(D.fixed?'Paying for '+$m(D.ltcTotal)+' of care from a qualified account costs more than '+$m(D.ltcTotal):D.ltcYrs+' years of care can cost '+$m(D.ltcTotal)+' after tax')+'. Where that money comes from decides what it really costs.</p></div>'
     + '<div class="for">Prepared for<b>'+esc(D.client)+'</b>'+esc(D.dateStr)+(D.advisor?'<br>'+esc(D.advisor):'')+'</div></div>','cover');
 
   // 2 problem
   const p2 = page('<div class="in"><div class="eyebrow">The problem</div><h1>The tax comes out before the care gets paid</h1>'
     + '<p>Money in a qualified account has never been taxed. To pay for care from it, you have to withdraw more than the care costs — and pay the tax on the whole withdrawal.</p>'
-    + '<div class="pair"><div class="big navyb"><div class="n">'+$m(D.ltcTotal)+'</div><div class="l">Care you need to pay for</div><div class="s">'+$m(D.mo)+' a month for '+D.ltcYrs+' years</div></div><div class="big orange"><div class="n">'+$m(D.qpGrossTotal)+'</div><div class="l">Withdrawn from a qualified account to cover it</div><div class="s">at a '+pc(I.qpTax,1)+' tax rate</div></div></div>'
+    + '<div class="pair"><div class="big navyb"><div class="n">'+$m(D.ltcTotal)+'</div><div class="l">'+(D.fixed?'Total care available':'Care you need to pay for')+'</div><div class="s">'+$m(D.mo)+' a month'+(D.fixed?'':' for '+D.ltcYrs+' years')+'</div></div><div class="big orange"><div class="n">'+$m(D.qpGrossTotal)+'</div><div class="l">Withdrawn from a qualified account to cover it</div><div class="s">at a '+pc(I.qpTax,1)+' tax rate</div></div></div>'
     + '<div class="card o"><h3>The difference is a tax bill</h3><p><b>'+$m(D.qpTaxTotal)+'</b> of that withdrawal goes to taxes, not care. It also arrives as extra taxable income in the years you are least able to absorb it.</p></div>'
     + '<div class="band">Every $1 of care paid from a qualified account takes about $'+(1/(1-D.qpRate)).toFixed(2)+' out of it.</div></div>');
 
@@ -774,15 +781,18 @@ function buildDiscussionDoc(R, I, M){
 
   // 4 care
   const p4 = page('<div class="in"><div class="eyebrow">If care is needed</div><h1>A tax-free benefit, month after month</h1>'
-    + '<div class="pair"><div class="big green"><div class="n">'+$m(D.mo)+'</div><div class="l">Illustrated monthly long-term care benefit</div><div class="s">'+$m(D.ltcAnnual)+' a year</div></div><div class="big navyb"><div class="n">'+$m(D.ltcTotal)+'</div><div class="l">Over '+D.ltcYrs+' years, tax-free</div><div class="s">no withdrawal needed from your qualified account</div></div></div>'
-    + '<div class="card g"><h3>Where the benefit comes from</h3><p>While the insured is living, the asset\'s total benefit is the pool the care benefit draws from. At age '+D.ltcAge+' that pool is illustrated at <b>'+$m(D.pool)+'</b> — about '+(D.poolCovers>=10?Math.round(D.poolCovers):D.poolCovers.toFixed(1))+' times the '+D.ltcYrs+'-year benefit. Whatever is not used for care passes to your family.</p></div>'
-    + '<div class="card o"><h3>To net the same from a qualified account</h3><table><thead><tr><th></th><th>Per month</th><th>Per year</th><th>'+D.ltcYrs+' years</th></tr></thead><tbody><tr><td>Tax-free benefit</td><td><b>'+$m(D.mo)+'</b></td><td><b>'+$m(D.ltcAnnual)+'</b></td><td><b>'+$m(D.ltcTotal)+'</b></td></tr><tr><td>Qualified-account withdrawal</td><td><b>'+$m(D.qpGrossMonthly)+'</b></td><td><b>'+$m(D.qpGrossAnnual)+'</b></td><td><b>'+$m(D.qpGrossTotal)+'</b></td></tr><tr><td>Paid in tax</td><td>'+$m(D.qpGrossMonthly-D.mo)+'</td><td>'+$m(D.qpGrossAnnual-D.ltcAnnual)+'</td><td>'+$m(D.qpTaxTotal)+'</td></tr></tbody></table></div>'
+    + '<div class="pair"><div class="big green"><div class="n">'+$m(D.mo)+'</div><div class="l">Illustrated monthly long-term care benefit</div><div class="s">'+$m(D.ltcAnnual)+' a year</div></div><div class="big navyb"><div class="n">'+$m(D.ltcTotal)+'</div><div class="l">'+(D.fixed?'Total care available, tax-free':'Over '+D.ltcYrs+' years, tax-free')+'</div><div class="s">no withdrawal needed from your qualified account</div></div></div>'
+    + '<div class="card g">'+(D.fixed
+      ? '<h3>The care coverage</h3><p>Total care available at issue is illustrated at <b>'+$m(D.careAmt)+'</b>. This is a separate amount from the total benefit. The total benefit, reduced by any loans or benefits taken, remains for your family.</p>'
+      : '<h3>Where the benefit comes from</h3><p>While the insured is living, the asset\'s total benefit is the pool the care benefit draws from. At age '+D.ltcAge+' that pool is illustrated at <b>'+$m(D.pool)+'</b> — about '+D.fx(D.poolCovers)+' times the '+D.ltcYrs+'-year benefit. Whatever is not used for care passes to your family.</p>')+'</div>'
+    + '<div class="card o"><h3>To net the same from a qualified account</h3><table><thead><tr><th></th><th>Per month</th><th>Per year</th><th>'+(D.fixed?'Total available':D.ltcYrs+' years')+'</th></tr></thead><tbody><tr><td>Tax-free benefit</td><td><b>'+$m(D.mo)+'</b></td><td><b>'+$m(D.ltcAnnual)+'</b></td><td><b>'+$m(D.ltcTotal)+'</b></td></tr><tr><td>Qualified-account withdrawal</td><td><b>'+$m(D.qpGrossMonthly)+'</b></td><td><b>'+$m(D.qpGrossAnnual)+'</b></td><td><b>'+$m(D.qpGrossTotal)+'</b></td></tr><tr><td>Paid in tax</td><td>'+$m(D.qpGrossMonthly-D.mo)+'</td><td>'+$m(D.qpGrossAnnual-D.ltcAnnual)+'</td><td>'+$m(D.qpTaxTotal)+'</td></tr></tbody></table></div>'
     + '<div class="band">'+$m(D.qpTaxTotal)+' that could stay in your qualified account, still working for you.</div></div>');
 
   // 5 income
-  const chart = lineChart({ w:640, h:170, ages:R.ages, label:'Cumulative income', series:[
-      {name:'Asset',color:'#2e9e6b',vals:D.cumPol.map((v,i)=>R.ages[i]>=I.is?v:null)},
-      {name:'Taxable account',color:'#2f6fb5',vals:D.cumTax.map((v,i)=>R.ages[i]>=I.is?v:null)} ] });
+  const _ix=R.ages.map((a,i)=>i).filter(i=>R.ages[i]>=I.is&&R.ages[i]<=I.ie);
+  const chart = lineChart({ w:640, h:170, ages:_ix.map(i=>R.ages[i]), label:'Cumulative income', series:[
+      {name:'Asset',color:'#2e9e6b',vals:_ix.map(i=>D.cumPol[i])},
+      {name:'Taxable account',color:'#2f6fb5',vals:_ix.map(i=>D.cumTax[i])} ] });
   const bandRows = [25,50,75].map(b=>{ const lab=b===25?'Cautious markets':b===50?'Median markets':'Favorable markets'; return '<tr><td>'+lab+'</td><td>'+$m(R.invBands[b].total)+'</td><td>'+$m(R.bands[b].total)+'</td></tr>'; }).join('');
   const p5head = D.polLeads ? 'The asset can also pay you income' : 'The asset can also pay you income — and here is how it compares';
   const p5band = D.polLeads ? 'In the median case, tax-free income from the asset outpaces what the account nets after tax.' : 'On income alone the account nets more in the median case. The asset adds the care benefit and the benefit for your family the account cannot.';
@@ -800,10 +810,10 @@ function buildDiscussionDoc(R, I, M){
       {name:'Total benefit',color:'#e8772e',vals:R.illus.map(r=>r.db)},
       {name:'Accessible value',color:'#2e9e6b',vals:R.illus.map(r=>r.csv)} ] });
   const p6 = page('<div class="in"><div class="eyebrow">What stays behind</div><h1>Protection that grows with you</h1>'
-    + '<p>The total benefit is the pool for care while you are living, and what your family receives afterward. Accessible value is what you can reach through asset loans.</p>'
+    + '<p>'+(D.fixed?'The total benefit is what your family receives, reduced by any loans or benefits taken. Care coverage is a separate amount set at issue. ':'The total benefit is the pool for care while you are living, and what your family receives afterward. ')+'Accessible value is what you can reach through asset loans.</p>'
     + '<div class="card"><div style="font:700 13px var(--body);color:var(--muted);margin-bottom:2px">As illustrated at '+pc(p.iRate)+', before any asset loans</div>'+chart2+legend([{name:'Total benefit',color:'#e8772e'},{name:'Accessible value',color:'#2e9e6b'}])+'</div>'
     + '<div class="card"><table><thead><tr><th></th><th>Accessible value</th><th>Total benefit</th></tr></thead><tbody>'+protRows+'</tbody></table></div>'
-    + '<div class="band">Income taken as asset loans reduces the total benefit and the care pool, so we decide how much to take, and when, together.</div></div>');
+    + '<div class="band">Income taken as asset loans reduces the total benefit'+(D.fixed?'':' and the care pool')+', so we decide how much to take, and when, together.</div></div>');
 
   // 7 how built
   const p7 = page('<div class="in"><div class="eyebrow">How we built these numbers</div><h2 style="font-size:34px">Plain-English assumptions</h2>'
@@ -813,12 +823,12 @@ function buildDiscussionDoc(R, I, M){
     + '<tr><td>Total benefit and accessible value</td><td>Shown exactly as illustrated at '+pc(p.iRate)+', before asset loans'+(R.overlay?' (the illustration is the base asset, so simulated values can run higher)':'')+'</td></tr>'
     + '<tr><td>Taxable account</td><td>A diversified blend of stocks and bonds, less a '+pc(p.invFee)+' fee and '+pc(p.invDrag)+' a year for taxes along the way; gains taxed at '+pc(p.invTax,1)+' when withdrawn</td></tr>'
     + '<tr><td>Income</td><td>Ages '+D.is+'–'+D.ie+', rising '+pc(p.cola)+' a year. Asset income is taken as loans at '+pc(p.loanRate)+' interest and sized to keep accessible value above '+$m(p.csvFloor)+'</td></tr>'
-    + '<tr><td>Care benefit</td><td>'+$m(D.mo)+' a month as illustrated; withdrawal comparison uses a '+pc(I.qpTax,1)+' tax rate over '+D.ltcYrs+' years</td></tr>'
+    + '<tr><td>Care benefit</td><td>'+$m(D.mo)+' a month as illustrated; withdrawal comparison uses a '+pc(I.qpTax,1)+' tax rate'+(D.fixed?'':' over '+D.ltcYrs+' years')+'</td></tr>'
     + '</tbody></table><p class="fine" style="margin-top:14px">'+esc(DISCLOSURE)+'</p></div>');
 
   // 8 questions
   const p8 = page('<div class="in"><div class="eyebrow">Before you decide</div><h1 style="font-size:38px">Questions worth sitting with</h1>'
-    + '<div class="qblock"><div class="eyebrow">Ask yourself</div><ol><li>If care were needed in the next five years, which account would you want to pay for it from — and what would that withdrawal cost you in taxes?</li><li>Has anyone shown you what '+D.ltcYrs+' years of care would take out of your qualified account after tax?</li><li>What happens to the rest of your plan if the need arrives before you are ready?</li><li>Each year you wait, pricing and insurability can change. What would waiting cost you?</li></ol></div>'
+    + '<div class="qblock"><div class="eyebrow">Ask yourself</div><ol><li>If care were needed in the next five years, which account would you want to pay for it from — and what would that withdrawal cost you in taxes?</li><li>Has anyone shown you what '+(D.fixed?'that much care':D.ltcYrs+' years of care')+' would take out of your qualified account after tax?</li><li>What happens to the rest of your plan if the need arrives before you are ready?</li><li>Each year you wait, pricing and insurability can change. What would waiting cost you?</li></ol></div>'
     + '<div class="card g"><h3>A simple next step</h3><p>Let\'s look at your own numbers: the monthly benefit that fits, the contribution that makes sense, and the way to fund it.</p></div>'
     + '<div class="sig" style="margin-top:auto">'+(D.advisor?esc(D.advisor):'Your advisor')+'<small>'+esc(D.dateStr)+'</small></div></div>');
 
@@ -887,7 +897,7 @@ function inputs(){
   const fs=$('fundSrc').value, ex=nv('exAmt')||0;
   const fundNote = fs==='nq' ? 'Non-qualified savings' : fs==='x1035' ? '1035 exchange of existing values' : fs==='mix' ? '1035 exchange ('+$m(ex)+') combined with non-qualified savings' : 'Qualified source, with the tax on distributions handled separately';
   return { clientName:$('clientName').value.trim(), advisorName:$('advisorName').value.trim(), dateStr:$('dateStr').value, version:$('version').value.trim(),
-    iRate:nv('iRate'), cap:nv('cap'), floor:nv('floor'), ltcMonthly:nv('ltcMonthly'), ltcYears:nv('ltcYears'), qpTax:nv('qpTax'), ltcAge:nv('ltcAge'), careCost:nv('careCost'), careInfl:nv('careInfl'), careProb:nv('careProb'), careDur:nv('careDur'),
+    iRate:nv('iRate'), cap:nv('cap'), floor:nv('floor'), ltcMonthly:nv('ltcMonthly'), ltcYears:nv('ltcYears'), qpTax:nv('qpTax'), ltcAge:nv('ltcAge'), careMode:$('careMode').value, careAmt:nv('careAmt'), careCost:nv('careCost'), careInfl:nv('careInfl'), careProb:nv('careProb'), careDur:nv('careDur'),
     is:nv('is'), ie:nv('ie'), cola:nv('cola'), loanRate:nv('loanRate'), csvFloor:nv('csvFloor'),
     invEq:nv('invEq'), invFee:nv('invFee'), invDrag:nv('invDrag'), invTax:nv('invTax'), dataYrs:nv('dataYrs'), nSims:nv('nSims'), seed:20240607, overlay:$('overlay').value==='1',
     fundSrc:fs, exAmt:ex, fundNote };
@@ -899,6 +909,7 @@ $('run').onclick=async()=>{
   if(I.qpTax<0||I.qpTax>=100){ $('runMsg').innerHTML='<div class="err">Tax rate must be between 0 and 99.</div>'; return; }
   const ex1=(I.fundSrc==='x1035'||I.fundSrc==='mix')?(I.exAmt||0):0;
   if(ex1>0 && ILL.rows[0].prem < ex1-1){ $('runMsg').innerHTML='<div class="err">The illustration\'s year-1 premium ('+$m(ILL.rows[0].prem)+') is less than the exchange amount entered ('+$m(ex1)+'). Run the illustration with the exchange included in year 1, or correct the amount.</div>'; return; }
+  if(I.careMode==='fixed'){ if(!(I.careAmt>0)){ $('runMsg').innerHTML='<div class="err">Enter the total care available at issue.</div>'; return; } }
   $('runMsg').innerHTML=''; $('run').disabled=true; $('results').classList.add('hide');
   try{
     const R=await runMonteCarlo(ILL,I,(f,t)=>{ $('pbar').style.width=Math.round(f*100)+'%'; $('status').textContent=t||''; });
@@ -910,7 +921,7 @@ $('run').onclick=async()=>{
 function show(R,I){
   const M=ILL.meta, D=derive(R,I,M);
   $('kpis').innerHTML=
-   '<div class="kpi k1"><div class="n">'+$m(D.ltcTotal)+'</div><div class="l">Tax-free care benefit over '+D.ltcYrs+' years</div></div>'+
+   '<div class="kpi k1"><div class="n">'+$m(D.ltcTotal)+'</div><div class="l">'+(D.fixed?'Total care available, tax-free':'Tax-free care benefit over '+D.ltcYrs+' years')+'</div></div>'+
    '<div class="kpi k3"><div class="n">'+$m(D.qpGrossTotal)+'</div><div class="l">Qualified-account withdrawal needed for the same net</div></div>'+
    '<div class="kpi k2"><div class="n">'+$m(D.txTotal)+'</div><div class="l">Taxable account, total net income (median)</div></div>'+
    '<div class="kpi k4"><div class="n">'+$m(D.polTotal)+'</div><div class="l">Protection asset, total tax-free income (median)</div></div>';
@@ -925,5 +936,7 @@ document.querySelectorAll('[data-o]').forEach(b=>b.onclick=()=>{
   const w=window.open(URL.createObjectURL(new Blob([html],{type:'text/html'})),'_blank');
   if(!w) $('popHint').textContent='Your browser blocked the pop-up. Allow pop-ups for this site and try again.';
 });
+
+(function(){var s=document.getElementById('careMode');function f(){var x=s.value==='fixed';document.getElementById('careAmtBox').style.display=x?'':'none';document.getElementById('ltcAgeBox').style.display=x?'none':'';document.getElementById('ltcYrsBox').style.display=x?'none':'';}s.addEventListener('change',f);f();})();
 </script>
 </body></html>
