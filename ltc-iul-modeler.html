@@ -39,7 +39,8 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}th{font:700 11.5px va
 <div><label>Client name</label><input id="clientName" placeholder="Client or household"></div>
 <div><label>Prepared by</label><input id="advisorName"></div>
 <div><label>Date</label><input id="dateStr"></div>
-<div><label>Version label (optional)</label><input id="version" placeholder="e.g. Draft 1"></div></div></section>
+<div><label>Version label (optional)</label><input id="version" placeholder="e.g. Draft 1"></div>
+<div id="versionBBox" class="hide"><label>Version label, second option (optional)</label><input id="versionB" placeholder="e.g. Draft 1"></div></div></section>
 
 <section class="card"><h2>2 · Carrier illustration</h2>
 <label style="display:flex;gap:8px;align-items:center;margin:-4px 0 10px;cursor:pointer"><input type="checkbox" id="cmp" style="width:auto"> Compare two options (adds a second illustration and a comparison summary)</label>
@@ -1105,9 +1106,9 @@ document.querySelectorAll('[data-o]').forEach(b=>b.onclick=()=>{
 // ───────── second option (comparison) ─────────
 function inputsB(){
   const I=inputs(); const g=id=>nv(id);
-  return Object.assign({},I,{ iRate:g('iRateB'), cap:g('capB'), loanRate:g('loanRateB'), ltcMonthly:g('ltcMonthlyB'), ltcYears:g('ltcYearsB'), ltcAge:g('ltcAgeB'), careMode:$('careModeB').value, careAmt:g('careAmtB'), overlay:$('overlayB').value==='1' });
+  return Object.assign({},I,{ version:$('versionB').value.trim(), iRate:g('iRateB'), cap:g('capB'), loanRate:g('loanRateB'), ltcMonthly:g('ltcMonthlyB'), ltcYears:g('ltcYearsB'), ltcAge:g('ltcAgeB'), careMode:$('careModeB').value, careAmt:g('careAmtB'), overlay:$('overlayB').value==='1' });
 }
-$('cmp').onchange=()=>{ $('cardB').classList.toggle('hide',!$('cmp').checked); if(!$('cmp').checked) $('cmpBtns').classList.add('hide'); };
+$('cmp').onchange=()=>{ $('versionBBox').classList.toggle('hide',!$('cmp').checked); $('cardB').classList.toggle('hide',!$('cmp').checked); if(!$('cmp').checked) $('cmpBtns').classList.add('hide'); };
 const dropB=$('dropB'), fileInB=$('fileB');
 dropB.onclick=()=>fileInB.click();
 ['dragover','dragenter'].forEach(e=>dropB.addEventListener(e,ev=>{ev.preventDefault();dropB.classList.add('on');}));
