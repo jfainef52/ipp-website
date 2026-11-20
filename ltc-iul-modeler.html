@@ -730,26 +730,26 @@ function p_(R){ return R.params; }
 function buildDiscussionDoc(R, I, M){
   const D = derive(R,I,M), p=R.params;
   const TOTAL = 9;
-  const style = '@page{size:letter;margin:0}'
-   + '.page{width:8.5in;height:11in;margin:14px auto;background:#fff;box-shadow:0 2px 14px rgba(0,0,0,.14);position:relative;display:flex;flex-direction:column;overflow:hidden}'
+  const style = '@page{size:11in 8.5in;margin:0}'
+   + '.page{width:11in;height:8.5in;margin:14px auto;background:#fff;box-shadow:0 2px 14px rgba(0,0,0,.14);position:relative;display:flex;flex-direction:column;overflow:hidden}'
    + '@media print{.page{margin:0;box-shadow:none;break-after:page;page-break-after:always}.page:last-child{break-after:auto;page-break-after:auto}}'
-   + '.in{padding:.6in .7in .55in;flex:1;display:flex;flex-direction:column}.eyebrow{font:700 12px var(--head);letter-spacing:.22em;text-transform:uppercase;color:var(--orange)}'
-   + 'h1{margin:6px 0 10px;font:800 44px/1.02 var(--head);color:var(--navy);text-transform:uppercase;letter-spacing:.005em}h2{margin:0 0 8px;font:800 24px/1.1 var(--head);color:var(--navy);text-transform:uppercase}'
-   + 'p{font:400 16.5px/1.5 var(--body);margin:0 0 10px;color:var(--ink)}.muted{color:var(--muted)}'
-   + '.pf{position:absolute;left:.7in;right:.7in;bottom:.22in;display:flex;justify-content:space-between;font:500 9px var(--body);color:#8794a8;border-top:1px solid var(--line);padding-top:5px}'
-   + '.cover{background:var(--navy);color:#fff}.cover .in{padding:.9in .8in .7in;justify-content:space-between}.cover h1{color:#fff;font-size:60px;line-height:.98;margin:12px 0 16px}.cover .eyebrow{color:var(--amber)}.cover p{color:#c9d6e8;font-size:19px}'
+   + '.in{padding:.45in .6in .55in;flex:1;display:flex;flex-direction:column}.eyebrow{font:700 12px var(--head);letter-spacing:.22em;text-transform:uppercase;color:var(--orange)}'
+   + 'h1{margin:4px 0 10px;font:800 40px/1.02 var(--head);color:var(--navy);text-transform:uppercase;letter-spacing:.005em}h2{margin:0 0 8px;font:800 24px/1.1 var(--head);color:var(--navy);text-transform:uppercase}'
+   + 'p{font:400 17px/1.45 var(--body);margin:0 0 12px;color:var(--ink)}.muted{color:var(--muted)}'
+   + '.pf{position:absolute;left:.6in;right:.6in;bottom:.22in;display:flex;justify-content:space-between;font:500 9px var(--body);color:#8794a8;border-top:1px solid var(--line);padding-top:5px}'
+   + '.cover{background:var(--navy);color:#fff}.cover .in{padding:.8in .9in .6in;justify-content:space-between}.cover h1{color:#fff;font-size:52px;max-width:8in;line-height:.98;margin:12px 0 16px}.cover .eyebrow{color:var(--amber)}.cover p{color:#c9d6e8;font-size:17px;max-width:7.5in}'
    + '.cover .bar{height:8px;width:90px;background:var(--amber);border-radius:4px;margin:6px 0 18px}.cover .for{font:600 14px var(--body);color:#c9d6e8;line-height:1.7}.cover .for b{color:#fff;font:700 24px var(--head);letter-spacing:.04em;text-transform:uppercase;display:block}'
-   + '.pair{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:8px 0 14px}.big{border-radius:14px;padding:20px 22px;color:#fff}.big .n{font:800 54px/1 var(--head)}.big .l{font:600 15px/1.35 var(--body);margin-top:6px}.big .s{font:500 13px/1.35 var(--body);opacity:.92;margin-top:4px}'
+   + '.pair{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:8px 0 14px}.big{border-radius:14px;padding:20px 24px;color:#fff}.big .n{font:800 58px/1 var(--head)}.big .l{font:600 16.5px/1.35 var(--body);margin-top:6px}.big .s{font:500 14.5px/1.35 var(--body);opacity:.92;margin-top:4px}'
    + '.green{background:var(--green)}.blue{background:var(--blue)}.orange{background:var(--orange)}.navyb{background:var(--navy2)}'
-   + '.band{background:var(--amber);color:var(--navy);padding:16px 22px;border-radius:12px;font:700 20px/1.3 var(--body);margin-top:auto}'
-   + '.card{border:1px solid var(--line);border-radius:14px;padding:16px 20px;background:#fff;margin-bottom:12px}.card h3{margin:0 0 4px;font:800 19px var(--head);text-transform:uppercase;letter-spacing:.05em}.card p{font-size:15px;margin:0}'
+   + '.band{background:var(--amber);color:var(--navy);padding:15px 24px;border-radius:12px;font:700 21px/1.3 var(--body);margin-top:auto}'
+   + '.card{border:1px solid var(--line);border-radius:14px;padding:18px 22px;background:#fff;margin-bottom:12px}.card h3{margin:0 0 6px;font:800 21px var(--head);text-transform:uppercase;letter-spacing:.05em}.card p{font-size:16.5px;margin:0}'
    + '.card.b{border-top:7px solid var(--blue)}.card.b h3{color:var(--blue)}.card.g{border-top:7px solid var(--green)}.card.g h3{color:var(--green)}.card.o{border-top:7px solid var(--orange)}.card.o h3{color:var(--orange)}'
-   + '.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}ul.k{margin:6px 0 0;padding-left:18px;font:400 14.5px/1.5 var(--body)}ul.k li{margin-bottom:3px}'
-   + 'table{border-collapse:collapse;width:100%;font-size:14px}th{font:700 12px var(--body);color:var(--muted);text-align:right;padding:6px 8px;border-bottom:2px solid var(--line)}th:first-child,td:first-child{text-align:left}td{text-align:right;padding:7px 8px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}td b{color:var(--navy)}'
-   + '.legend{display:flex;gap:16px;font:600 12px var(--body);color:var(--muted);margin-top:4px}.legend i{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:6px;vertical-align:-1px}'
-   + '.qblock{background:var(--navy);color:#fff;border-radius:16px;padding:26px 30px;margin:6px 0 16px}.qblock .eyebrow{color:var(--amber);margin-bottom:10px}.qblock ol{margin:0;padding-left:24px}.qblock li{font:600 19px/1.4 var(--body);margin-bottom:14px;color:#fff}'
+   + '.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}ul.k{margin:8px 0 0;padding-left:20px;font:400 16.5px/1.5 var(--body)}ul.k li{margin-bottom:3px}'
+   + 'table{border-collapse:collapse;width:100%;font-size:16px}th{font:700 13.5px var(--body);color:var(--muted);text-align:right;padding:6px 8px;border-bottom:2px solid var(--line)}th:first-child,td:first-child{text-align:left}td{text-align:right;padding:9px 10px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}td b{color:var(--navy)}'
+   + '.legend{display:flex;gap:16px;font:600 13.5px var(--body);color:var(--muted);margin-top:4px}.legend i{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:6px;vertical-align:-1px}'
+   + '.qblock{background:var(--navy);color:#fff;border-radius:16px;padding:22px 26px;margin:0}.qblock .eyebrow{color:var(--amber);margin-bottom:10px}.qblock ol{margin:0;padding-left:24px}.qblock li{font:600 19px/1.4 var(--body);margin-bottom:14px;color:#fff}'
    + '.sig{font:600 16px var(--body);color:var(--navy)}.sig small{display:block;font:500 13px var(--body);color:var(--muted)}'
-   + '.assume{font:400 12.5px/1.45 var(--body);color:var(--ink)}.assume td{padding:5px 8px;font-size:12.5px}.fine{font:400 10px/1.4 var(--body);color:#6c7a90}';
+   + '.assume{font:400 15px/1.45 var(--body);color:var(--ink)}.assume td{padding:8px 12px;font-size:15px;text-align:left;vertical-align:top}.assume td:first-child{width:22%;font-weight:700;color:var(--navy)}.two>.card{margin-bottom:0}.two{margin-bottom:12px;align-items:stretch}.card.o td:first-child{white-space:nowrap}.fine{font:400 10px/1.4 var(--body);color:#6c7a90}';
   let pg = 0;
   const page = (inner, cls) => { pg++; return '<section class="page '+(cls||'')+'">'+inner+(cls==='cover'?'':'<div class="pf"><span>Prepared for '+esc(D.client)+(D.advisor?' · '+esc(D.advisor):'')+' · '+esc(D.dateStr)+'</span><span>Page '+pg+' of '+TOTAL+'</span></div>')+'</section>'; };
 
@@ -782,15 +782,15 @@ function buildDiscussionDoc(R, I, M){
   // 4 care
   const p4 = page('<div class="in"><div class="eyebrow">If care is needed</div><h1>A tax-free benefit, month after month</h1>'
     + '<div class="pair"><div class="big green"><div class="n">'+$m(D.mo)+'</div><div class="l">Illustrated monthly long-term care benefit</div><div class="s">'+$m(D.ltcAnnual)+' a year</div></div><div class="big navyb"><div class="n">'+$m(D.ltcTotal)+'</div><div class="l">'+(D.fixed?'Total care available, tax-free':'Over '+D.ltcYrs+' years, tax-free')+'</div><div class="s">no withdrawal needed from your qualified account</div></div></div>'
-    + '<div class="card g">'+(D.fixed
+    + '<div class="two"><div class="card g">'+(D.fixed
       ? '<h3>The care coverage</h3><p>Total care available at issue is illustrated at <b>'+$m(D.careAmt)+'</b>. This is a separate amount from the total benefit. The total benefit, reduced by any loans or benefits taken, remains for your family.</p>'
       : '<h3>Where the benefit comes from</h3><p>While the insured is living, the asset\'s total benefit is the pool the care benefit draws from. At age '+D.ltcAge+' that pool is illustrated at <b>'+$m(D.pool)+'</b> — about '+D.fx(D.poolCovers)+' times the '+D.ltcYrs+'-year benefit. Whatever is not used for care passes to your family.</p>')+'</div>'
-    + '<div class="card o"><h3>To net the same from a qualified account</h3><table><thead><tr><th></th><th>Per month</th><th>Per year</th><th>'+(D.fixed?'Total available':D.ltcYrs+' years')+'</th></tr></thead><tbody><tr><td>Tax-free benefit</td><td><b>'+$m(D.mo)+'</b></td><td><b>'+$m(D.ltcAnnual)+'</b></td><td><b>'+$m(D.ltcTotal)+'</b></td></tr><tr><td>Qualified-account withdrawal</td><td><b>'+$m(D.qpGrossMonthly)+'</b></td><td><b>'+$m(D.qpGrossAnnual)+'</b></td><td><b>'+$m(D.qpGrossTotal)+'</b></td></tr><tr><td>Paid in tax</td><td>'+$m(D.qpGrossMonthly-D.mo)+'</td><td>'+$m(D.qpGrossAnnual-D.ltcAnnual)+'</td><td>'+$m(D.qpTaxTotal)+'</td></tr></tbody></table></div>'
+    + '<div class="card o"><h3>To net the same from a qualified account</h3><table><thead><tr><th></th><th>Per month</th><th>Per year</th><th>'+(D.fixed?'Total available':D.ltcYrs+' years')+'</th></tr></thead><tbody><tr><td>Tax-free benefit</td><td><b>'+$m(D.mo)+'</b></td><td><b>'+$m(D.ltcAnnual)+'</b></td><td><b>'+$m(D.ltcTotal)+'</b></td></tr><tr><td>Qualified-account withdrawal</td><td><b>'+$m(D.qpGrossMonthly)+'</b></td><td><b>'+$m(D.qpGrossAnnual)+'</b></td><td><b>'+$m(D.qpGrossTotal)+'</b></td></tr><tr><td>Paid in tax</td><td>'+$m(D.qpGrossMonthly-D.mo)+'</td><td>'+$m(D.qpGrossAnnual-D.ltcAnnual)+'</td><td>'+$m(D.qpTaxTotal)+'</td></tr></tbody></table></div></div>'
     + '<div class="band">'+$m(D.qpTaxTotal)+' that could stay in your qualified account, still working for you.</div></div>');
 
   // 5 income
   const _ix=R.ages.map((a,i)=>i).filter(i=>R.ages[i]>=I.is&&R.ages[i]<=I.ie);
-  const chart = lineChart({ w:640, h:170, ages:_ix.map(i=>R.ages[i]), label:'Cumulative income', series:[
+  const chart = lineChart({ w:520, h:270, ages:_ix.map(i=>R.ages[i]), label:'Cumulative income', series:[
       {name:'Asset',color:'#2e9e6b',vals:_ix.map(i=>D.cumPol[i])},
       {name:'Taxable account',color:'#2f6fb5',vals:_ix.map(i=>D.cumTax[i])} ] });
   const bandRows = [25,50,75].map(b=>{ const lab=b===25?'Cautious markets':b===50?'Median markets':'Favorable markets'; return '<tr><td>'+lab+'</td><td>'+$m(R.invBands[b].total)+'</td><td>'+$m(R.bands[b].total)+'</td></tr>'; }).join('');
@@ -799,24 +799,24 @@ function buildDiscussionDoc(R, I, M){
   const p5 = page('<div class="in"><div class="eyebrow">If care is never needed</div><h1>'+esc(p5head)+'</h1>'
     + '<p>We ran '+R.N.toLocaleString('en-US')+' possible market histories. Both strategies start income at age '+D.is+' and run to age '+D.ie+', rising '+pc(p.cola)+' a year.</p>'
     + '<div class="pair"><div class="big blue"><div class="n">'+$m(D.txFirst)+'</div><div class="l">Taxable account, first year</div><div class="s">after tax · '+$m(D.txTotal)+' in total</div></div><div class="big green"><div class="n">'+$m(D.polFirst)+'</div><div class="l">Asset, first year</div><div class="s">tax-free · '+$m(D.polTotal)+' in total</div></div></div>'
-    + '<div class="card"><div style="font:700 13px var(--body);color:var(--muted);margin-bottom:2px">Total income by age — median markets</div>'+chart+legend([{name:'Asset (tax-free)',color:'#2e9e6b'},{name:'Taxable account (after tax)',color:'#2f6fb5'}])+'</div>'
-    + '<div class="card"><table><thead><tr><th>Total income to age '+D.ie+'</th><th>Taxable account</th><th>Asset</th></tr></thead><tbody>'+bandRows+'</tbody></table></div>'
+    + '<div class="two"><div class="card"><div style="font:700 13px var(--body);color:var(--muted);margin-bottom:2px">Total income by age — median markets</div>'+chart+legend([{name:'Asset (tax-free)',color:'#2e9e6b'},{name:'Taxable account (after tax)',color:'#2f6fb5'}])+'</div>'
+    + '<div class="card"><table><thead><tr><th>Total income to age '+D.ie+'</th><th>Taxable account</th><th>Asset</th></tr></thead><tbody>'+bandRows+'</tbody></table></div></div>'
     + '<div class="band">'+esc(p5band)+'</div></div>');
 
   // 6 stays behind
   const ages = [65,70,75,80,85,90,95].filter(a=>a>=R.issueAge && a<=R.ages[R.ages.length-1]);
   const protRows = ages.map(a=>{ const r=D.at(a); return '<tr><td><b>Age '+a+'</b></td><td>'+$m(r.csv)+'</td><td>'+$m(r.db)+'</td></tr>'; }).join('');
-  const chart2 = lineChart({ w:640, h:200, ages:R.ages, label:'Total benefit and accessible value', series:[
+  const chart2 = lineChart({ w:520, h:320, ages:R.ages, label:'Total benefit and accessible value', series:[
       {name:'Total benefit',color:'#e8772e',vals:R.illus.map(r=>r.db)},
       {name:'Accessible value',color:'#2e9e6b',vals:R.illus.map(r=>r.csv)} ] });
   const p6 = page('<div class="in"><div class="eyebrow">What stays behind</div><h1>Protection that grows with you</h1>'
     + '<p>'+(D.fixed?'The total benefit is what your family receives, reduced by any loans or benefits taken. Care coverage is a separate amount set at issue. ':'The total benefit is the pool for care while you are living, and what your family receives afterward. ')+'Accessible value is what you can reach through asset loans.</p>'
-    + '<div class="card"><div style="font:700 13px var(--body);color:var(--muted);margin-bottom:2px">As illustrated at '+pc(p.iRate)+', before any asset loans</div>'+chart2+legend([{name:'Total benefit',color:'#e8772e'},{name:'Accessible value',color:'#2e9e6b'}])+'</div>'
-    + '<div class="card"><table><thead><tr><th></th><th>Accessible value</th><th>Total benefit</th></tr></thead><tbody>'+protRows+'</tbody></table></div>'
+    + '<div class="two"><div class="card"><div style="font:700 13px var(--body);color:var(--muted);margin-bottom:2px">As illustrated at '+pc(p.iRate)+', before any asset loans</div>'+chart2+legend([{name:'Total benefit',color:'#e8772e'},{name:'Accessible value',color:'#2e9e6b'}])+'</div>'
+    + '<div class="card"><table><thead><tr><th></th><th>Accessible value</th><th>Total benefit</th></tr></thead><tbody>'+protRows+'</tbody></table></div></div>'
     + '<div class="band">Income taken as asset loans reduces the total benefit'+(D.fixed?'':' and the care pool')+', so we decide how much to take, and when, together.</div></div>');
 
   // 7 how built
-  const p7 = page('<div class="in"><div class="eyebrow">How we built these numbers</div><h2 style="font-size:34px">Plain-English assumptions</h2>'
+  const p7 = page('<div class="in"><div class="eyebrow">How we built these numbers</div><h2 style="font-size:30px">Plain-English assumptions</h2>'
     + '<table class="assume"><tbody>'
     + '<tr><td>Contributions</td><td>'+D.fundPhrase+' into each strategy ('+$m(D.totalPrem)+' total). Source: '+esc(I.fundNote||'Non-qualified savings')+'. No financing is used.</td></tr>'
     + '<tr><td>Asset growth</td><td>The asset is illustrated at '+pc(p.iRate)+'. For income we replaced that with '+R.N.toLocaleString('en-US')+' simulated market histories, re-sampling '+R.years.n+' calendar years ('+R.years.from+'–'+R.years.to+'), with the asset\'s cap of '+pc(p.cap)+' and floor of '+pc(p.floor)+(R.overlay?', and the asset\'s enhancement rider credit multiplier applied':'')+'</td></tr>'
@@ -827,10 +827,10 @@ function buildDiscussionDoc(R, I, M){
     + '</tbody></table><p class="fine" style="margin-top:14px">'+esc(DISCLOSURE)+'</p></div>');
 
   // 8 questions
-  const p8 = page('<div class="in"><div class="eyebrow">Before you decide</div><h1 style="font-size:38px">Questions worth sitting with</h1>'
-    + '<div class="qblock"><div class="eyebrow">Ask yourself</div><ol><li>If care were needed in the next five years, which account would you want to pay for it from — and what would that withdrawal cost you in taxes?</li><li>Has anyone shown you what '+(D.fixed?'that much care':D.ltcYrs+' years of care')+' would take out of your qualified account after tax?</li><li>What happens to the rest of your plan if the need arrives before you are ready?</li><li>Each year you wait, pricing and insurability can change. What would waiting cost you?</li></ol></div>'
-    + '<div class="card g"><h3>A simple next step</h3><p>Let\'s look at your own numbers: the monthly benefit that fits, the contribution that makes sense, and the way to fund it.</p></div>'
-    + '<div class="sig" style="margin-top:auto">'+(D.advisor?esc(D.advisor):'Your advisor')+'<small>'+esc(D.dateStr)+'</small></div></div>');
+  const p8 = page('<div class="in"><div class="eyebrow">Before you decide</div><h1 style="font-size:32px">Questions worth sitting with</h1>'
+    + '<div class="two" style="flex:1;align-items:stretch;margin-bottom:0"><div class="qblock"><div class="eyebrow">Ask yourself</div><ol><li>If care were needed in the next five years, which account would you want to pay for it from — and what would that withdrawal cost you in taxes?</li><li>Has anyone shown you what '+(D.fixed?'that much care':D.ltcYrs+' years of care')+' would take out of your qualified account after tax?</li><li>What happens to the rest of your plan if the need arrives before you are ready?</li><li>Each year you wait, pricing and insurability can change. What would waiting cost you?</li></ol></div>'
+    + '<div style="display:flex;flex-direction:column"><div class="card g"><h3>A simple next step</h3><p>Let\'s look at your own numbers: the monthly benefit that fits, the contribution that makes sense, and the way to fund it.</p></div>'
+    + '<div class="sig" style="margin-top:auto">'+(D.advisor?esc(D.advisor):'Your advisor')+'<small>'+esc(D.dateStr)+'</small></div></div></div></div>');
 
   return '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Discussion Document - '+esc(D.client)+'</title>'+FONTS+'<style>'+PB_VARS+style+'</style></head><body>'
     + TOOLBAR('Discussion Document') + cover + p2 + p3 + p3b + p4 + p5 + p6 + p7 + p8 + '</body></html>';
