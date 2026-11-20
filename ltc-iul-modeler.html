@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LTC Protection Modeler — Integrated Planning Partners</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700;800&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--navy:#0f2742;--navy2:#17375c;--amber:#f5a623;--orange:#e8772e;--blue:#2f6fb5;--green:#2e9e6b;--bg:#eef1f6;--ink:#14233a;--muted:#52627a;--line:#dde3ec;--head:"Barlow Condensed","Arial Narrow",Arial,sans-serif;--body:"Barlow",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 var(--body)}
+#auth-gate{position:fixed;inset:0;background:var(--navy);display:flex;align-items:center;justify-content:center;z-index:1000;transition:opacity .3s}
+#auth-gate.hidden{opacity:0;pointer-events:none}.spin{width:34px;height:34px;border:3px solid rgba(255,255,255,.2);border-top-color:var(--amber);border-radius:50%;animation:sp .8s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}
+header{background:var(--navy);color:#fff;border-bottom:6px solid var(--amber);padding:18px 28px;display:flex;align-items:flex-end;gap:20px;flex-wrap:wrap}
+header h1{margin:0;font:800 34px/1 var(--head);text-transform:uppercase;letter-spacing:.02em}header .s{font:500 14px var(--body);color:#c9d6e8;margin-top:4px}
+header a{margin-left:auto;color:var(--amber);font:700 13px var(--body);text-decoration:none}
+main{max-width:1180px;margin:20px auto 60px;padding:0 20px;display:grid;grid-template-columns:1fr;gap:16px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px 20px}
+.card h2{margin:0 0 10px;font:800 19px var(--head);letter-spacing:.08em;text-transform:uppercase;color:var(--navy)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
+label{display:block;font:600 12px var(--body);color:var(--muted);margin-bottom:3px}
+input,select{width:100%;padding:8px 10px;border:1px solid #c5cedb;border-radius:7px;font:500 14px var(--body);background:#fff;color:var(--ink)}
+input:focus,select:focus{outline:2px solid var(--amber);border-color:var(--amber)}
+.hint{font:400 11.5px var(--body);color:var(--muted);margin-top:2px}
+.drop{border:2px dashed #9fb0c7;border-radius:12px;padding:26px;text-align:center;color:var(--muted);cursor:pointer;background:#f7f9fc}
+.drop.on{border-color:var(--green);background:#eef8f3;color:var(--ink)}
+button.pri{background:var(--amber);color:var(--navy);border:0;border-radius:8px;padding:12px 22px;font:800 15px var(--body);cursor:pointer}
+button.pri:disabled{opacity:.45;cursor:not-allowed}button.sec{background:var(--navy);color:#fff;border:0;border-radius:8px;padding:11px 18px;font:700 14px var(--body);cursor:pointer}
+.warn{background:#fff6e0;border-left:5px solid var(--amber);padding:10px 14px;border-radius:6px;margin-top:10px;font-size:13.5px}
+.err{background:#fdeceb;border-left:5px solid #c0392b;padding:10px 14px;border-radius:6px;margin-top:10px;font-size:13.5px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}.kpi{border-radius:12px;padding:14px 16px;color:#fff}.kpi .n{font:800 32px/1 var(--head)}.kpi .l{font:600 12.5px var(--body);opacity:.95;margin-top:4px}
+.k1{background:var(--green)}.k2{background:var(--blue)}.k3{background:var(--orange)}.k4{background:var(--navy2)}
+.bar{height:8px;background:#e1e7f0;border-radius:4px;overflow:hidden;margin-top:10px}.bar i{display:block;height:100%;width:0;background:var(--amber);transition:width .2s}
+.btns{display:flex;gap:10px;flex-wrap:wrap}.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+table{border-collapse:collapse;width:100%;font-size:13.5px}th{font:700 11.5px var(--body);color:var(--muted);text-align:right;padding:5px 8px;border-bottom:2px solid var(--line)}th:first-child,td:first-child{text-align:left}td{text-align:right;padding:6px 8px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+.hide{display:none}
+</style></head><body>
+<div id="auth-gate"><div class="spin"></div></div>
+<header><div><h1>LTC Protection Modeler</h1><div class="s">Long-term-care-focused indexed life vs. a taxable investment account · Monte Carlo income, illustrated protection</div></div><a href="advisor-dashboard.html">← Advisor dashboard</a></header>
+<main id="app" class="hide">
+<section class="card"><h2>1 · Case details</h2><div class="grid">
+<div><label>Client name</label><input id="clientName" placeholder="Client or household"></div>
+<div><label>Prepared by</label><input id="advisorName"></div>
+<div><label>Date</label><input id="dateStr"></div>
+<div><label>Version label (optional)</label><input id="version" placeholder="e.g. Draft 1"></div></div></section>
+
+<section class="card"><h2>2 · Policy illustration</h2>
+<div class="drop" id="drop">Drop the illustration output here (.csv or .xlsx), or click to choose<input type="file" id="file" accept=".csv,.xlsx,.xls" class="hide"></div>
+<div id="fileMsg"></div>
+<div class="grid" style="margin-top:12px">
+<div><label>Illustrated rate (%)</label><input id="iRate" type="number" step="0.01"><div class="hint">The rate the illustration was run at</div></div>
+<div><label>Index cap (%)</label><input id="cap" type="number" step="0.05"><div class="hint">Used in the Monte Carlo credit</div></div>
+<div><label>Index floor (%)</label><input id="floor" type="number" step="0.05" value="0"></div>
+<div><label>Illustrated monthly LTC benefit ($)</label><input id="ltcMonthly" type="number" step="1"></div>
+<div><label>Benefit period (years)</label><input id="ltcYears" type="number" min="1" max="10" value="3"></div>
+<div><label>Qualified-source tax rate (%)</label><input id="qpTax" type="number" step="0.5" value="30"></div>
+<div><label>Enhancement rider factors</label><select id="overlay"><option value="1">Apply (illustration run without the rider)</option><option value="0">Do not apply (illustration already includes it)</option></select><div class="hint">Credit multiplier and matching charge, by policy year</div></div>
+<div><label>Age shown for the benefit pool</label><input id="ltcAge" type="number" value="75"></div>
+<div><label>Typical monthly cost of care ($)</label><input id="careCost" type="number" value="10646"><div class="hint">Editable; default from the LTC cost calculator data</div></div>
+<div><label>Care cost inflation (%)</label><input id="careInfl" type="number" step="0.25" value="4"></div>
+<div><label>Chance of needing care after 65 (%)</label><input id="careProb" type="number" value="70"></div>
+<div><label>Average years of care</label><input id="careDur" type="number" step="0.1" value="3.3"></div></div></section>
+
+<section class="card"><h2>3 · Funding</h2><div class="grid">
+<div><label>Source of funds</label><select id="fundSrc"><option value="nq">Non-qualified savings</option><option value="x1035">1035 exchange from other life policies</option><option value="mix">Mix: 1035 exchange and non-qualified</option><option value="qp">Qualified source (taxes handled separately)</option></select></div>
+<div id="exWrap" class="hide"><label>Amount arriving by 1035 exchange ($)</label><input id="exAmt" type="number" step="1000" value="0"></div></div>
+<div class="hint" style="margin-top:6px">Contributions are read from the illustration (up to 20 years). The taxable account receives the same dollars in the same years. No financing is used.</div></section>
+
+<section class="card"><h2>4 · Income assumptions</h2><div class="grid">
+<div><label>Income starts at age</label><input id="is" type="number" value="65"></div>
+<div><label>Income ends at age</label><input id="ie" type="number" value="95"></div>
+<div><label>Annual increase (%)</label><input id="cola" type="number" step="0.25" value="2"></div>
+<div><label>Policy loan rate (%)</label><input id="loanRate" type="number" step="0.25" value="5"></div>
+<div><label>Keep cash value after loans above ($)</label><input id="csvFloor" type="number" step="5000" value="50000"></div></div></section>
+
+<section class="card"><h2>5 · Taxable account assumptions</h2><div class="grid">
+<div><label>Stocks (%) — rest in bonds</label><input id="invEq" type="number" value="60"></div>
+<div><label>Annual fee (%)</label><input id="invFee" type="number" step="0.05" value="1"></div>
+<div><label>Annual tax drag (%)</label><input id="invDrag" type="number" step="0.05" value="1.5"></div>
+<div><label>Tax on gains at withdrawal (%)</label><input id="invTax" type="number" step="0.1" value="23.8"></div>
+<div><label>Years of market history</label><select id="dataYrs"><option value="50">Last 50 years (1975–2024)</option><option value="40">Last 40 years</option><option value="30">Last 30 years</option><option value="20">Last 20 years</option></select></div>
+<div><label>Simulations</label><select id="nSims"><option value="5000">5,000</option><option value="10000" selected>10,000</option><option value="20000">20,000</option></select></div></div></section>
+
+<section class="card"><div class="row"><button class="pri" id="run" disabled>Run the model</button><div id="status" class="hint" style="flex:1"></div></div><div class="bar"><i id="pbar"></i></div><div id="runMsg"></div></section>
+
+<section class="card hide" id="results"><h2>Results</h2><div class="kpis" id="kpis"></div>
+<div style="margin-top:14px"><table id="bandTbl"></table></div>
+<div class="btns" style="margin-top:16px"><button class="sec" data-o="ledger">Open ledger</button><button class="sec" data-o="one">Open one-page summary</button><button class="sec" data-o="disc">Open discussion document</button></div>
+<div class="hint" id="popHint" style="margin-top:6px"></div></section>
+</main>
+
+<script>
+const SP_PRICE = {
+  1970: 0.0010, 1971: 0.1079, 1972: 0.1563, 1973:-0.1737,
+  1974:-0.2972, 1975: 0.3155, 1976: 0.1915, 1977:-0.1150,
+  1978: 0.0106, 1979: 0.1231, 1980: 0.2577, 1981:-0.0973,
+  1982: 0.1476, 1983: 0.1727, 1984: 0.0140, 1985: 0.2633,
+  1986: 0.1462, 1987: 0.0203, 1988: 0.1240, 1989: 0.2725,
+  1990:-0.0656, 1991: 0.2631, 1992: 0.0446, 1993: 0.0706,
+  1994:-0.0154, 1995: 0.3411, 1996: 0.2026, 1997: 0.3101,
+  1998: 0.2667, 1999: 0.1953, 2000:-0.1014, 2001:-0.1304,
+  2002:-0.2337, 2003: 0.2638, 2004: 0.0899, 2005: 0.0300,
+  2006: 0.1362, 2007: 0.0353, 2008:-0.3849, 2009: 0.2345,
+  2010: 0.1278, 2011: 0.0000, 2012: 0.1341, 2013: 0.2960,
+  2014: 0.1139, 2015:-0.0073, 2016: 0.0954, 2017: 0.1942,
+  2018:-0.0624, 2019: 0.2888, 2020: 0.1626, 2021: 0.2689,
+  2022:-0.1944, 2023: 0.2423, 2024: 0.2331
+};
+
+// S&P 500 total return (with dividends) 1970–2024
+const SP_TOTAL = {
+  1970: 0.0401, 1971: 0.1431, 1972: 0.1898, 1973:-0.1466,
+  1974:-0.2647, 1975: 0.3720, 1976: 0.2384, 1977:-0.0718,
+  1978: 0.0656, 1979: 0.1844, 1980: 0.3242, 1981:-0.0491,
+  1982: 0.2155, 1983: 0.2256, 1984: 0.0627, 1985: 0.3173,
+  1986: 0.1867, 1987: 0.0525, 1988: 0.1661, 1989: 0.3169,
+  1990:-0.0310, 1991: 0.3047, 1992: 0.0762, 1993: 0.1008,
+  1994: 0.0132, 1995: 0.3758, 1996: 0.2296, 1997: 0.3336,
+  1998: 0.2858, 1999: 0.2104, 2000:-0.0910, 2001:-0.1189,
+  2002:-0.2210, 2003: 0.2868, 2004: 0.1088, 2005: 0.0491,
+  2006: 0.1579, 2007: 0.0549, 2008:-0.3700, 2009: 0.2646,
+  2010: 0.1506, 2011: 0.0211, 2012: 0.1600, 2013: 0.3239,
+  2014: 0.1369, 2015: 0.0138, 2016: 0.1196, 2017: 0.2183,
+  2018:-0.0438, 2019: 0.3149, 2020: 0.1840, 2021: 0.2871,
+  2022:-0.1811, 2023: 0.2629, 2024: 0.2502
+};
+
+// US 10-year Treasury bond annual total returns (coupon + price), 1975–2024.
+// Source: Damodaran (NYU Stern), "Historical Returns on Stocks, Bonds and Bills: 1928-2024" (histretSP).
+// Used for the bond sleeve of the taxable comparison account. Same calendar year as the S&P draw.
+const TB10 = {
+  1975:0.0361, 1976:0.1598, 1977:0.0129, 1978:-0.0078, 1979:0.0067,
+  1980:-0.0299, 1981:0.0820, 1982:0.3281, 1983:0.0320, 1984:0.1373,
+  1985:0.2571, 1986:0.2428, 1987:-0.0496, 1988:0.0822, 1989:0.1769,
+  1990:0.0624, 1991:0.1500, 1992:0.0936, 1993:0.1421, 1994:-0.0804,
+  1995:0.2348, 1996:0.0143, 1997:0.0994, 1998:0.1492, 1999:-0.0825,
+  2000:0.1666, 2001:0.0557, 2002:0.1512, 2003:0.0038, 2004:0.0449,
+  2005:0.0287, 2006:0.0196, 2007:0.1021, 2008:0.2010, 2009:-0.1112,
+  2010:0.0846, 2011:0.1604, 2012:0.0297, 2013:-0.0910, 2014:0.1075,
+  2015:0.0128, 2016:0.0069, 2017:0.0280, 2018:-0.0002, 2019:0.0964,
+  2020:0.1133, 2021:-0.0442, 2022:-0.1783, 2023:0.0388, 2024:-0.0164
+};
+const POOL_YEARS = Object.keys(SP_PRICE).map(Number);
+
+// ════════════════════════════════════════════════════════════════════
+// ENGINE — carrier-neutral illustration parsing, calibration, Monte Carlo
+// (no carrier names anywhere: formats are "csv export" and "workbook")
+// ════════════════════════════════════════════════════════════════════
+
+// ---------- helpers ----------
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+const num = v => { if (v===null||v===undefined||v==='') return NaN; if (typeof v==='number') return v; const s=String(v).replace(/[$,\s"]/g,''); return s===''?NaN:parseFloat(s); };
+const num0 = v => { const x=num(v); return isNaN(x)?0:x; };
+const clampR = (x,lo,hi) => Math.min(Math.max(x,lo),hi);
+
+function splitCsvLine(line){
+  const out=[]; let cur='', q=false;
+  for (let i=0;i<line.length;i++){
+    const c=line[i];
+    if (c==='"'){ if (q && line[i+1]==='"'){cur+='"';i++;} else q=!q; }
+    else if (c===',' && !q){ out.push(cur); cur=''; }
+    else cur+=c;
+  }
+  out.push(cur);
+  return out.map(s=>s.trim());
+}
+
+// ---------- normalized illustration ----------
+// rows[i] = { year, age, prem, fixedChg, avChg, chg, idxCr, othCr, cr, av, surr, csv, db }
+//   chg   = total policy charges (positive $)            = fixedChg + avChg
+//   cr    = total credits ($)                             = idxCr + othCr
+//   idxCr = credits that move with the index              othCr = return-independent credits net of rider charges
+function finishIllustration(fmt, rows, meta){
+  const warnings = [];
+  if (!rows.length) return { error:'No policy-year rows were found in the file.' };
+  rows.sort((a,b)=>a.year-b.year);
+  // integrity: AV(t) = AV(t-1) + premium - charges + credits
+  let bad = 0, prev = 0;
+  rows.forEach(r=>{
+    const calc = prev + r.prem - r.chg + r.cr;
+    if (Math.abs(calc - r.av) > Math.max(3, r.av*0.00005)) bad++;
+    prev = r.av;
+  });
+  if (bad > 2) warnings.push('Illustration integrity check: accumulated value did not roll forward cleanly in '+bad+' policy years. Confirm the file is the full illustration output.');
+  const payRows = rows.filter(r=>r.prem>0);
+  const payYears = payRows.length;
+  const annualPrem = payRows.length ? payRows[0].prem : 0;
+  const level = payRows.every(r=>Math.abs(r.prem-annualPrem)<1);
+  const contigu = payRows.every((r,i)=>r.year===payRows[0].year+i);
+  meta.payYears = payYears; meta.annualPrem = annualPrem; meta.levelPremium = level && contigu;
+  meta.totalPrem = payRows.reduce((s,r)=>s+r.prem,0);
+  meta.issueAge = rows[0].age;
+  if (payYears > 20) warnings.push('The illustration funds the policy for '+payYears+' years. The modeler supports up to 20 contribution years.');
+  if (!(level && contigu)) warnings.push('Premiums in the file are not a level, uninterrupted schedule. The modeler will follow the schedule exactly as illustrated.');
+  if (meta.mecYear > 0) warnings.push('The illustration reports a modified endowment contract (MEC) in policy year '+meta.mecYear+'. Policy loans would not receive tax-free treatment as modeled.');
+  if (meta.lapseYear > 0) warnings.push('The illustration reports the policy lapsing in policy year '+meta.lapseYear+'.');
+  return { format:fmt, rows, meta, warnings };
+}
+
+// ---------- CSV export format ----------
+function parseCsvText(text){
+  const lines = text.split(/\r?\n/);
+  const meta = { format:'csv' };
+  const mi = lines.findIndex(l=>/initial face/i.test(l));
+  if (mi>=0){
+    const h = splitCsvLine(lines[mi]).map(s=>s.toLowerCase());
+    let vi = mi+1; while (vi<lines.length && !lines[vi].trim()) vi++;
+    const v = splitCsvLine(lines[vi]||'');
+    const at = (...t)=>{ for (const x of t){ const i=h.findIndex(s=>s.includes(x)); if (i>=0) return num(v[i]); } return NaN; };
+    meta.initialDB = at('initial face','face amount');
+    meta.modalPremium = at('modal premium');
+    meta.mecYear = num0(at('mec year'));
+    meta.lapseYear = num0(at('lapse year'));
+    const w = at('weighted average interest');
+    if (!isNaN(w)) meta.illustratedRatePct = Math.round(w*10000)/100;
+  }
+  const hi = lines.findIndex(l=>{ const c=splitCsvLine(l).map(s=>s.toLowerCase()); return c[0]==='year' && c[1]==='age'; });
+  if (hi<0) return { error:'Could not find the policy-year table (Year, Age, …) in this CSV.' };
+  const hd = splitCsvLine(lines[hi]).map(s=>s.toLowerCase().replace(/\s+/g,' ').trim());
+  const col = (...t)=>{ for (const x of t){ let i=hd.findIndex(s=>s===x); if (i>=0) return i; i=hd.findIndex(s=>s.includes(x)); if (i>=0) return i; } return -1; };
+  const c = {
+    year:0, age:1,
+    prem: col('premium outlay','outlay'),
+    chg: col('policy charges','total charge'),
+    avChg: col('accumulated value charge'),
+    pe: col('premium expense charge','prem expense charge'),
+    idx: col('interest credit'),
+    bonus: col('additional bonus','bonus'),
+    cr: col('total credits'),
+    av: hd.findIndex(s=>s==='accumulated value'),
+    surr: col('surrender charge'),
+    csv: col('cash surrender value'),
+    db: col('net death benefit','death benefit')
+  };
+  const missing = Object.entries(c).filter(([k,v])=>v<0 && !['avChg','bonus','pe'].includes(k)).map(([k])=>k);
+  if (missing.length) return { error:'The CSV is missing expected columns: '+missing.join(', ')+'.' };
+  const rows = [];
+  for (let i=hi+1;i<lines.length;i++){
+    const p = splitCsvLine(lines[i]);
+    const yr = parseInt(p[0],10);
+    if (isNaN(yr) || yr<1 || yr>121) continue;
+    const chg = Math.abs(num0(p[c.chg]));
+    const pe = c.pe>=0 ? Math.abs(num0(p[c.pe])) : 0;
+    const avChg = c.avChg>=0 ? Math.abs(num0(p[c.avChg])) : 0;
+    const idxCr = num0(p[c.idx]);
+    const bonus = c.bonus>=0 ? num0(p[c.bonus]) : 0;
+    const cr = num0(p[c.cr]);
+    rows.push({ year:yr, age:parseInt(p[1],10)||0, prem:num0(p[c.prem]), fixedChg:chg-avChg, avChg, chg, pe, std:chg,
+      idxCr, othCr:cr-idxCr, cr, av:num0(p[c.av]), surr:Math.abs(num0(p[c.surr])), csv:num0(p[c.csv]), db:num0(p[c.db]) });
+  }
+  return finishIllustration('csv', rows, meta);
+}
+
+// ---------- workbook format (sheets supplied as {name, rows:[[…]]}) ----------
+function parseWorkbookSheets(sheets){
+  const meta = { format:'workbook', mecYear:0, lapseYear:0 };
+  const by = f => sheets.find(s=>f(s.name.toLowerCase()));
+  const chgS = by(n=>n.includes('charge')), crS = by(n=>n.includes('credit')),
+        ledS = by(n=>n.includes('ledger')), tabS = by(n=>n.includes('tabular')), covS = by(n=>n.includes('coverage'));
+  if (!chgS) return { error:'The workbook does not contain the policy charges sheet.' };
+  const isData = r => r && r.length>3 && Number.isInteger(+r[0]) && +r[0]>=1 && +r[0]<=121 && !isNaN(num(r[1])) && num(r[1])>=0 && num(r[1])<=125 && !isNaN(num(r[2]));
+  const dataRows = s => (s?s.rows:[]).filter(isData);
+  // illustrated rate from any sheet header text
+  for (const s of sheets){
+    for (const r of s.rows.slice(0,14)){
+      for (const cell of (r||[])){
+        if (typeof cell!=='string') continue;
+        const m = cell.match(/illustrated\s+(\d+(?:\.\d+)?)\s*%/i) || cell.match(/@\s*(\d+(?:\.\d+)?)\s*%/);
+        if (m && meta.illustratedRatePct===undefined) meta.illustratedRatePct = parseFloat(m[1]);
+      }
+    }
+  }
+  const credMap = {};
+  dataRows(crS).forEach(r=>{ credMap[+r[0]] = { fixed:num0(r[1]), basicIdx:num0(r[2]), pfrCr:num0(r[3]), totIdx:num0(r[4]), pfrChg:Math.abs(num0(r[5])), total:num0(r[6]) }; });
+  const dbMap = {};
+  if (ledS) dataRows(ledS).forEach(r=>{ dbMap[+r[0]] = num0(r[5]); });
+  else if (tabS) dataRows(tabS).forEach(r=>{ dbMap[+r[0]] = num0(r[11]); });
+  if (covS){ const r1 = covS.rows.find(r=>r && Number.isInteger(+r[0]) && +r[0]===1 && !isNaN(num(r[5]))); if (r1) meta.initialDB = num0(r1[5]); }
+  const rows = [];
+  dataRows(chgS).forEach(r=>{
+    const yr = +r[0];
+    const chg = Math.abs(num0(r[7]));
+    const cr = num0(r[8]);
+    const cm = credMap[yr];
+    let idxCr = cr, othCr = 0;
+    if (cm){ idxCr = cm.totIdx; othCr = cm.fixed - cm.pfrChg; if (Math.abs((idxCr+othCr)-cr) > 2) { idxCr = cr; othCr = 0; } }
+    const pl = Math.abs(num0(r[3]));
+    rows.push({ year:yr, age:+r[1], prem:num0(r[2]), fixedChg:chg, avChg:0, chg, pe:pl, std:Math.abs(num0(r[4])+num0(r[5])+num0(r[6])), idxCr, othCr, cr,
+      av:num0(r[9]), surr:Math.abs(num0(r[10])), csv:num0(r[11]), db:dbMap[yr]||0 });
+  });
+  if (!meta.initialDB && rows[0]) meta.initialDB = rows[0].db;
+  return finishIllustration('workbook', rows, meta);
+}
+
+// ════════════════════════════════════════════════════════════════════
+// CALIBRATION
+// Charges held at illustrated dollar amounts (plus any AV-linked charge as a % of average AV).
+// Index-linked credit = O × k × clamp(index return, floor, cap), with k calibrated year-by-year so the
+// engine reproduces the illustration exactly when the index return equals the illustrated rate.
+//   O = average-balance proxy = AV(t-1) + ½·(premium − fixed charges)
+// ════════════════════════════════════════════════════════════════════
+
+// ---- enhancement-rider factor tables: [bonus charge factor, credit multiplier, persistency bonus] by policy year ----
+const rep = (n, a) => Array.from({length:n}, () => a.slice());
+const FAC_CSV = [].concat([[0.03,1.0,0]], rep(18,[0.03,2.05,0]), rep(10,[0.02,1.8,0]), rep(26,[0.01,1.5,0]));
+const FAC_WB = [[0.0160,1.000,0],[0.0310,1.300,0],[0.0386,1.450,0],[0.0460,1.600,0],[0.0536,1.750,0],[0.0610,1.890,0],[0.0686,2.040,0],[0.0760,2.190,0],[0.0836,2.330,0],[0.0910,2.470,0],
+  [0.0910,2.470,0.002736],[0.0910,2.470,0.005436],[0.0910,2.470,0.007918],[0.0910,2.470,0.010264],[0.0910,2.470,0.012437],[0.0910,2.470,0.014420],[0.0910,2.470,0.016214],[0.0910,2.470,0.017804],[0.0910,2.470,0.019208],[0.0910,2.470,0.020425],
+  [0.0820,2.300,0.021457],[0.0730,2.130,0.020513],[0.0640,1.950,0.019612],[0.0550,1.780,0.018755],[0.0460,1.600,0.017925],[0.0460,1.600,0.017140],[0.0460,1.600,0.016372],[0.0460,1.600,0.015660],[0.0460,1.600,0.014955],[0.0460,1.600,0.014278],
+  [0.0460,1.600,0.013618],[0.0460,1.600,0.010854],[0.0460,1.600,0.008292],[0.0460,1.600,0.005949],[0.0460,1.600,0.003772],[0.0460,1.600,0.001829]].concat(rep(14,[0.0460,1.600,0]));
+function buildCalibration(ill, iRate, cap, floor, overlay){
+  const g = clampR(iRate, floor, cap);
+  if (!(g>0)) return { error:'Illustrated rate must be above the floor rate.' };
+  const n = ill.rows.length, cal = { n, g, cap, floor, iRate, k:new Float64Array(n), a:new Float64Array(n), b:new Float64Array(n),
+    F:new Float64Array(n), P:new Float64Array(n), S:new Float64Array(n) };
+  let prevAV = 0;
+  if (overlay){
+    const T = ill.format==='csv' ? FAC_CSV : FAC_WB;
+    cal.mode = ill.format==='csv' ? 'a' : 'b';
+    cal.bcf = new Float64Array(n); cal.bcr = new Float64Array(n); cal.pb = new Float64Array(n); cal.std = new Float64Array(n); cal.pe = new Float64Array(n);
+    ill.rows.forEach((r,i)=>{ const t=T[Math.min(i,T.length-1)]; cal.bcf[i]=t[0]; cal.bcr[i]=t[1]; cal.pb[i]=t[2]; cal.std[i]=r.std; cal.pe[i]=r.pe; cal.P[i]=r.prem; cal.S[i]=r.surr; cal.F[i]=r.fixedChg; });
+    return cal;
+  }
+  ill.rows.forEach((r,i)=>{
+    const O = Math.max(1e-6, prevAV + 0.5*(r.prem - r.fixedChg));
+    cal.k[i] = r.idxCr / (O*g);
+    cal.a[i] = r.avChg / O;
+    cal.b[i] = r.othCr / O;
+    cal.F[i] = r.fixedChg; cal.P[i] = r.prem; cal.S[i] = r.surr;
+    prevAV = r.av;
+  });
+  return cal;
+}
+// one path of index returns -> end-of-year AV series (length = rets.length)
+function simAV(cal, rets, avOut){
+  let av = 0, P2 = 0;
+  for (let i=0;i<rets.length;i++){
+    const j = Math.min(i, cal.n-1);
+    if (cal.mode){
+      const g2 = clampR(rets[i], cal.floor, cal.cap), P = cal.P[j], sd = cal.std[j], bcf = cal.bcf[j];
+      let O;
+      if (cal.mode==='a') O = Math.max(0, (av + P + cal.pe[j]/2 - sd/2) / (1 + bcf/2));
+      else { const net = P>0 ? Math.max(0, P - cal.pe[j]) : 0; O = Math.max(0, (av + net - 0.5*sd) / (1 + 0.5*bcf)); P2 = net; }
+      const bon = O*bcf, cr2 = O*(g2*cal.bcr[j] + cal.pb[j]);
+      av = Math.max(0, av + (cal.mode==='a'?P:P2) - sd - bon + cr2);
+      avOut[i] = av; continue;
+    }
+    const O = Math.max(0, av + 0.5*(cal.P[j] - cal.F[j]));
+    const g = clampR(rets[i], cal.floor, cal.cap);
+    const chg = cal.F[j] + cal.a[j]*O;
+    const cr = O*(cal.k[j]*g + cal.b[j]);
+    av = Math.max(0, av + cal.P[j] - chg + cr);
+    avOut[i] = av;
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// POLICY LOAN INCOME
+// ════════════════════════════════════════════════════════════════════
+function loanWalk(av, surr, o, inc, out){
+  // o: {issueAge, is, ie, cola, r(decimal), floor}; returns true if income is sustained and the policy stays in force
+  let cum = 0;
+  for (let i=0;i<av.length;i++){
+    const age = o.issueAge + i;
+    const income = (inc>0 && age>=o.is && age<=o.ie) ? inc*Math.pow(1+o.cola, age-o.is) : 0;
+    cum = cum*(1+o.r) + income;
+    const csvNet = Math.max(0, av[i]-surr[i] - cum);
+    if (out){ out.inc[i]=income; out.cum[i]=cum; out.csvNet[i]=csvNet; }
+    if (age>=o.is && age<=o.ie){ if (csvNet < o.floor) { if(!out) return false; out.fail=true; } }
+    else if (age>o.ie && inc>0 && csvNet<=0){ if(!out) return false; out.fail=true; }
+  }
+  return !(out && out.fail);
+}
+function solveLoanIncome(av, surr, o){
+  let lo=0, hi=Math.max(...av)*0.5+1;
+  for (let it=0; it<60; it++){ const m=(lo+hi)/2; if (loanWalk(av,surr,o,m,null)) lo=m; else hi=m; }
+  return lo;
+}
+
+// ════════════════════════════════════════════════════════════════════
+// TAXABLE ACCOUNT (comparison) — same treatment as the other modelers
+// blend of S&P total return / 10-yr Treasury of the SAME drawn calendar year, less fee + tax drag;
+// gains taxed at withdrawal with cost basis tracked. Contributions at the start of each year.
+// ════════════════════════════════════════════════════════════════════
+function invAccumulate(idxs, pool, P, n, fee, out){
+  let bal=0, basis=0;
+  for (let i=0;i<n;i++){
+    bal += P[i]; basis += P[i];
+    bal = bal*(1+pool[idxs[i]]-fee);
+    out[i] = bal;
+  }
+  return { bal, basis };
+}
+function invRunPath(idxs, pool, b0, ba0, W, o, det){
+  let b=b0, ba=ba0;
+  for (let j=0;j<o.nInc;j++){
+    const k = idxs[o.startIdx+j];
+    b = b*(1+pool[k]-o.fee);
+    const w = W*o.cf[j];
+    if (w > b+1e-6) return false;
+    const gf = b>0 ? Math.max(0,(b-ba)/b) : 0;
+    const tax = w*gf*o.tax;
+    ba = Math.max(0, ba - w*(1-gf));
+    b -= w;
+    if (det){ det.gross[j]=w; det.net[j]=w-tax; det.bal[j]=b; }
+  }
+  return true;
+}
+
+// ════════════════════════════════════════════════════════════════════
+// MONTE CARLO
+// ════════════════════════════════════════════════════════════════════
+function pctileSorted(sorted, p){ if(!sorted.length) return 0; return sorted[Math.floor(p/100*(sorted.length-1))]; }
+function sortedCopy(a){ return Array.from(a).sort((x,y)=>x-y); }
+const tick = () => new Promise(r=>setTimeout(r,0));
+
+async function runMonteCarlo(ill, p, onProgress){
+  // p: iRate(%), cap(%), floor(%), is, ie, cola(%), loanRate(%), csvFloor($), nSims, dataYrs, invEq(%), invFee(%), invDrag(%), invTax(%), seed
+  const prog = onProgress || (()=>{});
+  const cal = buildCalibration(ill, p.iRate/100, p.cap/100, p.floor/100, p.overlay!==false);
+  if (cal.error) return { error: cal.error };
+  const issueAge = ill.meta.issueAge;
+  const nYrs = Math.min(100-issueAge+1, ill.rows.length);
+  if (nYrs < 10) return { error:'Issue age leaves too few policy years to model.' };
+  if (p.is < issueAge || p.ie < p.is || p.ie > 100) return { error:'Check the income start and end ages (start ≥ issue age, end ≤ 100).' };
+  const N = p.nSims;
+  const rand = mulberry32((p.seed|0) || 12345);
+  const cutoff = 2024 - p.dataYrs + 1;
+  const years = POOL_YEARS.filter(y=>y>=cutoff && TB10[y]!==undefined);
+  const priceArr = Float64Array.from(years.map(y=>SP_PRICE[y]));
+  const eq = p.invEq/100;
+  const blend = Float64Array.from(years.map(y=>eq*SP_TOTAL[y]+(1-eq)*TB10[y]));
+  const fee = (p.invFee + p.invDrag)/100, tax = p.invTax/100;
+  const o = { issueAge, is:p.is, ie:p.ie, cola:p.cola/100, r:p.loanRate/100, floor:p.csvFloor };
+  const P = Float64Array.from(ill.rows.slice(0,nYrs).map(r=>r.prem));
+  const incIdx = p.is - issueAge, nInc = p.ie - p.is + 1;
+  const cf = Float64Array.from({length:nInc},(_,j)=>Math.pow(1+o.cola,j));
+
+  const avAll = new Float64Array(N*nYrs), surrArr = Float64Array.from(cal.S.slice(0,nYrs));
+  const draws = new Int16Array(N*nYrs);
+  const b0 = new Float64Array(N), ba0 = new Float64Array(N);
+  const invPre = new Float64Array(N*Math.max(incIdx,1));
+  const rets = new Float64Array(nYrs), avTmp = new Float64Array(nYrs), accTmp = new Float64Array(nYrs);
+  let sumCredited = 0, cntCredited = 0;
+  for (let s=0;s<N;s++){
+    if (s%1000===0){ prog(0.05+0.35*s/N, 'Simulating '+s.toLocaleString()+' / '+N.toLocaleString()); await tick(); }
+    for (let i=0;i<nYrs;i++){ const d=Math.floor(rand()*years.length); draws[s*nYrs+i]=d; rets[i]=priceArr[d]; const g=clampR(rets[i],cal.floor,cal.cap); sumCredited+= cal.mode ? g*cal.bcr[Math.min(i,cal.n-1)] : g; cntCredited++; }
+    simAV(cal, rets, avTmp);
+    avAll.set(avTmp, s*nYrs);
+    const acc = invAccumulate(draws.subarray(s*nYrs,(s+1)*nYrs), blend, P, incIdx, fee, accTmp);
+    b0[s]=acc.bal; ba0[s]=acc.basis;
+    for (let i=0;i<incIdx;i++) invPre[s*incIdx+i]=accTmp[i];
+  }
+  const avgCredited = sumCredited/cntCredited;
+
+  // ---- policy bands (average of the middle 10% of paths ranked by AV at income start) ----
+  prog(0.42,'Solving policy income…'); await tick();
+  const order = Array.from({length:N},(_,i)=>i).sort((a,b)=>avAll[a*nYrs+incIdx]-avAll[b*nYrs+incIdx]);
+  const bw = Math.max(10, Math.floor(N*0.10));
+  const PCTS = [25,50,75];
+  const bands = {};
+  PCTS.forEach(pc=>{
+    const c = Math.floor(pc/100*N), lo = Math.max(0, c-Math.floor(bw/2)), hi = Math.min(N, lo+bw);
+    const av = new Float64Array(nYrs); const m = hi-lo;
+    for (let q=lo;q<hi;q++){ const k=order[q]; for (let i=0;i<nYrs;i++) av[i]+=avAll[k*nYrs+i]/m; }
+    const inc = solveLoanIncome(av, surrArr, o);
+    const out = { inc:new Float64Array(nYrs), cum:new Float64Array(nYrs), csvNet:new Float64Array(nYrs) };
+    loanWalk(av, surrArr, o, inc, out);
+    bands[pc] = { av, income:inc, walk:out };
+  });
+  const survFor = inc => {
+    let ok=0; const av = new Float64Array(nYrs);
+    for (let k=0;k<N;k++){ for (let i=0;i<nYrs;i++) av[i]=avAll[k*nYrs+i]; if (loanWalk(av,surrArr,o,inc,null)) ok++; }
+    return ok/N;
+  };
+  const surv = {}; PCTS.forEach(pc=>{ surv[pc]=survFor(bands[pc].income); });
+
+  // ---- taxable account: per-path solve to last through income end ----
+  prog(0.55,'Solving taxable account income…'); await tick();
+  const io = { nInc, startIdx:incIdx, cf, fee, tax };
+  const gross = new Float64Array(N*nInc), net = new Float64Array(N*nInc), bal = new Float64Array(N*nInc);
+  const totNet = new Float64Array(N), firstNet = new Float64Array(N);
+  const det = { gross:new Float64Array(nInc), net:new Float64Array(nInc), bal:new Float64Array(nInc) };
+  for (let k=0;k<N;k++){
+    if (k%2000===0){ prog(0.55+0.2*k/N,'Solving taxable account income…'); await tick(); }
+    const id = draws.subarray(k*nYrs,(k+1)*nYrs);
+    let lo=0, hi=b0[k]*3;
+    for (let it=0; it<50; it++){ const m=(lo+hi)/2; if (invRunPath(id,blend,b0[k],ba0[k],m,io,null)) lo=m; else hi=m; }
+    invRunPath(id,blend,b0[k],ba0[k],lo,io,det);
+    let t=0;
+    for (let j=0;j<nInc;j++){ gross[k*nInc+j]=det.gross[j]; net[k*nInc+j]=det.net[j]; bal[k*nInc+j]=det.bal[j]; t+=det.net[j]; }
+    totNet[k]=t; firstNet[k]=det.net[0];
+  }
+  const medOf = a => pctileSorted(sortedCopy(a),50);
+  const invSurvFor = W => { let ok=0; for (let k=0;k<N;k++) if (invRunPath(draws.subarray(k*nYrs,(k+1)*nYrs),blend,b0[k],ba0[k],W,io,null)) ok++; return ok/N; };
+
+  // ---- per-age taxable percentiles ----
+  prog(0.78,'Building ledger…'); await tick();
+  const ages = Array.from({length:nYrs},(_,i)=>issueAge+i);
+  const taxable = ages.map((age,i)=>{
+    const col = [];
+    if (i<incIdx){ for (let k=0;k<N;k++) col.push(invPre[k*incIdx+i]); return { age, bal:pctileSorted(sortedCopy(col),50), gross:0, net:0 }; }
+    if (age<=p.ie){ const j=age-p.is; const g=[],n=[],b=[]; for(let k=0;k<N;k++){ g.push(gross[k*nInc+j]); n.push(net[k*nInc+j]); b.push(bal[k*nInc+j]); }
+      return { age, bal:pctileSorted(sortedCopy(b),50), gross:pctileSorted(sortedCopy(g),50), net:pctileSorted(sortedCopy(n),50) }; }
+    return { age, bal:0, gross:0, net:0 };
+  });
+  const totSorted = sortedCopy(totNet), firstSorted = sortedCopy(firstNet);
+  const invBands = {}; PCTS.forEach(pc=>{ invBands[pc] = { first:pctileSorted(firstSorted,pc), total:pctileSorted(totSorted,pc) }; });
+
+  // ---- equal-confidence check ----
+  prog(0.85,'Equal-confidence check…'); await tick();
+  const bisect = (f,t,hi)=>{ let lo=0; for(let it=0;it<26;it++){ const m=(lo+hi)/2; if (f(m)>=t) lo=m; else hi=m; } return lo; };
+  const cfSum = cf.reduce((s,v)=>s+v,0);
+  const maxB0 = b0.reduce((m,v)=>v>m?v:m,0);
+  let maxAV=1; for (let i=0;i<avAll.length;i++) if (avAll[i]>maxAV) maxAV=avAll[i];
+  const dHi = maxAV*0.5+1;
+  const eq3 = [0.90,0.75,0.50].map(t=>{
+    const dInc = bisect(survFor,t,dHi);
+    const W = bisect(invSurvFor,t,maxB0);
+    const n1=[], nT=[];
+    for (let k=0;k<N;k++){
+      const dd = { gross:new Float64Array(nInc), net:new Float64Array(nInc), bal:new Float64Array(nInc) };
+      if (invRunPath(draws.subarray(k*nYrs,(k+1)*nYrs),blend,b0[k],ba0[k],W,io,dd)){ n1.push(dd.net[0]); let s=0; for(let j=0;j<nInc;j++) s+=dd.net[j]; nT.push(s); }
+    }
+    return { t, polInc:dInc, polTot:dInc*cfSum, taxNet1:medOf(n1), taxNetT:medOf(nT) };
+  });
+
+  // ---- assemble ----
+  const m = bands[50];
+  const policy = ages.map((age,i)=>({ age, av:m.av[i], income:m.walk.inc[i], loan:m.walk.cum[i], csvNet:m.walk.csvNet[i] }));
+  const illus = ill.rows.slice(0,nYrs).map(r=>({ age:r.age, year:r.year, prem:r.prem, av:r.av, csv:r.csv, db:r.db }));
+  const polTot = {}; PCTS.forEach(pc=>{ let s=0; for(let j=0;j<nInc;j++) s+=bands[pc].income*cf[j]; polTot[pc]=s; });
+  // calibration diagnostic: engine at constant illustrated return vs the file
+  const diag = (()=>{ const r = new Float64Array(nYrs).fill(cal.iRate), a = new Float64Array(nYrs); simAV(cal,r,a);
+    let mx=0; for(let i=0;i<nYrs;i++) mx=Math.max(mx,Math.abs(a[i]-ill.rows[i].av)); return { maxAvDiff:mx }; })();
+  prog(1,'Done');
+  return { params:p, issueAge, nYrs, N, ages, years:{from:years[0],to:years[years.length-1],n:years.length},
+    prem:Array.from(P), totalPrem:Array.from(P).reduce((s,v)=>s+v,0), nInc, cfSum,
+    policy, taxable, illus, bands:Object.fromEntries(PCTS.map(pc=>[pc,{income:bands[pc].income, total:polTot[pc], surv:surv[pc]}])),
+    invBands, eq3, avgCredited, diag, kRange:cal.mode?[Math.min(...cal.bcr),Math.max(...cal.bcr)]:[Math.min(...cal.k), Math.max(...cal.k)], overlay:!!cal.mode };
+}
+
+if (typeof module!=='undefined') module.exports = { parseCsvText, parseWorkbookSheets, buildCalibration, simAV, runMonteCarlo, mulberry32 };
+
+// ════════════════════════════════════════════════════════════════════
+// OUTPUT DOCUMENTS — Playbook style. No carrier names. Built from the results object.
+// ════════════════════════════════════════════════════════════════════
+const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const $m = n => (n==null||isNaN(n)) ? '—' : (n<0?'-':'')+'$'+Math.round(Math.abs(n)).toLocaleString('en-US');
+const $z = n => (n==null||isNaN(n)||Math.abs(n)<0.5) ? '—' : $m(n);
+const $k = n => { const a=Math.abs(n); const s = a>=1e6 ? '$'+(a/1e6).toFixed(a>=1e7?1:2).replace(/\.?0+$/,'')+'M' : a>=1e3 ? '$'+Math.round(a/1e3)+'K' : '$'+Math.round(a); return (n<0?'-':'')+s; };
+const pc = (x,d=2) => Number(x).toFixed(d).replace(/\.?0+$/,'')+'%';
+
+const FONTS = '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700;800&display=swap">';
+
+const PB_VARS = ':root{--navy:#0f2742;--navy2:#17375c;--amber:#f5a623;--orange:#e8772e;--blue:#2f6fb5;--green:#2e9e6b;--bg:#eef1f6;--card:#fff;--ink:#14233a;--muted:#52627a;--line:#dde3ec;--head:"Barlow Condensed","Arial Narrow",Arial,sans-serif;--body:"Barlow",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}'
+ + '*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+ + '.toolbar{position:sticky;top:0;z-index:20;display:flex;gap:10px;align-items:center;justify-content:flex-end;padding:10px 18px;background:var(--navy);color:#fff;font:600 13px var(--body)}'
+ + '.toolbar span{margin-right:auto;font:700 15px var(--head);letter-spacing:.08em;text-transform:uppercase;color:var(--amber)}'
+ + '.toolbar button{background:var(--amber);color:var(--navy);border:0;border-radius:6px;padding:8px 14px;font:700 13px var(--body);cursor:pointer}'
+ + '.toolbar button.ghost{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.35)}'
+ + '@media print{.toolbar{display:none}body{background:#fff}}';
+
+const TOOLBAR = t => '<div class="toolbar"><span>'+esc(t)+'</span><button class="ghost" onclick="saveHtml()">Save HTML</button><button onclick="window.print()">Print / Save PDF</button></div>'
+ + '<script>function saveHtml(){var h="<!DOCTYPE html>"+document.documentElement.outerHTML;var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([h],{type:"text/html"}));a.download=document.title.replace(/[^a-z0-9]+/gi,"-").toLowerCase()+".html";document.body.appendChild(a);a.click();a.remove();}<\/script>';
+
+// ---------- derived numbers shared by all three outputs ----------
+function derive(R, I, M){
+  const D = {};
+  D.client = I.clientName || 'Sample Client';
+  D.advisor = I.advisorName || '';
+  D.dateStr = I.dateStr;
+  D.issueAge = R.issueAge;
+  D.payYears = M.payYears; D.annual = M.annualPrem; D.totalPrem = R.totalPrem;
+  D.payEndAge = R.issueAge + M.payYears - 1;
+  D.is = I.is; D.ie = I.ie; D.incYears = I.ie - I.is + 1;
+  D.pol = R.bands[50]; D.tax = R.invBands[50];
+  D.polFirst = D.pol.income; D.polTotal = D.pol.total;
+  D.txFirst = D.tax.first; D.txTotal = D.tax.total;
+  D.polLeads = D.polTotal >= D.txTotal;
+  D.incDiff = D.polTotal - D.txTotal;
+  // LTC
+  D.mo = I.ltcMonthly; D.ltcYrs = I.ltcYears; D.ltcAnnual = D.mo*12; D.ltcTotal = D.ltcAnnual*D.ltcYrs;
+  D.qpRate = I.qpTax/100; D.qpGrossTotal = D.ltcTotal/(1-D.qpRate); D.qpGrossAnnual = D.ltcAnnual/(1-D.qpRate); D.qpTaxTotal = D.qpGrossTotal - D.ltcTotal;
+  D.qpGrossMonthly = D.mo/(1-D.qpRate);
+  // illustrated rows
+  const at = age => R.illus.find(r=>r.age===age) || R.illus[R.illus.length-1];
+  D.at = at;
+  D.ltcAge = Math.min(Math.max(I.ltcAge, R.issueAge), R.ages[R.ages.length-1]);
+  D.pool = at(D.ltcAge).db;
+  D.poolCovers = D.pool / Math.max(1,D.ltcTotal);
+  D.initialDB = M.initialDB;
+  // ledger cumulative
+  let cp=0, ct=0; D.cumPol=[]; D.cumTax=[];
+  R.ages.forEach((a,i)=>{ cp += R.policy[i].income; ct += R.taxable[i].net; D.cumPol.push(cp); D.cumTax.push(ct); });
+  D.ledgerPolTotal = cp; D.ledgerTaxTotal = ct;
+  D.eq = R.eq3;
+  D.cond = (R.params.cap/100);
+  D.careMo = I.careCost || 10646; D.careInfl = (I.careInfl!=null?I.careInfl:4)/100; D.careProb = I.careProb || 70; D.careDur = I.careDur || 3.3;
+  D.careTotalToday = D.careMo*12*D.ltcYrs;
+  D.careAtLtc = D.careMo*12*D.ltcYrs*Math.pow(1+D.careInfl, Math.max(0,D.ltcAge-R.issueAge));
+  return D;
+}
+
+function lineChart(opts){
+  // opts: {w,h,ages,series:[{name,color,vals,dash}], yFmt, xMarks:[{age,label}]}
+  const W=opts.w, H=opts.h, L=58, Rr=14, T=14, B=30;
+  const ages=opts.ages, x0=ages[0], x1=ages[ages.length-1];
+  const all=[].concat(...opts.series.map(s=>s.vals.filter(v=>v!=null)));
+  let max=Math.max(...all,1); const step=Math.pow(10,Math.floor(Math.log10(max))); max=Math.ceil(max/step)*step;
+  const X=a=>L+(a-x0)/(x1-x0)*(W-L-Rr), Y=v=>T+(1-v/max)*(H-T-B);
+  let g='';
+  for (let i=0;i<=4;i++){ const v=max*i/4, y=Y(v); g+='<line x1="'+L+'" x2="'+(W-Rr)+'" y1="'+y+'" y2="'+y+'" stroke="#dde3ec" stroke-width="1"/><text x="'+(L-6)+'" y="'+(y+3.5)+'" text-anchor="end" font-size="10" fill="#52627a">'+$k(v)+'</text>'; }
+  const tickAges = []; for (let a=Math.ceil(x0/5)*5; a<=x1; a+=5) tickAges.push(a);
+  tickAges.forEach(a=>{ g+='<text x="'+X(a)+'" y="'+(H-10)+'" text-anchor="middle" font-size="10" fill="#52627a">'+a+'</text>'; });
+  (opts.xMarks||[]).forEach(m=>{ g+='<line x1="'+X(m.age)+'" x2="'+X(m.age)+'" y1="'+T+'" y2="'+(H-B)+'" stroke="#94a3b8" stroke-dasharray="3 3"/><text x="'+(X(m.age)+4)+'" y="'+(T+10)+'" font-size="9.5" fill="#52627a">'+esc(m.label)+'</text>'; });
+  opts.series.forEach(s=>{
+    let d=''; s.vals.forEach((v,i)=>{ if(v==null) return; d += (d?'L':'M')+X(ages[i]).toFixed(1)+' '+Y(v).toFixed(1); });
+    g+='<path d="'+d+'" fill="none" stroke="'+s.color+'" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"'+(s.dash?' stroke-dasharray="'+s.dash+'"':'')+'/>';
+  });
+  return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="'+esc(opts.label||'chart')+'">'+g+'</svg>';
+}
+const legend = items => '<div class="legend">'+items.map(i=>'<span><i style="background:'+i.color+'"></i>'+esc(i.name)+'</span>').join('')+'</div>';
+
+const DISCLOSURE = 'This material is hypothetical and for discussion only. It is not tax, legal or investment advice, and it is not a guarantee of future results. Policy values, death benefits and long-term care benefits shown are illustrations that depend on the policy as issued, on its charges and on assumptions that are not guaranteed. Monte Carlo results come from simulations that re-sample historical market returns; actual results will differ. Policy loans and long-term care benefit payments reduce cash value and death benefit and can cause a policy to lapse if not managed. Qualification for benefits depends on the policy terms and on a licensed health professional certifying chronic illness. Taxes are assumed at the rates shown; speak with a tax professional about your situation.';
+
+// ════════════════════════════════════════════════════════════════════
+// 1. LEDGER — 11x17 landscape
+// ════════════════════════════════════════════════════════════════════
+function buildLedgerDoc(R, I, M){
+  const D = derive(R,I,M), p = R.params;
+  const incIdx = I.is - R.issueAge;
+  let rows = '';
+  let cumD = 0;
+  R.ages.forEach((age,i)=>{
+    const pol = R.policy[i], tx = R.taxable[i], il = R.illus[i], prem = R.prem[i];
+    const inInc = age>=I.is && age<=I.ie;
+    const diff = inInc ? pol.income - tx.net : 0; cumD += diff;
+    const cls = (prem>0?'pay ':'') + (age===I.is?'start ':'') + (age===I.ie+1?'after ':'');
+    rows += '<tr class="'+cls+'"><td class="c b">'+age+'</td><td class="c">'+(i+1)+'</td><td>'+$z(prem)+'</td>'
+      + '<td class="t">'+(age<=I.ie?$z(tx.bal):'—')+'</td><td class="t">'+(inInc?$m(tx.gross):'—')+'</td><td class="t b">'+(inInc?$m(tx.net):'—')+'</td>'
+      + '<td class="g">'+$z(pol.av)+'</td><td class="g b">'+(inInc?$m(pol.income):'—')+'</td><td class="g">'+(age>=I.is?$z(pol.loan):'—')+'</td><td class="g">'+$z(pol.csvNet)+'</td>'
+      + '<td class="d '+(diff<0?'neg':'pos')+'">'+(inInc?$m(diff):'—')+'</td><td class="d '+(cumD<0?'neg':'pos')+'">'+(age>=I.is?$m(cumD):'—')+'</td>'
+      + '<td class="o">'+$z(il.csv)+'</td><td class="o">'+$z(il.db)+'</td></tr>';
+  });
+  const sumTxG = R.taxable.reduce((s,t,i)=>s+(R.ages[i]>=I.is&&R.ages[i]<=I.ie?t.gross:0),0);
+  const tot = '<tr class="tot"><td colspan="2" class="c b">Totals</td><td>'+$m(R.totalPrem)+'</td><td class="t">—</td><td class="t">'+$m(sumTxG)+'</td><td class="t b">'+$m(D.ledgerTaxTotal)+'</td><td class="g">—</td><td class="g b">'+$m(D.ledgerPolTotal)+'</td><td class="g">—</td><td class="g">—</td><td class="d" colspan="2">'+$m(D.ledgerPolTotal-D.ledgerTaxTotal)+'</td><td class="o">—</td><td class="o">—</td></tr>';
+
+  const bandRows = [25,50,75].map(b=>{
+    const lab = b===25?'Cautious markets (25th percentile)':b===50?'Median markets (50th percentile)':'Favorable markets (75th percentile)';
+    const pb=R.bands[b], tb=R.invBands[b];
+    return '<tr><td class="lbl">'+lab+'</td><td>'+$m(tb.first)+'</td><td>'+$m(tb.total)+'</td><td>'+$m(pb.income)+'</td><td>'+$m(pb.total)+'</td><td>'+Math.round(pb.surv*100)+'%</td><td class="'+(pb.total-tb.total<0?'neg':'pos')+'">'+$m(pb.total-tb.total)+'</td></tr>';
+  }).join('');
+  const eqRows = D.eq.map(e=>'<tr><td class="lbl">'+Math.round(e.t*100)+'% of simulations</td><td>'+$m(e.polInc)+'</td><td>'+$m(e.taxNet1)+'</td><td>'+$m(e.polTot)+'</td><td>'+$m(e.taxNetT)+'</td><td><b>'+(e.polTot>=e.taxNetT?'Policy':'Taxable')+'</b></td></tr>').join('');
+
+  const css = PB_VARS + FONTS_LINK_PLACEHOLDER + '';
+  const style = '@page{size:17in 11in;margin:.3in}'
+   + 'body{font-size:11px}.sheet{width:16.4in;margin:14px auto;background:#fff;padding:.25in .3in;box-shadow:0 2px 14px rgba(0,0,0,.12)}'
+   + '@media print{.sheet{width:auto;margin:0;padding:0;box-shadow:none}}'
+   + '.hdr{display:flex;align-items:flex-end;gap:24px;background:var(--navy);color:#fff;padding:12px 18px;border-radius:8px;border-bottom:5px solid var(--amber)}'
+   + '.hdr h1{margin:0;font:800 30px/1 var(--head);letter-spacing:.02em;text-transform:uppercase}.hdr .sub{font:500 13px var(--body);color:#c9d6e8;margin-top:4px}'
+   + '.hdr .meta{margin-left:auto;text-align:right;font:500 12px/1.5 var(--body);color:#c9d6e8}.hdr .meta b{color:#fff}'
+   + '.chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 8px}.chip{background:#f1f4f9;border:1px solid var(--line);border-radius:999px;padding:3px 10px;font:600 10.5px var(--body);color:var(--navy2)}.chip b{color:var(--navy)}'
+   + '.top{display:grid;grid-template-columns:1.55fr 1fr;gap:14px;margin-bottom:8px}'
+   + 'h3{margin:0 0 4px;font:700 13px var(--head);letter-spacing:.08em;text-transform:uppercase;color:var(--navy)}'
+   + 'table{border-collapse:collapse;width:100%}.sm th{background:var(--navy2);color:#fff;font:600 10px var(--body);padding:4px 6px;text-align:right}.sm th:first-child,.sm td.lbl{text-align:left}'
+   + '.sm td{padding:3px 6px;text-align:right;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}.sm td.lbl{font-weight:600;color:var(--navy)}'
+   + '.pos{color:#1c7c53}.neg{color:#b4421b}'
+   + '.led{font-size:9.6px;font-variant-numeric:tabular-nums}.led th{padding:3px 5px;font:700 9.4px var(--body);text-align:right;color:#fff;line-height:1.15}.led th.grp{font:800 11px var(--head);letter-spacing:.1em;text-transform:uppercase;text-align:center;padding:5px}'
+   + '.led td{padding:1.3px 6px;text-align:right;border-bottom:1px solid #e8edf4;line-height:1.28}.led td.c{text-align:center;color:var(--muted)}.led td.b{font-weight:700}'
+   + '.led thead{display:table-header-group}.led tr{break-inside:avoid}'
+   + '.led .h0{background:var(--navy)}.led .h1{background:var(--blue)}.led .h2{background:var(--green)}.led .h3{background:#5b6b82}.led .h4{background:var(--orange)}'
+   + '.led td.t{background:rgba(47,111,181,.06)}.led td.g{background:rgba(46,158,107,.07)}.led td.d{background:rgba(91,107,130,.07);font-weight:600}.led td.o{background:rgba(232,119,46,.07)}'
+   + '.led tr.pay td:nth-child(3){background:#fff3d6;font-weight:700}.led tr.start td{border-top:2px solid var(--navy2)}.led tr.after td{border-top:1.5px dashed #94a3b8}'
+   + '.led tr.tot td{border-top:2px solid var(--navy);font-weight:800;background:#eef1f6}'
+   + '.notes{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px;font:500 9.6px/1.45 var(--body);color:var(--muted)}.notes b{color:var(--navy)}'
+   + '.eq{margin-top:8px}.foot{margin-top:8px;font:500 8.6px/1.4 var(--body);color:var(--muted);border-top:1px solid var(--line);padding-top:6px}';
+
+  const nSim = R.N.toLocaleString('en-US');
+  const html = '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Income and Protection Ledger - '+esc(D.client)+'</title>'+FONTS+'<style>'+PB_VARS+style+'</style></head><body>'
+   + TOOLBAR('Ledger')
+   + '<div class="sheet"><div class="hdr"><div><h1>Income &amp; Protection Ledger</h1><div class="sub">'+esc(D.client)+' · Issue age '+D.issueAge+' · '+$m(D.annual)+' per year for '+D.payYears+' years ('+$m(D.totalPrem)+' total) into each strategy</div></div>'
+   + '<div class="meta">'+(D.advisor?'Prepared by <b>'+esc(D.advisor)+'</b><br>':'')+esc(D.dateStr)+(I.version?'<br>'+esc(I.version):'')+'</div></div>'
+   + '<div class="chips"><span class="chip">Illustrated rate <b>'+pc(p.iRate)+'</b></span><span class="chip">Index cap <b>'+pc(p.cap)+'</b> · floor <b>'+pc(p.floor)+'</b></span><span class="chip">Income ages <b>'+I.is+'–'+I.ie+'</b></span><span class="chip">Cost-of-living increase <b>'+pc(p.cola)+'</b></span><span class="chip">Policy loan rate <b>'+pc(p.loanRate)+'</b></span><span class="chip">Cash value kept above <b>'+$m(p.csvFloor)+'</b></span>'
+   + '<span class="chip"><b>'+nSim+'</b> simulations · returns '+R.years.from+'–'+R.years.to+'</span><span class="chip">Taxable account: <b>'+p.invEq+'%</b> stocks / <b>'+(100-p.invEq)+'%</b> bonds · fee <b>'+pc(p.invFee)+'</b> · tax drag <b>'+pc(p.invDrag)+'</b> · gains taxed <b>'+pc(p.invTax,1)+'</b></span></div>'
+   + '<div class="top"><div><h3>Outcome range — income from the same contributions</h3><table class="sm"><thead><tr><th>Market experience</th><th>Taxable: year-1 net</th><th>Taxable: total net</th><th>Policy: year-1 tax-free</th><th>Policy: total tax-free</th><th>Policy odds income lasts</th><th>Policy minus taxable</th></tr></thead><tbody>'+bandRows+'</tbody></table></div>'
+   + '<div class="eq"><h3 style="margin-top:0">Equal-confidence check · advisor review</h3><table class="sm"><thead><tr><th>Income lasts to age '+I.ie+' in</th><th>Policy yr-1</th><th>Taxable net yr-1</th><th>Policy total</th><th>Taxable net total</th><th>Leads</th></tr></thead><tbody>'+eqRows+'</tbody></table></div></div>'
+   + '<table class="led"><thead><tr><th class="grp h0" colspan="3">Contributions</th><th class="grp h1" colspan="3">Taxable investment account · median</th><th class="grp h2" colspan="4">Life insurance policy · simulated median</th><th class="grp h3" colspan="2">Income difference</th><th class="grp h4" colspan="2">Policy at illustrated rate ('+pc(p.iRate)+')</th></tr>'
+   + '<tr><th class="h0">Age</th><th class="h0">Yr</th><th class="h0">Each strategy</th><th class="h1">Balance</th><th class="h1">Withdrawal</th><th class="h1">Net after tax</th><th class="h2">Account value</th><th class="h2">Tax-free income</th><th class="h2">Loan balance</th><th class="h2">Cash value after loans</th><th class="h3">Policy − taxable (yr)</th><th class="h3">Cumulative</th><th class="h4">Cash surrender value</th><th class="h4">Death benefit</th></tr></thead><tbody>'+rows+tot+'</tbody></table>'
+   + '<div class="notes"><div><b>Funding.</b> '+esc(I.fundNote||'Non-qualified savings')+'; no financing. <b>How to read this page.</b> The first two sections come from '+nSim+' simulated market paths built by re-sampling '+R.years.n+' calendar years of historical returns. Each age shows the median across paths. Policy income is the level (cost-of-living adjusted) amount taken as policy loans that keeps cash value after loans above '+$m(p.csvFloor)+' through age '+I.ie+' and keeps the policy in force to age 100. The taxable account withdrawal is solved on each path so the account lasts to age '+I.ie+' (this uses hindsight, so it favors the taxable account), with gains taxed at '+pc(p.invTax,1)+' as withdrawn.</div>'
+   + '<div><b>Third section.</b> Cash surrender value and death benefit are shown exactly as illustrated at '+pc(p.iRate)+', before any policy loans. Death benefit is also the pool available for long-term care while the insured is living, so loans taken for income reduce it. '+(R.overlay?'The simulated sections apply the policy enhancement rider (a credit multiplier of '+R.kRange[0].toFixed(2).replace(/\.?0+$/,'')+'x to '+R.kRange[1].toFixed(2).replace(/\.?0+$/,'')+'x on the capped index return, with its matching charge), so simulated values can exceed the base illustration shown here. Average credited rate across all simulated years was '+pc(R.avgCredited*100)+'.':'The simulated policy engine reproduces the illustration to within '+$m(R.diag.maxAvDiff)+' when the index earns the illustrated rate; average credited rate across all simulated years was '+pc(R.avgCredited*100)+' against '+pc(Math.min(Math.max(p.iRate,p.floor),p.cap))+' illustrated (after cap and floor).')+'</div></div>'
+   + '<div class="foot">'+esc(DISCLOSURE)+'</div></div></body></html>';
+  return html;
+}
+const FONTS_LINK_PLACEHOLDER = '';
+
+// ════════════════════════════════════════════════════════════════════
+// 2. ONE-PAGE SUMMARY — letter portrait
+// ════════════════════════════════════════════════════════════════════
+function buildOnePagerDoc(R, I, M){
+  const D = derive(R,I,M), p=R.params;
+  const leadTxt = D.polLeads
+    ? 'In the median case the policy produces about '+$m(D.polTotal-D.txTotal)+' more tax-free income than the taxable account nets after tax.'
+    : 'In the median case the taxable account nets about '+$m(D.txTotal-D.polTotal)+' more income than the policy, before counting the care benefit and death benefit only the policy provides.';
+  const takeaway = 'Unlike homeowners insurance, a year with no claim is not a year of premium lost. The value stays yours.';
+  const style = '@page{size:letter;margin:0}'
+   + '.page{width:8.5in;min-height:11in;margin:14px auto;background:#fff;box-shadow:0 2px 14px rgba(0,0,0,.14);display:flex;flex-direction:column}'
+   + '@media print{.page{margin:0;box-shadow:none;height:11in;overflow:hidden}}.page{min-height:11in}'
+   + '.top{background:var(--navy);color:#fff;padding:.24in .5in .18in;border-bottom:6px solid var(--amber)}'
+   + '.eyebrow{font:700 11px var(--head);letter-spacing:.2em;text-transform:uppercase;color:var(--amber)}'
+   + '.top h1{margin:3px 0 3px;font:800 28px/1.02 var(--head);text-transform:uppercase;letter-spacing:.01em}.top p{margin:0;font:500 13px var(--body);color:#c9d6e8}'
+   + '.body{padding:.14in .5in .1in;display:flex;flex-direction:column;gap:8px;flex:1}'
+   + 'h2{margin:0 0 4px;font:800 14px var(--head);letter-spacing:.09em;text-transform:uppercase;color:var(--navy)}'
+   + '.pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}'
+   + '.big{border-radius:10px;padding:10px 14px;color:#fff}.big .n{font:800 34px/1 var(--head);letter-spacing:.01em}.big .l{font:600 12px/1.3 var(--body);opacity:.95;margin-top:3px}'
+   + '.big.green{background:var(--green)}.big.blue{background:var(--blue)}.big.navy{background:var(--navy2)}.big.orange{background:var(--orange)}'
+   + '.big .s{font:500 10.5px/1.3 var(--body);opacity:.9;margin-top:2px}'
+   + '.card{border:1px solid var(--line);border-radius:10px;padding:8px 14px;background:#fff}'
+   + '.card.accent{border-left:6px solid var(--orange)}.card.g{border-left:6px solid var(--green)}.card.b{border-left:6px solid var(--blue)}'
+   + 'table{border-collapse:collapse;width:100%;font-size:11.5px}th{font:700 10.5px var(--body);text-align:right;color:var(--muted);padding:3px 6px;border-bottom:2px solid var(--line)}th:first-child,td:first-child{text-align:left}'
+   + 'td{padding:3px 6px;text-align:right;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}td b{color:var(--navy)}'
+   + '.band{background:var(--amber);color:var(--navy);padding:9px 16px;border-radius:10px;font:700 14.5px/1.25 var(--body)}'
+   + '.sm{font:500 10.8px/1.4 var(--body);color:var(--muted)}.fine{font:500 8.4px/1.35 var(--body);color:#6c7a90;padding:6px .5in .22in;border-top:1px solid var(--line)}'
+   + '.cols{display:grid;grid-template-columns:1.12fr 1fr;gap:10px}.legend{display:flex;gap:14px;font:600 11px var(--body);color:var(--muted);margin-top:2px}.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}';
+  const ages = [65,80,95].filter(a=>a>=R.issueAge && a<=R.ages[R.ages.length-1]);
+  if (ages.indexOf(D.ltcAge)<0 && false) ages.push(D.ltcAge);
+  const protRows = ages.map(a=>{ const r=D.at(a); return '<tr><td><b>Age '+a+'</b></td><td>'+$m(r.csv)+'</td><td>'+$m(r.db)+'</td></tr>'; }).join('');
+  const chart = lineChart({ w:330, h:150, ages:R.ages, label:'Cumulative income', series:[
+      {name:'Policy (tax-free)',color:'#2e9e6b',vals:D.cumPol.map((v,i)=>R.ages[i]>=I.is?v:null)},
+      {name:'Taxable account (after tax)',color:'#2f6fb5',vals:D.cumTax.map((v,i)=>R.ages[i]>=I.is?v:null)} ] });
+  const html = '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>One-Page Summary - '+esc(D.client)+'</title>'+FONTS+'<style>'+PB_VARS+style+'</style></head><body>'
+   + TOOLBAR('One-Page Summary')
+   + '<div class="page"><div class="top"><div class="eyebrow">Prepared for '+esc(D.client)+' · age '+D.issueAge+'</div><h1>Paying for care without paying the tax first</h1><p>'+$m(D.annual)+' a year for '+D.payYears+' years ('+$m(D.totalPrem)+') — placed in a policy, or placed in a taxable account. Here is what each could do.</p></div>'
+   + '<div class="body">'
+   + '<div><h2>If care is needed</h2><div class="pair"><div class="big green"><div class="n">'+$m(D.mo)+'<span style="font-size:15px;font-weight:700"> / month</span></div><div class="l">Illustrated tax-free long-term care benefit</div><div class="s">'+$m(D.ltcAnnual)+' a year · '+$m(D.ltcTotal)+' over '+D.ltcYrs+' years</div></div>'
+   + '<div class="big orange"><div class="n">'+$m(D.qpGrossTotal)+'</div><div class="l">Withdrawn from a qualified account to net the same '+$m(D.ltcTotal)+'</div><div class="s">at a '+pc(I.qpTax,1)+' tax rate · '+$m(D.qpTaxTotal)+' goes to taxes</div></div></div></div>'
+   + '<div class="cols"><div class="card g"><h2>The benefit pool</h2><div class="sm" style="color:var(--ink);font-size:12px;line-height:1.45">While the insured is living, the death benefit is the pool the care benefit draws from. At age '+D.ltcAge+' that pool is illustrated at <b>'+$m(D.pool)+'</b> — about <b>'+(D.poolCovers>=10?Math.round(D.poolCovers):D.poolCovers.toFixed(1))+'×</b> the '+D.ltcYrs+'-year benefit above.</div></div>'
+   + '<div class="card accent"><h2>Per month, same net care dollars</h2><table><tr><td>Tax-free from policy</td><td><b>'+$m(D.mo)+'</b></td></tr><tr><td>From a qualified account</td><td><b>'+$m(D.qpGrossMonthly)+'</b></td></tr></table></div></div>'
+   + '<div><h2>If care is never needed — the income picture</h2><div class="cols"><div class="card b"><table><thead><tr><th></th><th>Taxable account</th><th>Policy</th></tr></thead><tbody>'
+   + '<tr><td>Income starts at age</td><td>'+D.is+'</td><td>'+D.is+'</td></tr>'
+   + '<tr><td>Year-1 income</td><td><b>'+$m(D.txFirst)+'</b> after tax</td><td><b>'+$m(D.polFirst)+'</b> tax-free</td></tr>'
+   + '<tr><td>Total to age '+D.ie+'</td><td><b>'+$m(D.txTotal)+'</b></td><td><b>'+$m(D.polTotal)+'</b></td></tr>'
+   + '<tr><td>Median market case</td><td colspan="2" style="text-align:right;color:var(--muted)">'+R.N.toLocaleString('en-US')+' simulations</td></tr></tbody></table></div>'
+   + '<div class="card"><div style="font:700 11px var(--body);color:var(--muted);margin-bottom:2px">Cumulative income by age</div>'+chart+legend([{name:'Policy',color:'#2e9e6b'},{name:'Taxable account',color:'#2f6fb5'}])+'</div></div>'
+   + '<div class="sm" style="margin-top:5px">'+esc(leadTxt)+' Income is cost-of-living adjusted at '+pc(p_(R).cola)+' a year.</div></div>'
+   + '<div class="card accent"><h2>Not use it or lose it</h2><div class="sm" style="color:var(--ink);font-size:12px;line-height:1.45">Traditional long-term care coverage works like homeowners insurance: if there is no claim, the premium is gone. Here, care is only one of three ways the same dollars can be used. <b>Needed for care:</b> a tax-free benefit. <b>Not needed:</b> tax-free policy loan income. <b>Either way:</b> a death benefit for your family. About '+Math.round(D.careProb)+'% of people over 65 need some care, averaging '+D.careDur+' years, with a typical cost near '+$m(D.careMo)+' a month and rising about '+pc(D.careInfl*100,1)+' a year.</div></div>'
+   + '<div><h2>What stays behind (illustrated at '+pc(R.params.iRate)+', before loans)</h2><div class="card"><table><thead><tr><th></th><th>Cash surrender value</th><th>Death benefit</th></tr></thead><tbody>'+protRows+'</tbody></table></div></div>'
+   + '<div class="band">'+esc(takeaway)+'</div></div>'
+   + '<div class="fine">'+esc(DISCLOSURE)+' Illustrated rate '+pc(R.params.iRate)+'; income ages '+D.is+'–'+D.ie+'. '+(D.advisor?'Prepared by '+esc(D.advisor)+' · ':'')+esc(D.dateStr)+'.</div></div></body></html>';
+  return html;
+}
+function p_(R){ return R.params; }
+
+// ════════════════════════════════════════════════════════════════════
+// 3. DISCUSSION DOCUMENT — letter portrait, fixed pages
+// ════════════════════════════════════════════════════════════════════
+function buildDiscussionDoc(R, I, M){
+  const D = derive(R,I,M), p=R.params;
+  const TOTAL = 9;
+  const style = '@page{size:letter;margin:0}'
+   + '.page{width:8.5in;height:11in;margin:14px auto;background:#fff;box-shadow:0 2px 14px rgba(0,0,0,.14);position:relative;display:flex;flex-direction:column;overflow:hidden}'
+   + '@media print{.page{margin:0;box-shadow:none;break-after:page;page-break-after:always}.page:last-child{break-after:auto;page-break-after:auto}}'
+   + '.in{padding:.6in .7in .55in;flex:1;display:flex;flex-direction:column}.eyebrow{font:700 12px var(--head);letter-spacing:.22em;text-transform:uppercase;color:var(--orange)}'
+   + 'h1{margin:6px 0 10px;font:800 44px/1.02 var(--head);color:var(--navy);text-transform:uppercase;letter-spacing:.005em}h2{margin:0 0 8px;font:800 24px/1.1 var(--head);color:var(--navy);text-transform:uppercase}'
+   + 'p{font:400 16.5px/1.5 var(--body);margin:0 0 10px;color:var(--ink)}.muted{color:var(--muted)}'
+   + '.pf{position:absolute;left:.7in;right:.7in;bottom:.22in;display:flex;justify-content:space-between;font:500 9px var(--body);color:#8794a8;border-top:1px solid var(--line);padding-top:5px}'
+   + '.cover{background:var(--navy);color:#fff}.cover .in{padding:.9in .8in .7in;justify-content:space-between}.cover h1{color:#fff;font-size:60px;line-height:.98;margin:12px 0 16px}.cover .eyebrow{color:var(--amber)}.cover p{color:#c9d6e8;font-size:19px}'
+   + '.cover .bar{height:8px;width:90px;background:var(--amber);border-radius:4px;margin:6px 0 18px}.cover .for{font:600 14px var(--body);color:#c9d6e8;line-height:1.7}.cover .for b{color:#fff;font:700 24px var(--head);letter-spacing:.04em;text-transform:uppercase;display:block}'
+   + '.pair{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:8px 0 14px}.big{border-radius:14px;padding:20px 22px;color:#fff}.big .n{font:800 54px/1 var(--head)}.big .l{font:600 15px/1.35 var(--body);margin-top:6px}.big .s{font:500 13px/1.35 var(--body);opacity:.92;margin-top:4px}'
+   + '.green{background:var(--green)}.blue{background:var(--blue)}.orange{background:var(--orange)}.navyb{background:var(--navy2)}'
+   + '.band{background:var(--amber);color:var(--navy);padding:16px 22px;border-radius:12px;font:700 20px/1.3 var(--body);margin-top:auto}'
+   + '.card{border:1px solid var(--line);border-radius:14px;padding:16px 20px;background:#fff;margin-bottom:12px}.card h3{margin:0 0 4px;font:800 19px var(--head);text-transform:uppercase;letter-spacing:.05em}.card p{font-size:15px;margin:0}'
+   + '.card.b{border-top:7px solid var(--blue)}.card.b h3{color:var(--blue)}.card.g{border-top:7px solid var(--green)}.card.g h3{color:var(--green)}.card.o{border-top:7px solid var(--orange)}.card.o h3{color:var(--orange)}'
+   + '.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}ul.k{margin:6px 0 0;padding-left:18px;font:400 14.5px/1.5 var(--body)}ul.k li{margin-bottom:3px}'
+   + 'table{border-collapse:collapse;width:100%;font-size:14px}th{font:700 12px var(--body);color:var(--muted);text-align:right;padding:6px 8px;border-bottom:2px solid var(--line)}th:first-child,td:first-child{text-align:left}td{text-align:right;padding:7px 8px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}td b{color:var(--navy)}'
+   + '.legend{display:flex;gap:16px;font:600 12px var(--body);color:var(--muted);margin-top:4px}.legend i{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:6px;vertical-align:-1px}'
+   + '.qblock{background:var(--navy);color:#fff;border-radius:16px;padding:26px 30px;margin:6px 0 16px}.qblock .eyebrow{color:var(--amber);margin-bottom:10px}.qblock ol{margin:0;padding-left:24px}.qblock li{font:600 19px/1.4 var(--body);margin-bottom:14px;color:#fff}'
+   + '.sig{font:600 16px var(--body);color:var(--navy)}.sig small{display:block;font:500 13px var(--body);color:var(--muted)}'
+   + '.assume{font:400 12.5px/1.45 var(--body);color:var(--ink)}.assume td{padding:5px 8px;font-size:12.5px}.fine{font:400 10px/1.4 var(--body);color:#6c7a90}';
+  let pg = 0;
+  const page = (inner, cls) => { pg++; return '<section class="page '+(cls||'')+'">'+inner+(cls==='cover'?'':'<div class="pf"><span>Prepared for '+esc(D.client)+(D.advisor?' · '+esc(D.advisor):'')+' · '+esc(D.dateStr)+'</span><span>Page '+pg+' of '+TOTAL+'</span></div>')+'</section>'; };
+
+  // 1 cover
+  const cover = page('<div class="in"><div><div class="eyebrow">A conversation about the cost of care</div><div class="bar"></div><h1>What if the money for care came out tax-free?</h1><p>'+D.ltcYrs+' years of care can cost '+$m(D.ltcTotal)+' after tax. Where that money comes from decides what it really costs.</p></div>'
+    + '<div class="for">Prepared for<b>'+esc(D.client)+'</b>'+esc(D.dateStr)+(D.advisor?'<br>'+esc(D.advisor):'')+'</div></div>','cover');
+
+  // 2 problem
+  const p2 = page('<div class="in"><div class="eyebrow">The problem</div><h1>The tax comes out before the care gets paid</h1>'
+    + '<p>Money in a qualified account has never been taxed. To pay for care from it, you have to withdraw more than the care costs — and pay the tax on the whole withdrawal.</p>'
+    + '<div class="pair"><div class="big navyb"><div class="n">'+$m(D.ltcTotal)+'</div><div class="l">Care you need to pay for</div><div class="s">'+$m(D.mo)+' a month for '+D.ltcYrs+' years</div></div><div class="big orange"><div class="n">'+$m(D.qpGrossTotal)+'</div><div class="l">Withdrawn from a qualified account to cover it</div><div class="s">at a '+pc(I.qpTax,1)+' tax rate</div></div></div>'
+    + '<div class="card o"><h3>The difference is a tax bill</h3><p><b>'+$m(D.qpTaxTotal)+'</b> of that withdrawal goes to taxes, not care. It also arrives as extra taxable income in the years you are least able to absorb it.</p></div>'
+    + '<div class="band">Every $1 of care paid from a qualified account takes about $'+(1/(1-D.qpRate)).toFixed(2)+' out of it.</div></div>');
+
+  // 3 two destinations
+  const p3 = page('<div class="in"><div class="eyebrow">One contribution, two places</div><h1>The same '+$m(D.annual)+' a year, put to work two ways</h1>'
+    + '<div class="pair"><div class="big blue"><div class="n">'+$m(D.totalPrem)+'</div><div class="l">Into a taxable investment account</div><div class="s">'+$m(D.annual)+' a year for '+D.payYears+' years, ages '+D.issueAge+'–'+D.payEndAge+'</div></div><div class="big green"><div class="n">'+$m(D.totalPrem)+'</div><div class="l">Into a life insurance policy</div><div class="s">the same '+$m(D.annual)+' a year for '+D.payYears+' years</div></div></div>'
+    + '<div class="two"><div class="card b"><h3>Taxable account</h3><ul class="k"><li>Grows with the markets, up and down</li><li>Fees and taxes along the way</li><li>Gains taxed when you take income</li><li>Nothing extra if care is needed</li></ul></div>'
+    + '<div class="card g"><h3>Policy</h3><ul class="k"><li>Cash value that grows with an index, with a floor</li><li>A long-term care benefit, paid tax-free</li><li>A death benefit for the people you leave</li><li>Income through policy loans, which are not taxed as income when the policy is properly structured</li></ul></div></div>'
+    + '<div class="band">Same dollars in. Different things you can do when you need them.</div></div>');
+
+  // 3b use it or lose it
+  const p3b = page('<div class="in"><div class="eyebrow">A modern way to plan for care</div><h1>Not use it or lose it</h1>'
+    + '<p>Think of homeowners insurance. You pay every year, and in a year with no claim, that premium is gone. Traditional long-term care insurance works much the same way, and it is the reason many people put off planning for care.</p>'
+    + '<div class="two"><div class="card o"><h3>The old way</h3><ul class="k"><li>Premium paid every year</li><li>No care needed? The premium is gone</li><li>Premiums can rise over time</li><li>Nothing for your family if the benefit is never used</li></ul></div>'
+    + '<div class="card g"><h3>This way</h3><ul class="k"><li>Funded for '+D.payYears+' years, then paid up</li><li>Care needed? A tax-free benefit of '+$m(D.mo)+' a month</li><li>Care not needed? Tax-free income through policy loans</li><li>Either way, a death benefit for your family</li></ul></div></div>'
+    + '<div class="pair"><div class="big navyb"><div class="n">'+Math.round(D.careProb)+'%</div><div class="l">of people over 65 are expected to need some long-term care</div><div class="s">averaging about '+D.careDur+' years</div></div><div class="big orange"><div class="n">'+$m(D.careMo)+'</div><div class="l">typical monthly cost of care today</div><div class="s">rising about '+pc(D.careInfl*100,1)+' a year</div></div></div>'
+    + '<div class="band">Every dollar has a job whether or not care is ever needed.</div></div>');
+
+  // 4 care
+  const p4 = page('<div class="in"><div class="eyebrow">If care is needed</div><h1>A tax-free benefit, month after month</h1>'
+    + '<div class="pair"><div class="big green"><div class="n">'+$m(D.mo)+'</div><div class="l">Illustrated monthly long-term care benefit</div><div class="s">'+$m(D.ltcAnnual)+' a year</div></div><div class="big navyb"><div class="n">'+$m(D.ltcTotal)+'</div><div class="l">Over '+D.ltcYrs+' years, tax-free</div><div class="s">no withdrawal needed from your qualified account</div></div></div>'
+    + '<div class="card g"><h3>Where the benefit comes from</h3><p>While the insured is living, the policy\'s death benefit is the pool the care benefit draws from. At age '+D.ltcAge+' that pool is illustrated at <b>'+$m(D.pool)+'</b> — about '+(D.poolCovers>=10?Math.round(D.poolCovers):D.poolCovers.toFixed(1))+' times the '+D.ltcYrs+'-year benefit. Whatever is not used for care passes to your family.</p></div>'
+    + '<div class="card o"><h3>To net the same from a qualified account</h3><table><thead><tr><th></th><th>Per month</th><th>Per year</th><th>'+D.ltcYrs+' years</th></tr></thead><tbody><tr><td>Tax-free benefit</td><td><b>'+$m(D.mo)+'</b></td><td><b>'+$m(D.ltcAnnual)+'</b></td><td><b>'+$m(D.ltcTotal)+'</b></td></tr><tr><td>Qualified-account withdrawal</td><td><b>'+$m(D.qpGrossMonthly)+'</b></td><td><b>'+$m(D.qpGrossAnnual)+'</b></td><td><b>'+$m(D.qpGrossTotal)+'</b></td></tr><tr><td>Paid in tax</td><td>'+$m(D.qpGrossMonthly-D.mo)+'</td><td>'+$m(D.qpGrossAnnual-D.ltcAnnual)+'</td><td>'+$m(D.qpTaxTotal)+'</td></tr></tbody></table></div>'
+    + '<div class="band">'+$m(D.qpTaxTotal)+' that could stay in your qualified account, still working for you.</div></div>');
+
+  // 5 income
+  const chart = lineChart({ w:640, h:170, ages:R.ages, label:'Cumulative income', series:[
+      {name:'Policy',color:'#2e9e6b',vals:D.cumPol.map((v,i)=>R.ages[i]>=I.is?v:null)},
+      {name:'Taxable account',color:'#2f6fb5',vals:D.cumTax.map((v,i)=>R.ages[i]>=I.is?v:null)} ] });
+  const bandRows = [25,50,75].map(b=>{ const lab=b===25?'Cautious markets':b===50?'Median markets':'Favorable markets'; return '<tr><td>'+lab+'</td><td>'+$m(R.invBands[b].total)+'</td><td>'+$m(R.bands[b].total)+'</td></tr>'; }).join('');
+  const p5head = D.polLeads ? 'The policy can also pay you income' : 'The policy can also pay you income — and here is how it compares';
+  const p5band = D.polLeads ? 'In the median case, tax-free income from the policy outpaces what the account nets after tax.' : 'On income alone the account nets more in the median case. The policy adds the care benefit and death benefit the account cannot.';
+  const p5 = page('<div class="in"><div class="eyebrow">If care is never needed</div><h1>'+esc(p5head)+'</h1>'
+    + '<p>We ran '+R.N.toLocaleString('en-US')+' possible market histories. Both strategies start income at age '+D.is+' and run to age '+D.ie+', rising '+pc(p.cola)+' a year.</p>'
+    + '<div class="pair"><div class="big blue"><div class="n">'+$m(D.txFirst)+'</div><div class="l">Taxable account, first year</div><div class="s">after tax · '+$m(D.txTotal)+' in total</div></div><div class="big green"><div class="n">'+$m(D.polFirst)+'</div><div class="l">Policy, first year</div><div class="s">tax-free · '+$m(D.polTotal)+' in total</div></div></div>'
+    + '<div class="card"><div style="font:700 13px var(--body);color:var(--muted);margin-bottom:2px">Total income by age — median markets</div>'+chart+legend([{name:'Policy (tax-free)',color:'#2e9e6b'},{name:'Taxable account (after tax)',color:'#2f6fb5'}])+'</div>'
+    + '<div class="card"><table><thead><tr><th>Total income to age '+D.ie+'</th><th>Taxable account</th><th>Policy</th></tr></thead><tbody>'+bandRows+'</tbody></table></div>'
+    + '<div class="band">'+esc(p5band)+'</div></div>');
+
+  // 6 stays behind
+  const ages = [65,70,75,80,85,90,95].filter(a=>a>=R.issueAge && a<=R.ages[R.ages.length-1]);
+  const protRows = ages.map(a=>{ const r=D.at(a); return '<tr><td><b>Age '+a+'</b></td><td>'+$m(r.csv)+'</td><td>'+$m(r.db)+'</td></tr>'; }).join('');
+  const chart2 = lineChart({ w:640, h:200, ages:R.ages, label:'Death benefit and cash value', series:[
+      {name:'Death benefit',color:'#e8772e',vals:R.illus.map(r=>r.db)},
+      {name:'Cash surrender value',color:'#2e9e6b',vals:R.illus.map(r=>r.csv)} ] });
+  const p6 = page('<div class="in"><div class="eyebrow">What stays behind</div><h1>Protection that grows with you</h1>'
+    + '<p>The death benefit is the pool for care while you are living, and what your family receives afterward. Cash value is what you can reach through policy loans.</p>'
+    + '<div class="card"><div style="font:700 13px var(--body);color:var(--muted);margin-bottom:2px">As illustrated at '+pc(p.iRate)+', before any policy loans</div>'+chart2+legend([{name:'Death benefit',color:'#e8772e'},{name:'Cash surrender value',color:'#2e9e6b'}])+'</div>'
+    + '<div class="card"><table><thead><tr><th></th><th>Cash surrender value</th><th>Death benefit</th></tr></thead><tbody>'+protRows+'</tbody></table></div>'
+    + '<div class="band">Income taken as policy loans reduces the death benefit and the care pool, so we decide how much to take, and when, together.</div></div>');
+
+  // 7 how built
+  const p7 = page('<div class="in"><div class="eyebrow">How we built these numbers</div><h2 style="font-size:34px">Plain-English assumptions</h2>'
+    + '<table class="assume"><tbody>'
+    + '<tr><td>Contributions</td><td>'+$m(D.annual)+' a year for '+D.payYears+' years into each strategy ('+$m(D.totalPrem)+' total). Source: '+esc(I.fundNote||'Non-qualified savings')+'. No financing is used.</td></tr>'
+    + '<tr><td>Policy growth</td><td>The policy is illustrated at '+pc(p.iRate)+'. For income we replaced that with '+R.N.toLocaleString('en-US')+' simulated market histories, re-sampling '+R.years.n+' calendar years ('+R.years.from+'–'+R.years.to+'), with the policy\'s cap of '+pc(p.cap)+' and floor of '+pc(p.floor)+(R.overlay?', and the policy\'s enhancement rider credit multiplier applied':'')+'</td></tr>'
+    + '<tr><td>Death benefit and cash value</td><td>Shown exactly as illustrated at '+pc(p.iRate)+', before policy loans'+(R.overlay?' (the illustration is the base policy, so simulated values can run higher)':'')+'</td></tr>'
+    + '<tr><td>Taxable account</td><td>A diversified blend of stocks and bonds, less a '+pc(p.invFee)+' fee and '+pc(p.invDrag)+' a year for taxes along the way; gains taxed at '+pc(p.invTax,1)+' when withdrawn</td></tr>'
+    + '<tr><td>Income</td><td>Ages '+D.is+'–'+D.ie+', rising '+pc(p.cola)+' a year. Policy income is taken as loans at '+pc(p.loanRate)+' interest and sized to keep cash value above '+$m(p.csvFloor)+'</td></tr>'
+    + '<tr><td>Care benefit</td><td>'+$m(D.mo)+' a month as illustrated; withdrawal comparison uses a '+pc(I.qpTax,1)+' tax rate over '+D.ltcYrs+' years</td></tr>'
+    + '</tbody></table><p class="fine" style="margin-top:14px">'+esc(DISCLOSURE)+'</p></div>');
+
+  // 8 questions
+  const p8 = page('<div class="in"><div class="eyebrow">Before you decide</div><h1 style="font-size:38px">Questions worth sitting with</h1>'
+    + '<div class="qblock"><div class="eyebrow">Ask yourself</div><ol><li>If care were needed in the next five years, which account would you want to pay for it from — and what would that withdrawal cost you in taxes?</li><li>Has anyone shown you what '+D.ltcYrs+' years of care would take out of your qualified account after tax?</li><li>What happens to the rest of your plan if the need arrives before you are ready?</li><li>Each year you wait, pricing and insurability can change. What would waiting cost you?</li></ol></div>'
+    + '<div class="card g"><h3>A simple next step</h3><p>Let\'s look at your own numbers: the monthly benefit that fits, the contribution that makes sense, and the way to fund it.</p></div>'
+    + '<div class="sig" style="margin-top:auto">'+(D.advisor?esc(D.advisor):'Your advisor')+'<small>'+esc(D.dateStr)+'</small></div></div>');
+
+  return '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Discussion Document - '+esc(D.client)+'</title>'+FONTS+'<style>'+PB_VARS+style+'</style></head><body>'
+    + TOOLBAR('Discussion Document') + cover + p2 + p3 + p3b + p4 + p5 + p6 + p7 + p8 + '</body></html>';
+}
+
+</script>
+<script>
+// ───────── gate: advisor session required ─────────
+(function(){
+  const U='https://piixgvxrasddphklgazh.supabase.co', K='sb_publishable_acvdk0hBniaB6qOD8_k8XQ_9R6FNbP_';
+  const bounce = q => { try{localStorage.setItem('ipp_return_url', location.href);}catch(e){} location.href='advisor-portal.html'+(q||''); };
+  (async()=>{
+    let s=null; try{ s=JSON.parse(localStorage.getItem('ipp_sb_session')||'null'); }catch(e){}
+    if(!s||!s.access_token||(s.expires_at&&Date.now()/1000>s.expires_at-60)||!(s.user&&s.user.id)) return bounce();
+    let prof=null;
+    try{
+      const r=await fetch(U+'/rest/v1/advisor_profiles?id=eq.'+encodeURIComponent(s.user.id)+'&select=first_name,last_name,firm_name',{headers:{apikey:K,Authorization:'Bearer '+s.access_token,Accept:'application/vnd.pgrst.object+json'}});
+      if(!r.ok) return bounce('?error=no_profile'); prof=await r.json();
+    }catch(e){ return bounce(); }
+    if(!prof) return bounce('?error=no_profile');
+    window.__advisorName=[prof.first_name,prof.last_name].filter(Boolean).join(' ');
+    const a=document.getElementById('advisorName'); if(a&&!a.value) a.value=window.__advisorName;
+    document.getElementById('app').classList.remove('hide');
+    const g=document.getElementById('auth-gate'); g.classList.add('hidden'); setTimeout(()=>g.remove(),400);
+  })();
+})();
+
+// ───────── app ─────────
+const $=id=>document.getElementById(id);
+let ILL=null, RES=null, INP=null;
+$('dateStr').value=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+$('fundSrc').onchange=()=>{ const v=$('fundSrc').value; $('exWrap').classList.toggle('hide', !(v==='x1035'||v==='mix')); };
+const drop=$('drop'), fileIn=$('file');
+drop.onclick=()=>fileIn.click();
+['dragover','dragenter'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.add('on');}));
+['dragleave','drop'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();if(e==='dragleave')drop.classList.remove('on');}));
+drop.addEventListener('drop',ev=>{ if(ev.dataTransfer.files[0]) handleFile(ev.dataTransfer.files[0]); });
+fileIn.onchange=()=>{ if(fileIn.files[0]) handleFile(fileIn.files[0]); };
+
+async function handleFile(f){
+  $('fileMsg').innerHTML=''; ILL=null; $('run').disabled=true;
+  try{
+    let ill;
+    if(/\.csv$/i.test(f.name)) ill=parseCsvText(await f.text());
+    else{
+      if(typeof XLSX==='undefined') throw new Error('The spreadsheet reader did not load. Check your connection and reload.');
+      const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});
+      ill=parseWorkbookSheets(wb.SheetNames.map(n=>({name:n,rows:XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,defval:null})})));
+    }
+    if(ill.error) throw new Error(ill.error);
+    ILL=ill; const m=ill.meta;
+    drop.classList.add('on'); drop.textContent='Loaded: '+f.name;
+    $('iRate').value = m.illustratedRatePct!=null ? m.illustratedRatePct : '';
+    $('cap').value = ill.format==='csv' ? 9.25 : 12;
+    if(!$('ltcAge').value) $('ltcAge').value=75;
+    $('is').value=Math.max(65,m.issueAge); $('ltcAge').value=Math.max(75,m.issueAge);
+    const w=(ill.warnings||[]).map(x=>'<div class="warn">'+esc(x)+'</div>').join('');
+    $('fileMsg').innerHTML='<div class="hint" style="margin-top:8px">Issue age '+m.issueAge+' · '+$m(m.annualPrem)+' a year for '+m.payYears+' years · initial death benefit '+$m(m.initialDB)+(m.illustratedRatePct!=null?'':' · enter the illustrated rate below')+'</div>'+w;
+    $('run').disabled=false;
+  }catch(e){ $('fileMsg').innerHTML='<div class="err">'+esc(e.message||e)+'</div>'; }
+}
+const nv=id=>parseFloat($(id).value);
+function inputs(){
+  const fs=$('fundSrc').value, ex=nv('exAmt')||0;
+  const fundNote = fs==='nq' ? 'Non-qualified savings' : fs==='x1035' ? '1035 exchange from other life insurance policies' : fs==='mix' ? '1035 exchange ('+$m(ex)+') combined with non-qualified savings' : 'Qualified source, with the tax on distributions handled separately';
+  return { clientName:$('clientName').value.trim(), advisorName:$('advisorName').value.trim(), dateStr:$('dateStr').value, version:$('version').value.trim(),
+    iRate:nv('iRate'), cap:nv('cap'), floor:nv('floor'), ltcMonthly:nv('ltcMonthly'), ltcYears:nv('ltcYears'), qpTax:nv('qpTax'), ltcAge:nv('ltcAge'), careCost:nv('careCost'), careInfl:nv('careInfl'), careProb:nv('careProb'), careDur:nv('careDur'),
+    is:nv('is'), ie:nv('ie'), cola:nv('cola'), loanRate:nv('loanRate'), csvFloor:nv('csvFloor'),
+    invEq:nv('invEq'), invFee:nv('invFee'), invDrag:nv('invDrag'), invTax:nv('invTax'), dataYrs:nv('dataYrs'), nSims:nv('nSims'), seed:20240607, overlay:$('overlay').value==='1',
+    fundSrc:fs, exAmt:ex, fundNote };
+}
+$('run').onclick=async()=>{
+  const I=inputs(); const bad=[];
+  ['iRate','cap','floor','ltcMonthly','ltcYears','qpTax','is','ie','cola','loanRate','csvFloor','invEq','invFee','invDrag','invTax'].forEach(k=>{ if(isNaN(I[k])) bad.push(k); });
+  if(bad.length||!(I.ltcMonthly>0)){ $('runMsg').innerHTML='<div class="err">Please fill in every input, including the illustrated rate and the monthly LTC benefit.</div>'; return; }
+  if(I.qpTax<0||I.qpTax>=100){ $('runMsg').innerHTML='<div class="err">Tax rate must be between 0 and 99.</div>'; return; }
+  $('runMsg').innerHTML=''; $('run').disabled=true; $('results').classList.add('hide');
+  try{
+    const R=await runMonteCarlo(ILL,I,(f,t)=>{ $('pbar').style.width=Math.round(f*100)+'%'; $('status').textContent=t||''; });
+    if(R.error) throw new Error(R.error);
+    RES=R; INP=I; show(R,I);
+  }catch(e){ $('runMsg').innerHTML='<div class="err">'+esc(e.message||e)+'</div>'; }
+  $('run').disabled=false;
+};
+function show(R,I){
+  const M=ILL.meta, D=derive(R,I,M);
+  $('kpis').innerHTML=
+   '<div class="kpi k1"><div class="n">'+$m(D.ltcTotal)+'</div><div class="l">Tax-free care benefit over '+D.ltcYrs+' years</div></div>'+
+   '<div class="kpi k3"><div class="n">'+$m(D.qpGrossTotal)+'</div><div class="l">Qualified-account withdrawal needed for the same net</div></div>'+
+   '<div class="kpi k2"><div class="n">'+$m(D.txTotal)+'</div><div class="l">Taxable account, total net income (median)</div></div>'+
+   '<div class="kpi k4"><div class="n">'+$m(D.polTotal)+'</div><div class="l">Policy, total tax-free income (median)</div></div>';
+  $('bandTbl').innerHTML='<thead><tr><th>Market experience</th><th>Taxable total net</th><th>Policy total</th><th>Policy odds income lasts</th></tr></thead><tbody>'+
+   [25,50,75].map(b=>'<tr><td>'+(b===25?'Cautious (25th)':b===50?'Median (50th)':'Favorable (75th)')+'</td><td>'+$m(R.invBands[b].total)+'</td><td>'+$m(R.bands[b].total)+'</td><td>'+Math.round(R.bands[b].surv*100)+'%</td></tr>').join('')+'</tbody>';
+  $('results').classList.remove('hide'); $('status').textContent='Done · '+R.N.toLocaleString('en-US')+' simulations';
+  $('results').scrollIntoView({behavior:'smooth'});
+}
+document.querySelectorAll('[data-o]').forEach(b=>b.onclick=()=>{
+  if(!RES) return; const o=b.dataset.o, M=ILL.meta;
+  const html = o==='ledger'?buildLedgerDoc(RES,INP,M):o==='one'?buildOnePagerDoc(RES,INP,M):buildDiscussionDoc(RES,INP,M);
+  const w=window.open(URL.createObjectURL(new Blob([html],{type:'text/html'})),'_blank');
+  if(!w) $('popHint').textContent='Your browser blocked the pop-up. Allow pop-ups for this site and try again.';
+});
+</script>
+</body></html>
