@@ -42,6 +42,7 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}th{font:700 11.5px va
 <div><label>Version label (optional)</label><input id="version" placeholder="e.g. Draft 1"></div></div></section>
 
 <section class="card"><h2>2 · Carrier illustration</h2>
+<label style="display:flex;gap:8px;align-items:center;margin:-4px 0 10px;cursor:pointer"><input type="checkbox" id="cmp" style="width:auto"> Compare two options (adds a second illustration and a comparison summary)</label>
 <div class="drop" id="drop">Drop the illustration output here (.csv or .xlsx), or click to choose<input type="file" id="file" accept=".csv,.xlsx,.xls" class="hide"></div>
 <div id="fileMsg"></div>
 <div class="grid" style="margin-top:12px">
@@ -80,11 +81,28 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}th{font:700 11.5px va
 <div><label>Years of market history</label><select id="dataYrs"><option value="50">Last 50 years (1975–2024)</option><option value="40">Last 40 years</option><option value="30">Last 30 years</option><option value="20">Last 20 years</option></select></div>
 <div><label>Simulations</label><select id="nSims"><option value="5000">5,000</option><option value="10000" selected>10,000</option><option value="20000">20,000</option></select></div></div></section>
 
+<section class="card hide" id="cardB"><h2>2b · Second option</h2>
+<div class="hint" style="margin:-6px 0 10px">Everything else (client, funding, income window, investment assumptions) is shared. Run both illustrations at the same contribution.</div>
+<div class="drop" id="dropB">Drop the second illustration output here (.csv or .xlsx), or click to choose<input type="file" id="fileB" accept=".csv,.xlsx,.xls" class="hide"></div>
+<div id="fileMsgB"></div>
+<div class="grid" style="margin-top:12px">
+<div><label>Label for first option</label><input id="labA" value="Option A"></div>
+<div><label>Label for second option</label><input id="labB" value="Option B"></div>
+<div><label>Illustrated rate (%)</label><input id="iRateB" type="number" step="0.01"></div>
+<div><label>Index cap (%)</label><input id="capB" type="number" step="0.05"></div>
+<div><label>Loan rate (%)</label><input id="loanRateB" type="number" step="0.25" value="5"></div>
+<div><label>Illustrated monthly LTC benefit ($)</label><input id="ltcMonthlyB" type="number" step="1"></div>
+<div id="ltcYrsBoxB"><label>Benefit period (years)</label><input id="ltcYearsB" type="number" min="1" max="10" value="3"></div>
+<div id="overlayBoxB"><label>Enhancement rider factors</label><select id="overlayB"><option value="1">Apply (illustration run without the rider)</option><option value="0">Do not apply (illustration already includes it)</option></select></div>
+<div><label>Care coverage structure</label><select id="careModeB"><option value="pool">Total benefit is the care pool</option><option value="fixed">Separate care amount (set at issue)</option></select></div>
+<div id="careAmtBoxB" style="display:none"><label>Total care available at issue ($)</label><input id="careAmtB" type="number" step="1000"></div>
+<div id="ltcAgeBoxB"><label>Age shown for the benefit pool</label><input id="ltcAgeB" type="number" value="75"></div></div></section>
 <section class="card"><div class="row"><button class="pri" id="run" disabled>Run the model</button><div id="status" class="hint" style="flex:1"></div></div><div class="bar"><i id="pbar"></i></div><div id="runMsg"></div></section>
 
 <section class="card hide" id="results"><h2>Results</h2><div class="kpis" id="kpis"></div>
 <div style="margin-top:14px"><table id="bandTbl"></table></div>
 <div class="btns" style="margin-top:16px"><button class="sec" data-o="ledger">Open ledger</button><button class="sec" data-o="one">Open one-page summary</button><button class="sec" data-o="disc">Open discussion document</button></div>
+<div id="cmpBtns" class="hide" style="margin-top:14px"><div class="hint" style="margin-bottom:6px">Second option and comparison</div><div class="btns"><button class="sec" data-ob="ledger">Open second option ledger</button><button class="sec" data-ob="one">Open second option one-page summary</button><button class="sec" data-ob="disc">Open second option discussion document</button><button class="sec" style="background:var(--amber);color:var(--navy)" id="cmpOne">Open comparison summary</button></div></div>
 <div class="hint" id="popHint" style="margin-top:6px"></div></section>
 </main>
 
@@ -245,7 +263,7 @@ function parseCsvText(text){
     const bonus = c.bonus>=0 ? num0(p[c.bonus]) : 0;
     const cr = num0(p[c.cr]);
     rows.push({ year:yr, age:parseInt(p[1],10)||0, prem:num0(p[c.prem]), fixedChg:chg-avChg, avChg, chg, pe, std:chg,
-      idxCr, othCr:cr-idxCr, cr, av:num0(p[c.av]), surr:Math.abs(num0(p[c.surr])), csv:num0(p[c.csv]), db:num0(p[c.db]) });
+      idxCr, bonus, othCr:cr-idxCr, cr, av:num0(p[c.av]), surr:Math.abs(num0(p[c.surr])), csv:num0(p[c.csv]), db:num0(p[c.db]) });
   }
   return finishIllustration('csv', rows, meta);
 }
@@ -306,10 +324,11 @@ const FAC_WB = [[0.0160,1.000,0],[0.0310,1.300,0],[0.0386,1.450,0],[0.0460,1.600
   [0.0910,2.470,0.002736],[0.0910,2.470,0.005436],[0.0910,2.470,0.007918],[0.0910,2.470,0.010264],[0.0910,2.470,0.012437],[0.0910,2.470,0.014420],[0.0910,2.470,0.016214],[0.0910,2.470,0.017804],[0.0910,2.470,0.019208],[0.0910,2.470,0.020425],
   [0.0820,2.300,0.021457],[0.0730,2.130,0.020513],[0.0640,1.950,0.019612],[0.0550,1.780,0.018755],[0.0460,1.600,0.017925],[0.0460,1.600,0.017140],[0.0460,1.600,0.016372],[0.0460,1.600,0.015660],[0.0460,1.600,0.014955],[0.0460,1.600,0.014278],
   [0.0460,1.600,0.013618],[0.0460,1.600,0.010854],[0.0460,1.600,0.008292],[0.0460,1.600,0.005949],[0.0460,1.600,0.003772],[0.0460,1.600,0.001829]].concat(rep(14,[0.0460,1.600,0]));
+const NLG_LOAN_BONUS_DIFF = 0.0035; // loaned-account bonus less primary-account bonus (60-25 bps yrs 2-9; 85-50 bps yrs 10+)
 function buildCalibration(ill, iRate, cap, floor, overlay){
   const g = clampR(iRate, floor, cap);
   if (!(g>0)) return { error:'Illustrated rate must be above the floor rate.' };
-  const n = ill.rows.length, cal = { n, g, cap, floor, iRate, k:new Float64Array(n), a:new Float64Array(n), b:new Float64Array(n),
+  const n = ill.rows.length, cal = { n, g, cap, floor, iRate, k:new Float64Array(n), a:new Float64Array(n), b:new Float64Array(n), bn:new Float64Array(n),
     F:new Float64Array(n), P:new Float64Array(n), S:new Float64Array(n) };
   let prevAV = 0;
   if (overlay){
@@ -324,6 +343,7 @@ function buildCalibration(ill, iRate, cap, floor, overlay){
     cal.k[i] = r.idxCr / (O*g);
     cal.a[i] = r.avChg / O;
     cal.b[i] = r.othCr / O;
+    cal.bn[i] = (r.bonus||0) / O;
     cal.F[i] = r.fixedChg; cal.P[i] = r.prem; cal.S[i] = r.surr;
     prevAV = r.av;
   });
@@ -355,23 +375,31 @@ function simAV(cal, rets, avOut){
 // ════════════════════════════════════════════════════════════════════
 // POLICY LOAN INCOME
 // ════════════════════════════════════════════════════════════════════
-function loanWalk(av, surr, o, inc, out){
+function loanWalk(av, surr, o, inc, out, ext){
   // o: {issueAge, is, ie, cola, r(decimal), floor}; returns true if income is sustained and the policy stays in force
-  let cum = 0;
+  let cum = 0, La = 0, Lb = 0;
   for (let i=0;i<av.length;i++){
     const age = o.issueAge + i;
     const income = (inc>0 && age>=o.is && age<=o.ie) ? inc*Math.pow(1+o.cola, age-o.is) : 0;
     cum = cum*(1+o.r) + income;
-    const csvNet = Math.max(0, av[i]-surr[i] - cum);
-    if (out){ out.inc[i]=income; out.cum[i]=cum; out.csvNet[i]=csvNet; }
+    let avT = av[i];
+    if (ext){
+      // two index accounts: loaned principal earns the same capped credit with a larger bonus than it would in the primary account
+      const j = Math.min(i, ext.cal.n-1), g = clampR(ext.price[ext.idxs[i]], ext.cal.floor, ext.cal.cap), rho = ext.cal.k[j]*g + ext.cal.bn[j];
+      La *= (1 + rho + NLG_LOAN_BONUS_DIFF); Lb *= (1 + rho);
+      avT = av[i] + (La - Lb);
+      La += income; Lb += income;
+    }
+    const csvNet = Math.max(0, avT-surr[i] - cum);
+    if (out){ out.inc[i]=income; out.cum[i]=cum; out.csvNet[i]=csvNet; if (out.avTot) out.avTot[i]=avT; }
     if (age>=o.is && age<=o.ie){ if (csvNet < o.floor) { if(!out) return false; out.fail=true; } }
     else if (age>o.ie && inc>0 && csvNet<=0){ if(!out) return false; out.fail=true; }
   }
   return !(out && out.fail);
 }
-function solveLoanIncome(av, surr, o){
+function solveLoanIncome(av, surr, o, ext){
   let lo=0, hi=Math.max(...av)*0.5+1;
-  for (let it=0; it<60; it++){ const m=(lo+hi)/2; if (loanWalk(av,surr,o,m,null)) lo=m; else hi=m; }
+  for (let it=0; it<60; it++){ const m=(lo+hi)/2; if (loanWalk(av,surr,o,m,null,ext)) lo=m; else hi=m; }
   return lo;
 }
 
@@ -415,7 +443,8 @@ const tick = () => new Promise(r=>setTimeout(r,0));
 async function runMonteCarlo(ill, p, onProgress){
   // p: iRate(%), cap(%), floor(%), is, ie, cola(%), loanRate(%), csvFloor($), nSims, dataYrs, invEq(%), invFee(%), invDrag(%), invTax(%), seed
   const prog = onProgress || (()=>{});
-  const cal = buildCalibration(ill, p.iRate/100, p.cap/100, p.floor/100, p.overlay!==false);
+  const nlg = ill.format==='csv' && p.nlgBonus!==false;
+  const cal = buildCalibration(ill, p.iRate/100, p.cap/100, p.floor/100, p.overlay!==false && !nlg);
   if (cal.error) return { error: cal.error };
   const issueAge = ill.meta.issueAge;
   const nYrs = Math.min(100-issueAge+1, ill.rows.length);
@@ -458,7 +487,7 @@ async function runMonteCarlo(ill, p, onProgress){
   const pathInc = new Float64Array(N);
   for (let k=0;k<N;k++){
     if (k%1000===0){ prog(0.42+0.2*k/N,'Solving policy income…'); await tick(); }
-    pathInc[k] = solveLoanIncome(avAll.subarray(k*nYrs,(k+1)*nYrs), surrArr, o);
+    pathInc[k] = solveLoanIncome(avAll.subarray(k*nYrs,(k+1)*nYrs), surrArr, o, nlg?{cal,price:priceArr,idxs:draws.subarray(k*nYrs,(k+1)*nYrs)}:null);
   }
   const order = Array.from({length:N},(_,i)=>i).sort((a,b)=>pathInc[a]-pathInc[b]);
   const PCTS = [25,50,75];
@@ -471,8 +500,8 @@ async function runMonteCarlo(ill, p, onProgress){
     const k = order[Math.floor(pc/100*(N-1))];
     const av = avAll.subarray(k*nYrs,(k+1)*nYrs);
     const inc = pathInc[k];
-    const out = { inc:new Float64Array(nYrs), cum:new Float64Array(nYrs), csvNet:new Float64Array(nYrs) };
-    loanWalk(av, surrArr, o, inc, out);
+    const out = { inc:new Float64Array(nYrs), cum:new Float64Array(nYrs), csvNet:new Float64Array(nYrs), avTot:new Float64Array(nYrs) };
+    loanWalk(av, surrArr, o, inc, out, nlg?{cal,price:priceArr,idxs:draws.subarray(k*nYrs,(k+1)*nYrs)}:null);
     const id = draws.subarray(k*nYrs,(k+1)*nYrs);
     let lo=0, hi=b0[k]*3;
     for (let it=0; it<50; it++){ const m=(lo+hi)/2; if (invRunPath(id,blend,b0[k],ba0[k],m,io,null)) lo=m; else hi=m; }
@@ -484,7 +513,7 @@ async function runMonteCarlo(ill, p, onProgress){
   const bands = {}, invBands = {};
   PCTS.forEach(pc=>{ const st=strands[pc]; bands[pc]={ income:st.inc, total:st.polTotal, surv:null }; invBands[pc]={ first:st.txFirst, total:st.txTotal }; });
   const m = strands[50];
-  const policy = ages.map((age,i)=>({ age, av:m.av[i], income:m.walk.inc[i], loan:m.walk.cum[i], csvNet:m.walk.csvNet[i] }));
+  const policy = ages.map((age,i)=>({ age, av:m.walk.avTot[i], income:m.walk.inc[i], loan:m.walk.cum[i], csvNet:m.walk.csvNet[i] }));
   const taxable = ages.map((age,i)=>{
     if (i<incIdx) return { age, bal:invPre[m.k*incIdx+i], gross:0, net:0 };
     if (age<=p.ie){ const j=age-p.is; return { age, bal:m.det.bal[j], gross:m.det.gross[j], net:m.det.net[j] }; }
@@ -499,7 +528,7 @@ async function runMonteCarlo(ill, p, onProgress){
   return { params:p, issueAge, nYrs, N, ages, years:{from:years[0],to:years[years.length-1],n:years.length},
     prem:Array.from(P), totalPrem:Array.from(P).reduce((s,v)=>s+v,0), nInc, cfSum,
     policy, taxable, illus, bands,
-    invBands, eq3, avgCredited, diag, kRange:cal.mode?[Math.min(...cal.bcr),Math.max(...cal.bcr)]:[Math.min(...cal.k), Math.max(...cal.k)], overlay:!!cal.mode };
+    invBands, eq3, avgCredited, diag, kRange:cal.mode?[Math.min(...cal.bcr),Math.max(...cal.bcr)]:[Math.min(...cal.k), Math.max(...cal.k)], overlay:!!cal.mode, nlg };
 }
 
 if (typeof module!=='undefined') module.exports = { parseCsvText, parseWorkbookSheets, buildCalibration, simAV, runMonteCarlo, mulberry32 };
@@ -680,7 +709,7 @@ function buildLedgerDoc(R, I, M){
    + [65,80,95].filter(x=>x>=R.issueAge&&x<=R.ages[R.ages.length-1]).map(x=>'<tr><td>Total benefit at age '+x+'</td><td><b>'+D.lx(D.levDB(x))+'</b></td></tr>').join('')
    + '</tbody></table></div></div>'
    + '<div class="notes"><div><b>Funding.</b> '+esc(I.fundNote||'Non-qualified savings')+'; no financing. <b>How to read this page.</b> The first two sections use '+nSim+' hypothetical market sequences built by re-sampling '+R.years.n+' calendar years of historical returns. The cautious, median and favorable cases are three actual sequences from that set, ranked by the income the asset can support. The taxable account is run on the same sequence in each case, with its withdrawal sized so the account lasts through age '+I.ie+', and gains taxed at '+pc(p.invTax,1)+' as withdrawn. Asset income is the level, cost-of-living adjusted amount taken as loans that keeps accessible value after loans above '+$m(p.csvFloor)+' through age '+I.ie+' and keeps the asset in force to age 100. The ledger rows follow the median sequence.</div>'
-   + '<div><b>Third section.</b> Accessible value and total benefit are shown exactly as illustrated at '+pc(p.iRate)+', before any asset loans. '+(D.fixed?'Loans taken for income reduce the total benefit. ':'Total benefit is also the pool available for long-term care while the insured is living, so loans taken for income reduce it. ')+(R.overlay?'The simulated sections apply the asset enhancement rider (a credit multiplier of '+R.kRange[0].toFixed(2).replace(/\.?0+$/,'')+'x to '+R.kRange[1].toFixed(2).replace(/\.?0+$/,'')+'x on the capped index return, with its matching charge), so simulated values can exceed the base illustration shown here. Average credited rate across all simulated years was '+pc(R.avgCredited*100)+'.':'The simulated asset engine reproduces the illustration to within '+$m(R.diag.maxAvDiff)+' when the index earns the illustrated rate; average credited rate across all simulated years was '+pc(R.avgCredited*100)+' against '+pc(Math.min(Math.max(p.iRate,p.floor),p.cap))+' illustrated (after cap and floor).')+'</div></div>'
+   + '<div><b>Third section.</b> Accessible value and total benefit are shown exactly as illustrated at '+pc(p.iRate)+', before any asset loans. '+(D.fixed?'Loans taken for income reduce the total benefit. ':'Total benefit is also the pool available for long-term care while the insured is living, so loans taken for income reduce it. ')+(R.nlg?'The simulated sections credit the capped index return plus the asset\'s standard bonus, which is paid even when the index return is zero or negative, so the effective floor is the bonus rate. Amounts loaned for income earn the same capped index return with a larger bonus, and the loan balance accrues interest at '+pc(p.loanRate)+'. Average credited rate across all simulated years was '+pc(R.avgCredited*100)+'.':R.overlay?'The simulated sections apply the asset enhancement rider (a credit multiplier of '+R.kRange[0].toFixed(2).replace(/\.?0+$/,'')+'x to '+R.kRange[1].toFixed(2).replace(/\.?0+$/,'')+'x on the capped index return, with its matching charge), so simulated values can exceed the base illustration shown here. Average credited rate across all simulated years was '+pc(R.avgCredited*100)+'.':'The simulated asset engine reproduces the illustration to within '+$m(R.diag.maxAvDiff)+' when the index earns the illustrated rate; average credited rate across all simulated years was '+pc(R.avgCredited*100)+' against '+pc(Math.min(Math.max(p.iRate,p.floor),p.cap))+' illustrated (after cap and floor).')+'</div></div>'
    + '<div class="foot">'+esc(DISCLOSURE)+'</div></div></body></html>';
   return html;
 }
@@ -851,7 +880,7 @@ function buildDiscussionDoc(R, I, M){
   const p7 = page('<div class="in"><div class="eyebrow">How we built these numbers</div><h2 style="font-size:30px">Plain-English assumptions</h2>'
     + '<table class="assume"><tbody>'
     + '<tr><td>Contributions</td><td>'+D.fundPhrase+' into each strategy ('+$m(D.totalPrem)+' total). Source: '+esc(I.fundNote||'Non-qualified savings')+'. No financing is used.</td></tr>'
-    + '<tr><td>Asset growth</td><td>The asset is illustrated at '+pc(p.iRate)+'. For income we replaced that with '+R.N.toLocaleString('en-US')+' simulated market histories, re-sampling '+R.years.n+' calendar years ('+R.years.from+'–'+R.years.to+'), with the asset\'s cap of '+pc(p.cap)+' and floor of '+pc(p.floor)+(R.overlay?', and the asset\'s enhancement rider credit multiplier applied':'')+'</td></tr>'
+    + '<tr><td>Asset growth</td><td>The asset is illustrated at '+pc(p.iRate)+'. For income we replaced that with '+R.N.toLocaleString('en-US')+' simulated market histories, re-sampling '+R.years.n+' calendar years ('+R.years.from+'–'+R.years.to+'), with the asset\'s cap of '+pc(p.cap)+' and floor of '+pc(p.floor)+(R.nlg?', plus the asset\'s standard bonus (credited even when the index return is zero or negative), with a larger bonus on amounts loaned for income and loan interest at '+pc(p.loanRate):(R.overlay?', and the asset\'s enhancement rider credit multiplier applied':''))+'</td></tr>'
     + '<tr><td>Total benefit and accessible value</td><td>Shown exactly as illustrated at '+pc(p.iRate)+', before asset loans'+(R.overlay?' (the illustration is the base asset, so simulated values can run higher)':'')+'</td></tr>'
     + '<tr><td>Taxable account</td><td>A diversified blend of stocks and bonds, less a '+pc(p.invFee)+' fee and '+pc(p.invDrag)+' a year for taxes along the way; gains taxed at '+pc(p.invTax,1)+' when withdrawn</td></tr>'
     + '<tr><td>Income</td><td>Ages '+D.is+'–'+D.ie+', rising '+pc(p.cola)+' a year. Asset income is taken as loans at '+pc(p.loanRate)+' interest and sized to keep accessible value above '+$m(p.csvFloor)+'</td></tr>'
@@ -866,6 +895,84 @@ function buildDiscussionDoc(R, I, M){
 
   return '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Discussion Document - '+esc(D.client)+'</title>'+FONTS+'<style>'+PB_VARS+style+'</style></head><body>'
     + TOOLBAR('Discussion Document') + cover + p2 + p3 + p3b + p4 + p5 + p6 + pL + p7 + p8 + '</body></html>';
+}
+
+// ════════════════════════════════════════════════════════════════════
+// 4. COMPARISON ONE-PAGE SUMMARY — two options, same contribution. Letter portrait, 1 page.
+// ════════════════════════════════════════════════════════════════════
+function buildComparePagerDoc(RA, IA, MA, RB, IB, MB, labA, labB){
+  labA = (labA||'').trim() || 'Option A'; labB = (labB||'').trim() || 'Option B';
+  const A = derive(RA,IA,MA), B = derive(RB,IB,MB);
+  const cA='#2e9e6b', cB='#17375c';
+  const style = '@page{size:letter;margin:0}'
+   + '.page{width:8.5in;min-height:11in;margin:14px auto;background:#fff;box-shadow:0 2px 14px rgba(0,0,0,.14);display:flex;flex-direction:column}'
+   + '@media print{.page{margin:0;box-shadow:none;height:11in;overflow:hidden}}'
+   + '.top{background:var(--navy);color:#fff;padding:.24in .5in .18in;border-bottom:6px solid var(--amber)}'
+   + '.eyebrow{font:700 11px var(--head);letter-spacing:.2em;text-transform:uppercase;color:var(--amber)}'
+   + '.top h1{margin:3px 0 3px;font:800 28px/1.02 var(--head);text-transform:uppercase;letter-spacing:.01em}.top p{margin:0;font:500 13px var(--body);color:#c9d6e8}'
+   + '.body{padding:.14in .5in .1in;display:flex;flex-direction:column;gap:8px;flex:1}'
+   + 'h2{margin:0 0 4px;font:800 14px var(--head);letter-spacing:.09em;text-transform:uppercase;color:var(--navy)}'
+   + 'table{border-collapse:collapse;width:100%;font-size:11.6px}th{font:800 13px var(--head);letter-spacing:.06em;text-transform:uppercase;text-align:right;color:#fff;padding:5px 8px}th:first-child{background:#fff}'
+   + 'th.a{background:'+cA+'}th.b{background:'+cB+'}td{padding:3.4px 8px;text-align:right;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}td:first-child{text-align:left;color:var(--ink)}'
+   + 'td.lead{background:#eef8f3;color:#1d7a50;font-weight:700}td small{display:block;font:500 9.5px var(--body);color:var(--muted);font-weight:500}'
+   + 'tr.sec td{background:#f2f5fa;font:800 11px var(--head);letter-spacing:.1em;text-transform:uppercase;color:var(--navy);text-align:left;padding:3px 8px}'
+   + '.card{border:1px solid var(--line);border-radius:10px;padding:8px 14px;background:#fff}.card.accent{border-left:6px solid var(--orange)}'
+   + '.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}.sm{font:500 10.8px/1.4 var(--body);color:var(--muted)}'
+   + '.legend{display:flex;gap:14px;font:600 11px var(--body);color:var(--muted);margin-top:2px}.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}'
+   + '.band{background:var(--amber);color:var(--navy);padding:9px 16px;border-radius:10px;font:700 14px/1.3 var(--body)}'
+   + '.fine{font:500 7.6px/1.3 var(--body);color:#6c7a90;padding:4px .5in .16in;border-top:1px solid var(--line)}';
+  const hi = (a,b,pref)=>{ pref = pref||'max'; if (a==null||b==null||Math.abs(a-b)<0.5) return ['','']; const aw = pref==='max'? a>b : a<b; return aw?['lead','']:['','lead']; };
+  const row = (label, a, b, f, opts)=>{ opts=opts||{}; const c = opts.nohi ? ['',''] : hi(a,b); return '<tr><td>'+label+(opts.sub?'<small>'+opts.sub+'</small>':'')+'</td><td class="'+c[0]+'">'+f(a, A)+'</td><td class="'+c[1]+'">'+f(b, B)+'</td></tr>'; };
+  const sec = t=>'<tr class="sec"><td colspan="3">'+t+'</td></tr>';
+  const id = x=>x;
+  const basis = D => D.fixed ? 'stated separate care amount' : 'total benefit at age '+D.ltcAge;
+  const lastCommon = Math.min(RA.ages[RA.ages.length-1], RB.ages[RB.ages.length-1]);
+  const stayAges = [75,85,95].filter(a=>a>=Math.max(RA.issueAge,RB.issueAge) && a<=lastCommon);
+  let rows = '';
+  rows += sec('The contribution');
+  rows += row('Premium contributed', A.totalPrem, B.totalPrem, $m, {nohi:true, sub:'same dollars into each side'});
+  rows += sec('If care is needed');
+  rows += row('Care available, tax-free', A.careBase, B.careBase, $m, {sub:esc(labA)+': '+basis(A)+' · '+esc(labB)+': '+basis(B)});
+  rows += row('Illustrated monthly care benefit', A.mo, B.mo, $m);
+  rows += row('Care available per $1 contributed', A.levCare, B.levCare, (v,D)=>D.lx(v));
+  rows += sec('If care is never needed — income, median market case, ages '+A.is+'–'+A.ie);
+  rows += row('Year-1 tax-free income', A.polFirst, B.polFirst, $m);
+  rows += row('Total tax-free income', A.polTotal, B.polTotal, $m);
+  rows += row('Total income per $1 contributed', A.levInc, B.levInc, (v,D)=>D.lx(v));
+  rows += row('Cautious to favorable market range', RA.bands[25].total, RB.bands[25].total, (v,D)=>{ const R=(D===A?RA:RB); return $k(R.bands[25].total)+' – '+$k(R.bands[75].total); }, {nohi:true});
+  rows += row('Taxable account, net after tax', A.txTotal, B.txTotal, $m, {nohi:true, sub:'same dollars, same market path as each income result'});
+  rows += row('Income difference vs taxable account', A.incDiff, B.incDiff, (v)=>(v>=0?'+':'−')+$m(Math.abs(v)));
+  if (stayAges.length){
+    rows += sec('What stays behind — illustrated at '+pc(RA.params.iRate)+', before loans');
+    stayAges.forEach(a=>{ rows += row('Total benefit at age '+a, A.at(a).db, B.at(a).db, (v,D)=>$m(v)+' <small style="display:inline;color:var(--muted)">('+D.lx(D.levDB(a))+' per $1)</small>'); });
+  }
+  const ca = Math.max(RA.issueAge,RB.issueAge);
+  const ages = []; for (let a=ca; a<=lastCommon; a++) ages.push(a);
+  const chartDB = lineChart({ w:330, h:150, ages, label:'Total benefit by age', series:[
+    {name:labA,color:cA,vals:ages.map(a=>A.at(a).db)}, {name:labB,color:cB,vals:ages.map(a=>B.at(a).db)} ] });
+  const ia = RA.ages.map((a,i)=>i).filter(i=>RA.ages[i]>=IA.is && RA.ages[i]<=IA.ie);
+  const ib = RB.ages.map((a,i)=>i).filter(i=>RB.ages[i]>=IB.is && RB.ages[i]<=IB.ie);
+  const nI = Math.min(ia.length, ib.length), ia2=ia.slice(0,nI), ib2=ib.slice(0,nI);
+  const chartInc = lineChart({ w:330, h:150, ages:ia2.map(i=>RA.ages[i]), label:'Cumulative tax-free income', series:[
+    {name:labA,color:cA,vals:ia2.map(i=>A.cumPol[i])}, {name:labB,color:cB,vals:ib2.map(i=>B.cumPol[i])} ] });
+  const careLead = Math.abs(A.careBase-B.careBase)<1 ? null : (A.careBase>B.careBase?labA:labB);
+  const incLead = Math.abs(A.polTotal-B.polTotal)<1 ? null : (A.polTotal>B.polTotal?labA:labB);
+  let read;
+  if (careLead && incLead && careLead!==incLead) read = '<b>'+esc(careLead)+'</b> shows the larger care benefit ('+$m(Math.max(A.careBase,B.careBase))+' vs '+$m(Math.min(A.careBase,B.careBase))+'). <b>'+esc(incLead)+'</b> shows more tax-free income in the median case ('+$m(Math.max(A.polTotal,B.polTotal))+' vs '+$m(Math.min(A.polTotal,B.polTotal))+'). Which fits better depends on what matters more: the size of the care benefit, or the income potential if care is never needed.';
+  else if (careLead && careLead===incLead) read = '<b>'+esc(careLead)+'</b> shows more care available and more median tax-free income in this comparison.';
+  else read = 'The two options are close on care available and on median tax-free income in this comparison.';
+  const mismatch = Math.abs(A.totalPrem-B.totalPrem) > 1 ? ' Note: the two illustrations do not have identical total premium, so compare the per-$1 rows.' : '';
+  const html = '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Comparison Summary - '+esc(A.client)+'</title>'+FONTS+'<style>'+PB_VARS+style+'</style></head><body>'
+   + TOOLBAR('Comparison Summary')
+   + '<div class="page"><div class="top"><div class="eyebrow">Prepared for '+esc(A.client)+' · age '+A.issueAge+'</div><h1>Two ways to put the same dollars to work</h1><p>'+esc(A.fundPhrase)+' ('+$m(A.totalPrem)+') placed in '+esc(labA)+' or '+esc(labB)+', each with its own illustrated total benefit.</p></div>'
+   + '<div class="body">'
+   + '<div class="card" style="padding:4px 8px"><table><thead><tr><th></th><th class="a">'+esc(labA)+'</th><th class="b">'+esc(labB)+'</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+   + '<div class="two"><div class="card"><div style="font:700 11px var(--body);color:var(--muted);margin-bottom:2px">Total benefit by age</div>'+chartDB+legend([{name:labA,color:cA},{name:labB,color:cB}])+'</div>'
+   + '<div class="card"><div style="font:700 11px var(--body);color:var(--muted);margin-bottom:2px">Cumulative tax-free income by age</div>'+chartInc+legend([{name:labA,color:cA},{name:labB,color:cB}])+'</div></div>'
+   + '<div class="card accent"><h2>How to read this</h2><div class="sm" style="color:var(--ink);font-size:12px;line-height:1.45">'+read+mismatch+'</div></div>'
+   + '<div class="band">Same dollars in. The right choice depends on how you weigh the care benefit against income access.</div></div>'
+   + '<div class="fine">'+esc(DISCLOSURE)+' Illustrated rates: '+esc(labA)+' '+pc(RA.params.iRate)+', '+esc(labB)+' '+pc(RB.params.iRate)+'; index caps '+pc(RA.params.cap)+' and '+pc(RB.params.cap)+'. Income ages '+A.is+'–'+A.ie+'; '+RA.N.toLocaleString('en-US')+' simulations. '+(A.advisor?'Prepared by '+esc(A.advisor)+' · ':'')+esc(A.dateStr)+'.</div></div></body></html>';
+  return html;
 }
 
 </script>
@@ -892,7 +999,7 @@ function buildDiscussionDoc(R, I, M){
 
 // ───────── app ─────────
 const $=id=>document.getElementById(id);
-let ILL=null, RES=null, INP=null;
+let ILL=null, RES=null, INP=null, ILL_B=null, RESB=null, INPB=null;
 $('dateStr').value=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
 $('fundSrc').onchange=()=>{ const v=$('fundSrc').value; $('exWrap').classList.toggle('hide', !(v==='x1035'||v==='mix')); };
 const drop=$('drop'), fileIn=$('file');
@@ -902,21 +1009,27 @@ drop.onclick=()=>fileIn.click();
 drop.addEventListener('drop',ev=>{ if(ev.dataTransfer.files[0]) handleFile(ev.dataTransfer.files[0]); });
 fileIn.onchange=()=>{ if(fileIn.files[0]) handleFile(fileIn.files[0]); };
 
+async function readIll(f){
+  let ill;
+  if(/\.csv$/i.test(f.name)) ill=parseCsvText(await f.text());
+  else{
+    if(typeof XLSX==='undefined') throw new Error('The spreadsheet reader did not load. Check your connection and reload.');
+    const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});
+    ill=parseWorkbookSheets(wb.SheetNames.map(n=>({name:n,rows:XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,defval:null})})));
+  }
+  return ill;
+}
 async function handleFile(f){
   $('fileMsg').innerHTML=''; ILL=null; $('run').disabled=true;
   try{
-    let ill;
-    if(/\.csv$/i.test(f.name)) ill=parseCsvText(await f.text());
-    else{
-      if(typeof XLSX==='undefined') throw new Error('The spreadsheet reader did not load. Check your connection and reload.');
-      const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});
-      ill=parseWorkbookSheets(wb.SheetNames.map(n=>({name:n,rows:XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,defval:null})})));
-    }
+    const ill=await readIll(f);
     if(ill.error) throw new Error(ill.error);
     ILL=ill; const m=ill.meta;
     drop.classList.add('on'); drop.textContent='Loaded: '+f.name;
     $('iRate').value = m.illustratedRatePct!=null ? m.illustratedRatePct : '';
-    $('cap').value = ill.format==='csv' ? 9.25 : 12;
+    $('cap').value = ill.format==='csv' ? 11 : 12;
+    $('loanRate').value = ill.format==='csv' ? 6.25 : 5;
+    $('overlay').parentElement.style.display = ill.format==='csv' ? 'none' : '';
     if(!$('ltcAge').value) $('ltcAge').value=75;
     $('is').value=Math.max(65,m.issueAge); $('ltcAge').value=Math.max(75,m.issueAge);
     const w=(ill.warnings||[]).map(x=>'<div class="warn">'+esc(x)+'</div>').join('');
@@ -942,11 +1055,30 @@ $('run').onclick=async()=>{
   const ex1=(I.fundSrc==='x1035'||I.fundSrc==='mix')?(I.exAmt||0):0;
   if(ex1>0 && ILL.rows[0].prem < ex1-1){ $('runMsg').innerHTML='<div class="err">The illustration\'s year-1 premium ('+$m(ILL.rows[0].prem)+') is less than the exchange amount entered ('+$m(ex1)+'). Run the illustration with the exchange included in year 1, or correct the amount.</div>'; return; }
   if(I.careMode==='fixed'){ if(!(I.careAmt>0)){ $('runMsg').innerHTML='<div class="err">Enter the total care available at issue.</div>'; return; } }
+  if($('cmp').checked){
+    if(!ILL_B){ $('runMsg').innerHTML='<div class="err">Load the second illustration, or turn off the comparison.</div>'; return; }
+    const IB=inputsB(); const badB=['iRate','cap','ltcMonthly','ltcYears','ltcAge'].filter(k=>isNaN(IB[k]));
+    if(badB.length||!(IB.ltcMonthly>0)){ $('runMsg').innerHTML='<div class="err">Please fill in the second option\'s illustrated rate, cap and monthly LTC benefit.</div>'; return; }
+    if(IB.careMode==='fixed'&&!(IB.careAmt>0)){ $('runMsg').innerHTML='<div class="err">Enter the second option\'s total care available at issue.</div>'; return; }
+    const exB=(IB.fundSrc==='x1035'||IB.fundSrc==='mix')?(IB.exAmt||0):0;
+    if(exB>0 && ILL_B.rows[0].prem < exB-1){ $('runMsg').innerHTML='<div class="err">The second illustration\'s year-1 premium is less than the exchange amount entered.</div>'; return; }
+  }
   $('runMsg').innerHTML=''; $('run').disabled=true; $('results').classList.add('hide');
   try{
     const R=await runMonteCarlo(ILL,I,(f,t)=>{ $('pbar').style.width=Math.round(f*100)+'%'; $('status').textContent=t||''; });
     if(R.error) throw new Error(R.error);
     RES=R; INP=I; show(R,I);
+    RESB=null; INPB=null; $('cmpBtns').classList.add('hide');
+    if($('cmp').checked){
+      const IB=inputsB(); const mB=ILL_B.meta;
+      const R2=await runMonteCarlo(ILL_B,IB,(f,t)=>{ $('pbar').style.width=Math.round(f*100)+'%'; $('status').textContent=(t||'')+' (second option)'; });
+      if(R2.error) throw new Error(R2.error);
+      RESB=R2; INPB=IB; $('cmpBtns').classList.remove('hide');
+      let w='';
+      if(Math.abs(R.totalPrem-R2.totalPrem)>1) w+='<div class="warn">The two illustrations do not have the same total premium ('+$m(R.totalPrem)+' vs '+$m(R2.totalPrem)+'). The comparison shows each premium and per-$1 figures, but a like-for-like comparison needs the same contribution.</div>';
+      if(R.issueAge!==R2.issueAge) w+='<div class="warn">The two illustrations have different issue ages ('+R.issueAge+' vs '+R2.issueAge+').</div>';
+      $('runMsg').innerHTML=w;
+    }
   }catch(e){ $('runMsg').innerHTML='<div class="err">'+esc(e.message||e)+'</div>'; }
   $('run').disabled=false;
 };
@@ -969,6 +1101,47 @@ document.querySelectorAll('[data-o]').forEach(b=>b.onclick=()=>{
   if(!w) $('popHint').textContent='Your browser blocked the pop-up. Allow pop-ups for this site and try again.';
 });
 
+
+// ───────── second option (comparison) ─────────
+function inputsB(){
+  const I=inputs(); const g=id=>nv(id);
+  return Object.assign({},I,{ iRate:g('iRateB'), cap:g('capB'), loanRate:g('loanRateB'), ltcMonthly:g('ltcMonthlyB'), ltcYears:g('ltcYearsB'), ltcAge:g('ltcAgeB'), careMode:$('careModeB').value, careAmt:g('careAmtB'), overlay:$('overlayB').value==='1' });
+}
+$('cmp').onchange=()=>{ $('cardB').classList.toggle('hide',!$('cmp').checked); if(!$('cmp').checked) $('cmpBtns').classList.add('hide'); };
+const dropB=$('dropB'), fileInB=$('fileB');
+dropB.onclick=()=>fileInB.click();
+['dragover','dragenter'].forEach(e=>dropB.addEventListener(e,ev=>{ev.preventDefault();dropB.classList.add('on');}));
+['dragleave','drop'].forEach(e=>dropB.addEventListener(e,ev=>{ev.preventDefault();if(e==='dragleave')dropB.classList.remove('on');}));
+dropB.addEventListener('drop',ev=>{ if(ev.dataTransfer.files[0]) handleFileB(ev.dataTransfer.files[0]); });
+fileInB.onchange=()=>{ if(fileInB.files[0]) handleFileB(fileInB.files[0]); };
+async function handleFileB(f){
+  $('fileMsgB').innerHTML=''; ILL_B=null;
+  try{
+    const ill=await readIll(f); if(ill.error) throw new Error(ill.error);
+    ILL_B=ill; const m=ill.meta;
+    dropB.classList.add('on'); dropB.textContent='Loaded: '+f.name;
+    $('iRateB').value = m.illustratedRatePct!=null ? m.illustratedRatePct : '';
+    $('capB').value = ill.format==='csv' ? 11 : 12;
+    $('loanRateB').value = ill.format==='csv' ? 6.25 : 5;
+    $('overlayBoxB').style.display = ill.format==='csv' ? 'none' : '';
+    $('ltcAgeB').value=Math.max(75,m.issueAge);
+    const w=(ill.warnings||[]).map(x=>'<div class="warn">'+esc(x)+'</div>').join('');
+    $('fileMsgB').innerHTML='<div class="hint" style="margin-top:8px">Issue age '+m.issueAge+' · '+$m(m.annualPrem)+' a year for '+m.payYears+' years · initial total benefit '+$m(m.initialDB)+(m.illustratedRatePct!=null?'':' · enter the illustrated rate below')+'</div>'+w;
+  }catch(e){ $('fileMsgB').innerHTML='<div class="err">'+esc(e.message||e)+'</div>'; }
+}
+document.querySelectorAll('[data-ob]').forEach(b=>b.onclick=()=>{
+  if(!RESB) return; const o=b.dataset.ob, M=ILL_B.meta;
+  const html = o==='ledger'?buildLedgerDoc(RESB,INPB,M):o==='one'?buildOnePagerDoc(RESB,INPB,M):buildDiscussionDoc(RESB,INPB,M);
+  const w=window.open(URL.createObjectURL(new Blob([html],{type:'text/html'})),'_blank');
+  if(!w) $('popHint').textContent='Your browser blocked the pop-up. Allow pop-ups for this site and try again.';
+});
+$('cmpOne').onclick=()=>{
+  if(!RES||!RESB) return;
+  const html=buildComparePagerDoc(RES,INP,ILL.meta,RESB,INPB,ILL_B.meta,$('labA').value,$('labB').value);
+  const w=window.open(URL.createObjectURL(new Blob([html],{type:'text/html'})),'_blank');
+  if(!w) $('popHint').textContent='Your browser blocked the pop-up. Allow pop-ups for this site and try again.';
+};
+(function(){var s=document.getElementById('careModeB');function f(){var x=s.value==='fixed';document.getElementById('careAmtBoxB').style.display=x?'':'none';document.getElementById('ltcAgeBoxB').style.display=x?'none':'';document.getElementById('ltcYrsBoxB').style.display=x?'none':'';}s.addEventListener('change',f);f();})();
 (function(){var s=document.getElementById('careMode');function f(){var x=s.value==='fixed';document.getElementById('careAmtBox').style.display=x?'':'none';document.getElementById('ltcAgeBox').style.display=x?'none':'';document.getElementById('ltcYrsBox').style.display=x?'none':'';}s.addEventListener('change',f);f();})();
 </script>
 </body></html>
